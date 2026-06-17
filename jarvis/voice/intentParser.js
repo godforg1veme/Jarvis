@@ -4,6 +4,7 @@ const {
   isVisualContinuationCommand,
   isClearVisualContextCommand,
 } = require("../tools/visualCommandMatcher");
+const { parseFileCommand } = require("../tools/fileCommandParser");
 
 const wakeAliases = [
   "РґР¶Р°СЂРІРёСЃ",
@@ -92,6 +93,25 @@ function isTranslateSelectedCommand(text) {
 
 function parseIntent(rawText) {
   const text = normalizeText(rawText);
+
+  const fileCommand = parseFileCommand(rawText);
+  if (fileCommand) {
+    const actionMap = {
+      open: "open_file",
+      reveal: "reveal_file",
+      find: "find_file",
+    };
+
+    return {
+      ok: true,
+      action: actionMap[fileCommand.action],
+      query: fileCommand.query,
+      location: fileCommand.location,
+      confidence: 0.9,
+      source: "regex",
+      rawText
+    };
+  }
 
   const hasWake = includesAny(text, wakeAliases);
   const hasLaunch = includesAny(text, launchWords);

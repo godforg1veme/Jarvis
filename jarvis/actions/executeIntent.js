@@ -101,6 +101,34 @@ async function executeIntent(intent, options = {}) {
 
   }
 
+  if (["open_file", "reveal_file", "find_file"].includes(intent.action)) {
+
+    const executeFileCommand = options.executeFileCommand || (async (args) => {
+      const fileCommander = require("../tools/fileCommander");
+      return await fileCommander.execute(args);
+    });
+
+    const actionMap = {
+      open_file: "open",
+      reveal_file: "reveal",
+      find_file: "find",
+    };
+
+    const result = await executeFileCommand({
+      action: actionMap[intent.action],
+      query: intent.query,
+      location: intent.location,
+      source: "voice",
+    });
+
+    if (result && (result.needsSelection || result.needsConfirmation) && typeof options.showMainWindow === "function") {
+      await options.showMainWindow();
+    }
+
+    return result;
+
+  }
+
 
 
   if (!["launch_app", "close_app"].includes(intent.action)) {

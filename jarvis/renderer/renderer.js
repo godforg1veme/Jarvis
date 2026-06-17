@@ -549,6 +549,8 @@ function hasCandidateSelection(item) {
 const typeLabels = {
   run: 'Запуск',
   runProgram: 'Запуск',
+  file: 'Файл',
+  fileCommander: 'Файл',
   powershell: 'PowerShell',
   find: 'Поиск',
   searchFiles: 'Поиск',
@@ -564,6 +566,8 @@ const typeLabels = {
 const typeIcons = {
   run: '▶',
   runProgram: '▶',
+  file: '▣',
+  fileCommander: '▣',
   powershell: '⚡',
   find: '⌕',
   searchFiles: '⌕',
@@ -603,6 +607,13 @@ function updateHistoryPanel() {
 }
 
 function candidateLabel(candidate) {
+  if (candidate.type === 'file') {
+    const warning = candidate.warning ? '⚠ ' : '';
+    const size = candidate.size ? ` · ${candidate.size} B` : '';
+    const detail = candidate.directory || candidate.path || '';
+    return `${warning}${candidate.name}${detail ? ` — ${detail}` : ''}${size}`;
+  }
+
   const source = candidate.source || candidate.type || '?';
   const score = typeof candidate.score === 'number' ? ` · score ${candidate.score.toFixed(2)}` : '';
   const detail = candidate.command || candidate.path || candidate.aumid || '';
@@ -626,6 +637,19 @@ async function launchSelectedCandidate() {
 
   const candidate = item.candidates[state.selectedCandidateIndex];
   if (!candidate) return;
+
+  if (candidate.type === 'file') {
+    const result = await window.jarvis.executeTool('fileCommander', {
+      action: candidate.action || 'open',
+      query: candidate.name,
+      location: 'direct',
+      selectedFile: candidate,
+      confirmed: !!candidate.warning,
+    });
+    inputEl.value = '';
+    await saveAndDisplay(result, candidate.path || candidate.name);
+    return;
+  }
 
   const rawInput = candidate.command || candidate.name || candidate.path || '';
   const result = await launchCandidate(candidate);
@@ -734,6 +758,90 @@ async function saveAndDisplay(result, rawInput) {
 }
 
 // --- Parse Tool & Args ---
+function cleanFileCommandText(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+    .replace(/[«»"]/g, '')
+    .replace(/[,!?;:]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function stripFileWakeWord(text) {
+  return String(text || '').replace(/^(джарвис|jarvis)\s+/i, '').trim();
+}
+
+function normalizeFileLocation(text) {
+  const normalized = cleanFileCommandText(text);
+  const aliases = [
+    ['desktop', ['desktop', 'рабочий стол', 'рабочем столе', 'на рабочем столе']],
+    ['downloads', ['downloads', 'download', 'загрузки', 'загрузках', 'в загрузках']],
+    ['documents', ['documents', 'document', 'документы', 'документах', 'в документах']],
+    ['pictures', ['pictures', 'images', 'изображения', 'картинки', 'фото']],
+    ['videos', ['videos', 'video', 'видео']],
+    ['music', ['music', 'музыка', 'музыке']],
+    ['home', ['home', 'user', 'домашняя папка', 'папка пользователя']],
+    ['computer', ['computer', 'pc', 'на пк', 'на компьютере', 'везде', 'не помню где']],
+  ];
+
+  for (const [id, names] of aliases) {
+    if (names.some((name) => normalized.includes(cleanFileCommandText(name)))) return id;
+  }
+
+  return '';
+}
+
+function parseFileCommandForRenderer(rawText) {
+  const text = cleanFileCommandText(rawText);
+  const withoutWake = stripFileWakeWord(text);
+  let action = '';
+
+  if (/^(покажи|показать|show|reveal)(\s|$)/.test(withoutWake)) action = 'reveal';
+  else if (/^(найди|найти|поиск|ищи|find|search)(\s|$)/.test(withoutWake)) action = 'find';
+  else if (/^(открой|открыть|open)(\s|$)/.test(withoutWake)) action = 'open';
+  if (!action) return null;
+
+  const location = normalizeFileLocation(text) || 'computer';
+  let query = stripFileWakeWord(text)
+    .replace(/^(открой|открыть|покажи|показать|найди|найти|поиск|ищи|open|show|reveal|find|search)\s+/i, '')
+    .replace(/^файл\s+/i, '')
+    .trim();
+
+  [
+    'на рабочем столе',
+    'рабочем столе',
+    'рабочий стол',
+    'в загрузках',
+    'загрузках',
+    'загрузки',
+    'в документах',
+    'документах',
+    'документы',
+    'в изображениях',
+    'изображениях',
+    'изображения',
+    'в видео',
+    'в музыке',
+    'музыке',
+    'музыка',
+    'в домашней папке',
+    'домашней папке',
+    'домашняя папка',
+    'на компьютере',
+    'на пк',
+    'везде',
+    'не помню где',
+  ].forEach((phrase) => {
+    query = query.replace(phrase, ' ');
+  });
+
+  query = query.replace(/\b(в|на)\s*$/i, '').replace(/\s+/g, ' ').trim();
+  if (!query) return null;
+
+  return { action, query, location };
+}
+
 function parseTool(input) {
   const trimmed = input.trim();
   if (trimmed.startsWith('/run ')) return 'runProgram';
@@ -746,6 +854,7 @@ function parseTool(input) {
   if (trimmed.startsWith('/aidebug')) return 'aidebug';
 
   const lower = trimmed.toLowerCase();
+  if (parseFileCommandForRenderer(trimmed)) return 'fileCommander';
   if (/aidebug/.test(lower)) return 'aidebug';
   if (/appinfo/.test(lower)) return 'appinfo';
   if (/систем|инфо|cpu|ram|память|диск/.test(lower)) return 'sysinfo';
@@ -786,6 +895,8 @@ function parseArgs(input, toolName) {
       if (trimmed.startsWith('/ps ')) command = trimmed.slice(4).trim();
       return { command };
     }
+    case 'fileCommander':
+      return parseFileCommandForRenderer(trimmed) || { action: 'find', query: trimmed, location: 'computer' };
     case 'searchFiles': {
       let query = trimmed;
       if (trimmed.startsWith('/find ')) query = trimmed.slice(6).trim();
@@ -802,6 +913,14 @@ function parseArgs(input, toolName) {
 function displayResult(result, rawInput) {
   if (!result) return;
 
+  if (result.needsConfirmation && result.commandToConfirm) {
+    state.confirmingCommand = result.commandToConfirm;
+    confirmText.textContent = result.content || result.message || 'Нужно подтверждение.';
+    confirmDialog.classList.remove('hidden');
+    confirmYes.focus();
+    return;
+  }
+
   state.results = [];
   state.selectedIndex = 0;
   state.selectedCandidateIndex = 0;
@@ -809,7 +928,7 @@ function displayResult(result, rawInput) {
   // Handle needsSelection (multiple candidates)
   if (result.needsSelection && result.candidates) {
     state.results.push({
-      type: 'run',
+      type: result.type || 'run',
       title: result.title || 'Выберите приложение',
       content: result.content || '',
       candidates: result.candidates,
@@ -889,7 +1008,11 @@ confirmYes.addEventListener('click', async () => {
   state.confirmingCommand = null;
 
   const result = await window.jarvis.confirmCommand(cmd.tool, cmd.args);
-  saveAndDisplay(result, cmd.args.command || '');
+  const rawInput = cmd.args.command ||
+    cmd.description ||
+    (cmd.args.selectedFile && (cmd.args.selectedFile.path || cmd.args.selectedFile.name)) ||
+    '';
+  saveAndDisplay(result, rawInput);
 });
 
 confirmNo.addEventListener('click', () => {
@@ -959,6 +1082,7 @@ function renderResults() {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = `candidate-button${isSelected ? ' selected' : ''}`;
+        if (candidate.warning) btn.classList.add('warning');
         btn.textContent = candidateLabel(candidate);
         btn.addEventListener('click', async () => {
           state.selectedCandidateIndex = candidateIndex;
@@ -974,7 +1098,11 @@ function renderResults() {
     if (item.notFound) {
       const tipDiv = document.createElement('div');
       tipDiv.className = 'result-tip';
-      tipDiv.innerHTML = 'Можно добавить папку для поиска:<br>/addscanroot "D:\\Папка"<br>Или добавить приложение вручную:<br>/addapp имя "C:\\путь\\к\\app.exe"';
+      if (item.type === 'file') {
+        tipDiv.innerHTML = 'Можно попробовать:<br>найди файл на компьютере<br>или указать папку: в загрузках, документах, на рабочем столе';
+      } else {
+        tipDiv.innerHTML = 'Можно добавить папку для поиска:<br>/addscanroot "D:\\Папка"<br>Или добавить приложение вручную:<br>/addapp имя "C:\\путь\\к\\app.exe"';
+      }
       div.appendChild(tipDiv);
     }
 

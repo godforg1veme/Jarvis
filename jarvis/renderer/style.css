@@ -444,6 +444,13 @@ button {
   background: rgba(245, 158, 11, 0.10);
 }
 
+.type-file,
+.type-fileCommander {
+  color: rgba(191, 219, 254, 0.92);
+  border-color: rgba(96, 165, 250, 0.28);
+  background: rgba(96, 165, 250, 0.10);
+}
+
 .type-powershell,
 .type-error {
   color: #fecaca;
@@ -485,6 +492,10 @@ button {
   border-color: rgba(245, 158, 11, 0.4);
   background: var(--amber-soft);
   color: var(--text);
+}
+
+.candidate-button.warning {
+  color: #ffd28a;
 }
 
 .result-tip {

@@ -2,12 +2,15 @@ const runProgram = require('./runProgram');
 const powershell = require('./powershell');
 const searchFiles = require('./searchFiles');
 const sysinfo = require('./sysinfo');
+const fileCommander = require('./fileCommander');
+const { parseFileCommand } = require('./fileCommandParser');
 
 const tools = {
   run: runProgram,
   powershell: powershell,
   find: searchFiles,
   sys: sysinfo,
+  fileCommander,
 };
 
 // Parse user input and dispatch to the right tool
@@ -66,6 +69,11 @@ function parseAndDispatch(input) {
   // Natural language matching using keywords
   const lower = trimmed.toLowerCase();
 
+  const fileCommand = parseFileCommand(trimmed);
+  if (fileCommand) {
+    return { tool: 'fileCommander', args: fileCommand };
+  }
+
   // System info detection
   const sysKeywords = [
     'системная информация', 'система', 'инфо', 'sysinfo', 'system info',
@@ -111,7 +119,8 @@ function getToolSchemas() {
   return tools.run.getSchema() + '\n' +
     tools.powershell.getSchema() + '\n' +
     tools.find.getSchema() + '\n' +
-    tools.sys.getSchema();
+    tools.sys.getSchema() + '\n' +
+    tools.fileCommander.getSchema();
 }
 
 module.exports = {

@@ -137,6 +137,11 @@ function handleClearVisualContext() {
   return clearVisualContext(console);
 }
 
+async function handleFileCommand(args, confirmed = false) {
+  const fileCommander = require('./tools/fileCommander');
+  return await fileCommander.execute(args, confirmed);
+}
+
 function ensureWindowsAutoStart() {
   if (process.platform !== 'win32') return;
 
@@ -295,6 +300,8 @@ app.whenReady().then(() => {
       analyzeVisualArea: handleVisualAnalyze,
       continueVisualDialog: handleVisualContinue,
       clearVisualContext: handleClearVisualContext,
+      executeFileCommand: handleFileCommand,
+      showMainWindow,
     },
   });
   voiceService.registerIpcHandlers();
@@ -326,7 +333,7 @@ app.whenReady().then(() => {
   });
 
   // Whitelist of allowed tool modules
-  const ALLOWED_TOOLS = ['runProgram', 'powershell', 'searchFiles', 'sysinfo'];
+  const ALLOWED_TOOLS = ['runProgram', 'powershell', 'searchFiles', 'sysinfo', 'fileCommander'];
 
   // --- IPC Handlers ---
   ipcMain.handle('execute-tool', async (event, { tool, args }) => {

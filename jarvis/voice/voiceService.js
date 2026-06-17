@@ -30,6 +30,8 @@ class VoiceService {
     this.onStateChange = typeof options.onStateChange === 'function' ? options.onStateChange : null;
     this.ttsService = options.ttsService || defaultTtsService;
     this.intentOptions = options.intentOptions || {};
+    this.pendingVoiceConfirmation = null;
+    this.pendingVoiceSelection = null;
   }
 
   get isVoiceEnabled() { return this._voiceEnabled; }
@@ -189,16 +191,185 @@ class VoiceService {
     if (msg.type === 'stopped') { this.broadcastStatus('stopped', 'Voice worker stopped.'); return; }
   }
 
+  normalizeVoiceResponse(text) {
+    return String(text || '')
+      .toLowerCase()
+      .replace(/ё/g, 'е')
+      .replace(/[.,!?;:]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  isVoiceConfirm(text) {
+    const normalized = this.normalizeVoiceResponse(text);
+    return ['да', 'запусти', 'открой', 'подтверждаю'].some((phrase) => normalized === phrase || normalized.includes(phrase));
+  }
+
+  isVoiceCancel(text) {
+    const normalized = this.normalizeVoiceResponse(text);
+    return ['нет', 'отмена', 'не надо', 'отмени'].some((phrase) => normalized === phrase || normalized.includes(phrase));
+  }
+
+  voiceSelectionIndex(text) {
+    const normalized = this.normalizeVoiceResponse(text);
+    const words = [
+      ['первый', 0],
+      ['первая', 0],
+      ['1', 0],
+      ['один', 0],
+      ['второй', 1],
+      ['вторая', 1],
+      ['2', 1],
+      ['два', 1],
+      ['третий', 2],
+      ['третья', 2],
+      ['3', 2],
+      ['три', 2],
+      ['четвертый', 3],
+      ['четвертая', 3],
+      ['4', 3],
+      ['четыре', 3],
+      ['пятый', 4],
+      ['пятая', 4],
+      ['5', 4],
+      ['пять', 4],
+    ];
+    const match = words.find(([word]) => normalized.includes(word));
+    return match ? match[1] : -1;
+  }
+
+  hasExplicitVoiceLaunch(text) {
+    const normalized = this.normalizeVoiceResponse(text);
+    return ['запусти', 'открой', 'запускай'].some((phrase) => normalized.includes(phrase));
+  }
+
+  async executePendingVoiceCommand(commandToConfirm) {
+    if (!commandToConfirm || commandToConfirm.tool !== 'fileCommander') {
+      return { ok: false, message: 'Не могу подтвердить эту команду голосом.' };
+    }
+
+    const executeFileCommand = this.intentOptions.executeFileCommand || (async (args, confirmed) => {
+      const fileCommander = require('../tools/fileCommander');
+      return await fileCommander.execute(args, confirmed);
+    });
+
+    return await executeFileCommand(commandToConfirm.args, true);
+  }
+
+  async executeVoiceFileCandidate(candidate, confirmed) {
+    const executeFileCommand = this.intentOptions.executeFileCommand || (async (args, isConfirmed) => {
+      const fileCommander = require('../tools/fileCommander');
+      return await fileCommander.execute(args, isConfirmed);
+    });
+
+    return await executeFileCommand({
+      action: candidate.action || 'open',
+      query: candidate.name,
+      location: 'direct',
+      selectedFile: candidate,
+      confirmed,
+    }, confirmed);
+  }
+
+  async handlePendingVoiceResponse(text) {
+    if (this.pendingVoiceConfirmation) {
+      if (this.isVoiceCancel(text)) {
+        this.pendingVoiceConfirmation = null;
+        const result = { ok: true, type: 'voice', message: 'Отменено.' };
+        this.broadcastStatus('result', result.message, { result });
+        await this._speakVoiceResult(result);
+        return true;
+      }
+
+      if (this.isVoiceConfirm(text)) {
+        const command = this.pendingVoiceConfirmation;
+        this.pendingVoiceConfirmation = null;
+        const result = await this.executePendingVoiceCommand(command);
+        this.broadcastStatus('result', result.message || JSON.stringify(result), { result });
+        this.lastCommandTime = Date.now();
+        await this._speakVoiceResult(result);
+        return true;
+      }
+
+      const result = { ok: false, type: 'voice', message: 'Скажите да или нет.' };
+      this.broadcastStatus('ignored', result.message, { result });
+      await this._speakVoiceResult(result);
+      return true;
+    }
+
+    if (this.pendingVoiceSelection) {
+      if (this.isVoiceCancel(text)) {
+        this.pendingVoiceSelection = null;
+        const result = { ok: true, type: 'voice', message: 'Отменено.' };
+        this.broadcastStatus('result', result.message, { result });
+        await this._speakVoiceResult(result);
+        return true;
+      }
+
+      const index = this.voiceSelectionIndex(text);
+      if (index < 0) return false;
+
+      const candidate = this.pendingVoiceSelection.candidates[index];
+      if (!candidate) {
+        const result = { ok: false, type: 'voice', message: 'Такого варианта нет в списке.' };
+        this.broadcastStatus('ignored', result.message, { result });
+        await this._speakVoiceResult(result);
+        return true;
+      }
+
+      const explicitLaunch = this.hasExplicitVoiceLaunch(text);
+      if (candidate.warning && !explicitLaunch) {
+        const ordinalWords = ['первый', 'второй', 'третий', 'четвертый', 'пятый'];
+        const result = {
+          ok: false,
+          type: 'voice',
+          message: `Это исполняемый файл или скрипт. Чтобы запустить, скажите: запусти ${ordinalWords[index] || `${index + 1}`}.`,
+        };
+        this.broadcastStatus('ignored', result.message, { result });
+        await this._speakVoiceResult(result);
+        return true;
+      }
+
+      this.pendingVoiceSelection = null;
+      const result = await this.executeVoiceFileCandidate(candidate, !!candidate.warning && explicitLaunch);
+      this.broadcastStatus('result', result.message || JSON.stringify(result), { result });
+      this.lastCommandTime = Date.now();
+      await this._speakVoiceResult(result);
+      return true;
+    }
+
+    return false;
+  }
+
   async _handleFinalResult(text) {
-    const now = Date.now();
-    if (now - this.lastCommandTime < COOLDOWN_MS) { this.broadcastStatus('ignored', 'Cooldown'); return; }
     if (!text || text.trim().length === 0) { this.broadcastStatus('ignored', 'Empty'); return; }
     this.broadcastStatus('recognized', text);
+
+    try {
+      if (await this.handlePendingVoiceResponse(text)) return;
+    } catch (e) {
+      this.broadcastStatus('error', `voice confirmation failed: ${e.message}`);
+      return;
+    }
+
+    const now = Date.now();
+    if (now - this.lastCommandTime < COOLDOWN_MS) { this.broadcastStatus('ignored', 'Cooldown'); return; }
+
     const intent = parseIntent(text);
     if (!intent.ok) { this.broadcastStatus('ignored', `Not recognized: ${intent.reason}`); return; }
     this.broadcastStatus('intent', JSON.stringify(intent));
     try {
       const result = await executeIntent(intent, this.intentOptions);
+      if (result && result.needsConfirmation && result.commandToConfirm) {
+        this.pendingVoiceConfirmation = result.commandToConfirm;
+        this.pendingVoiceSelection = null;
+      } else if (result && result.needsSelection && Array.isArray(result.candidates)) {
+        this.pendingVoiceSelection = { candidates: result.candidates };
+        this.pendingVoiceConfirmation = null;
+      } else {
+        this.pendingVoiceConfirmation = null;
+        this.pendingVoiceSelection = null;
+      }
       this.broadcastStatus('result', result.message || JSON.stringify(result), { result });
       this.lastCommandTime = Date.now();
       await this._speakVoiceResult(result);

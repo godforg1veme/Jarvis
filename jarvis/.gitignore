@@ -15,6 +15,7 @@ data/app-index.json
 data/apps.user.json
 data/history.json
 data/ai-cache.json
+data/file-index.json
 data/tts-cache/
 data/*.log
 
