@@ -1,0 +1,19 @@
+{
+  "enabled": true,
+  "provider": "silero",
+  "fallbackProvider": "piper",
+  "command": "py",
+  "args": ["-m", "piper"],
+  "voice": "ru_RU-irina-medium",
+  "voiceDir": "voices/piper",
+  "model": "v5_ru",
+  "modelDir": "voices/silero",
+  "modelUrl": "https://models.silero.ai/models/tts/ru/v5_ru.pt",
+  "speaker": "baya",
+  "sampleRate": 48000,
+  "threads": 4,
+  "outputDir": "data/tts-cache",
+  "speakVoiceResults": true,
+  "cleanupWav": true,
+  "sentenceSilence": 0.15
+}

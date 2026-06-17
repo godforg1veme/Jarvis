@@ -1,0 +1,14 @@
+[
+  { "name": "notepad", "type": "command", "aliases": ["блокнот", "notepad", "text editor"], "command": "notepad.exe", "icon": "📝" },
+  { "name": "Calculator", "type": "command", "aliases": ["calc", "cal", "calculator", "калькулятор"], "command": "calc", "icon": "🔢" },
+  { "name": "chrome", "type": "command", "aliases": ["хром", "chrome", "browser", "браузер", "google chrome"], "command": "chrome.exe", "icon": "🌐" },
+  { "name": "VS Code", "type": "command", "aliases": ["vscode", "vs code", "visual studio code", "редактор кода", "code"], "command": "code", "icon": "💻" },
+  { "name": "powershell", "type": "command", "aliases": ["powershell", "павершелл"], "command": "powershell.exe", "icon": "⚡" },
+  { "name": "cmd", "type": "command", "aliases": ["cmd", "командная строка", "command prompt", "terminal", "терминал"], "command": "cmd.exe", "icon": "🖥️" },
+  { "name": "explorer", "type": "command", "aliases": ["проводник", "explorer", "папки", "files", "файлы"], "command": "explorer.exe", "icon": "📁" },
+  { "name": "taskmgr", "type": "command", "aliases": ["диспетчер задач", "task manager", "taskmgr", "процессы"], "command": "taskmgr.exe", "icon": "📊" },
+  { "name": "mspaint", "type": "command", "aliases": ["paint", "mspint", "рисование", "paint"], "command": "mspaint.exe", "icon": "🎨" },
+  { "name": "snippingtool", "type": "command", "aliases": ["скриншот", "снимок", "snipping tool", "обрезка"], "command": "snippingtool.exe", "icon": "📸" },
+  { "name": "settings", "type": "command", "aliases": ["настройки", "settings", "параметры"], "command": "ms-settings:", "icon": "⚙️" },
+  { "name": "edge", "type": "command", "aliases": ["edge", "microsoft edge", "эдж"], "command": "msedge.exe", "icon": "🌍" }
+]

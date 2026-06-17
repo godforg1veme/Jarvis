@@ -1,0 +1,11 @@
+{
+  "provider": "openrouter",
+  "baseUrl": "https://openrouter.ai/api/v1",
+  "textModel": "openrouter/free",
+  "visionModel": "openrouter/auto",
+  "fallbackModels": ["openrouter/free"],
+  "maxRetries": 2,
+  "timeoutMs": 30000,
+  "enableAiIntent": true,
+  "useAiOnlyOnFallback": true
+}

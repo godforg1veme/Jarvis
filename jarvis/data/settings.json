@@ -1,0 +1,18 @@
+{
+  "autoIndexOnFirstLaunch": true,
+  "autoRefreshDays": 7,
+  "scanRoots": [
+    "C:\\Program Files",
+    "C:\\Program Files (x86)",
+    "%LOCALAPPDATA%\\Programs",
+    "%APPDATA%",
+    "%USERPROFILE%\\Desktop",
+    "%PUBLIC%\\Desktop",
+    "D:\\Programs",
+    "D:\\Games",
+    "D:\\Apps",
+    "D:\\Projects"
+  ],
+  "maxDepth": 5,
+  "maxFiles": 30000
+}

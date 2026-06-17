@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; media-src 'self' mediastream: blob: 'unsafe-inline'">
+  <title>Jarvis</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="jarvis-window">
+    <aside id="rail" aria-label="Разделы Jarvis">
+      <div class="jarvis-mark" aria-label="Jarvis">J</div>
+      <button class="rail-button active" type="button" title="Команды" aria-label="Команды">⌘</button>
+      <button id="voice-toggle-btn" class="rail-button voice-toggle is-off" type="button" title="Голос выключен" aria-label="Включить голос" aria-pressed="false">
+        <span class="voice-toggle-icon" aria-hidden="true">🎙</span>
+      </button>
+      <button id="voice-debug-toggle" class="rail-button debug-toggle" type="button" title="Voice Debug" aria-label="Voice Debug" aria-controls="voice-debug-panel" aria-expanded="false">DBG</button>
+      <button class="rail-button" type="button" title="Поиск" aria-label="Поиск">⌕</button>
+      <button class="rail-button" type="button" title="Настройки" aria-label="Настройки">⚙</button>
+      <div class="rail-spacer"></div>
+      <button class="rail-button" type="button" title="Справка" aria-label="Справка">?</button>
+    </aside>
+
+    <main id="assistant-shell">
+      <header id="topbar">
+        <label id="command-bar" for="input">
+          <span class="command-icon" aria-hidden="true">⌕</span>
+          <input type="text" id="input" placeholder="Запусти Steam, найди файл или спроси Jarvis..." autofocus autocomplete="off" spellcheck="false">
+        </label>
+        <div id="voice-pill" class="status-pill" aria-live="polite">
+          <span class="status-dot"></span>
+          <span id="voice-status-line">Голос готов</span>
+        </div>
+      </header>
+
+      <section id="workspace">
+        <section id="results-panel" aria-label="Результаты Jarvis">
+          <div class="panel-heading">
+            <div>
+              <span class="eyebrow">Jarvis</span>
+              <h1>Быстрые действия</h1>
+            </div>
+            <div class="shortcuts-hint" aria-label="Горячие команды">
+              <kbd>/run</kbd>
+              <kbd>/ps</kbd>
+              <kbd>/find</kbd>
+              <kbd>/sys</kbd>
+            </div>
+          </div>
+          <div id="results">
+            <div id="results-list"></div>
+          </div>
+        </section>
+
+        <aside id="side-panel" aria-label="Статус Jarvis">
+          <section class="status-card voice-card">
+            <div class="card-heading">
+              <span class="card-icon">🎙</span>
+              <div>
+                <h2>Голосовой режим</h2>
+                <p>Скажите: “Джарвис, включи доту”.</p>
+              </div>
+            </div>
+            <div class="voice-meter" aria-hidden="true"></div>
+            <div class="chip-row">
+              <span class="chip">Vosk</span>
+              <span class="chip">TTS</span>
+              <span class="chip">RU</span>
+            </div>
+            <div class="voice-actions">
+              <button id="voice-start-btn" class="tool-button" type="button">Включить</button>
+              <button id="voice-stop-btn" class="tool-button danger" type="button">Выключить</button>
+            </div>
+          </section>
+
+          <section class="status-card">
+            <div class="card-heading compact">
+              <span class="card-icon">↺</span>
+              <div>
+                <h2>Последние команды</h2>
+                <p id="history-summary">История появится после первого запуска.</p>
+              </div>
+            </div>
+            <div id="history-chips" class="chip-row"></div>
+          </section>
+        </aside>
+      </section>
+
+      <div id="confirm-dialog" class="hidden">
+        <div class="confirm-message">
+          <span class="confirm-icon">!</span>
+          <span id="confirm-text"></span>
+        </div>
+        <div class="confirm-actions">
+          <button id="confirm-no" class="confirm-btn confirm-btn-no">Отмена</button>
+          <button id="confirm-yes" class="confirm-btn confirm-btn-yes">Подтвердить</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="renderer.js"></script>
+  <script src="voiceCapture.js"></script>
+
+  <div id="voice-debug-panel" aria-hidden="true">
+    <h3>Voice Debug</h3>
+    <h4>Partial</h4>
+    <pre id="voice-partial"></pre>
+    <h4>Status</h4>
+    <pre id="voice-status"></pre>
+  </div>
+</body>
+</html>

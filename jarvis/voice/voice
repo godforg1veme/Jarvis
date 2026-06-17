@@ -1,0 +1,319 @@
+const { BrowserWindow, ipcMain } = require('electron');
+const { spawn } = require('child_process');
+const path = require('path');
+const { parseIntent } = require('./intentParser');
+const { executeIntent } = require('../actions/executeIntent');
+
+const COOLDOWN_MS = 2500;
+const READY_TIMEOUT_MS = 10000;
+
+/**
+ * VoiceService — manages Vosk worker lifecycle and PCM routing.
+ * Audio capture happens in the main window's renderer (voiceCapture.js).
+ * This service handles: worker spawn, PCM forwarding, intent parsing, result broadcasting.
+ */
+class VoiceService {
+  constructor() {
+    this.workerProcess = null;
+    this.workerReady = false;
+    this.stopRequested = false;
+    this.readyTimeout = null;
+    this.lastCommandTime = 0;
+    this._voiceEnabled = false;
+  }
+
+  get isVoiceEnabled() {
+    return this._voiceEnabled;
+  }
+
+  /**
+   * Send a status message to ALL open BrowserWindows
+   */
+  broadcastStatus(type, message, extra = {}) {
+    const payload = { type, message, ...extra };
+    for (const win of BrowserWindow.getAllWindows()) {
+      try {
+        if (win.webContents && !win.webContents.isDestroyed()) {
+          win.webContents.send('voice:status', payload);
+        }
+      } catch (e) {
+        // Window may be closing
+      }
+    }
+  }
+
+  _clearReadyTimeout() {
+    if (this.readyTimeout) {
+      clearTimeout(this.readyTimeout);
+      this.readyTimeout = null;
+    }
+  }
+
+  /**
+   * Start the Vosk worker process
+   */
+  startWorker() {
+    if (this.workerProcess) {
+      this.broadcastStatus('error', 'Worker already running. Stop it first.');
+      return false;
+    }
+
+    this.workerReady = false;
+    this.stopRequested = false;
+
+    const workerPath = path.join(__dirname, 'voskWorker.js');
+    const nodeCommand = process.env.JARVIS_NODE_EXE || 'node';
+
+    let resolvedNode = nodeCommand;
+    if (nodeCommand === 'node') {
+      try {
+        const { execSync } = require('child_process');
+        resolvedNode = execSync('where node', { encoding: 'utf8' }).trim().split('\n')[0];
+      } catch (e) {
+        resolvedNode = 'node';
+      }
+    }
+
+    try {
+      this.workerProcess = spawn(resolvedNode, [workerPath], {
+        cwd: path.join(__dirname, '..'),
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+    } catch (e) {
+      this.broadcastStatus('error', `Failed to spawn worker: ${e.message}.`);
+      this.workerProcess = null;
+      return false;
+    }
+
+    this.workerProcess.stdout.setEncoding('utf8');
+    let stdoutBuffer = '';
+
+    this.workerProcess.stdout.on('data', (chunk) => {
+      stdoutBuffer += chunk;
+      const lines = stdoutBuffer.split('\n');
+      stdoutBuffer = lines.pop();
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        let msg;
+        try { msg = JSON.parse(line); } catch (e) { continue; }
+        this._handleWorkerMessage(msg);
+      }
+    });
+
+    this.workerProcess.stderr.on('data', (data) => {
+      const text = data.toString('utf8').trim();
+      if (text) {
+        console.error('[voice-worker]:', text);
+        this.broadcastStatus('worker-stderr', text);
+      }
+    });
+
+    this.workerProcess.on('exit', (code, signal) => {
+      this._clearReadyTimeout();
+      const exitInfo = `code=${code}, signal=${signal || 'none'}`;
+      this.broadcastStatus('worker-exit', `Voice worker exited. ${exitInfo}`);
+
+      if (!this.stopRequested && code !== 0) {
+        this.broadcastStatus('error', `Worker crashed. ${exitInfo}. Auto-restarting in 3s...`);
+        setTimeout(() => {
+          if (this._voiceEnabled && !this.stopRequested) {
+            console.log('[voiceService] Auto-restarting crashed worker...');
+            this.startWorker();
+          }
+        }, 3000);
+      }
+
+      this.workerProcess = null;
+      this.workerReady = false;
+    });
+
+    this.workerProcess.on('error', (err) => {
+      this._clearReadyTimeout();
+      console.error('[voiceService] Worker spawn error:', err);
+      this.broadcastStatus('error', `Worker spawn error: ${err.message}`);
+      this.workerProcess = null;
+      this.workerReady = false;
+    });
+
+    this.readyTimeout = setTimeout(() => {
+      if (!this.workerReady && this.workerProcess) {
+        this.broadcastStatus('error', `Worker timeout: no "ready" after ${READY_TIMEOUT_MS / 1000}s.`);
+        try { this.workerProcess.kill(); } catch (e) {}
+      }
+    }, READY_TIMEOUT_MS);
+
+    return true;
+  }
+
+  stopWorker() {
+    this.stopRequested = true;
+    this._clearReadyTimeout();
+    if (this.workerProcess) {
+      try {
+        if (this.workerProcess.stdin && this.workerProcess.stdin.writable) {
+          this.workerProcess.stdin.write(JSON.stringify({ type: 'stop' }) + '\n');
+        }
+        setTimeout(() => {
+          if (this.workerProcess) {
+            try { this.workerProcess.kill(); } catch (e) {}
+          }
+        }, 2000);
+      } catch (e) {
+        console.error('[voiceService] Error stopping worker:', e);
+      }
+    } else {
+      this.workerReady = false;
+    }
+  }
+
+  /**
+   * Forward PCM audio data to the Vosk worker
+   */
+  sendPcmToWorker(pcmBuffer) {
+    if (!this.workerProcess || !this.workerReady || !this.workerProcess.stdin.writable) {
+      return;
+    }
+    try {
+      const base64 = Buffer.from(pcmBuffer).toString('base64');
+      this.workerProcess.stdin.write(JSON.stringify({ type: 'pcm', base64 }) + '\n');
+    } catch (e) {
+      console.error('[voiceService] Error writing PCM to worker:', e);
+    }
+  }
+
+  _handleWorkerMessage(msg) {
+    if (msg.type === 'ready') {
+      this.workerReady = true;
+      this._clearReadyTimeout();
+      this.broadcastStatus('ready', 'Готово. Скажите: джарвис включи доту');
+      return;
+    }
+    if (msg.type === 'partial') {
+      this.broadcastStatus('partial', '', { text: msg.text });
+      for (const win of BrowserWindow.getAllWindows()) {
+        try {
+          if (win.webContents && !win.webContents.isDestroyed()) {
+            win.webContents.send('voice:partial', { text: msg.text });
+          }
+        } catch (e) {}
+      }
+      return;
+    }
+    if (msg.type === 'final') {
+      this._handleFinalResult(msg.text, msg.audioBase64);
+      return;
+    }
+    if (msg.type === 'error') {
+      this.broadcastStatus('error', msg.message || 'Unknown worker error');
+      return;
+    }
+    if (msg.type === 'stopped') {
+      this.broadcastStatus('stopped', 'Voice worker stopped.');
+      return;
+    }
+  }
+
+  async _handleFinalResult(text) {
+    const now = Date.now();
+    if (now - this.lastCommandTime < COOLDOWN_MS) {
+      this.broadcastStatus('ignored', 'Command ignored (cooldown)');
+      return;
+    }
+    if (!text || text.trim().length === 0) {
+      this.broadcastStatus('ignored', 'Empty recognition result');
+      return;
+    }
+
+    this.broadcastStatus('recognized', text);
+    const intent = parseIntent(text);
+    if (!intent.ok) {
+      this.broadcastStatus('ignored', `Intent not recognized: ${intent.reason}`);
+      return;
+    }
+
+    this.broadcastStatus('intent', JSON.stringify(intent));
+    try {
+      const result = await executeIntent(intent);
+      this.broadcastStatus('result', result.message || JSON.stringify(result), { result });
+      this.lastCommandTime = Date.now();
+    } catch (e) {
+      this.broadcastStatus('error', `executeIntent failed: ${e.message}`);
+    }
+  }
+
+  // --- Public API: Enable/Disable ---
+
+  enable(startResultCallback) {
+    if (this._voiceEnabled) {
+      if (startResultCallback) startResultCallback({ ok: false, error: 'Voice already enabled.' });
+      return;
+    }
+    this._voiceEnabled = true;
+    const started = this.startWorker();
+    if (!started) {
+      this._voiceEnabled = false;
+      if (startResultCallback) startResultCallback({ ok: false, error: 'Failed to start worker.' });
+      return;
+    }
+    console.log('[voiceService] Voice enabled (worker started).');
+    if (startResultCallback) startResultCallback({ ok: true });
+  }
+
+  disable() {
+    this._voiceEnabled = false;
+    this.stopWorker();
+    console.log('[voiceService] Voice disabled.');
+  }
+
+  toggle() {
+    if (this._voiceEnabled) {
+      this.disable();
+    } else {
+      this.enable();
+    }
+    return this._voiceEnabled;
+  }
+
+  shutdown() {
+    this._voiceEnabled = false;
+    this.stopRequested = true;
+    this.stopWorker();
+    this._clearReadyTimeout();
+    this.workerProcess = null;
+    this.workerReady = false;
+    console.log('[voiceService] Shutdown complete.');
+  }
+
+  /**
+   * Register IPC handlers for voice PCM and control
+   */
+  registerIpcHandlers() {
+    // UI requests to start voice worker
+    ipcMain.handle('voice:start', async () => {
+      return new Promise((resolve) => {
+        this.enable(resolve);
+      });
+    });
+
+    ipcMain.handle('voice:stop', async () => {
+      this.disable();
+      return { ok: true };
+    });
+
+    // PCM audio data from renderer (jarvisVoice.sendPcm)
+    ipcMain.on('voice:pcm', (event, arrayBuffer) => {
+      this.sendPcmToWorker(arrayBuffer);
+    });
+
+    ipcMain.handle('voice:state', async () => {
+      return { enabled: this._voiceEnabled, workerReady: this.workerReady };
+    });
+
+    ipcMain.handle('voice:toggle', async () => {
+      const enabled = this.toggle();
+      return { ok: true, enabled };
+    });
+  }
+}
+
+module.exports = { VoiceService };

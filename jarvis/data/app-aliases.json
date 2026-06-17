@@ -1,0 +1,49 @@
+{
+  "aliases": [
+    {
+      "input": ["дота", "дотка", "дота 2"],
+      "queries": ["dota", "dota 2", "дота", "дота 2"]
+    },
+    {
+      "input": ["кс", "каэс", "контра", "кс2"],
+      "queries": ["cs2", "counter-strike", "counter strike 2", "кс", "кс2"]
+    },
+    {
+      "input": ["хром", "гугл", "браузер гугла", "браузер от гугла"],
+      "queries": ["chrome", "google chrome", "хром"]
+    },
+    {
+      "input": [
+        "редактор кода",
+        "приложение для кода",
+        "код редактор",
+        "вскод",
+        "vs code",
+        "visual studio code"
+      ],
+      "queries": ["vscode", "vs code", "visual studio code", "code"]
+    },
+    {
+      "input": ["фотошоп"],
+      "queries": ["photoshop", "adobe photoshop"]
+    },
+    {
+      "input": [
+        "файрфокс",
+        "фаерфокс",
+        "мозила",
+        "мозилла",
+        "mozilla",
+        "mozila",
+        "браузер от мозилы",
+        "браузер от мозиллы",
+        "браузер мозилла"
+      ],
+      "queries": ["firefox", "mozilla firefox"]
+    },
+    {
+      "input": ["приложение для сайтов", "браузер", "открой браузер"],
+      "queries": ["chrome", "firefox", "edge"]
+    }
+  ]
+}
