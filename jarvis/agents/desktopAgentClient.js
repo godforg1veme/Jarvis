@@ -26,6 +26,7 @@ class DesktopAgentClient extends EventEmitter {
     this.serverPath = options.serverPath || SERVER_PATH;
     this.root = options.root || ROOT;
     this.spawnImpl = options.spawn || spawn;
+    this.toolExecutor = options.toolExecutor || null;
     this.child = null;
     this.readline = null;
     this.nextId = 1;
@@ -178,6 +179,10 @@ class DesktopAgentClient extends EventEmitter {
       this.emit('ready', event);
     }
 
+    if (event.type === 'tool_request') {
+      this.handleToolRequest(event);
+    }
+
     this.emit('event', event);
     if (event.task_id) {
       this.emit(`task:${event.task_id}`, event);
@@ -191,6 +196,28 @@ class DesktopAgentClient extends EventEmitter {
       } else {
         pending.resolve(event);
       }
+    }
+  }
+
+  async handleToolRequest(event) {
+    if (typeof this.toolExecutor !== 'function') return;
+
+    const payload = event.payload || {};
+    const requestId = payload.request_id || payload.requestId || '';
+    try {
+      const result = await this.toolExecutor({
+        requestId,
+        action: payload.action,
+        policy: payload.policy,
+        args: payload.args || {},
+        taskId: event.task_id,
+      });
+      this.send('tool_result', { request_id: requestId, result }, { taskId: event.task_id });
+    } catch (error) {
+      this.send('tool_result', {
+        request_id: requestId,
+        result: { ok: false, error: error.message },
+      }, { taskId: event.task_id });
     }
   }
 }

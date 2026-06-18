@@ -62,6 +62,24 @@ async function run() {
       },
     }) + '\n');
 
+    await waitFor(() => runtime.events.some((event) => event.type === 'tool_request' && event.task_id === 'demo-task'));
+    const toolRequest = runtime.events.find((event) => event.type === 'tool_request' && event.task_id === 'demo-task');
+    assert.strictEqual(toolRequest.payload.action, 'file.search');
+
+    runtime.child.stdin.write(JSON.stringify({
+      type: 'tool_result',
+      id: 'tool-result-1',
+      task_id: 'demo-task',
+      payload: {
+        request_id: toolRequest.payload.request_id,
+        result: {
+          ok: true,
+          action: 'file.search',
+          results: [{ name: 'image.png', path: 'C:\\Users\\maxob\\Desktop\\image.png' }],
+        },
+      },
+    }) + '\n');
+
     await waitFor(() => runtime.events.some((event) => event.type === 'needs_input' && event.task_id === 'demo-task'));
     const plan = runtime.events.find((event) => event.type === 'plan_draft' && event.task_id === 'demo-task');
     assert(plan, 'expected plan_draft event');

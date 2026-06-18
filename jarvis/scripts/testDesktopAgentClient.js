@@ -7,7 +7,13 @@ const { DesktopAgentClient } = require('../agents/desktopAgentClient');
 const { appendTask, pruneTasks, readHistory, updateTask } = require('../agents/agentHistory');
 
 async function testClient() {
-  const client = new DesktopAgentClient();
+  const client = new DesktopAgentClient({
+    toolExecutor: async (request) => ({
+      ok: true,
+      action: request.action,
+      results: [{ name: 'image.png', path: 'C:\\Users\\maxob\\Desktop\\image.png' }],
+    }),
+  });
   const events = [];
   client.on('event', (event) => events.push(event));
 
@@ -32,6 +38,7 @@ async function testClient() {
     });
 
     assert(events.some((event) => event.type === 'plan_draft' && event.task_id === taskId));
+    assert(events.some((event) => event.type === 'tool_request' && event.task_id === taskId));
   } finally {
     client.stop();
   }

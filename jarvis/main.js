@@ -4,7 +4,7 @@ if (process.env.ELECTRON_RUN_AS_NODE) {
   delete process.env.ELECTRON_RUN_AS_NODE;
 }
 
-const { app, BrowserWindow, globalShortcut, ipcMain, session, screen, Tray, Menu, nativeImage, clipboard, desktopCapturer } = require('electron');
+const { app, BrowserWindow, globalShortcut, ipcMain, session, screen, Tray, Menu, nativeImage, clipboard, desktopCapturer, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const appIndexer = require('./tools/appIndexer');
@@ -26,6 +26,7 @@ const {
   sendAgentTaskEvent,
   getAgentTaskWindow,
 } = require('./agents/agentTaskWindow');
+const { executeToolRequest } = require('./agents/toolGateway');
 
 if (process.platform === 'win32') {
   // Keep hidden renderer processes alive so microphone capture continues in the tray/background.
@@ -156,7 +157,12 @@ function getDesktopAgentClient() {
     return desktopAgentClient;
   }
 
-  desktopAgentClient = new DesktopAgentClient();
+  desktopAgentClient = new DesktopAgentClient({
+    toolExecutor: (request) => executeToolRequest(request, {
+      shell,
+      workArea: screen.getPrimaryDisplay().workArea,
+    }),
+  });
   desktopAgentClient.on('event', (event) => {
     sendAgentTaskEvent(event);
 
