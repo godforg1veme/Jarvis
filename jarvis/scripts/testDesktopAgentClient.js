@@ -95,6 +95,81 @@ async function testPendingConfirmation() {
   assert.strictEqual(sent[1].options.taskId, 'confirm-task');
 }
 
+function waitForTaskEvent(client, taskId, predicate, timeoutMs = 5000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error(`Timed out waiting for ${taskId} event`));
+    }, timeoutMs);
+    const onEvent = (event) => {
+      if (predicate(event)) {
+        cleanup();
+        resolve(event);
+      }
+    };
+    const cleanup = () => {
+      clearTimeout(timer);
+      client.off(`task:${taskId}`, onEvent);
+    };
+    client.on(`task:${taskId}`, onEvent);
+  });
+}
+
+async function testDemoFlowWithConfirmations() {
+  const calls = [];
+  const client = new DesktopAgentClient({
+    toolExecutor: async (request, options = {}) => {
+      calls.push({ request, options });
+      if (request.action === 'file.search') {
+        return {
+          ok: true,
+          action: request.action,
+          results: [{ name: 'image.png', path: 'C:\\Users\\maxob\\Desktop\\image.png' }],
+        };
+      }
+      if (request.action === 'file.create_folder' && !options.confirmed) {
+        return { ok: false, requiresConfirmation: true, message: 'confirm folder' };
+      }
+      if (request.action === 'file.create_folder') {
+        return { ok: true, action: request.action, path: request.args.path };
+      }
+      if (request.action === 'file.move_batch' && !options.strongConfirmed) {
+        return { ok: false, requiresStrongConfirmation: true, message: 'confirm move' };
+      }
+      if (request.action === 'file.move_batch') {
+        return { ok: true, action: request.action, results: [{ ok: true }] };
+      }
+      return { ok: false, error: `unexpected action: ${request.action}` };
+    },
+  });
+
+  client.start();
+  try {
+    await client.waitUntilReady();
+    const { taskId } = client.startTask('Agent, find all png on desktop and move up to 20 files to Images', {
+      taskId: 'demo-confirm-flow',
+    });
+
+    await waitForTaskEvent(client, taskId, (event) => event.type === 'needs_input');
+    client.sendTaskAction(taskId, 'user_choice', { index: 0, choice: 'Create on desktop' });
+
+    await waitForTaskEvent(client, taskId, (event) => event.type === 'needs_confirmation'
+      && event.payload.request.action === 'file.create_folder');
+    await client.confirmPendingTool(taskId);
+
+    await waitForTaskEvent(client, taskId, (event) => event.type === 'needs_confirmation'
+      && event.payload.request.action === 'file.move_batch');
+    await client.confirmPendingTool(taskId, { strongConfirmed: true });
+
+    const report = await waitForTaskEvent(client, taskId, (event) => event.type === 'final_report');
+    assert.strictEqual(report.payload.moved, 1);
+    assert(calls.some((call) => call.request.action === 'file.create_folder' && call.options.confirmed));
+    assert(calls.some((call) => call.request.action === 'file.move_batch' && call.options.strongConfirmed));
+  } finally {
+    client.stop();
+  }
+}
+
 function testHistory() {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-agent-history-'));
   const historyPath = path.join(tempDir, 'agent-history.json');
@@ -123,6 +198,7 @@ function testHistory() {
 async function run() {
   await testClient();
   await testPendingConfirmation();
+  await testDemoFlowWithConfirmations();
   testHistory();
   console.log('[testDesktopAgentClient] client and history tests passed');
 }
