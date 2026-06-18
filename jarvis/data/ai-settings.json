@@ -3,6 +3,13 @@
   "baseUrl": "https://openrouter.ai/api/v1",
   "textModel": "openrouter/free",
   "visionModel": "openrouter/auto",
+  "agentAi": {
+    "provider": "gemini",
+    "model": "gemini-3.1-flash-lite",
+    "timeoutMs": 30000,
+    "maxRetries": 1,
+    "complexityPolicy": "static-v1"
+  },
   "fallbackModels": ["openrouter/free"],
   "maxRetries": 2,
   "timeoutMs": 30000,
