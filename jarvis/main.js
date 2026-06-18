@@ -599,6 +599,9 @@ app.whenReady().then(() => {
       activeAgentTaskId = null;
       if (desktopAgentClient && taskId) {
         desktopAgentClient.rejectPendingTool(taskId, 'Task cancelled by user.');
+        if (desktopAgentClient.isRunning()) {
+          desktopAgentClient.sendTaskAction(taskId, 'cancel');
+        }
       }
       sendAgentTaskEvent({
         type: 'final_report',
@@ -641,12 +644,22 @@ app.whenReady().then(() => {
     }
 
     if (action === 'stop_after_current_step') {
+      if (desktopAgentClient && taskId && desktopAgentClient.isRunning()) {
+        desktopAgentClient.sendTaskAction(taskId, 'stop_after_current_step');
+      }
       sendAgentTaskEvent({
         type: 'event',
         task_id: taskId,
         payload: { message: 'Остановлю задачу после текущего шага.' },
       });
       return { ok: true };
+    }
+
+    if (action === 'user_choice' || action === 'continue') {
+      if (!desktopAgentClient || !taskId || !desktopAgentClient.isRunning()) {
+        return { ok: false, error: 'No active agent runtime.' };
+      }
+      return desktopAgentClient.sendTaskAction(taskId, action, payload || {});
     }
 
     sendAgentTaskEvent({

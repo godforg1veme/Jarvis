@@ -85,6 +85,21 @@ async function run() {
     assert(plan, 'expected plan_draft event');
     assert(plan.payload.plan.some((step) => step.action === 'ask_user'), 'expected ask_user plan step');
 
+    runtime.child.stdin.write(JSON.stringify({
+      type: 'task_action',
+      id: 'choice-1',
+      task_id: 'demo-task',
+      payload: {
+        action: 'user_choice',
+        index: 0,
+        choice: 'Create on desktop',
+      },
+    }) + '\n');
+
+    await waitFor(() => runtime.events.some((event) => event.type === 'tool_request' && event.payload.request_id === 'demo-task:create_images_folder'));
+    const createFolderRequest = runtime.events.find((event) => event.payload && event.payload.request_id === 'demo-task:create_images_folder');
+    assert.strictEqual(createFolderRequest.payload.action, 'file.create_folder');
+
     runtime.child.stdin.write('[]\n');
     await waitFor(() => runtime.events.some((event) => event.type === 'error' && /message must be/.test(event.payload.error)));
 

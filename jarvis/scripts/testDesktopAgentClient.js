@@ -87,6 +87,12 @@ async function testPendingConfirmation() {
   assert.strictEqual(executorCalls[1].options.confirmed, true);
   assert.strictEqual(sent[0].type, 'tool_result');
   assert.strictEqual(sent[0].payload.result.ok, true);
+
+  const actionResult = client.sendTaskAction('confirm-task', 'continue', { note: 'ok' });
+  assert.strictEqual(actionResult.ok, true);
+  assert.strictEqual(sent[1].type, 'task_action');
+  assert.strictEqual(sent[1].payload.action, 'continue');
+  assert.strictEqual(sent[1].options.taskId, 'confirm-task');
 }
 
 function testHistory() {

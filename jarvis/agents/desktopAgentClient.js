@@ -142,6 +142,14 @@ class DesktopAgentClient extends EventEmitter {
     return { id, taskId };
   }
 
+  sendTaskAction(taskId, action, payload = {}) {
+    if (!taskId) {
+      return { ok: false, error: 'taskId is required' };
+    }
+    this.send('task_action', { ...payload, action }, { taskId });
+    return { ok: true };
+  }
+
   request(type, payload = {}, options = {}) {
     const terminalTypes = new Set(options.terminalTypes || ['final_report', 'needs_input', 'error']);
     const id = this.send(type, payload, options);
