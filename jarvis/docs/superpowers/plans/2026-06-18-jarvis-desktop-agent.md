@@ -115,13 +115,18 @@ tool execution and safety.
 
 ## Phase 10: Verification
 
-- [ ] Run Python tests.
-- [ ] Run Node agent protocol tests.
-- [ ] Run file command tests.
-- [ ] Run router/gateway/window tests.
-- [ ] Run `node scripts/testVoskLoad.js`.
-- [ ] Run at least one `node voice/testCommand.js "<agent command>"`.
+- [x] Run Python tests.
+- [x] Run Node agent protocol tests.
+- [x] Run file command tests.
+- [x] Run router/gateway/window tests.
+- [x] Run `node scripts/testVoskLoad.js`.
+- [x] Run at least one `node voice/testCommand.js "<agent command>"`.
 - [ ] Run `npm start` and visually verify the agent task window.
 - [ ] Manually smoke the acceptance command:
   `Агент, найди все png на рабочем столе и перемести до 20 штук в папку Images`.
-- [ ] Record any missing local model/key/runtime limitations honestly.
+- [x] Record any missing local model/key/runtime limitations honestly.
+
+Verification notes:
+
+- `node voice/testCommand.js "Agent, find all png on desktop and move up to 20 files to Images"` parses `desktop_agent`, but standalone execution returns "Desktop Agent недоступен" because the CLI test does not provide Electron's `startAgentTask` callback.
+- In-app browser blocked direct `file://` visual verification by policy. No workaround server was started.
