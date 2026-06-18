@@ -19,6 +19,13 @@ const {
   continueVisualDialog,
   clearVisualContext,
 } = require('./tools/screenVisionAnalyzer');
+const { DesktopAgentClient } = require('./agents/desktopAgentClient');
+const { appendTask, updateTask } = require('./agents/agentHistory');
+const {
+  showAgentTaskWindow,
+  sendAgentTaskEvent,
+  getAgentTaskWindow,
+} = require('./agents/agentTaskWindow');
 
 if (process.platform === 'win32') {
   // Keep hidden renderer processes alive so microphone capture continues in the tray/background.
@@ -29,6 +36,8 @@ if (process.platform === 'win32') {
 let mainWindow = null;
 let tray = null;
 let voiceService = null;
+let desktopAgentClient = null;
+let activeAgentTaskId = null;
 let lastExternalForegroundHwnd = null;
 const HISTORY_PATH = path.join(__dirname, 'data', 'history.json');
 const APPS_PATH = path.join(__dirname, 'data', 'apps.default.json');
@@ -140,6 +149,111 @@ function handleClearVisualContext() {
 async function handleFileCommand(args, confirmed = false) {
   const fileCommander = require('./tools/fileCommander');
   return await fileCommander.execute(args, confirmed);
+}
+
+function getDesktopAgentClient() {
+  if (desktopAgentClient && desktopAgentClient.isRunning()) {
+    return desktopAgentClient;
+  }
+
+  desktopAgentClient = new DesktopAgentClient();
+  desktopAgentClient.on('event', (event) => {
+    sendAgentTaskEvent(event);
+
+    if (event.type === 'plan_draft' && event.task_id) {
+      updateTask(event.task_id, {
+        taskId: event.task_id,
+        status: 'planning',
+        plan: event.payload && event.payload.plan,
+      });
+    }
+
+    if ((event.type === 'final_report' || event.type === 'error' || event.type === 'needs_input') && event.task_id) {
+      updateTask(event.task_id, {
+        taskId: event.task_id,
+        status: event.type,
+        lastEvent: event,
+      });
+    }
+
+    if ((event.type === 'final_report' || event.type === 'error') && event.task_id === activeAgentTaskId) {
+      activeAgentTaskId = null;
+    }
+  });
+  desktopAgentClient.on('exit', (event) => {
+    sendAgentTaskEvent({
+      type: 'error',
+      task_id: activeAgentTaskId,
+      payload: {
+        error: `Agent runtime stopped (${event.code ?? event.signal ?? 'unknown'}).`,
+      },
+    });
+  });
+  desktopAgentClient.start();
+  return desktopAgentClient;
+}
+
+async function handleStartAgentTask(command, options = {}) {
+  const userCommand = String(command || '').trim();
+  if (!userCommand) {
+    return { ok: false, type: 'agent', title: 'Agent', content: 'Введите задачу для агента.' };
+  }
+
+  if (activeAgentTaskId) {
+    showAgentTaskWindow({ noFocus: true });
+    return {
+      ok: false,
+      type: 'agent',
+      title: 'Agent уже занят',
+      content: 'Сначала завершите или отмените текущую задачу агента.',
+      taskId: activeAgentTaskId,
+    };
+  }
+
+  showAgentTaskWindow({ noFocus: true });
+
+  try {
+    const client = getDesktopAgentClient();
+    await client.waitUntilReady();
+    const { taskId } = client.startTask(userCommand, options);
+    activeAgentTaskId = taskId;
+    appendTask({
+      taskId,
+      command: userCommand,
+      source: options.source || 'launcher',
+      status: 'started',
+    });
+    sendAgentTaskEvent({
+      type: 'event',
+      task_id: taskId,
+      payload: {
+        message: 'Открыл агент и запустил задачу.',
+      },
+    });
+    return {
+      ok: true,
+      type: 'agent',
+      title: 'Agent task started',
+      content: `Открыл агент для задачи: ${userCommand}`,
+      taskId,
+    };
+  } catch (error) {
+    sendAgentTaskEvent({
+      type: 'error',
+      task_id: activeAgentTaskId,
+      payload: {
+        error: `${error.message}. Запустите node scripts/ensureAgentRuntime.js, если Python runtime не подготовлен.`,
+      },
+    });
+    activeAgentTaskId = null;
+    return {
+      ok: false,
+      type: 'agent',
+      title: 'Agent runtime недоступен',
+      content: `${error.message}. Запустите node scripts/ensureAgentRuntime.js, если Python runtime не подготовлен.`,
+      error: error.message,
+    };
+  }
 }
 
 function ensureWindowsAutoStart() {
@@ -258,6 +372,10 @@ function shutdownApp() {
   if (voiceService) {
     voiceService.shutdown();
     voiceService = null;
+  }
+  if (desktopAgentClient) {
+    desktopAgentClient.stop();
+    desktopAgentClient = null;
   }
   if (tray) {
     tray.destroy();
@@ -456,6 +574,47 @@ app.whenReady().then(() => {
     return handleClearVisualContext();
   });
 
+  ipcMain.handle('agent-start-task', async (event, { command } = {}) => {
+    return await handleStartAgentTask(command, { source: 'launcher' });
+  });
+
+  ipcMain.handle('agent-task-action', async (event, { action, payload } = {}) => {
+    const taskId = payload && payload.taskId ? payload.taskId : activeAgentTaskId;
+
+    if (action === 'hide') {
+      const win = getAgentTaskWindow();
+      if (win) win.hide();
+      return { ok: true };
+    }
+
+    if (action === 'cancel') {
+      activeAgentTaskId = null;
+      sendAgentTaskEvent({
+        type: 'final_report',
+        task_id: taskId,
+        payload: { phase: 'finalized', message: 'Задача отменена пользователем.' },
+      });
+      if (taskId) updateTask(taskId, { status: 'cancelled' });
+      return { ok: true };
+    }
+
+    if (action === 'stop_after_current_step') {
+      sendAgentTaskEvent({
+        type: 'event',
+        task_id: taskId,
+        payload: { message: 'Остановлю задачу после текущего шага.' },
+      });
+      return { ok: true };
+    }
+
+    sendAgentTaskEvent({
+      type: 'event',
+      task_id: taskId,
+      payload: { message: `Действие пока не реализовано: ${action || 'unknown'}` },
+    });
+    return { ok: true };
+  });
+
   // --- Auto-index on first launch or stale index ---
   setTimeout(async () => {
     try {
@@ -501,6 +660,10 @@ app.on('before-quit', () => {
   if (voiceService) {
     voiceService.shutdown();
     voiceService = null;
+  }
+  if (desktopAgentClient) {
+    desktopAgentClient.stop();
+    desktopAgentClient = null;
   }
   if (tray) {
     tray.destroy();

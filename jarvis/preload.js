@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('jarvis', {
   analyzeVisualArea: (command) => ipcRenderer.invoke('visual-analyze', { command }),
   continueVisualDialog: (command) => ipcRenderer.invoke('visual-continue', { command }),
   clearVisualContext: () => ipcRenderer.invoke('visual-clear-context'),
+  startAgentTask: (command) => ipcRenderer.invoke('agent-start-task', { command }),
 
   // Focus input listener from main process
   onFocusInput: (callback) => ipcRenderer.on('focus-input', (_event, ...args) => callback(...args)),

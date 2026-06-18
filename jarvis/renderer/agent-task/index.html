@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jarvis Agent Task</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="task-shell">
+    <aside class="task-rail">
+      <header class="agent-title">
+        <div class="agent-name">Desktop Agent</div>
+        <div id="task-id" class="task-id">Нет активной задачи</div>
+      </header>
+
+      <section class="phase-list" aria-label="Фазы задачи">
+        <div class="rail-label">Фазы</div>
+        <div class="phase active" data-phase="observing"><span></span>Разведка</div>
+        <div class="phase" data-phase="planning"><span></span>План</div>
+        <div class="phase" data-phase="needs_confirmation"><span></span>Подтверждение</div>
+        <div class="phase" data-phase="executing"><span></span>Выполнение</div>
+        <div class="phase" data-phase="finalized"><span></span>Отчет</div>
+      </section>
+
+      <div class="limits">Лимиты: 20 файлов, 10 действий, stop on error</div>
+
+      <footer class="rail-actions">
+        <button id="stop-btn" type="button">Остановить</button>
+        <button id="hide-btn" type="button">Скрыть</button>
+      </footer>
+    </aside>
+
+    <main class="task-main">
+      <header class="task-header">
+        <div class="task-heading">
+          <h1 id="task-command">Ожидаю задачу агента</h1>
+          <p id="task-status">Jarvis откроет здесь ход выполнения, когда задача начнется.</p>
+        </div>
+        <div id="policy-badges" class="policy-badges"></div>
+      </header>
+
+      <section class="task-content">
+        <div class="process-column">
+          <section class="current-action">
+            <div class="section-label">Текущее действие</div>
+            <h2 id="current-title">Готов к работе</h2>
+            <p id="current-body">Здесь появится вопрос, текущий шаг или подтверждение плана.</p>
+            <div id="choices" class="choices"></div>
+          </section>
+
+          <section class="live-process">
+            <div class="section-label">Live process</div>
+            <div id="event-list" class="event-list"></div>
+          </section>
+        </div>
+
+        <aside class="plan-panel">
+          <div class="section-label">Plan draft</div>
+          <div id="plan-list" class="plan-list"></div>
+        </aside>
+      </section>
+
+      <footer class="task-footer">
+        <div id="footer-status" class="footer-status">Ожидаю событий агента.</div>
+        <div class="footer-actions">
+          <button id="cancel-btn" type="button">Отмена</button>
+          <button id="continue-btn" type="button" class="primary">Продолжить</button>
+        </div>
+      </footer>
+    </main>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

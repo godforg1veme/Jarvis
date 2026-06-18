@@ -442,6 +442,7 @@ function showSuggestions(query) {
     { prefix: 'посмотри сюда', title: 'посмотри сюда', desc: 'Проанализировать область экрана вокруг курсора' },
     { prefix: 'забудь экран', title: 'забудь экран', desc: 'Очистить последний визуальный контекст' },
     { prefix: '/run ', title: '/run <приложение>', desc: 'Запустить программу' },
+    { prefix: '/agent ', title: '/agent <задача>', desc: 'Открыть Desktop Agent task window' },
     { prefix: '/ps ', title: '/ps <команда>', desc: 'Выполнить PowerShell-команду' },
     { prefix: '/find ', title: '/find <запрос>', desc: 'Найти файлы' },
     { prefix: '/sys', title: '/sys', desc: 'Информация о системе' },
@@ -699,6 +700,13 @@ async function executeCommand(rawInput) {
   }
 
   // Handle aidebug specially — show AI intent JSON without launching anything.
+  if (toolName === 'agent') {
+    const agentArgs = parseArgs(rawInput, toolName);
+    const result = await window.jarvis.startAgentTask(agentArgs.command);
+    saveAndDisplay(result, rawInput);
+    return;
+  }
+
   if (toolName === 'aidebug') {
     const aiArgs = parseArgs(rawInput, toolName);
     const result = await window.jarvis.executeTool('runProgram', aiArgs);
@@ -845,6 +853,7 @@ function parseFileCommandForRenderer(rawText) {
 function parseTool(input) {
   const trimmed = input.trim();
   if (trimmed.startsWith('/run ')) return 'runProgram';
+  if (trimmed.startsWith('/agent ')) return 'agent';
   if (trimmed.startsWith('/ps ')) return 'powershell';
   if (trimmed.startsWith('/find ')) return 'searchFiles';
   if (trimmed.startsWith('/sys')) return 'sysinfo';
@@ -874,6 +883,8 @@ function parseArgs(input, toolName) {
     }
     case 'refresh':
       return {};
+    case 'agent':
+      return { command: trimmed.slice(7).trim() };
     case 'addapp': {
       const rest = trimmed.slice(8).trim();
       const match = rest.match(/^(\S+)\s+"(.+)"$/);
