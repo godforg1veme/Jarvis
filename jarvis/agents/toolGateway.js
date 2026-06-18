@@ -107,6 +107,37 @@ function confirmationBlock(action, policy, args) {
   };
 }
 
+function ensureParentDir(targetPath) {
+  const parent = path.dirname(targetPath);
+  if (!fs.existsSync(parent)) {
+    throw new Error(`destination parent does not exist: ${parent}`);
+  }
+}
+
+function nextAvailablePath(targetPath) {
+  if (!fs.existsSync(targetPath)) return targetPath;
+
+  const dir = path.dirname(targetPath);
+  const ext = path.extname(targetPath);
+  const base = path.basename(targetPath, ext);
+
+  for (let index = 1; index <= 999; index += 1) {
+    const candidate = path.join(dir, `${base} (${index})${ext}`);
+    if (!fs.existsSync(candidate)) return candidate;
+  }
+
+  throw new Error(`cannot find available name for ${targetPath}`);
+}
+
+function enforceBatchLimit(paths, limit = 20) {
+  if (!Array.isArray(paths) || paths.length === 0) {
+    throw new Error('batch paths are required');
+  }
+  if (paths.length > limit) {
+    throw new Error(`batch limit exceeded: ${paths.length} > ${limit}`);
+  }
+}
+
 function listDirectory(args, options = {}) {
   const dir = normalizePath(args.path, options);
   const limit = Math.min(Math.max(Number(args.limit || 50), 1), 200);
@@ -206,6 +237,97 @@ async function openOrReveal(action, args, options = {}) {
     : { ok: true, action, policy: POLICY.LOW_RISK, target: candidate };
 }
 
+function createFolder(args, options = {}) {
+  const targetPath = normalizePath(args.path, options);
+  const finalPath = args.overwrite ? targetPath : nextAvailablePath(targetPath);
+  fs.mkdirSync(finalPath, { recursive: true });
+  return { ok: true, action: 'file.create_folder', policy: POLICY.CONFIRM, path: finalPath };
+}
+
+function renamePath(args, options = {}) {
+  const from = normalizePath(args.from || args.path, options);
+  const newName = String(args.newName || '').trim();
+  if (!newName) throw new Error('newName is required');
+  if (newName.includes('/') || newName.includes('\\')) throw new Error('newName must be a name, not a path');
+  if (!fs.existsSync(from)) throw new Error(`source does not exist: ${from}`);
+
+  const to = nextAvailablePath(path.join(path.dirname(from), newName));
+  fs.renameSync(from, to);
+  return { ok: true, action: 'file.rename', policy: POLICY.CONFIRM, from, to };
+}
+
+function movePath(args, options = {}) {
+  const from = normalizePath(args.from || args.path, options);
+  const rawTo = args.to || args.destination;
+  const toInput = normalizePath(rawTo, options);
+  if (!fs.existsSync(from)) throw new Error(`source does not exist: ${from}`);
+
+  const destination = fs.existsSync(toInput) && fs.statSync(toInput).isDirectory()
+    ? path.join(toInput, path.basename(from))
+    : toInput;
+  ensureParentDir(destination);
+  const to = args.overwrite ? destination : nextAvailablePath(destination);
+  fs.renameSync(from, to);
+  return { ok: true, action: 'file.move', policy: POLICY.CONFIRM, from, to };
+}
+
+function copyPath(args, options = {}) {
+  const from = normalizePath(args.from || args.path, options);
+  const rawTo = args.to || args.destination;
+  const toInput = normalizePath(rawTo, options);
+  if (!fs.existsSync(from)) throw new Error(`source does not exist: ${from}`);
+
+  const destination = fs.existsSync(toInput) && fs.statSync(toInput).isDirectory()
+    ? path.join(toInput, path.basename(from))
+    : toInput;
+  ensureParentDir(destination);
+  const to = args.overwrite ? destination : nextAvailablePath(destination);
+  fs.cpSync(from, to, { recursive: true, force: !!args.overwrite, errorOnExist: !args.overwrite });
+  return { ok: true, action: 'file.copy', policy: POLICY.CONFIRM, from, to };
+}
+
+async function deleteToRecycleBin(args, options = {}) {
+  const targetPath = normalizePath(args.path, options);
+  if (!fs.existsSync(targetPath)) throw new Error(`path does not exist: ${targetPath}`);
+
+  const shell = options.shell;
+  if (!shell || typeof shell.trashItem !== 'function') {
+    throw new Error('shell.trashItem unavailable; refusing to permanently delete without strong confirmation');
+  }
+
+  await shell.trashItem(targetPath);
+  return { ok: true, action: 'file.delete', policy: POLICY.CONFIRM, path: targetPath, recycled: true };
+}
+
+function permanentDelete(args, options = {}) {
+  const targetPath = normalizePath(args.path, options);
+  if (!fs.existsSync(targetPath)) throw new Error(`path does not exist: ${targetPath}`);
+  fs.rmSync(targetPath, { recursive: true, force: true });
+  return { ok: true, action: 'file.permanent_delete', policy: POLICY.STRONG, path: targetPath, permanent: true };
+}
+
+async function executeBatch(action, args, options = {}) {
+  const paths = args.paths || args.items;
+  enforceBatchLimit(paths, options.maxBatchItems || 20);
+
+  const results = [];
+  for (const item of paths) {
+    if (action === 'file.delete_batch') {
+      results.push(await deleteToRecycleBin({ path: item.path || item }, options));
+    } else if (action === 'file.move_batch') {
+      results.push(movePath({ from: item.path || item.from || item, to: item.to || args.to || args.destination }, options));
+    } else if (action === 'file.copy_batch') {
+      results.push(copyPath({ from: item.path || item.from || item, to: item.to || args.to || args.destination }, options));
+    } else if (action === 'file.rename_batch') {
+      results.push(renamePath({ from: item.path || item.from, newName: item.newName }, options));
+    } else {
+      throw new Error(`unsupported batch action: ${action}`);
+    }
+  }
+
+  return { ok: true, action, policy: POLICY.STRONG, results };
+}
+
 async function executeToolRequest(request, options = {}) {
   let normalized;
   try {
@@ -226,6 +348,15 @@ async function executeToolRequest(request, options = {}) {
     if (action === 'file.search') return searchFilesForGateway(args, options);
     if (action === 'file.list_directory') return listDirectory(args, options);
     if (action === 'file.open' || action === 'file.reveal') return await openOrReveal(action, args, options);
+    if (action === 'file.create_folder') return createFolder(args, options);
+    if (action === 'file.rename') return renamePath(args, options);
+    if (action === 'file.move') return movePath(args, options);
+    if (action === 'file.copy') return copyPath(args, options);
+    if (action === 'file.delete') return await deleteToRecycleBin(args, options);
+    if (action === 'file.permanent_delete') return permanentDelete(args, options);
+    if (['file.move_batch', 'file.copy_batch', 'file.rename_batch', 'file.delete_batch'].includes(action)) {
+      return await executeBatch(action, args, options);
+    }
 
     return {
       ok: false,

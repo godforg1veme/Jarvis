@@ -74,6 +74,87 @@ async function run() {
   });
   assert.strictEqual(strong.requiresStrongConfirmation, true);
 
+  const created = await executeToolRequest({
+    action: 'file.create_folder',
+    args: { path: path.join(root, 'Images') },
+  }, { allowRoots: [root], confirmed: true });
+  assert.strictEqual(created.ok, true);
+  assert.strictEqual(fs.existsSync(path.join(root, 'Images')), true);
+
+  const createdAgain = await executeToolRequest({
+    action: 'file.create_folder',
+    args: { path: path.join(root, 'Images') },
+  }, { allowRoots: [root], confirmed: true });
+  assert.strictEqual(createdAgain.ok, true);
+  assert.strictEqual(path.basename(createdAgain.path), 'Images (1)');
+
+  const renameSource = path.join(root, 'rename-me.txt');
+  fs.writeFileSync(renameSource, 'rename');
+  const renamed = await executeToolRequest({
+    action: 'file.rename',
+    args: { from: renameSource, newName: 'renamed.txt' },
+  }, { allowRoots: [root], confirmed: true });
+  assert.strictEqual(renamed.ok, true);
+  assert.strictEqual(fs.existsSync(path.join(root, 'renamed.txt')), true);
+
+  const copySource = path.join(root, 'copy-me.txt');
+  fs.writeFileSync(copySource, 'copy');
+  const copied = await executeToolRequest({
+    action: 'file.copy',
+    args: { from: copySource, to: path.join(root, 'Images') },
+  }, { allowRoots: [root], confirmed: true });
+  assert.strictEqual(copied.ok, true);
+  assert.strictEqual(fs.existsSync(path.join(root, 'Images', 'copy-me.txt')), true);
+
+  const moved = await executeToolRequest({
+    action: 'file.move',
+    args: { from: copied.to, to: path.join(root, 'moved.txt') },
+  }, { allowRoots: [root], confirmed: true });
+  assert.strictEqual(moved.ok, true);
+  assert.strictEqual(fs.existsSync(path.join(root, 'moved.txt')), true);
+
+  const trashed = [];
+  const recycled = await executeToolRequest({
+    action: 'file.delete',
+    args: { path: moved.to },
+  }, {
+    allowRoots: [root],
+    confirmed: true,
+    shell: { trashItem: async (targetPath) => { trashed.push(targetPath); } },
+  });
+  assert.strictEqual(recycled.ok, true);
+  assert.deepStrictEqual(trashed, [moved.to]);
+
+  const permanentPath = path.join(root, 'permanent.txt');
+  fs.writeFileSync(permanentPath, 'delete');
+  const permanent = await executeToolRequest({
+    action: 'file.permanent_delete',
+    args: { path: permanentPath },
+  }, { allowRoots: [root], strongConfirmed: true });
+  assert.strictEqual(permanent.ok, true);
+  assert.strictEqual(fs.existsSync(permanentPath), false);
+
+  const batchDir = path.join(root, 'Batch');
+  fs.mkdirSync(batchDir);
+  const batchFiles = ['a.txt', 'b.txt'].map((name) => {
+    const filePath = path.join(root, name);
+    fs.writeFileSync(filePath, name);
+    return filePath;
+  });
+  const batchMoved = await executeToolRequest({
+    action: 'file.move_batch',
+    args: { paths: batchFiles, to: batchDir },
+  }, { allowRoots: [root], strongConfirmed: true });
+  assert.strictEqual(batchMoved.ok, true);
+  assert.strictEqual(batchMoved.results.length, 2);
+
+  const tooMany = await executeToolRequest({
+    action: 'file.copy_batch',
+    args: { paths: Array.from({ length: 21 }, (_, index) => ({ path: path.join(batchDir, 'a.txt'), to: path.join(root, `x-${index}.txt`) })) },
+  }, { allowRoots: [root], strongConfirmed: true });
+  assert.strictEqual(tooMany.ok, false);
+  assert.match(tooMany.error, /batch limit exceeded/);
+
   console.log('[testToolGateway] gateway policy tests passed');
 }
 
