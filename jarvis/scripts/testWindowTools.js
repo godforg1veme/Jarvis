@@ -7,6 +7,7 @@ const {
   buildMoveResizeScript,
   buildShowWindowScript,
   focusWindow,
+  findWindows,
   listWindows,
   multiWindowLayout,
   snapRect,
@@ -52,6 +53,11 @@ async function run() {
     execFile: fakeExec(JSON.stringify([{ hwnd: 1, title: 'Code', processName: 'Code' }]), calls),
   });
   assert.strictEqual(windows[0].title, 'Code');
+
+  const found = await findWindows('code', {
+    execFile: fakeExec(JSON.stringify([{ hwnd: 1, title: 'Code', processName: 'Code' }]), calls),
+  });
+  assert.strictEqual(found.length, 1);
 
   const focus = await focusWindow(1, { execFile: fakeExec('{"ok":true}', calls) });
   assert.strictEqual(focus.ok, true);

@@ -129,6 +129,17 @@ async function listWindows(options = {}) {
   return Array.isArray(parsed) ? parsed : [parsed].filter(Boolean);
 }
 
+async function findWindows(query, options = {}) {
+  const normalized = String(query || '').toLowerCase().trim();
+  if (!normalized) return [];
+
+  const windows = await listWindows(options);
+  return windows.filter((window) => {
+    const haystack = `${window.title || ''} ${window.processName || ''}`.toLowerCase();
+    return haystack.includes(normalized);
+  });
+}
+
 async function focusWindow(hwnd, options = {}) {
   const stdout = await runPowerShell(buildShowWindowScript(hwnd, SW_RESTORE), options);
   return parseJsonOutput(stdout, { ok: true });
@@ -219,6 +230,7 @@ module.exports = {
   buildMoveResizeScript,
   buildCloseWindowScript,
   listWindows,
+  findWindows,
   focusWindow,
   minimizeWindow,
   maximizeWindow,
