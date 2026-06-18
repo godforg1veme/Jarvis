@@ -189,6 +189,44 @@ async function run() {
   assert.strictEqual(layout.ok, true);
   assert.strictEqual(windowCalls.length, 2);
 
+  const resolvedApp = await executeToolRequest({
+    action: 'app.resolve',
+    args: { query: 'code' },
+  }, {
+    appResolver: {
+      resolve: (query) => ({ ok: true, app: { name: query, type: 'exe', path: 'C:\\Code.exe' } }),
+    },
+  });
+  assert.strictEqual(resolvedApp.ok, true);
+  assert.strictEqual(resolvedApp.result.app.name, 'code');
+
+  const launchBlocked = await executeToolRequest({
+    action: 'app.launch',
+    args: { app: { name: 'Code', type: 'exe', path: 'C:\\Code.exe' } },
+  });
+  assert.strictEqual(launchBlocked.requiresConfirmation, true);
+
+  const launched = await executeToolRequest({
+    action: 'app.launch',
+    args: { app: { name: 'Code', type: 'exe', path: 'C:\\Code.exe' } },
+  }, {
+    confirmed: true,
+    launchApp: { launch: async (app) => ({ ok: true, app }) },
+  });
+  assert.strictEqual(launched.ok, true);
+  assert.strictEqual(launched.result.app.name, 'Code');
+
+  const closed = await executeToolRequest({
+    action: 'app.close',
+    args: { appId: 'code' },
+  }, {
+    confirmed: true,
+    registryApps: { code: { id: 'code', processNames: ['Code.exe'] } },
+    closeAppProcesses: async (app) => ({ ok: true, killed: app.processNames }),
+  });
+  assert.strictEqual(closed.ok, true);
+  assert.deepStrictEqual(closed.result.killed, ['Code.exe']);
+
   console.log('[testToolGateway] gateway policy tests passed');
 }
 

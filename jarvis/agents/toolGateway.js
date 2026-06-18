@@ -3,6 +3,10 @@ const path = require('path');
 const { searchFiles } = require('../tools/fileSearch');
 const { isDangerousFile, toFileCandidate } = require('../tools/fileSafety');
 const defaultWindowTools = require('../tools/windowTools');
+const defaultAppResolver = require('../tools/appResolver');
+const defaultLaunchApp = require('../tools/launchApp');
+const { apps: defaultRegistryApps } = require('../actions/appRegistry');
+const { closeAppProcesses: defaultCloseAppProcesses } = require('../actions/processKiller');
 
 const POLICY = {
   OBSERVE: 'observe',
@@ -405,6 +409,39 @@ async function executeWindowLayout(args, options = {}) {
   return { ok: true, action: 'window.layout', policy: POLICY.CONFIRM, results };
 }
 
+async function executeAppAction(action, args, options = {}) {
+  const appResolver = options.appResolver || defaultAppResolver;
+  const launchApp = options.launchApp || defaultLaunchApp;
+  const registryApps = options.registryApps || defaultRegistryApps;
+  const closeAppProcesses = options.closeAppProcesses || defaultCloseAppProcesses;
+
+  if (action === 'app.resolve') {
+    const query = String(args.query || args.name || '').trim();
+    if (!query) throw new Error('app query is required');
+    const result = appResolver.resolve(query, { infoOnly: !!args.infoOnly });
+    return { ok: result.ok !== false, action, policy: POLICY.OBSERVE, result };
+  }
+
+  if (action === 'app.launch') {
+    const app = args.app || null;
+    if (!app || typeof app !== 'object') {
+      throw new Error('resolved app object is required for app.launch');
+    }
+    const result = await launchApp.launch(app);
+    return { ok: result.ok !== false, action, policy: POLICY.CONFIRM, result };
+  }
+
+  if (action === 'app.close') {
+    const appId = String(args.appId || '').trim();
+    const app = registryApps[appId];
+    if (!app) throw new Error(`unknown whitelisted app id: ${appId}`);
+    const result = await closeAppProcesses(app, options);
+    return { ok: result.ok !== false, action, policy: POLICY.CONFIRM, result };
+  }
+
+  throw new Error(`unsupported app action: ${action}`);
+}
+
 async function executeToolRequest(request, options = {}) {
   let normalized;
   try {
@@ -438,6 +475,9 @@ async function executeToolRequest(request, options = {}) {
       return await executeWindowAction(action, args, options);
     }
     if (action === 'window.layout') return await executeWindowLayout(args, options);
+    if (['app.resolve', 'app.launch', 'app.close'].includes(action)) {
+      return await executeAppAction(action, args, options);
+    }
 
     return {
       ok: false,
