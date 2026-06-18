@@ -4,6 +4,7 @@ const state = {
   events: [],
   plan: [],
   pendingConfirmation: null,
+  strongConfirmArmed: false,
 };
 
 const taskIdEl = document.getElementById('task-id');
@@ -115,6 +116,7 @@ function renderChoices(choices = []) {
 
 function setConfirmationControls(pendingConfirmation) {
   state.pendingConfirmation = pendingConfirmation || null;
+  state.strongConfirmArmed = false;
   continueBtn.textContent = pendingConfirmation
     ? pendingConfirmation.requiresStrongConfirmation ? 'Сильно подтвердить' : 'Подтвердить'
     : 'Продолжить';
@@ -226,7 +228,17 @@ document.getElementById('cancel-btn').addEventListener('click', () => sendAction
 document.getElementById('stop-btn').addEventListener('click', () => sendAction('stop_after_current_step', { taskId: state.taskId }));
 continueBtn.addEventListener('click', () => {
   if (state.pendingConfirmation) {
-    sendAction(state.pendingConfirmation.requiresStrongConfirmation ? 'strong_confirm' : 'confirm', { taskId: state.taskId });
+    if (state.pendingConfirmation.requiresStrongConfirmation) {
+      if (!state.strongConfirmArmed) {
+        state.strongConfirmArmed = true;
+        continueBtn.textContent = 'Подтверждаю риск';
+        footerStatusEl.textContent = 'Нажми еще раз, чтобы выполнить сильное подтверждение.';
+        return;
+      }
+      sendAction('strong_confirm', { taskId: state.taskId });
+      return;
+    }
+    sendAction('confirm', { taskId: state.taskId });
     return;
   }
   sendAction('continue', { taskId: state.taskId });

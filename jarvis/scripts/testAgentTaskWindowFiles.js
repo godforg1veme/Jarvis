@@ -25,6 +25,7 @@ function run() {
   assert(js.includes('needs_confirmation'));
   assert(js.includes('requires_strong_confirmation'));
   assert(js.includes('strong_confirm'));
+  assert(js.includes('Подтверждаю риск'));
   assert(preload.includes('jarvisAgentTask'));
   assert(windowModule.includes('showInactive'));
 
