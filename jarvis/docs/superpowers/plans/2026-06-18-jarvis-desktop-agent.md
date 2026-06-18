@@ -129,4 +129,5 @@ tool execution and safety.
 Verification notes:
 
 - `node voice/testCommand.js "Agent, find all png on desktop and move up to 20 files to Images"` parses `desktop_agent`, but standalone execution returns "Desktop Agent недоступен" because the CLI test does not provide Electron's `startAgentTask` callback.
+- `node scripts/testDesktopAgentClient.js` covers the demo agent flow through fake search, ordinary confirmation, strong confirmation, batch move, and final report without touching real files.
 - In-app browser blocked direct `file://` visual verification by policy. No workaround server was started.
