@@ -101,6 +101,24 @@ async function executeIntent(intent, options = {}) {
 
   }
 
+  if (intent.action === "desktop_agent") {
+
+    if (typeof options.startAgentTask !== "function") {
+
+      return {
+
+        ok: false,
+
+        message: "Desktop Agent недоступен."
+
+      };
+
+    }
+
+    return await options.startAgentTask(intent.command || intent.rawText || "");
+
+  }
+
   if (["open_file", "reveal_file", "find_file"].includes(intent.action)) {
 
     const executeFileCommand = options.executeFileCommand || (async (args) => {

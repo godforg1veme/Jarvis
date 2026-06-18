@@ -425,6 +425,7 @@ app.whenReady().then(() => {
       continueVisualDialog: handleVisualContinue,
       clearVisualContext: handleClearVisualContext,
       executeFileCommand: handleFileCommand,
+      startAgentTask: (command) => handleStartAgentTask(command, { source: 'voice' }),
       showMainWindow,
     },
   });

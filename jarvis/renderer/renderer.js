@@ -850,6 +850,39 @@ function parseFileCommandForRenderer(rawText) {
   return { action, query, location };
 }
 
+function stripAgentPrefixForRenderer(input) {
+  let command = String(input || '').trim();
+  command = command.replace(/^\/agent\s+/i, '');
+  command = command.replace(/^(агент|agent)[,\s:]*/i, '');
+  command = command.replace(/^(джарвис|jarvis)\s+(сделай|выполни задачу|разберись|организуй)[,\s:]*/i, '');
+  command = command.replace(/^(джарвис|jarvis)\s+(do|run task|handle|figure out|organize)[,\s:]*/i, '');
+  command = command.replace(/^(сделай|выполни задачу|разберись|организуй)[,\s:]*/i, '');
+  command = command.replace(/^(do|run task|handle|figure out|organize)[,\s:]*/i, '');
+  return command.trim();
+}
+
+function shouldUseAgentForRenderer(input) {
+  const raw = String(input || '').trim();
+  const text = normalizeCommandText(raw);
+  if (/^\/agent\s+/i.test(raw)) return true;
+  if (/^(агент|agent)\b/i.test(raw)) return true;
+  if (/^(джарвис|jarvis)\s+(сделай|выполни задачу|разберись|организуй)\b/i.test(raw)) return true;
+  if (/^(джарвис|jarvis)\s+(do|run task|handle|figure out|organize)\b/i.test(raw)) return true;
+  if (/^(сделай|выполни задачу|разберись|организуй)\b/i.test(raw)) return true;
+  if (/^(do|run task|handle|figure out|organize)\b/i.test(raw)) return true;
+
+  const batch = /\b(all|every|до\s+\d+|все|кажд|несколько)\b/.test(text) ||
+    /[*?]\.[a-z0-9]+/.test(text) ||
+    (/\bpng|jpg|pdf|txt\b/.test(text) && /\bmove|copy|delete|перемест|скопир|удал/i.test(text));
+  const multiStep = (/\b(and then|then|после этого|затем|и потом|а потом)\b/.test(text) || text.includes(' и ')) &&
+    ['find', 'search', 'move', 'copy', 'rename', 'delete', 'create', 'open', 'найди', 'перемести', 'скопируй', 'переименуй', 'удали', 'создай', 'открой']
+      .filter((word) => text.includes(word)).length >= 2;
+  const windowLayout = /\b(window|windows|окн|приложени|app)\b/.test(text) &&
+    /\b(left|right|top|bottom|layout|snap|columns|слева|справа|сверху|снизу|размест|располож|колонк)\b/.test(text);
+
+  return batch || multiStep || windowLayout;
+}
+
 function parseTool(input) {
   const trimmed = input.trim();
   if (trimmed.startsWith('/run ')) return 'runProgram';
@@ -863,6 +896,7 @@ function parseTool(input) {
   if (trimmed.startsWith('/aidebug')) return 'aidebug';
 
   const lower = trimmed.toLowerCase();
+  if (shouldUseAgentForRenderer(trimmed)) return 'agent';
   if (parseFileCommandForRenderer(trimmed)) return 'fileCommander';
   if (/aidebug/.test(lower)) return 'aidebug';
   if (/appinfo/.test(lower)) return 'appinfo';
@@ -884,7 +918,7 @@ function parseArgs(input, toolName) {
     case 'refresh':
       return {};
     case 'agent':
-      return { command: trimmed.slice(7).trim() };
+      return { command: stripAgentPrefixForRenderer(trimmed) };
     case 'addapp': {
       const rest = trimmed.slice(8).trim();
       const match = rest.match(/^(\S+)\s+"(.+)"$/);

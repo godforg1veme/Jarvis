@@ -5,6 +5,7 @@ const {
   isClearVisualContextCommand,
 } = require("../tools/visualCommandMatcher");
 const { parseFileCommand } = require("../tools/fileCommandParser");
+const { parseAgentCommand } = require("../agents/agentRouter");
 
 const wakeAliases = [
   "РґР¶Р°СЂРІРёСЃ",
@@ -93,6 +94,18 @@ function isTranslateSelectedCommand(text) {
 
 function parseIntent(rawText) {
   const text = normalizeText(rawText);
+
+  const agentCommand = parseAgentCommand(rawText);
+  if (agentCommand) {
+    return {
+      ok: true,
+      action: "desktop_agent",
+      command: agentCommand.command,
+      confidence: agentCommand.explicit ? 0.95 : 0.8,
+      source: "agent-router",
+      rawText
+    };
+  }
 
   const fileCommand = parseFileCommand(rawText);
   if (fileCommand) {
