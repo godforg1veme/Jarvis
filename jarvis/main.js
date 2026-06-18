@@ -158,9 +158,10 @@ function getDesktopAgentClient() {
   }
 
   desktopAgentClient = new DesktopAgentClient({
-    toolExecutor: (request) => executeToolRequest(request, {
+    toolExecutor: (request, executionOptions = {}) => executeToolRequest(request, {
       shell,
       workArea: screen.getPrimaryDisplay().workArea,
+      ...executionOptions,
     }),
   });
   desktopAgentClient.on('event', (event) => {
@@ -174,7 +175,7 @@ function getDesktopAgentClient() {
       });
     }
 
-    if ((event.type === 'final_report' || event.type === 'error' || event.type === 'needs_input') && event.task_id) {
+    if ((event.type === 'final_report' || event.type === 'error' || event.type === 'needs_input' || event.type === 'needs_confirmation') && event.task_id) {
       updateTask(event.task_id, {
         taskId: event.task_id,
         status: event.type,
@@ -596,6 +597,9 @@ app.whenReady().then(() => {
 
     if (action === 'cancel') {
       activeAgentTaskId = null;
+      if (desktopAgentClient && taskId) {
+        desktopAgentClient.rejectPendingTool(taskId, 'Task cancelled by user.');
+      }
       sendAgentTaskEvent({
         type: 'final_report',
         task_id: taskId,
@@ -603,6 +607,37 @@ app.whenReady().then(() => {
       });
       if (taskId) updateTask(taskId, { status: 'cancelled' });
       return { ok: true };
+    }
+
+    if (action === 'confirm' || action === 'strong_confirm') {
+      if (!desktopAgentClient || !taskId) {
+        return { ok: false, error: 'No active agent task.' };
+      }
+      const result = await desktopAgentClient.confirmPendingTool(taskId, {
+        strongConfirmed: action === 'strong_confirm',
+      });
+      sendAgentTaskEvent({
+        type: result.ok ? 'event' : 'error',
+        task_id: taskId,
+        payload: {
+          message: result.ok ? 'Подтверждение принято, продолжаю выполнение.' : result.error,
+          error: result.ok ? undefined : result.error,
+        },
+      });
+      return result;
+    }
+
+    if (action === 'reject_confirmation') {
+      if (!desktopAgentClient || !taskId) {
+        return { ok: false, error: 'No active agent task.' };
+      }
+      const result = desktopAgentClient.rejectPendingTool(taskId, 'Tool request rejected by user.');
+      sendAgentTaskEvent({
+        type: 'event',
+        task_id: taskId,
+        payload: { message: result.ok ? 'Действие отклонено.' : result.error },
+      });
+      return result;
     }
 
     if (action === 'stop_after_current_step') {

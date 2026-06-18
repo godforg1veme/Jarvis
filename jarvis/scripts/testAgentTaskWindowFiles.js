@@ -18,10 +18,13 @@ function run() {
   assert(html.includes('Desktop Agent'));
   assert(html.includes('Live process'));
   assert(html.includes('Plan draft'));
+  assert(html.includes('reject-btn'));
   assert(css.includes('grid-template-columns: 190px'));
   assert(css.includes('.limits'));
   assert(js.includes('needs_input'));
+  assert(js.includes('needs_confirmation'));
   assert(js.includes('requires_strong_confirmation'));
+  assert(js.includes('strong_confirm'));
   assert(preload.includes('jarvisAgentTask'));
   assert(windowModule.includes('showInactive'));
 

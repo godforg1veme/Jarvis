@@ -240,6 +240,7 @@ h1 {
   color: #b8c7dc;
   font-size: 13px;
   line-height: 1.45;
+  white-space: pre-line;
 }
 
 .choices {
@@ -317,6 +318,11 @@ h1 {
 
 .plan-step.strong {
   background: #3a2d22;
+}
+
+.plan-step.disabled {
+  opacity: .48;
+  text-decoration: line-through;
 }
 
 .footer-status {

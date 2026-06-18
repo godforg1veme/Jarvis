@@ -3,6 +3,7 @@ const path = require('path');
 const { EventEmitter } = require('events');
 const { spawn } = require('child_process');
 const readline = require('readline');
+const { normalizePlanEvent } = require('./planNormalizer');
 
 const ROOT = path.join(__dirname, '..');
 const SERVER_PATH = path.join(ROOT, 'agent_runtime', 'server.py');
@@ -33,6 +34,7 @@ class DesktopAgentClient extends EventEmitter {
     this.pending = new Map();
     this.ready = false;
     this.stderrBuffer = [];
+    this.pendingToolConfirmations = new Map();
   }
 
   isRunning() {
@@ -174,6 +176,10 @@ class DesktopAgentClient extends EventEmitter {
       return;
     }
 
+    if (event.type === 'plan_draft') {
+      event = normalizePlanEvent(event);
+    }
+
     if (event.type === 'ready') {
       this.ready = true;
       this.emit('ready', event);
@@ -204,21 +210,78 @@ class DesktopAgentClient extends EventEmitter {
 
     const payload = event.payload || {};
     const requestId = payload.request_id || payload.requestId || '';
+    const taskId = event.task_id || '';
+    const request = {
+      requestId,
+      action: payload.action,
+      policy: payload.policy,
+      args: payload.args || {},
+      taskId,
+    };
+
     try {
-      const result = await this.toolExecutor({
-        requestId,
-        action: payload.action,
-        policy: payload.policy,
-        args: payload.args || {},
-        taskId: event.task_id,
-      });
-      this.send('tool_result', { request_id: requestId, result }, { taskId: event.task_id });
+      const result = await this.toolExecutor(request, {});
+      if (result && (result.requiresConfirmation || result.requiresStrongConfirmation)) {
+        this.pendingToolConfirmations.set(taskId, { request, result });
+        const confirmationEvent = {
+          type: 'needs_confirmation',
+          task_id: taskId,
+          payload: {
+            phase: 'needs_confirmation',
+            request,
+            result,
+            message: result.message || 'Confirmation is required.',
+          },
+        };
+        this.emit('event', confirmationEvent);
+        if (taskId) this.emit(`task:${taskId}`, confirmationEvent);
+        return;
+      }
+
+      this.send('tool_result', { request_id: requestId, result }, { taskId });
     } catch (error) {
       this.send('tool_result', {
         request_id: requestId,
         result: { ok: false, error: error.message },
-      }, { taskId: event.task_id });
+      }, { taskId });
     }
+  }
+
+  async confirmPendingTool(taskId, options = {}) {
+    const pending = this.pendingToolConfirmations.get(taskId);
+    if (!pending) {
+      return { ok: false, error: 'No pending tool confirmation for task.' };
+    }
+
+    const executionOptions = pending.result.requiresStrongConfirmation
+      ? { strongConfirmed: !!options.strongConfirmed }
+      : { confirmed: true };
+
+    if (pending.result.requiresStrongConfirmation && !executionOptions.strongConfirmed) {
+      return { ok: false, error: 'Strong confirmation is required.' };
+    }
+
+    const result = await this.toolExecutor(pending.request, executionOptions);
+    this.pendingToolConfirmations.delete(taskId);
+    this.send('tool_result', {
+      request_id: pending.request.requestId,
+      result,
+    }, { taskId });
+    return { ok: true, result };
+  }
+
+  rejectPendingTool(taskId, reason = 'Tool request rejected by user.') {
+    const pending = this.pendingToolConfirmations.get(taskId);
+    if (!pending) {
+      return { ok: false, error: 'No pending tool confirmation for task.' };
+    }
+
+    this.pendingToolConfirmations.delete(taskId);
+    this.send('tool_result', {
+      request_id: pending.request.requestId,
+      result: { ok: false, cancelled: true, error: reason },
+    }, { taskId });
+    return { ok: true };
   }
 }
 

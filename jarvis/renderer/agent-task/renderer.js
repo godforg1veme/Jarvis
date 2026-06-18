@@ -3,6 +3,7 @@ const state = {
   phase: 'created',
   events: [],
   plan: [],
+  pendingConfirmation: null,
 };
 
 const taskIdEl = document.getElementById('task-id');
@@ -15,10 +16,17 @@ const eventListEl = document.getElementById('event-list');
 const planListEl = document.getElementById('plan-list');
 const footerStatusEl = document.getElementById('footer-status');
 const policyBadgesEl = document.getElementById('policy-badges');
+const continueBtn = document.getElementById('continue-btn');
+const rejectBtn = document.getElementById('reject-btn');
 
 function sendAction(action, payload = {}) {
   if (!window.jarvisAgentTask || typeof window.jarvisAgentTask.sendAction !== 'function') return;
   window.jarvisAgentTask.sendAction(action, payload);
+}
+
+function phaseOrder(phase) {
+  return ['created', 'observing', 'planning', 'needs_input', 'needs_confirmation', 'executing', 'finalized', 'failed']
+    .indexOf(phase);
 }
 
 function setPhase(phase) {
@@ -28,11 +36,6 @@ function setPhase(phase) {
     el.classList.toggle('active', name === state.phase);
     el.classList.toggle('done', phaseOrder(name) < phaseOrder(state.phase));
   });
-}
-
-function phaseOrder(phase) {
-  return ['created', 'observing', 'planning', 'needs_input', 'needs_confirmation', 'executing', 'finalized', 'failed']
-    .indexOf(phase);
 }
 
 function shortPath(value) {
@@ -66,7 +69,10 @@ function renderPlan(plan = []) {
 
   plan.forEach((step, index) => {
     const div = document.createElement('div');
-    div.className = `plan-step${step.policy === 'requires_strong_confirmation' ? ' strong' : ''}`;
+    const classes = ['plan-step'];
+    if (step.policy === 'requires_strong_confirmation') classes.push('strong');
+    if (step.enabled === false) classes.push('disabled');
+    div.className = classes.join(' ');
     div.title = JSON.stringify(step.args || {}, null, 2);
     div.textContent = `${index + 1}. ${step.title || step.action || step.id}`;
     planListEl.appendChild(div);
@@ -107,6 +113,23 @@ function renderChoices(choices = []) {
   });
 }
 
+function setConfirmationControls(pendingConfirmation) {
+  state.pendingConfirmation = pendingConfirmation || null;
+  continueBtn.textContent = pendingConfirmation
+    ? pendingConfirmation.requiresStrongConfirmation ? 'Сильно подтвердить' : 'Подтвердить'
+    : 'Продолжить';
+  rejectBtn.hidden = !pendingConfirmation;
+}
+
+function describeToolRequest(request = {}) {
+  const args = request.args || {};
+  const parts = [request.action].filter(Boolean);
+  for (const key of ['path', 'from', 'to', 'destination', 'appId', 'hwnd']) {
+    if (args[key]) parts.push(`${key}: ${shortPath(args[key])}`);
+  }
+  return parts.join('\n') || 'Jarvis просит разрешение на действие.';
+}
+
 function applyState(nextState = {}) {
   if (nextState.task_id) {
     state.taskId = nextState.task_id;
@@ -144,6 +167,23 @@ function applyEvent(event) {
     renderPlan(Array.isArray(plan) ? plan : []);
     currentTitleEl.textContent = 'План подготовлен';
     currentBodyEl.textContent = 'Проверь шаги и дождись следующего действия Jarvis.';
+    setConfirmationControls(null);
+  }
+
+  if (event.type === 'needs_confirmation') {
+    const payload = event.payload || {};
+    const result = payload.result || {};
+    const request = payload.request || {};
+    setPhase('needs_confirmation');
+    taskStatusEl.textContent = 'Сейчас: нужно подтверждение';
+    currentTitleEl.textContent = result.requiresStrongConfirmation
+      ? 'Нужно сильное подтверждение'
+      : 'Нужно подтверждение';
+    currentBodyEl.textContent = `${payload.message || 'Подтверди действие агента.'}\n${describeToolRequest(request)}`;
+    setConfirmationControls({
+      requiresStrongConfirmation: !!result.requiresStrongConfirmation,
+    });
+    renderChoices([]);
   }
 
   if (event.type === 'needs_input') {
@@ -155,6 +195,7 @@ function applyEvent(event) {
     currentTitleEl.textContent = askStep ? askStep.title : 'Нужно уточнение';
     currentBodyEl.textContent = (askStep && askStep.args && askStep.args.question) || 'Выбери вариант или ответь голосом.';
     renderChoices((askStep && askStep.args && askStep.args.choices) || []);
+    setConfirmationControls(null);
   }
 
   if (event.type === 'final_report') {
@@ -162,6 +203,7 @@ function applyEvent(event) {
     applyState(runtimeState || {});
     currentTitleEl.textContent = 'Отчет готов';
     currentBodyEl.textContent = event.payload && event.payload.message ? event.payload.message : 'Задача завершена.';
+    setConfirmationControls(null);
   }
 
   if (event.type === 'error') {
@@ -172,7 +214,7 @@ function applyEvent(event) {
 
   state.events.push({
     type: event.type,
-    kind: event.type === 'needs_input' ? 'wait' : event.type,
+    kind: event.type === 'needs_input' || event.type === 'needs_confirmation' ? 'wait' : event.type,
     message: event.payload && (event.payload.message || event.payload.error || event.payload.phase),
     payload: event.payload,
   });
@@ -182,11 +224,19 @@ function applyEvent(event) {
 
 document.getElementById('cancel-btn').addEventListener('click', () => sendAction('cancel', { taskId: state.taskId }));
 document.getElementById('stop-btn').addEventListener('click', () => sendAction('stop_after_current_step', { taskId: state.taskId }));
-document.getElementById('continue-btn').addEventListener('click', () => sendAction('continue', { taskId: state.taskId }));
+continueBtn.addEventListener('click', () => {
+  if (state.pendingConfirmation) {
+    sendAction(state.pendingConfirmation.requiresStrongConfirmation ? 'strong_confirm' : 'confirm', { taskId: state.taskId });
+    return;
+  }
+  sendAction('continue', { taskId: state.taskId });
+});
+rejectBtn.addEventListener('click', () => sendAction('reject_confirmation', { taskId: state.taskId }));
 document.getElementById('hide-btn').addEventListener('click', () => sendAction('hide', { taskId: state.taskId }));
 
 renderEvents();
 renderPlan();
+setConfirmationControls(null);
 
 if (window.jarvisAgentTask && typeof window.jarvisAgentTask.onEvent === 'function') {
   window.jarvisAgentTask.onEvent(applyEvent);

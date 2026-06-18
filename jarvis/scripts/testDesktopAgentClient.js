@@ -44,6 +44,51 @@ async function testClient() {
   }
 }
 
+async function testPendingConfirmation() {
+  const sent = [];
+  const executorCalls = [];
+  const client = new DesktopAgentClient({
+    toolExecutor: async (request, options = {}) => {
+      executorCalls.push({ request, options });
+      if (options.confirmed) {
+        return { ok: true, action: request.action };
+      }
+      return {
+        ok: false,
+        action: request.action,
+        requiresConfirmation: true,
+        message: 'confirm',
+      };
+    },
+  });
+  client.send = (type, payload, options = {}) => {
+    sent.push({ type, payload, options });
+    return 'sent';
+  };
+
+  const events = [];
+  client.on('event', (event) => events.push(event));
+  await client.handleToolRequest({
+    type: 'tool_request',
+    task_id: 'confirm-task',
+    payload: {
+      request_id: 'req-1',
+      action: 'file.move',
+      args: { from: 'a', to: 'b' },
+    },
+  });
+
+  assert.strictEqual(sent.length, 0);
+  assert.strictEqual(events[0].type, 'needs_confirmation');
+  assert.strictEqual(client.pendingToolConfirmations.has('confirm-task'), true);
+
+  const confirmed = await client.confirmPendingTool('confirm-task');
+  assert.strictEqual(confirmed.ok, true);
+  assert.strictEqual(executorCalls[1].options.confirmed, true);
+  assert.strictEqual(sent[0].type, 'tool_result');
+  assert.strictEqual(sent[0].payload.result.ok, true);
+}
+
 function testHistory() {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-agent-history-'));
   const historyPath = path.join(tempDir, 'agent-history.json');
@@ -71,6 +116,7 @@ function testHistory() {
 
 async function run() {
   await testClient();
+  await testPendingConfirmation();
   testHistory();
   console.log('[testDesktopAgentClient] client and history tests passed');
 }
