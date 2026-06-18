@@ -155,6 +155,40 @@ async function run() {
   assert.strictEqual(tooMany.ok, false);
   assert.match(tooMany.error, /batch limit exceeded/);
 
+  const windowCalls = [];
+  const fakeWindowTools = {
+    listWindows: async () => [{ hwnd: 1, title: 'Code' }],
+    focusWindow: async (hwnd) => ({ ok: true, hwnd }),
+    restoreWindow: async (hwnd) => ({ ok: true, hwnd }),
+    closeWindow: async (hwnd) => ({ ok: true, hwnd }),
+    moveResizeWindow: async (hwnd, rect) => {
+      windowCalls.push({ hwnd, rect });
+      return { ok: true };
+    },
+    snapRect: (position) => ({ x: position === 'right' ? 500 : 0, y: 0, width: 500, height: 800 }),
+    multiWindowLayout: () => [
+      { x: 0, y: 0, width: 500, height: 800 },
+      { x: 500, y: 0, width: 500, height: 800 },
+    ],
+  };
+
+  const windows = await executeToolRequest({ action: 'window.list', args: {} }, { windowTools: fakeWindowTools });
+  assert.strictEqual(windows.ok, true);
+  assert.strictEqual(windows.windows[0].title, 'Code');
+
+  const focused = await executeToolRequest({ action: 'window.focus', args: { hwnd: 1 } }, { windowTools: fakeWindowTools });
+  assert.strictEqual(focused.ok, true);
+
+  const closeBlocked = await executeToolRequest({ action: 'window.close', args: { hwnd: 1 } }, { windowTools: fakeWindowTools });
+  assert.strictEqual(closeBlocked.requiresConfirmation, true);
+
+  const layout = await executeToolRequest({
+    action: 'window.layout',
+    args: { hwnds: [1, 2], layout: 'two-columns' },
+  }, { windowTools: fakeWindowTools, confirmed: true });
+  assert.strictEqual(layout.ok, true);
+  assert.strictEqual(windowCalls.length, 2);
+
   console.log('[testToolGateway] gateway policy tests passed');
 }
 

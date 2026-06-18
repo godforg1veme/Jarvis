@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { searchFiles } = require('../tools/fileSearch');
 const { isDangerousFile, toFileCandidate } = require('../tools/fileSafety');
+const defaultWindowTools = require('../tools/windowTools');
 
 const POLICY = {
   OBSERVE: 'observe',
@@ -328,6 +329,82 @@ async function executeBatch(action, args, options = {}) {
   return { ok: true, action, policy: POLICY.STRONG, results };
 }
 
+function normalizeHwnd(value) {
+  const hwnd = Number(value);
+  if (!Number.isFinite(hwnd) || hwnd <= 0) {
+    throw new Error('valid hwnd is required');
+  }
+  return hwnd;
+}
+
+async function executeWindowAction(action, args, options = {}) {
+  const windowTools = options.windowTools || defaultWindowTools;
+
+  if (action === 'window.list') {
+    const windows = await windowTools.listWindows(options);
+    return { ok: true, action, policy: POLICY.OBSERVE, windows };
+  }
+
+  const hwnd = normalizeHwnd(args.hwnd);
+
+  if (action === 'window.focus') {
+    const result = await windowTools.focusWindow(hwnd, options);
+    return { ok: result.ok !== false, action, policy: POLICY.LOW_RISK, hwnd, result };
+  }
+  if (action === 'window.restore') {
+    const result = await windowTools.restoreWindow(hwnd, options);
+    return { ok: result.ok !== false, action, policy: POLICY.LOW_RISK, hwnd, result };
+  }
+  if (action === 'window.close') {
+    const result = await windowTools.closeWindow(hwnd, options);
+    return { ok: result.ok !== false, action, policy: POLICY.CONFIRM, hwnd, result };
+  }
+  if (action === 'window.move' || action === 'window.resize') {
+    const rect = {
+      x: Number(args.x),
+      y: Number(args.y),
+      width: Number(args.width),
+      height: Number(args.height),
+    };
+    if (![rect.x, rect.y, rect.width, rect.height].every(Number.isFinite)) {
+      throw new Error('window rectangle requires x, y, width, and height');
+    }
+    const result = await windowTools.moveResizeWindow(hwnd, rect, options);
+    return { ok: result.ok !== false, action, policy: POLICY.CONFIRM, hwnd, rect, result };
+  }
+
+  throw new Error(`unsupported window action: ${action}`);
+}
+
+async function executeWindowLayout(args, options = {}) {
+  const windowTools = options.windowTools || defaultWindowTools;
+  const workArea = args.workArea || options.workArea;
+  const items = Array.isArray(args.items) ? args.items : [];
+
+  if (items.length > 0) {
+    const results = [];
+    for (const item of items) {
+      const hwnd = normalizeHwnd(item.hwnd);
+      const rect = item.rect || windowTools.snapRect(item.position, workArea);
+      results.push(await windowTools.moveResizeWindow(hwnd, rect, options));
+    }
+    return { ok: true, action: 'window.layout', policy: POLICY.CONFIRM, results };
+  }
+
+  const hwnds = Array.isArray(args.hwnds) ? args.hwnds.map(normalizeHwnd) : [];
+  const layout = args.layout || 'two-columns';
+  const rects = windowTools.multiWindowLayout(layout, workArea);
+  if (hwnds.length === 0 || hwnds.length > rects.length) {
+    throw new Error('layout requires hwnds matching available layout slots');
+  }
+
+  const results = [];
+  for (let index = 0; index < hwnds.length; index += 1) {
+    results.push(await windowTools.moveResizeWindow(hwnds[index], rects[index], options));
+  }
+  return { ok: true, action: 'window.layout', policy: POLICY.CONFIRM, results };
+}
+
 async function executeToolRequest(request, options = {}) {
   let normalized;
   try {
@@ -357,6 +434,10 @@ async function executeToolRequest(request, options = {}) {
     if (['file.move_batch', 'file.copy_batch', 'file.rename_batch', 'file.delete_batch'].includes(action)) {
       return await executeBatch(action, args, options);
     }
+    if (['window.list', 'window.focus', 'window.restore', 'window.close', 'window.move', 'window.resize'].includes(action)) {
+      return await executeWindowAction(action, args, options);
+    }
+    if (action === 'window.layout') return await executeWindowLayout(args, options);
 
     return {
       ok: false,
