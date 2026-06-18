@@ -30,9 +30,10 @@ tool execution and safety.
   BrowserWindow without stealing focus.
 - [x] Add `renderer/agent-task/` HTML/CSS/JS using the approved B v3 layout.
 - [x] Add preload exposure for agent task events/actions only.
-- [ ] Add IPC for cancel, stop-after-current-step, confirm, strong confirm,
-  disable steps, and user input.
-- [ ] Add a smoke path that opens the task window and displays a simple plan.
+- [x] Add IPC for cancel, stop-after-current-step, confirm, strong confirm,
+  and user input.
+- [ ] Add IPC for disabling plan steps.
+- [x] Add a smoke path that opens the task window and displays a simple plan.
 
 ## Phase 3: Smart Router And Escalation
 
@@ -42,7 +43,7 @@ tool execution and safety.
 - [x] Integrate voice routing for agent triggers.
 - [ ] Transfer existing fast-path candidates/confirmations into an agent task.
 - [ ] Explain auto-escalation in the task timeline.
-- [ ] Enforce one active task at a time.
+- [x] Enforce one active task at a time.
 - [x] Add router tests for simple local commands, `/agent`, natural triggers,
   multi-step commands, and escalation on `needsSelection`/`needsConfirmation`.
 
@@ -53,13 +54,13 @@ tool execution and safety.
   `requires_confirmation`, `requires_strong_confirmation`.
 - [x] Validate every Python tool request before execution.
 - [x] Normalize paths and reject malformed requests.
-- [ ] Normalize app ids and window ids through local resolvers.
+- [x] Normalize app ids and window ids through local resolvers.
 - [x] Return structured observations and errors to Python.
 - [x] Add tests for allowed, rejected, malformed, and policy-requiring requests.
 
 ## Phase 5: File/Folder Mutation Tools
 
-- [ ] Extend file tools to handle folders as first-class candidates.
+- [x] Extend file tools to handle folders as first-class candidates.
 - [x] Add create folder.
 - [x] Add rename.
 - [x] Add move.
@@ -90,16 +91,17 @@ tool execution and safety.
 
 ## Phase 8: Planning, Input, Confirmation, And Execution
 
-- [ ] Normalize Python draft plans into concrete Node plans.
-- [ ] Add dependency checks for disabled steps.
-- [ ] Add candidate-first `ask_user` UI and voice selection support.
-- [ ] Add ordinary confirmation.
-- [ ] Add two-step strong confirmation in UI.
+- [x] Normalize Python draft plans into concrete Node plans.
+- [x] Add dependency checks for disabled steps.
+- [x] Add candidate-first `ask_user` UI.
+- [ ] Add voice selection support for `ask_user` steps.
+- [x] Add ordinary confirmation.
+- [x] Add two-step strong confirmation in UI.
 - [ ] Add two-step strong confirmation by voice: `понимаю`, then
   `подтверждаю`.
 - [ ] Execute plans step by step through the gateway.
-- [ ] Stop on first execution error.
-- [ ] Produce compact final reports with completed/skipped/failed steps.
+- [x] Stop on first execution error.
+- [x] Produce compact final reports with completed/skipped/failed steps.
 
 ## Phase 9: Agent LLM
 
