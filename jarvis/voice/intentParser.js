@@ -107,28 +107,10 @@ function parseIntent(rawText) {
     };
   }
 
-  const fileCommand = parseFileCommand(rawText);
-  if (fileCommand) {
-    const actionMap = {
-      open: "open_file",
-      reveal: "reveal_file",
-      find: "find_file",
-    };
-
-    return {
-      ok: true,
-      action: actionMap[fileCommand.action],
-      query: fileCommand.query,
-      location: fileCommand.location,
-      confidence: 0.9,
-      source: "regex",
-      rawText
-    };
-  }
-
   const hasWake = includesAny(text, wakeAliases);
   const hasLaunch = includesAny(text, launchWords);
   const hasClose = includesAny(text, closeWords);
+  const app = findAppByAlias(text);
 
   if (isTranslateSelectedCommand(text)) {
     return {
@@ -170,8 +152,6 @@ function parseIntent(rawText) {
     };
   }
 
-  const app = findAppByAlias(text);
-
   if (hasWake && hasClose && app) {
     return {
       ok: true,
@@ -189,6 +169,25 @@ function parseIntent(rawText) {
       action: "launch_app",
       appId: app.id,
       confidence: 0.95,
+      source: "regex",
+      rawText
+    };
+  }
+
+  const fileCommand = parseFileCommand(rawText);
+  if (fileCommand) {
+    const actionMap = {
+      open: "open_file",
+      reveal: "reveal_file",
+      find: "find_file",
+    };
+
+    return {
+      ok: true,
+      action: actionMap[fileCommand.action],
+      query: fileCommand.query,
+      location: fileCommand.location,
+      confidence: 0.9,
       source: "regex",
       rawText
     };

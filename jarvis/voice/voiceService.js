@@ -4,14 +4,19 @@ const path = require('path');
 const { parseIntent } = require('./intentParser');
 const { executeIntent } = require('../actions/executeIntent');
 const defaultTtsService = require('../tts/ttsService');
+const {
+  getSttSettings,
+  resolveSttPythonPath,
+  sttSettingsPath,
+} = require('./sttSettings');
 
 const COOLDOWN_MS = 2500;
-const READY_TIMEOUT_MS = 10000;
+const DEFAULT_READY_TIMEOUT_MS = 10000;
 const MIC_GRAB_TIME_MS = 2000; // time to show window for getUserMedia
 const AUDIO_CAPTURE_START_RETRY_MS = 300;
 
 /**
- * VoiceService — manages Vosk worker lifecycle and background audio capture.
+ * VoiceService — manages STT worker lifecycle and background audio capture.
  * Uses a hidden BrowserWindow that is briefly shown to acquire the microphone,
  * then hidden. Audio continues because backgroundThrottling: false.
  */
@@ -30,6 +35,8 @@ class VoiceService {
     this.onStateChange = typeof options.onStateChange === 'function' ? options.onStateChange : null;
     this.ttsService = options.ttsService || defaultTtsService;
     this.intentOptions = options.intentOptions || {};
+    this.sttSettings = options.sttSettings || getSttSettings();
+    this.activeSttProvider = null;
     this.pendingVoiceConfirmation = null;
     this.pendingVoiceSelection = null;
   }
@@ -64,15 +71,23 @@ class VoiceService {
 
   // --- Worker lifecycle ---
 
-  startWorker() {
-    if (this.workerProcess) {
-      this.broadcastStatus('error', 'Worker already running.');
-      return false;
+  _buildWorkerLaunch() {
+    const provider = String(this.sttSettings.provider || 'vosk').toLowerCase();
+
+    if (provider === 'faster-whisper' || provider === 'faster_whisper') {
+      const pythonPath = resolveSttPythonPath(this.sttSettings);
+      return {
+        provider: 'faster-whisper',
+        command: pythonPath,
+        args: [
+          path.join(__dirname, '..', 'stt_runtime', 'faster_whisper_worker.py'),
+          '--settings',
+          sttSettingsPath(),
+        ],
+        cwd: path.join(__dirname, '..'),
+        readyTimeoutMs: Number(this.sttSettings.readyTimeoutMs || 90000),
+      };
     }
-    this.workerReady = false;
-    this.stopRequested = false;
-    this._workerGeneration++;
-    const gen = this._workerGeneration;
 
     const workerPath = path.join(__dirname, 'voskWorker.js');
     let resolvedNode = process.env.JARVIS_NODE_EXE || 'node';
@@ -83,13 +98,35 @@ class VoiceService {
       } catch (e) { resolvedNode = 'node'; }
     }
 
+    return {
+      provider: 'vosk',
+      command: resolvedNode,
+      args: [workerPath],
+      cwd: path.join(__dirname, '..'),
+      readyTimeoutMs: Number(this.sttSettings.readyTimeoutMs || DEFAULT_READY_TIMEOUT_MS),
+    };
+  }
+
+  startWorker() {
+    if (this.workerProcess) {
+      this.broadcastStatus('error', 'Worker already running.');
+      return false;
+    }
+    this.workerReady = false;
+    this.stopRequested = false;
+    this._workerGeneration++;
+    const gen = this._workerGeneration;
+
+    const launch = this._buildWorkerLaunch();
+    this.activeSttProvider = launch.provider;
+
     try {
-      this.workerProcess = spawn(resolvedNode, [workerPath], {
-        cwd: path.join(__dirname, '..'),
+      this.workerProcess = spawn(launch.command, launch.args, {
+        cwd: launch.cwd,
         stdio: ['pipe', 'pipe', 'pipe'],
       });
     } catch (e) {
-      this.broadcastStatus('error', `Failed to spawn worker: ${e.message}.`);
+      this.broadcastStatus('error', `Failed to spawn ${launch.provider} worker: ${e.message}.`);
       this.workerProcess = null;
       return false;
     }
@@ -137,10 +174,10 @@ class VoiceService {
 
     this.readyTimeout = setTimeout(() => {
       if (!this.workerReady && this.workerProcess && gen === this._workerGeneration) {
-        this.broadcastStatus('error', 'Worker timeout: Vosk model took too long to load.');
+        this.broadcastStatus('error', `Worker timeout: ${launch.provider} model took too long to load.`);
         try { this.workerProcess.kill(); } catch (e) {}
       }
-    }, READY_TIMEOUT_MS);
+    }, launch.readyTimeoutMs);
 
     return true;
   }
@@ -176,7 +213,9 @@ class VoiceService {
     if (msg.type === 'ready') {
       this.workerReady = true;
       this._clearReadyTimeout();
-      this.broadcastStatus('ready', 'Готово. Скажите: джарвис включи доту');
+      const provider = msg.provider || this.activeSttProvider || 'stt';
+      const model = msg.model ? ` ${msg.model}` : '';
+      this.broadcastStatus('ready', `Готово (${provider}${model}). Скажите: джарвис включи доту`);
       return;
     }
     if (msg.type === 'partial') {

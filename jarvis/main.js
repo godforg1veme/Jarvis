@@ -40,6 +40,7 @@ let voiceService = null;
 let desktopAgentClient = null;
 let activeAgentTaskId = null;
 let lastExternalForegroundHwnd = null;
+let suppressNextDesktopAgentExit = false;
 const HISTORY_PATH = path.join(__dirname, 'data', 'history.json');
 const APPS_PATH = path.join(__dirname, 'data', 'apps.default.json');
 
@@ -188,6 +189,11 @@ function getDesktopAgentClient() {
     }
   });
   desktopAgentClient.on('exit', (event) => {
+    if (suppressNextDesktopAgentExit) {
+      suppressNextDesktopAgentExit = false;
+      return;
+    }
+
     sendAgentTaskEvent({
       type: 'error',
       task_id: activeAgentTaskId,
@@ -198,6 +204,17 @@ function getDesktopAgentClient() {
   });
   desktopAgentClient.start();
   return desktopAgentClient;
+}
+
+function stopDesktopAgentClient(options = {}) {
+  if (!desktopAgentClient) return;
+
+  if (options.silent && desktopAgentClient.isRunning()) {
+    suppressNextDesktopAgentExit = true;
+  }
+
+  desktopAgentClient.stop();
+  desktopAgentClient = null;
 }
 
 async function handleStartAgentTask(command, options = {}) {
@@ -220,6 +237,9 @@ async function handleStartAgentTask(command, options = {}) {
   showAgentTaskWindow({ noFocus: true });
 
   try {
+    // Restart the Python runtime for new tasks so planner/tool fixes are not
+    // hidden behind a stale long-lived process.
+    stopDesktopAgentClient({ silent: true });
     const client = getDesktopAgentClient();
     await client.waitUntilReady();
     const { taskId } = client.startTask(userCommand, options);
@@ -395,7 +415,20 @@ function shutdownApp() {
   app.quit();
 }
 
+// Prevent multiple instances before app.whenReady() starts registering shortcuts.
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (app.isReady()) {
+      toggleWindow();
+    }
+  });
+}
+
 // --- App Ready ---
+if (gotTheLock) {
 app.whenReady().then(() => {
   const startHidden = process.argv.includes('--hidden');
 
@@ -693,21 +726,12 @@ app.whenReady().then(() => {
     }
   }, 1500);
 });
+}
 
 // --- Cleanup ---
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
 });
-
-// Prevent multiple instances
-const gotTheLock = app.requestSingleInstanceLock();
-if (!gotTheLock) {
-  app.quit();
-} else {
-  app.on('second-instance', () => {
-    toggleWindow();
-  });
-}
 
 // Ensure shutdown on app quit
 app.on('before-quit', () => {

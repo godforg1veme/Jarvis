@@ -17,13 +17,33 @@ const apps = {
     safeNoConfirm: true
   },
 
+  browser: {
+    id: "browser",
+    displayName: "Браузер",
+    aliases: [
+      "браузер",
+      "browser",
+      "интернет",
+      "приложение для сайтов"
+    ],
+    type: "path",
+    possiblePaths: [
+      "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
+      "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+      "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+      "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+      "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
+    ],
+    processNames: ["firefox.exe", "chrome.exe", "msedge.exe"],
+    safeNoConfirm: true
+  },
+
   chrome: {
     id: "chrome",
     displayName: "Google Chrome",
     aliases: [
       "хром",
       "chrome",
-      "браузер",
       "гугл хром"
     ],
     type: "path",
@@ -41,9 +61,17 @@ const apps = {
     aliases: [
       "фаерфокс",
       "фаер фокс",
+      "файрфокс",
+      "файр фокс",
+      "файерфокс",
+      "файер фокс",
+      "фйар фокс",
       "firefox",
+      "fire fox",
       "мозила",
       "mozila",
+      "mozilla",
+      "mozilla firefox",
       "лиса",
       "огненный лис"
     ],

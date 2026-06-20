@@ -9,6 +9,7 @@ const { POLICY } = require('../agents/toolGateway');
 
 function run() {
   assert.strictEqual(policyForPlanAction('file.move', 'observe'), POLICY.CONFIRM);
+  assert.strictEqual(policyForPlanAction('file.create_text_file', 'observe'), POLICY.CONFIRM);
   assert.strictEqual(policyForPlanAction('ask_user', ''), POLICY.OBSERVE);
 
   const normalized = normalizePlanDraft([

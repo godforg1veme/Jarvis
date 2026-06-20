@@ -1,0 +1,4 @@
+faster-whisper>=1.2.0
+numpy>=1.26.0
+nvidia-cublas-cu12
+nvidia-cudnn-cu12==9.*

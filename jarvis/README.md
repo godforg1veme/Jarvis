@@ -2,7 +2,7 @@
 
 Jarvis is a personal Windows desktop assistant built with Electron and Node.js.
 It provides a Spotlight-like launcher, app launching, local tools, command
-history, Vosk voice recognition, text-to-speech, and optional AI intent
+history, local speech recognition, text-to-speech, and optional AI intent
 resolution.
 
 ## Project Layout
@@ -10,7 +10,8 @@ resolution.
 - `main.js` - Electron lifecycle, tray, global shortcuts, IPC, and app windows.
 - `preload.js` - safe renderer bridge.
 - `renderer/` - launcher UI and voice capture renderer code.
-- `voice/` - Vosk worker, recognizer, audio capture window, and intent parsing.
+- `voice/` - speech worker selection, audio capture window, and intent parsing.
+- `stt_runtime/` - optional Python runtime for faster-whisper speech recognition.
 - `tts/` - provider-based text-to-speech service for Silero and Piper.
 - `actions/` - intent execution helpers such as app launch and process actions.
 - `tools/` - local tools, app resolver/indexer, AI client, screen vision, and selection helpers.
@@ -26,8 +27,10 @@ node scripts/ensureTts.js
 ```
 
 `scripts/ensureTts.js` prepares local TTS dependencies and downloads voice
-models into `voices/`. Vosk models live in `models/`. Both directories are
-ignored because they are large machine-local assets.
+models into `voices/`. `scripts/ensureStt.js` prepares the optional
+faster-whisper Python runtime in `stt_runtime/.venv`. Vosk models live in
+`models/`. These machine-local assets are ignored when they are large or
+generated.
 
 ## Run
 
@@ -41,6 +44,9 @@ npm start
 
 ```powershell
 node scripts/testVoskLoad.js
+node scripts/ensureStt.js
+node scripts/testSttSettings.js
+node scripts/testVoiceServiceSttProvider.js
 node voice/testCommand.js "джарвис включи доту"
 node scripts/testTtsProvider.js
 node scripts/testSileroService.js

@@ -22,6 +22,7 @@ function makeTempTree() {
 async function run() {
   assert.strictEqual(policyForAction('file.search'), POLICY.OBSERVE);
   assert.strictEqual(policyForAction('file.move_batch'), POLICY.STRONG);
+  assert.strictEqual(policyForAction('file.create_text_file'), POLICY.CONFIRM);
   assert.throws(() => validateToolRequest({ action: 'file.nope', args: {} }), /unknown tool action/);
 
   const root = makeTempTree();
@@ -87,6 +88,26 @@ async function run() {
   }, { allowRoots: [root], confirmed: true });
   assert.strictEqual(createdAgain.ok, true);
   assert.strictEqual(path.basename(createdAgain.path), 'Images (1)');
+
+  const textBlocked = await executeToolRequest({
+    action: 'file.create_text_file',
+    args: { path: path.join(root, 'note.txt') },
+  }, { allowRoots: [root] });
+  assert.strictEqual(textBlocked.requiresConfirmation, true);
+
+  const textFile = await executeToolRequest({
+    action: 'file.create_text_file',
+    args: { path: path.join(root, 'note.txt'), content: 'hello' },
+  }, { allowRoots: [root], confirmed: true });
+  assert.strictEqual(textFile.ok, true);
+  assert.strictEqual(fs.readFileSync(path.join(root, 'note.txt'), 'utf8'), 'hello');
+
+  const missingParent = await executeToolRequest({
+    action: 'file.create_text_file',
+    args: { path: path.join(root, 'Missing', 'note.txt') },
+  }, { allowRoots: [root], confirmed: true });
+  assert.strictEqual(missingParent.ok, false);
+  assert.strictEqual(missingParent.error, 'parent path does not exist');
 
   const renameSource = path.join(root, 'rename-me.txt');
   fs.writeFileSync(renameSource, 'rename');

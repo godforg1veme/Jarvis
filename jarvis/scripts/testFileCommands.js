@@ -34,9 +34,11 @@ function testSafety() {
 
 function makeTempTree() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-file-'));
+  fs.mkdirSync(path.join(root, 'Desktop'), { recursive: true });
   fs.mkdirSync(path.join(root, 'Documents'), { recursive: true });
   fs.mkdirSync(path.join(root, 'Downloads'), { recursive: true });
   fs.mkdirSync(path.join(root, 'node_modules'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'Desktop', 'проверка'), { recursive: true });
   fs.writeFileSync(path.join(root, 'Documents', 'config.json'), '{}');
   fs.writeFileSync(path.join(root, 'Downloads', 'invoice.pdf'), 'pdf');
   fs.writeFileSync(path.join(root, 'Downloads', 'setup.exe'), 'exe');
@@ -54,6 +56,12 @@ function testSearchAndIndex() {
   assert.strictEqual(configResults.length, 1);
   assert.strictEqual(configResults[0].name, 'config.json');
   assert.strictEqual(configResults[0].dangerous, false);
+
+  const folderResults = searchDirectory(path.join(root, 'Desktop'), 'проверка', { maxResults: 10, maxDepth: 2 });
+  assert.strictEqual(folderResults.length, 1);
+  assert.strictEqual(folderResults[0].name, 'проверка');
+  assert.strictEqual(folderResults[0].type, 'directory');
+  assert.strictEqual(folderResults[0].dangerous, false);
 
   const broadResults = searchFiles({ query: 'setup.exe', location: 'computer' }, {
     standardLocations: [{ id: 'downloads', path: downloads }],
@@ -91,11 +99,17 @@ function testTextFileCommandParsing() {
     query: 'vscode.bat',
     location: 'desktop',
   });
+  assert.deepStrictEqual(parseFileCommand('джарвис открой папку "проверка" на рабочем столе'), {
+    action: 'open',
+    query: 'проверка',
+    location: 'desktop',
+  });
 }
 
 async function testFileCommander() {
   const root = makeTempTree();
   const downloads = path.join(root, 'Downloads');
+  const desktop = path.join(root, 'Desktop');
 
   const findResult = await fileCommander.execute({
     action: 'find',
@@ -143,6 +157,28 @@ async function testFileCommander() {
     },
   });
   assert.strictEqual(selectedDangerous.ok, true);
+
+  const opened = [];
+  const folderResult = await fileCommander.execute({
+    action: 'open',
+    query: 'проверка',
+    location: 'desktop',
+    _testOptions: {
+      locationPath: desktop,
+      standardLocations: [{ id: 'desktop', path: desktop }],
+      enableDiskScan: false,
+      shell: {
+        openPath: async (target) => {
+          opened.push(target);
+          return '';
+        },
+        showItemInFolder: () => {},
+      },
+    },
+  });
+  assert.strictEqual(folderResult.ok, true);
+  assert.strictEqual(folderResult.data.type, 'directory');
+  assert.strictEqual(opened[0], path.join(desktop, 'проверка'));
 }
 
 function testVoiceFileIntentParsing() {
@@ -162,6 +198,12 @@ function testVoiceFileIntentParsing() {
   assert.strictEqual(findIntent.ok, true);
   assert.strictEqual(findIntent.action, 'find_file');
   assert.strictEqual(findIntent.location, 'computer');
+
+  const folderIntent = parseIntent('джарвис открой папку "проверка" на рабочем столе');
+  assert.strictEqual(folderIntent.ok, true);
+  assert.strictEqual(folderIntent.action, 'open_file');
+  assert.strictEqual(folderIntent.query, 'проверка');
+  assert.strictEqual(folderIntent.location, 'desktop');
 }
 
 async function run() {

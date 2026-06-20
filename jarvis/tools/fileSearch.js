@@ -85,6 +85,14 @@ function searchDirectory(dir, query, options = {}) {
 
       const fullPath = path.join(currentDir, entry.name);
       if (entry.isDirectory()) {
+        const score = scoreFileName(entry.name, query);
+        if (score > 0) {
+          try {
+            results.push(toFileCandidate(fullPath, fs.statSync(fullPath), source, score));
+          } catch {
+            // Keep walking even if this directory cannot be stat'ed.
+          }
+        }
         if (!entry.name.startsWith('.') && !isExcludedDir(entry.name)) {
           walk(fullPath, depth + 1);
         }

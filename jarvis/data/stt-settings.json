@@ -1,0 +1,23 @@
+{
+  "provider": "faster-whisper",
+  "readyTimeoutMs": 90000,
+  "fasterWhisper": {
+    "model": "small",
+    "device": "cuda",
+    "computeType": "int8_float16",
+    "language": "ru",
+    "beamSize": 3,
+    "vadFilter": false,
+    "minSpeechMs": 450,
+    "silenceMs": 900,
+    "maxSegmentMs": 10000,
+    "startRms": 0.012,
+    "continueRms": 0.006,
+    "preRollMs": 300,
+    "initialPrompt": "Голосовые команды Jarvis на русском: джарвис, открой, запусти, включи, выключи, найди, покажи, переведи, файл, папка, браузер, дота, стим.",
+    "hotwords": "джарвис открой запусти включи выключи найди покажи переведи файл папка браузер дота стим"
+  },
+  "vosk": {
+    "modelDir": "models/vosk-model-small-ru-0.22"
+  }
+}

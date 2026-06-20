@@ -27,6 +27,7 @@ const ACTION_POLICIES = {
   'window.restore': POLICY.LOW_RISK,
 
   'file.create_folder': POLICY.CONFIRM,
+  'file.create_text_file': POLICY.CONFIRM,
   'file.rename': POLICY.CONFIRM,
   'file.move': POLICY.CONFIRM,
   'file.copy': POLICY.CONFIRM,
@@ -249,6 +250,36 @@ function createFolder(args, options = {}) {
   return { ok: true, action: 'file.create_folder', policy: POLICY.CONFIRM, path: finalPath };
 }
 
+function createTextFile(args, options = {}) {
+  const targetPath = normalizePath(args.path, options);
+  const parent = path.dirname(targetPath);
+  if (!fs.existsSync(parent)) {
+    return {
+      ok: false,
+      action: 'file.create_text_file',
+      policy: POLICY.CONFIRM,
+      error: 'parent path does not exist',
+      path: targetPath,
+      parent,
+    };
+  }
+  if (!fs.statSync(parent).isDirectory()) {
+    return {
+      ok: false,
+      action: 'file.create_text_file',
+      policy: POLICY.CONFIRM,
+      error: 'parent path is not a directory',
+      path: targetPath,
+      parent,
+    };
+  }
+
+  const finalPath = args.overwrite ? targetPath : nextAvailablePath(targetPath);
+  const content = typeof args.content === 'string' ? args.content : '';
+  fs.writeFileSync(finalPath, content, { encoding: 'utf8', flag: args.overwrite ? 'w' : 'wx' });
+  return { ok: true, action: 'file.create_text_file', policy: POLICY.CONFIRM, path: finalPath };
+}
+
 function renamePath(args, options = {}) {
   const from = normalizePath(args.from || args.path, options);
   const newName = String(args.newName || '').trim();
@@ -463,6 +494,7 @@ async function executeToolRequest(request, options = {}) {
     if (action === 'file.list_directory') return listDirectory(args, options);
     if (action === 'file.open' || action === 'file.reveal') return await openOrReveal(action, args, options);
     if (action === 'file.create_folder') return createFolder(args, options);
+    if (action === 'file.create_text_file') return createTextFile(args, options);
     if (action === 'file.rename') return renamePath(args, options);
     if (action === 'file.move') return movePath(args, options);
     if (action === 'file.copy') return copyPath(args, options);

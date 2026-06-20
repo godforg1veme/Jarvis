@@ -46,6 +46,9 @@ error.txt
 agent_runtime/.venv/
 agent_runtime/__pycache__/
 agent_runtime/**/__pycache__/
+stt_runtime/.venv/
+stt_runtime/__pycache__/
+stt_runtime/**/__pycache__/
 .pytest_cache/
 
 # OS/editor noise

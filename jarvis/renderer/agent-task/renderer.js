@@ -121,6 +121,15 @@ function setConfirmationControls(pendingConfirmation) {
     ? pendingConfirmation.requiresStrongConfirmation ? 'Сильно подтвердить' : 'Подтвердить'
     : 'Продолжить';
   rejectBtn.hidden = !pendingConfirmation;
+  continueBtn.disabled = false;
+}
+
+function setTaskFinishedControls() {
+  state.pendingConfirmation = null;
+  state.strongConfirmArmed = false;
+  continueBtn.textContent = 'Завершено';
+  continueBtn.disabled = true;
+  rejectBtn.hidden = true;
 }
 
 function describeToolRequest(request = {}) {
@@ -205,13 +214,14 @@ function applyEvent(event) {
     applyState(runtimeState || {});
     currentTitleEl.textContent = 'Отчет готов';
     currentBodyEl.textContent = event.payload && event.payload.message ? event.payload.message : 'Задача завершена.';
-    setConfirmationControls(null);
+    setTaskFinishedControls();
   }
 
   if (event.type === 'error') {
     currentTitleEl.textContent = 'Ошибка агента';
     currentBodyEl.textContent = event.payload && event.payload.error ? event.payload.error : 'Неизвестная ошибка.';
     setPhase('failed');
+    setTaskFinishedControls();
   }
 
   state.events.push({

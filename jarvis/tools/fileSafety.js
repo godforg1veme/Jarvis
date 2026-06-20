@@ -25,9 +25,10 @@ function isDangerousFile(fileName) {
 function toFileCandidate(filePath, stats, source, score = 0) {
   const name = path.basename(filePath);
   const extension = normalizeExtension(name);
+  const isDirectory = !!(stats && typeof stats.isDirectory === 'function' && stats.isDirectory());
 
   return {
-    type: 'file',
+    type: isDirectory ? 'directory' : 'file',
     name,
     path: filePath,
     extension,

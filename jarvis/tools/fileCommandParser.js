@@ -24,7 +24,7 @@ function detectAction(text) {
 function stripAction(text) {
   return stripWakeWord(text)
     .replace(/^(открой|открыть|покажи|показать|найди|найти|поиск|ищи|open|show|reveal|find|search)\s+/i, '')
-    .replace(/^файл\s+/i, '')
+    .replace(/^(файл|файлик|папку|папка|папке|директорию|директория|folder|directory)\s+/i, '')
     .trim();
 }
 

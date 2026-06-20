@@ -4,6 +4,10 @@ const { VoiceService } = require("../voice/voiceService");
 const states = [];
 const service = new VoiceService({
   onStateChange: (state) => states.push(state),
+  ttsService: {
+    getSettings: () => ({ speakVoiceResults: false }),
+    prepare: async () => {},
+  },
 });
 
 service.startWorker = () => true;
