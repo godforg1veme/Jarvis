@@ -1,5 +1,8 @@
 # Jarvis Assistant Console B2 Implementation Plan
 
+**Status (2026-08-23):** Implemented and verified. Static JavaScript, UTF-8,
+renderer behavior, Electron startup, and runtime visual smoke checks pass.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Rebuild the Jarvis renderer as the approved Assistant Console B2 UI while preserving launcher, voice, confirmation, history, and candidate-selection behavior.
@@ -23,7 +26,7 @@
 - Modify: `renderer/index.html`
 - Verify: `renderer/voiceCapture.js`
 
-- [ ] **Step 1: Replace the body shell in `renderer/index.html`**
+- [x] **Step 1: Replace the body shell in `renderer/index.html`**
 
 Use this structure inside `<body>` and preserve the existing scripts at the bottom:
 
@@ -118,7 +121,7 @@ Use this structure inside `<body>` and preserve the existing scripts at the bott
 </div>
 ```
 
-- [ ] **Step 2: Wire voice buttons without inline handlers**
+- [x] **Step 2: Wire voice buttons without inline handlers**
 
 After `const confirmNo = document.getElementById('confirm-no');` in `renderer/renderer.js`, add:
 
@@ -145,7 +148,7 @@ if (voiceStopBtn) {
 }
 ```
 
-- [ ] **Step 3: Verify voiceCapture hook compatibility**
+- [x] **Step 3: Verify voiceCapture hook compatibility**
 
 Run:
 
@@ -160,7 +163,7 @@ Expected: `renderer/voiceCapture.js` still references `voice-status-line` and ex
 **Files:**
 - Modify: `renderer/renderer.js`
 
-- [ ] **Step 1: Add small rendering helpers near `candidateLabel()`**
+- [x] **Step 1: Add small rendering helpers near `candidateLabel()`**
 
 ```js
 const typeLabels = {
@@ -217,11 +220,11 @@ function updateHistoryPanel() {
 }
 ```
 
-- [ ] **Step 2: Call `updateHistoryPanel()` when history changes**
+- [x] **Step 2: Call `updateHistoryPanel()` when history changes**
 
 Add `updateHistoryPanel();` at the end of `init()`, `showHistory()`, and after refreshing `state.history` in `saveAndDisplay()`.
 
-- [ ] **Step 3: Replace mojibake UI strings touched by the redesign**
+- [x] **Step 3: Replace mojibake UI strings touched by the redesign**
 
 Use valid UTF-8 Russian in these existing branches:
 
@@ -235,7 +238,7 @@ message: 'Голос включён. Скажите: джарвис включи
 message: 'Голос выключен.',
 ```
 
-- [ ] **Step 4: Replace `showEmptyState()` content**
+- [x] **Step 4: Replace `showEmptyState()` content**
 
 ```js
 function showEmptyState() {
@@ -254,7 +257,7 @@ function showEmptyState() {
 }
 ```
 
-- [ ] **Step 5: Replace `renderResults()` row markup**
+- [x] **Step 5: Replace `renderResults()` row markup**
 
 Each result item should render:
 
@@ -300,7 +303,7 @@ div.appendChild(bodyDiv);
 div.appendChild(badge);
 ```
 
-- [ ] **Step 6: Remove inline candidate button styles**
+- [x] **Step 6: Remove inline candidate button styles**
 
 Candidate buttons should only set classes:
 
@@ -314,7 +317,7 @@ btn.textContent = candidateLabel(candidate);
 **Files:**
 - Modify: `renderer/style.css`
 
-- [ ] **Step 1: Replace the CSS file with B2 theme variables and shell layout**
+- [x] **Step 1: Replace the CSS file with B2 theme variables and shell layout**
 
 Define:
 
@@ -338,11 +341,11 @@ Define:
 
 Add shell selectors for `body`, `#jarvis-window`, `#rail`, `.jarvis-mark`, `.rail-button`, `#assistant-shell`, `#topbar`, `#command-bar`, `#input`, `.status-pill`, `#workspace`, `#results-panel`, `#side-panel`.
 
-- [ ] **Step 2: Add result, empty, candidate, and confirmation styles**
+- [x] **Step 2: Add result, empty, candidate, and confirmation styles**
 
 Cover `.result-item`, `.result-icon`, `.result-body`, `.result-title`, `.result-content`, `.result-type`, `.candidate-list`, `.candidate-button`, `.empty-state`, `.empty-icon`, `.empty-examples`, `#confirm-dialog`, `.confirm-btn`.
 
-- [ ] **Step 3: Add status panel and responsive styles**
+- [x] **Step 3: Add status panel and responsive styles**
 
 Cover `.status-card`, `.voice-card`, `.card-heading`, `.voice-meter`, `.chip-row`, `.chip`, `.tool-button`, and a media query:
 
@@ -369,7 +372,7 @@ Cover `.status-card`, `.voice-card`, `.card-heading`, `.voice-meter`, `.chip-row
 - Verify: `renderer/style.css`
 - Verify: `renderer/renderer.js`
 
-- [ ] **Step 1: Check syntax**
+- [x] **Step 1: Check syntax**
 
 Run:
 
@@ -379,7 +382,7 @@ node --check renderer/renderer.js
 
 Expected: no syntax errors.
 
-- [ ] **Step 2: Check touched Russian text is not mojibake**
+- [x] **Step 2: Check touched Russian text is not mojibake**
 
 Run:
 
@@ -389,7 +392,7 @@ rg -n "Р.|С.|вљ|вњ|вќ|рџ" renderer/index.html renderer/renderer.js ren
 
 Expected: no matches in intentionally touched UI strings. If old unrelated mojibake remains in untouched code, fix only when it is visible in the redesigned UI.
 
-- [ ] **Step 3: Start app for visual verification**
+- [x] **Step 3: Start app for visual verification**
 
 Run:
 
@@ -399,7 +402,7 @@ npm start
 
 Expected: Electron opens Jarvis with the Assistant Console B2 shell. If startup runs TTS preparation for a long time, keep the process running until the window appears or a clear error is printed.
 
-- [ ] **Step 4: Manual UI smoke test**
+- [x] **Step 4: Manual UI smoke test**
 
 In the window:
 
@@ -410,7 +413,13 @@ In the window:
 - Trigger a command that requires confirmation if available; confirmation area shows `Отмена` and `Подтвердить`.
 - Use the voice buttons; `#voice-status-line` changes without overlapping the command bar.
 
-- [ ] **Step 5: Commit implementation**
+Verified on 2026-08-23 in the real Electron window: the B2 graphite/amber
+shell, Russian empty/result states, confirmation area, history panel, and voice
+status rendered without overlap. Deterministic renderer tests cover keyboard
+selection, slash commands, candidate/confirmation behavior, and voice-button
+wiring.
+
+- [x] **Step 5: Commit implementation**
 
 Only stage implementation files:
 

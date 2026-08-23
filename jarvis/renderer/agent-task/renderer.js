@@ -5,6 +5,7 @@ const state = {
   plan: [],
   pendingConfirmation: null,
   strongConfirmArmed: false,
+  dependencyErrors: [],
 };
 
 const taskIdEl = document.getElementById('task-id');
@@ -15,6 +16,7 @@ const currentBodyEl = document.getElementById('current-body');
 const choicesEl = document.getElementById('choices');
 const eventListEl = document.getElementById('event-list');
 const planListEl = document.getElementById('plan-list');
+const planValidationEl = document.getElementById('plan-validation');
 const footerStatusEl = document.getElementById('footer-status');
 const policyBadgesEl = document.getElementById('policy-badges');
 const continueBtn = document.getElementById('continue-btn');
@@ -45,6 +47,40 @@ function shortPath(value) {
   return `${text.slice(0, 28)}...${text.slice(-36)}`;
 }
 
+function resetTaskView(taskId) {
+  state.taskId = taskId || '';
+  state.phase = 'created';
+  state.events = [];
+  state.plan = [];
+  state.pendingConfirmation = null;
+  state.strongConfirmArmed = false;
+  state.dependencyErrors = [];
+
+  taskIdEl.textContent = state.taskId || '—';
+  taskCommandEl.textContent = 'Ожидаю описание задачи';
+  taskStatusEl.textContent = 'Задача создана.';
+  currentTitleEl.textContent = 'Готов к работе';
+  currentBodyEl.textContent = 'Здесь появится вопрос, текущий шаг или подтверждение плана.';
+  footerStatusEl.textContent = 'Ожидаю событий агента.';
+
+  setPhase('created');
+  renderPlan([]);
+  renderPlanValidation([]);
+  renderChoices([]);
+  setConfirmationControls(null);
+  renderEvents();
+}
+
+function switchTaskIfNeeded(taskId) {
+  if (!taskId) return;
+  if (state.taskId && state.taskId !== taskId) {
+    resetTaskView(taskId);
+    return;
+  }
+  state.taskId = taskId;
+  taskIdEl.textContent = taskId;
+}
+
 function renderBadges(plan = []) {
   const policies = new Set(plan.map((step) => step.policy).filter(Boolean));
   policyBadgesEl.innerHTML = '';
@@ -69,16 +105,42 @@ function renderPlan(plan = []) {
   }
 
   plan.forEach((step, index) => {
-    const div = document.createElement('div');
+    const div = document.createElement('label');
     const classes = ['plan-step'];
     if (step.policy === 'requires_strong_confirmation') classes.push('strong');
     if (step.enabled === false) classes.push('disabled');
+    if (step.status === 'blocked') classes.push('blocked');
     div.className = classes.join(' ');
     div.title = JSON.stringify(step.args || {}, null, 2);
-    div.textContent = `${index + 1}. ${step.title || step.action || step.id}`;
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = step.enabled !== false;
+    checkbox.setAttribute('aria-label', `Включить шаг ${index + 1}`);
+    checkbox.addEventListener('change', () => {
+      step.enabled = checkbox.checked;
+      const disabledStepIds = state.plan
+        .filter((item) => item.enabled === false)
+        .map((item) => item.id);
+      sendAction('disable_steps', { taskId: state.taskId, disabledStepIds });
+    });
+    const title = document.createElement('span');
+    title.textContent = `${index + 1}. ${step.title || step.action || step.id}`;
+    div.appendChild(checkbox);
+    div.appendChild(title);
     planListEl.appendChild(div);
   });
   renderBadges(plan);
+}
+
+function renderPlanValidation(errors = []) {
+  state.dependencyErrors = Array.isArray(errors) ? errors : [];
+  planValidationEl.hidden = state.dependencyErrors.length === 0;
+  planValidationEl.textContent = state.dependencyErrors
+    .map((error) => error.message || JSON.stringify(error))
+    .join('\n');
+  if (!state.pendingConfirmation) {
+    continueBtn.disabled = state.dependencyErrors.length > 0;
+  }
 }
 
 function renderEvents() {
@@ -95,8 +157,13 @@ function renderEvents() {
     const div = document.createElement('div');
     const kind = event.kind || event.type || 'event';
     div.className = 'event';
-    div.innerHTML = `<span class="event-kind ${kind}">${kind}</span><span></span>`;
-    div.lastChild.textContent = event.message || event.title || event.phase || JSON.stringify(event.payload || event);
+    const kindEl = document.createElement('span');
+    kindEl.className = `event-kind ${kind}`;
+    kindEl.textContent = kind;
+    const messageEl = document.createElement('span');
+    messageEl.textContent = event.message || event.title || event.phase || event.type || 'событие';
+    div.appendChild(kindEl);
+    div.appendChild(messageEl);
     eventListEl.appendChild(div);
   });
   eventListEl.scrollTop = eventListEl.scrollHeight;
@@ -121,7 +188,7 @@ function setConfirmationControls(pendingConfirmation) {
     ? pendingConfirmation.requiresStrongConfirmation ? 'Сильно подтвердить' : 'Подтвердить'
     : 'Продолжить';
   rejectBtn.hidden = !pendingConfirmation;
-  continueBtn.disabled = false;
+  continueBtn.disabled = state.dependencyErrors.length > 0;
 }
 
 function setTaskFinishedControls() {
@@ -141,10 +208,29 @@ function describeToolRequest(request = {}) {
   return parts.join('\n') || 'Jarvis просит разрешение на действие.';
 }
 
+function summarizeEvent(event) {
+  const payload = event.payload || {};
+  if (payload.message || payload.error || payload.phase) {
+    return payload.message || payload.error || payload.phase;
+  }
+  if (event.type === 'plan_draft') {
+    const plan = Array.isArray(payload.plan) ? payload.plan : [];
+    return `План подготовлен: ${plan.length} шагов.`;
+  }
+  if (event.type === 'needs_confirmation') {
+    return describeToolRequest(payload.request || {});
+  }
+  if (event.type === 'needs_input') {
+    const runtimePlan = payload.state && Array.isArray(payload.state.plan) ? payload.state.plan : [];
+    const askStep = runtimePlan.find((step) => step.action === 'ask_user');
+    return (askStep && askStep.args && askStep.args.question) || 'Нужен ответ пользователя.';
+  }
+  return event.type || 'событие';
+}
+
 function applyState(nextState = {}) {
   if (nextState.task_id) {
-    state.taskId = nextState.task_id;
-    taskIdEl.textContent = nextState.task_id;
+    switchTaskIfNeeded(nextState.task_id);
   }
   if (nextState.user_command) {
     taskCommandEl.textContent = nextState.user_command;
@@ -156,13 +242,15 @@ function applyState(nextState = {}) {
   if (Array.isArray(nextState.plan)) {
     renderPlan(nextState.plan);
   }
+  if (Array.isArray(nextState.dependency_errors)) {
+    renderPlanValidation(nextState.dependency_errors);
+  }
 }
 
 function applyEvent(event) {
   if (!event || typeof event !== 'object') return;
   if (event.task_id) {
-    state.taskId = event.task_id;
-    taskIdEl.textContent = event.task_id;
+    switchTaskIfNeeded(event.task_id);
   }
 
   if (event.type === 'phase_changed') {
@@ -209,6 +297,15 @@ function applyEvent(event) {
     setConfirmationControls(null);
   }
 
+  if (event.type === 'plan_validation_error') {
+    const payload = event.payload || {};
+    const runtimeState = payload.state || {};
+    applyState(runtimeState);
+    renderPlanValidation(payload.errors || runtimeState.dependency_errors || []);
+    currentTitleEl.textContent = 'План нужно исправить';
+    currentBodyEl.textContent = payload.message || 'Отключённый шаг используется другими шагами.';
+  }
+
   if (event.type === 'final_report') {
     const runtimeState = event.payload && event.payload.state;
     applyState(runtimeState || {});
@@ -224,13 +321,13 @@ function applyEvent(event) {
     setTaskFinishedControls();
   }
 
+  const eventMessage = summarizeEvent(event);
   state.events.push({
     type: event.type,
     kind: event.type === 'needs_input' || event.type === 'needs_confirmation' ? 'wait' : event.type,
-    message: event.payload && (event.payload.message || event.payload.error || event.payload.phase),
-    payload: event.payload,
+    message: eventMessage,
   });
-  footerStatusEl.textContent = state.events[state.events.length - 1].message || event.type;
+  footerStatusEl.textContent = eventMessage;
   renderEvents();
 }
 

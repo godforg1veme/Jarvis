@@ -294,6 +294,18 @@ h1 {
   padding: 9px;
 }
 
+.plan-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.plan-step input {
+  margin-top: 2px;
+  accent-color: var(--accent);
+}
+
 .event {
   display: flex;
   gap: 10px;
@@ -323,6 +335,26 @@ h1 {
 .plan-step.disabled {
   opacity: .48;
   text-decoration: line-through;
+}
+
+.plan-step.disabled input {
+  text-decoration: none;
+}
+
+.plan-step.blocked {
+  border: 1px solid rgba(248, 113, 113, .55);
+}
+
+.plan-validation {
+  margin: 0 12px 12px;
+  border: 1px solid rgba(248, 113, 113, .55);
+  border-radius: 8px;
+  padding: 10px;
+  color: #fecaca;
+  background: rgba(127, 29, 29, .22);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: pre-line;
 }
 
 .footer-status {

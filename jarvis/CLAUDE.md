@@ -1,4 +1,4 @@
-# GEMINI.md
+# CLAUDE.md
 
 ## Project
 

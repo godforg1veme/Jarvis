@@ -28,6 +28,7 @@ class DesktopAgentClient extends EventEmitter {
     this.root = options.root || ROOT;
     this.spawnImpl = options.spawn || spawn;
     this.toolExecutor = options.toolExecutor || null;
+    this.env = options.env || {};
     this.child = null;
     this.readline = null;
     this.nextId = 1;
@@ -48,6 +49,7 @@ class DesktopAgentClient extends EventEmitter {
       cwd: this.root,
       env: {
         ...process.env,
+        ...this.env,
         PYTHONPATH: this.root,
         PYTHONIOENCODING: 'utf-8',
         PYTHONUTF8: '1',
@@ -138,7 +140,9 @@ class DesktopAgentClient extends EventEmitter {
 
   startTask(userCommand, options = {}) {
     const taskId = options.taskId || createTaskId();
-    const id = this.send('start_task', { user_command: userCommand }, { taskId });
+    const payload = { user_command: userCommand };
+    if (options.initialContext) payload.initial_context = options.initialContext;
+    const id = this.send('start_task', payload, { taskId });
     return { id, taskId };
   }
 

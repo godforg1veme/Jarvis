@@ -1,5 +1,8 @@
 # Jarvis File Commands Implementation Plan
 
+**Status (2026-08-23):** Implemented and verified. Deterministic file-command,
+voice parser, wildcard search, Vosk load/stream, and Electron smoke checks pass.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build safe natural-language file commands so Jarvis can open, reveal, and find files from text or voice.
@@ -35,7 +38,7 @@
 - Create: `scripts/testFileCommands.js`
 - Modify: `.gitignore`
 
-- [ ] **Step 1: Write failing tests for location and safety helpers**
+- [x] **Step 1: Write failing tests for location and safety helpers**
 
 Create `scripts/testFileCommands.js` with this initial content:
 
@@ -76,13 +79,13 @@ function run() {
 run();
 ```
 
-- [ ] **Step 2: Run helper tests and verify they fail**
+- [x] **Step 2: Run helper tests and verify they fail**
 
 Run: `node scripts/testFileCommands.js`
 
 Expected: FAIL with `Cannot find module '../tools/fileLocations'`.
 
-- [ ] **Step 3: Implement `tools/fileLocations.js`**
+- [x] **Step 3: Implement `tools/fileLocations.js`**
 
 Create `tools/fileLocations.js`:
 
@@ -162,7 +165,7 @@ module.exports = {
 };
 ```
 
-- [ ] **Step 4: Implement `tools/fileSafety.js`**
+- [x] **Step 4: Implement `tools/fileSafety.js`**
 
 Create `tools/fileSafety.js`:
 
@@ -216,7 +219,7 @@ module.exports = {
 };
 ```
 
-- [ ] **Step 5: Ignore generated file index**
+- [x] **Step 5: Ignore generated file index**
 
 Append this line to `.gitignore` if it is not already present:
 
@@ -224,7 +227,7 @@ Append this line to `.gitignore` if it is not already present:
 data/file-index.json
 ```
 
-- [ ] **Step 6: Run helper tests and commit**
+- [x] **Step 6: Run helper tests and commit**
 
 Run: `node scripts/testFileCommands.js`
 
@@ -244,7 +247,7 @@ git commit -m "feat: add file command helpers"
 - Create: `tools/fileIndex.js`
 - Modify: `scripts/testFileCommands.js`
 
-- [ ] **Step 1: Extend tests for live search, scoring, and index search**
+- [x] **Step 1: Extend tests for live search, scoring, and index search**
 
 Add this block to `scripts/testFileCommands.js` above `run()`:
 
@@ -304,13 +307,13 @@ function run() {
 }
 ```
 
-- [ ] **Step 2: Run tests and verify they fail**
+- [x] **Step 2: Run tests and verify they fail**
 
 Run: `node scripts/testFileCommands.js`
 
 Expected: FAIL with `Cannot find module '../tools/fileSearch'`.
 
-- [ ] **Step 3: Implement `tools/fileIndex.js`**
+- [x] **Step 3: Implement `tools/fileIndex.js`**
 
 Create `tools/fileIndex.js`:
 
@@ -435,7 +438,7 @@ module.exports = {
 };
 ```
 
-- [ ] **Step 4: Implement `tools/fileSearch.js`**
+- [x] **Step 4: Implement `tools/fileSearch.js`**
 
 Create `tools/fileSearch.js`:
 
@@ -565,7 +568,7 @@ module.exports = {
 };
 ```
 
-- [ ] **Step 5: Run search/index tests and commit**
+- [x] **Step 5: Run search/index tests and commit**
 
 Run: `node scripts/testFileCommands.js`
 
@@ -585,7 +588,7 @@ git commit -m "feat: add file search and index"
 - Modify: `scripts/testFileCommands.js`
 - Modify: `main.js`
 
-- [ ] **Step 1: Extend tests for commander result shapes**
+- [x] **Step 1: Extend tests for commander result shapes**
 
 Add this block to `scripts/testFileCommands.js`:
 
@@ -642,13 +645,13 @@ run().catch((error) => {
 });
 ```
 
-- [ ] **Step 2: Run commander tests and verify they fail**
+- [x] **Step 2: Run commander tests and verify they fail**
 
 Run: `node scripts/testFileCommands.js`
 
 Expected: FAIL with `Cannot find module '../tools/fileCommander'`.
 
-- [ ] **Step 3: Implement `tools/fileCommander.js`**
+- [x] **Step 3: Implement `tools/fileCommander.js`**
 
 Create `tools/fileCommander.js`:
 
@@ -815,7 +818,7 @@ module.exports = {
 };
 ```
 
-- [ ] **Step 4: Allow the tool in `main.js`**
+- [x] **Step 4: Allow the tool in `main.js`**
 
 Change:
 
@@ -829,7 +832,7 @@ to:
 const ALLOWED_TOOLS = ['runProgram', 'powershell', 'searchFiles', 'sysinfo', 'fileCommander'];
 ```
 
-- [ ] **Step 5: Run commander tests and commit**
+- [x] **Step 5: Run commander tests and commit**
 
 Run: `node scripts/testFileCommands.js`
 
@@ -850,7 +853,7 @@ git commit -m "feat: add file commander tool"
 - Modify: `renderer/style.css`
 - Modify: `scripts/testFileCommands.js`
 
-- [ ] **Step 1: Add parser tests for text file commands**
+- [x] **Step 1: Add parser tests for text file commands**
 
 Add this block to `scripts/testFileCommands.js`:
 
@@ -876,7 +879,7 @@ function testTextFileCommandParsing() {
 }
 ```
 
-- [ ] **Step 2: Implement a shared parser instead of renderer-only parsing**
+- [x] **Step 2: Implement a shared parser instead of renderer-only parsing**
 
 Create `tools/fileCommandParser.js`:
 
@@ -959,7 +962,7 @@ const { parseFileCommand } = require('../tools/fileCommandParser');
 
 Call `testTextFileCommandParsing()` from `run()`.
 
-- [ ] **Step 3: Route text commands in `tools/index.js`**
+- [x] **Step 3: Route text commands in `tools/index.js`**
 
 At the top:
 
@@ -984,7 +987,7 @@ const fileCommander = require('./fileCommander');
 
 and append `fileCommander.getSchema()`.
 
-- [ ] **Step 4: Route text commands in `renderer/renderer.js`**
+- [x] **Step 4: Route text commands in `renderer/renderer.js`**
 
 Because the renderer cannot use CommonJS `require`, add a local `parseFileCommandForRenderer(rawText)` near `parseTool()` with the same behavior as `tools/fileCommandParser.js`. Keep it small and limited to the same action/location/query extraction used by the shared parser.
 
@@ -1042,7 +1045,7 @@ if (candidate.type === 'file') {
 }
 ```
 
-- [ ] **Step 5: Keep styling aligned**
+- [x] **Step 5: Keep styling aligned**
 
 Add minimal CSS to `renderer/style.css`:
 
@@ -1063,7 +1066,7 @@ Add the warning class in `renderResults()`:
 if (candidate.warning) btn.classList.add('warning');
 ```
 
-- [ ] **Step 6: Run tests and commit**
+- [x] **Step 6: Run tests and commit**
 
 Run: `node scripts/testFileCommands.js`
 
@@ -1084,7 +1087,7 @@ git commit -m "feat: route text file commands"
 - Modify: `main.js`
 - Modify: `scripts/testFileCommands.js`
 
-- [ ] **Step 1: Add voice parser tests**
+- [x] **Step 1: Add voice parser tests**
 
 Add this block to `scripts/testFileCommands.js`:
 
@@ -1113,13 +1116,13 @@ function testVoiceFileIntentParsing() {
 
 Call `testVoiceFileIntentParsing()` from `run()`.
 
-- [ ] **Step 2: Run tests and verify they fail**
+- [x] **Step 2: Run tests and verify they fail**
 
 Run: `node scripts/testFileCommands.js`
 
 Expected: FAIL because `parseIntent()` does not return file actions yet.
 
-- [ ] **Step 3: Parse file intents in `voice/intentParser.js`**
+- [x] **Step 3: Parse file intents in `voice/intentParser.js`**
 
 Add near the imports:
 
@@ -1149,7 +1152,7 @@ if (fileCommand) {
 }
 ```
 
-- [ ] **Step 4: Execute file intents in `actions/executeIntent.js`**
+- [x] **Step 4: Execute file intents in `actions/executeIntent.js`**
 
 Before the allowed app-action check, add:
 
@@ -1183,7 +1186,7 @@ if (['open_file', 'reveal_file', 'find_file'].includes(intent.action)) {
 }
 ```
 
-- [ ] **Step 5: Inject file command execution in `main.js`**
+- [x] **Step 5: Inject file command execution in `main.js`**
 
 Add helper:
 
@@ -1201,7 +1204,7 @@ executeFileCommand: handleFileCommand,
 showMainWindow,
 ```
 
-- [ ] **Step 6: Run voice command checks and commit**
+- [x] **Step 6: Run voice command checks and commit**
 
 Run:
 
@@ -1230,7 +1233,7 @@ git commit -m "feat: parse voice file commands"
 - Modify: `tools/fileCommander.js`
 - Modify: `scripts/testFileCommands.js`
 
-- [ ] **Step 1: Add tests for dangerous candidate behavior**
+- [x] **Step 1: Add tests for dangerous candidate behavior**
 
 Add to `testFileCommander()`:
 
@@ -1254,7 +1257,7 @@ Add to `testFileCommander()`:
   assert.strictEqual(selectedDangerous.ok, true);
 ```
 
-- [ ] **Step 2: Ensure selected dangerous candidates can launch from UI**
+- [x] **Step 2: Ensure selected dangerous candidates can launch from UI**
 
 In `renderer/renderer.js`, ensure file candidate execution passes `confirmed: !!candidate.warning` exactly as in Task 4. Add warning class:
 
@@ -1264,7 +1267,7 @@ if (candidate.warning) btn.classList.add('warning');
 
 Do not set `confirmed` for non-warning candidates.
 
-- [ ] **Step 3: Keep single dangerous file confirmation intact**
+- [x] **Step 3: Keep single dangerous file confirmation intact**
 
 In `tools/fileCommander.js`, keep this guard before `openFile()`:
 
@@ -1276,7 +1279,7 @@ if (isDangerousFile(selectedFile.name) && !confirmed && !args.confirmed) {
 
 This preserves the spec: one dangerous file asks; a warning-marked UI candidate can be explicit confirmation.
 
-- [ ] **Step 4: Improve confirmation display text for file commands**
+- [x] **Step 4: Improve confirmation display text for file commands**
 
 In `renderer/renderer.js`, the existing confirmation branch should work for any tool. Verify it uses:
 
@@ -1289,7 +1292,7 @@ confirmYes.focus();
 
 No separate file confirmation dialog is needed.
 
-- [ ] **Step 5: Run tests and commit**
+- [x] **Step 5: Run tests and commit**
 
 Run: `node scripts/testFileCommands.js`
 
@@ -1307,7 +1310,7 @@ git commit -m "feat: add safe file candidate confirmation"
 **Files:**
 - Modify only if verification exposes issues.
 
-- [ ] **Step 1: Run deterministic Node checks**
+- [x] **Step 1: Run deterministic Node checks**
 
 Run:
 
@@ -1323,13 +1326,13 @@ Expected:
 - voice commands print parsed file intents.
 - execution may report not found depending on local files.
 
-- [ ] **Step 2: Run Vosk load test**
+- [x] **Step 2: Run Vosk load test**
 
 Run: `node scripts/testVoskLoad.js`
 
 Expected: Vosk model loads or prints the existing project-specific missing-model guidance. If the model is absent, record that as an environmental limitation instead of changing voice code.
 
-- [ ] **Step 3: Start Jarvis for visual verification**
+- [x] **Step 3: Start Jarvis for visual verification**
 
 Run: `npm start`
 
@@ -1341,11 +1344,15 @@ Expected:
 - Multiple results render in the current result list style.
 - Dangerous candidates show a warning marker.
 
-- [ ] **Step 4: Stop Jarvis cleanly**
+- [x] **Step 4: Stop Jarvis cleanly**
 
 Use the tray menu or close the Electron process from the app. Do not leave background Electron processes running.
 
-- [ ] **Step 5: Final git status**
+Verification on 2026-08-23 used deterministic temporary directories for file
+search and mutation checks. The real Electron renderer was inspected, then
+stopped cleanly; no user files were opened, moved, overwritten, or deleted.
+
+- [x] **Step 5: Final git status**
 
 Run: `git status --short`
 

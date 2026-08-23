@@ -7,20 +7,20 @@ const STT_RUNTIME_DIR = path.join(ROOT, 'stt_runtime');
 const STT_VENV_DIR = path.join(STT_RUNTIME_DIR, '.venv');
 
 const DEFAULT_SETTINGS = {
-  provider: 'vosk',
+  provider: 'faster-whisper',
   readyTimeoutMs: 10000,
   fasterWhisper: {
-    model: 'small',
+    model: 'large-v3',
     device: 'cuda',
     computeType: 'int8_float16',
     language: 'ru',
-    beamSize: 3,
-    vadFilter: false,
-    minSpeechMs: 450,
+    beamSize: 5,
+    vadFilter: true,
+    minSpeechMs: 600,
     silenceMs: 900,
     maxSegmentMs: 10000,
-    startRms: 0.012,
-    continueRms: 0.006,
+    startRms: 0.022,
+    continueRms: 0.012,
     preRollMs: 300,
     initialPrompt: '',
     hotwords: '',

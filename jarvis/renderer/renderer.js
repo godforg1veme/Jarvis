@@ -679,6 +679,27 @@ function moveCandidateSelection(delta) {
   if (selected) selected.scrollIntoView({ block: 'nearest' });
 }
 
+function agentEscalationContext(result, toolName) {
+  if (!result || !['runProgram', 'fileCommander'].includes(toolName)) return null;
+  if (result.needsSelection && Array.isArray(result.candidates) && result.candidates.length > 0) {
+    return {
+      kind: 'candidate_selection',
+      reason: result.type === 'file' || toolName === 'fileCommander'
+        ? 'Нужно выбрать файл из нескольких вариантов.'
+        : 'Нужно выбрать приложение из нескольких вариантов.',
+      candidates: result.candidates,
+    };
+  }
+  if (result.needsConfirmation && result.commandToConfirm && result.commandToConfirm.tool === 'fileCommander') {
+    return {
+      kind: 'confirmation',
+      reason: 'Открытие найденного файла требует подтверждения.',
+      confirmation: result.commandToConfirm,
+    };
+  }
+  return null;
+}
+
 // --- Execute Command ---
 async function executeCommand(rawInput) {
   const toolName = parseTool(rawInput);
@@ -733,6 +754,26 @@ async function executeCommand(rawInput) {
   renderResults();
 
   const result = await window.jarvis.executeTool(toolName, args);
+
+  if (result && result.needsAgent && result.command) {
+    const agentResult = await window.jarvis.startAgentTask(result.command, {
+      escalationReason: result.content || 'Команда требует многошагового плана.',
+      escalationKind: 'semantic',
+    });
+    saveAndDisplay(agentResult, rawInput);
+    return;
+  }
+
+  const escalationContext = agentEscalationContext(result, toolName);
+  if (escalationContext) {
+    const agentResult = await window.jarvis.startAgentTask(rawInput, {
+      escalationReason: escalationContext.reason,
+      escalationKind: escalationContext.kind,
+      initialContext: escalationContext,
+    });
+    saveAndDisplay(agentResult, rawInput);
+    return;
+  }
 
   // Handle PowerShell confirmation
   if (result && result.needsConfirmation && result.commandToConfirm) {

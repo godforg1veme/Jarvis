@@ -4,6 +4,11 @@ const path = require('path');
 const SETTINGS_PATH = path.join(__dirname, '..', 'data', 'ai-settings.json');
 const ENDPOINT_PATH = '/chat/completions';
 
+function isHeaderSafeApiKey(value) {
+  const token = String(value || '');
+  return token.length > 0 && token === token.trim() && /^[\x21-\x7e]+$/.test(token);
+}
+
 function loadSettings() {
   try {
     return JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf-8'));
@@ -182,8 +187,8 @@ async function requestOpenRouterChat(messages, options = {}) {
   const settings = loadSettings();
   const apiKey = process.env.OPENROUTER_API_KEY;
 
-  if (!apiKey || apiKey.trim() === '') {
-    throw new Error('OPENROUTER_API_KEY не задан. AI fallback недоступен.');
+  if (!isHeaderSafeApiKey(apiKey)) {
+    throw new Error('OPENROUTER_API_KEY не задан или имеет неверный формат. AI fallback недоступен.');
   }
 
   const baseUrl = String(settings.baseUrl || 'https://openrouter.ai/api/v1').replace(/\/+$/, '');
@@ -311,6 +316,7 @@ async function chatVision(messages, options = {}) {
 module.exports = {
   chatJson,
   chatVision,
+  isHeaderSafeApiKey,
   normalizeOpenRouterModel,
   resolveVisionModel,
 };

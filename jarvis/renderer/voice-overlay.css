@@ -1,0 +1,42 @@
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: transparent; /* Needs to be fully transparent for overlay */
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end; /* Align to bottom */
+  height: 100vh;
+  box-sizing: border-box;
+  padding-bottom: 50px; /* Offset from bottom of screen */
+}
+
+#overlay-container {
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 12px;
+  padding: 14px 24px;
+  color: #ffffff;
+  font-size: 24px;
+  font-weight: 500;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+  max-width: 80%;
+  text-align: center;
+
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+#overlay-container.hidden {
+  opacity: 0;
+  transform: translateY(20px);
+  pointer-events: none;
+}
+
+/* Let the window be click-through by applying pointer-events none to body or using Electron APIs */
+#voice-text {
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}

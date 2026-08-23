@@ -3,6 +3,7 @@
 if (process.env.ELECTRON_RUN_AS_NODE) {
   delete process.env.ELECTRON_RUN_AS_NODE;
 }
+require('./tools/loadEnv').loadEnvFile();
 
 const { app, BrowserWindow, globalShortcut, ipcMain, session, screen, Tray, Menu, nativeImage, clipboard, desktopCapturer, shell } = require('electron');
 const path = require('path');
@@ -35,6 +36,9 @@ if (process.platform === 'win32') {
 }
 
 let mainWindow = null;
+let voiceOverlayWindow = null;
+let transcriptionBarWindow = null;
+let showTranscriptionBar = true;
 let tray = null;
 let voiceService = null;
 let desktopAgentClient = null;
@@ -43,6 +47,7 @@ let lastExternalForegroundHwnd = null;
 let suppressNextDesktopAgentExit = false;
 const HISTORY_PATH = path.join(__dirname, 'data', 'history.json');
 const APPS_PATH = path.join(__dirname, 'data', 'apps.default.json');
+const UI_STATE_PATH = path.join(__dirname, 'data', 'ui-state.local.json');
 
 // --- Helpers ---
 function ensureDir(dir) {
@@ -61,6 +66,9 @@ function saveJSON(filePath, data) {
   ensureDir(path.dirname(filePath));
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
 }
+
+const initialUiState = loadJSON(UI_STATE_PATH, {});
+showTranscriptionBar = initialUiState.showTranscriptionBar !== false;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -153,6 +161,62 @@ async function handleFileCommand(args, confirmed = false) {
   return await fileCommander.execute(args, confirmed);
 }
 
+function limitedText(value, maxLength = 1024) {
+  return String(value || '').trim().slice(0, maxLength);
+}
+
+function sanitizeAgentCandidate(candidate) {
+  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return null;
+  const name = limitedText(candidate.name || candidate.title, 240);
+  if (!name) return null;
+  const safe = {
+    type: limitedText(candidate.type, 32),
+    name,
+    path: limitedText(candidate.path, 2048),
+    directory: limitedText(candidate.directory, 2048),
+    action: limitedText(candidate.action, 32),
+    warning: !!candidate.warning,
+    dangerous: !!candidate.dangerous,
+    score: Number.isFinite(Number(candidate.score)) ? Number(candidate.score) : 0,
+  };
+  for (const key of ['aumid', 'command', 'source', 'matchType']) {
+    if (candidate[key]) safe[key] = limitedText(candidate[key], 2048);
+  }
+  return safe;
+}
+
+function sanitizeAgentInitialContext(rawContext) {
+  if (!rawContext || typeof rawContext !== 'object' || Array.isArray(rawContext)) return null;
+  const kind = limitedText(rawContext.kind, 40);
+  const reason = limitedText(rawContext.reason, 500);
+  if (kind === 'candidate_selection') {
+    const candidates = Array.isArray(rawContext.candidates)
+      ? rawContext.candidates.slice(0, 20).map(sanitizeAgentCandidate).filter(Boolean)
+      : [];
+    return candidates.length > 0 ? { kind, reason, candidates } : null;
+  }
+  if (kind === 'confirmation') {
+    const confirmation = rawContext.confirmation;
+    if (!confirmation || confirmation.tool !== 'fileCommander') return null;
+    const selectedFile = sanitizeAgentCandidate(confirmation.args && confirmation.args.selectedFile);
+    const pathValue = limitedText(
+      (selectedFile && selectedFile.path) || (confirmation.args && confirmation.args.path),
+      2048,
+    );
+    if (!pathValue) return null;
+    return {
+      kind,
+      reason,
+      confirmation: {
+        action: limitedText(confirmation.args && confirmation.args.action, 32) || 'open',
+        path: pathValue,
+        candidate: selectedFile,
+      },
+    };
+  }
+  return null;
+}
+
 function getDesktopAgentClient() {
   if (desktopAgentClient && desktopAgentClient.isRunning()) {
     return desktopAgentClient;
@@ -167,6 +231,11 @@ function getDesktopAgentClient() {
   });
   desktopAgentClient.on('event', (event) => {
     sendAgentTaskEvent(event);
+    if (voiceService && typeof voiceService.handleAgentTaskEvent === 'function') {
+      voiceService.handleAgentTaskEvent(event).catch((error) => {
+        console.error('[voiceService] Agent event handling failed:', error);
+      });
+    }
 
     if (event.type === 'plan_draft' && event.task_id) {
       updateTask(event.task_id, {
@@ -242,19 +311,26 @@ async function handleStartAgentTask(command, options = {}) {
     stopDesktopAgentClient({ silent: true });
     const client = getDesktopAgentClient();
     await client.waitUntilReady();
-    const { taskId } = client.startTask(userCommand, options);
+    const initialContext = sanitizeAgentInitialContext(options.initialContext);
+    const escalationReason = limitedText(options.escalationReason, 500);
+    const { taskId } = client.startTask(userCommand, { ...options, initialContext });
     activeAgentTaskId = taskId;
     appendTask({
       taskId,
       command: userCommand,
       source: options.source || 'launcher',
+      escalationReason,
+      escalationKind: limitedText(options.escalationKind, 40),
       status: 'started',
     });
     sendAgentTaskEvent({
       type: 'event',
       task_id: taskId,
       payload: {
-        message: 'Открыл агент и запустил задачу.',
+        message: escalationReason
+          ? `Автоматическая эскалация: ${escalationReason}`
+          : 'Открыл агент и запустил задачу.',
+        initialContext,
       },
     });
     return {
@@ -281,6 +357,35 @@ async function handleStartAgentTask(command, options = {}) {
       error: error.message,
     };
   }
+}
+
+async function handleAgentVoiceAction(action, payload = {}) {
+  const taskId = payload.taskId || activeAgentTaskId;
+  if (!desktopAgentClient || !taskId || !desktopAgentClient.isRunning()) {
+    return { ok: false, error: 'No active agent runtime.' };
+  }
+
+  if (action === 'user_choice') {
+    return desktopAgentClient.sendTaskAction(taskId, 'user_choice', {
+      index: payload.index,
+      choice: payload.choice,
+    });
+  }
+  if (action === 'confirm' || action === 'strong_confirm') {
+    return await desktopAgentClient.confirmPendingTool(taskId, {
+      strongConfirmed: action === 'strong_confirm',
+    });
+  }
+  if (action === 'reject_confirmation') {
+    return desktopAgentClient.rejectPendingTool(taskId, 'Tool request rejected by voice command.');
+  }
+  if (action === 'cancel') {
+    desktopAgentClient.rejectPendingTool(taskId, 'Task cancelled by voice command.');
+    const result = desktopAgentClient.sendTaskAction(taskId, 'cancel');
+    if (taskId === activeAgentTaskId) activeAgentTaskId = null;
+    return result;
+  }
+  return { ok: false, error: `Unsupported voice agent action: ${action}` };
 }
 
 function ensureWindowsAutoStart() {
@@ -313,15 +418,39 @@ function updateTrayMenu() {
 
   const contextMenu = Menu.buildFromTemplate(buildTrayMenuTemplate({
     isMicOn,
+    showTranscriptionBar,
     onToggleMic: () => {
         if (voiceService) {
           voiceService.toggle();
           updateTrayMenu();
         }
       },
+    onToggleTranscriptionBar: (checked) => {
+      toggleTranscriptionBar(checked);
+    },
     onQuit: () => shutdownApp(),
   }));
   tray.setContextMenu(contextMenu);
+}
+
+function toggleTranscriptionBar(visible) {
+  showTranscriptionBar = visible;
+  const uiState = loadJSON(UI_STATE_PATH, {});
+  uiState.showTranscriptionBar = visible;
+  saveJSON(UI_STATE_PATH, uiState);
+
+  if (visible) {
+    if (!transcriptionBarWindow || transcriptionBarWindow.isDestroyed()) {
+      createTranscriptionBarWindow();
+    } else {
+      transcriptionBarWindow.show();
+    }
+  } else {
+    if (transcriptionBarWindow && !transcriptionBarWindow.isDestroyed()) {
+      transcriptionBarWindow.hide();
+    }
+  }
+  updateTrayMenu();
 }
 
 // --- Create Window ---
@@ -356,6 +485,8 @@ function createWindow() {
   mainWindow.on('close', (event) => {
     // Prevent actual close — hide to tray instead
     if (!app.isQuitting) {
+
+
       event.preventDefault();
       mainWindow.hide();
     }
@@ -363,6 +494,84 @@ function createWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+  });
+}
+
+function createVoiceOverlayWindow() {
+  voiceOverlayWindow = new BrowserWindow({
+    width: 800,
+    height: 150,
+    x: Math.round(screen.getPrimaryDisplay().workAreaSize.width / 2 - 400),
+    y: Math.round(screen.getPrimaryDisplay().workAreaSize.height - 180), // At the bottom
+    frame: false,
+    transparent: true,
+    resizable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    hasShadow: false,
+    focusable: false,
+    show: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  });
+
+  // Make it click-through
+  voiceOverlayWindow.setIgnoreMouseEvents(true, { forward: true });
+
+  voiceOverlayWindow.loadFile(path.join(__dirname, 'renderer', 'voice-overlay.html'));
+
+  voiceOverlayWindow.on('closed', () => {
+    voiceOverlayWindow = null;
+  });
+}
+
+function createTranscriptionBarWindow() {
+  if (transcriptionBarWindow && !transcriptionBarWindow.isDestroyed()) return;
+
+  const uiState = loadJSON(UI_STATE_PATH, {});
+  const savedPos = uiState.transcriptionBarPosition;
+
+  transcriptionBarWindow = new BrowserWindow({
+    width: 520,
+    height: 80,
+    x: savedPos ? savedPos[0] : Math.round(screen.getPrimaryDisplay().workAreaSize.width / 2 - 260),
+    y: savedPos ? savedPos[1] : 80,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    focusable: false,
+    show: showTranscriptionBar,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  });
+
+  transcriptionBarWindow.loadFile(path.join(__dirname, 'renderer', 'transcription-bar.html'));
+
+  let moveTimeout;
+  transcriptionBarWindow.on('move', () => {
+    if (moveTimeout) clearTimeout(moveTimeout);
+    moveTimeout = setTimeout(() => {
+      if (transcriptionBarWindow && !transcriptionBarWindow.isDestroyed()) {
+        const pos = transcriptionBarWindow.getPosition();
+        const latestUiState = loadJSON(UI_STATE_PATH, {});
+        latestUiState.transcriptionBarPosition = pos;
+        saveJSON(UI_STATE_PATH, latestUiState);
+      }
+    }, 1000);
+  });
+
+  transcriptionBarWindow.on('closed', () => {
+    transcriptionBarWindow = null;
   });
 }
 
@@ -412,6 +621,12 @@ function shutdownApp() {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.close();
   }
+  if (voiceOverlayWindow && !voiceOverlayWindow.isDestroyed()) {
+    voiceOverlayWindow.close();
+  }
+  if (transcriptionBarWindow && !transcriptionBarWindow.isDestroyed()) {
+    transcriptionBarWindow.close();
+  }
   app.quit();
 }
 
@@ -450,7 +665,6 @@ app.whenReady().then(() => {
   // --- Enable Windows autostart by default ---
   ensureWindowsAutoStart();
 
-  // --- Create voice service ---
   voiceService = new VoiceService({
     onStateChange: () => updateTrayMenu(),
     intentOptions: {
@@ -460,6 +674,11 @@ app.whenReady().then(() => {
       clearVisualContext: handleClearVisualContext,
       executeFileCommand: handleFileCommand,
       startAgentTask: (command) => handleStartAgentTask(command, { source: 'voice' }),
+      isAgentTaskWindowVisible: () => {
+        const win = getAgentTaskWindow();
+        return !!(win && !win.isDestroyed() && win.isVisible());
+      },
+      handleAgentVoiceAction,
       showMainWindow,
     },
   });
@@ -467,6 +686,8 @@ app.whenReady().then(() => {
 
   // --- Create main window (always, but hidden if --hidden) ---
   createWindow();
+  createVoiceOverlayWindow();
+  createTranscriptionBarWindow();
   if (startHidden) {
     mainWindow.hide();
   } else {
@@ -599,6 +820,11 @@ app.whenReady().then(() => {
     return { ok: true };
   });
 
+  ipcMain.handle('hide-transcription-bar', () => {
+    toggleTranscriptionBar(false);
+    return { ok: true };
+  });
+
   ipcMain.handle('translate-selected', async () => {
     return await handleTranslateSelected();
   });
@@ -615,8 +841,8 @@ app.whenReady().then(() => {
     return handleClearVisualContext();
   });
 
-  ipcMain.handle('agent-start-task', async (event, { command } = {}) => {
-    return await handleStartAgentTask(command, { source: 'launcher' });
+  ipcMain.handle('agent-start-task', async (event, { command, options } = {}) => {
+    return await handleStartAgentTask(command, { ...(options || {}), source: 'launcher' });
   });
 
   ipcMain.handle('agent-task-action', async (event, { action, payload } = {}) => {
@@ -688,7 +914,7 @@ app.whenReady().then(() => {
       return { ok: true };
     }
 
-    if (action === 'user_choice' || action === 'continue') {
+    if (action === 'user_choice' || action === 'continue' || action === 'disable_steps') {
       if (!desktopAgentClient || !taskId || !desktopAgentClient.isRunning()) {
         return { ok: false, error: 'No active agent runtime.' };
       }

@@ -1,5 +1,7 @@
 # Jarvis File Commands Design
 
+Status: implemented and verified, including Vosk and Electron smoke checks
+
 ## Goal
 
 Add safe natural-language file commands to Jarvis so the user can open, reveal,

@@ -1,0 +1,172 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: transparent;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  user-select: none;
+}
+
+.transcription-bar {
+  display: flex;
+  align-items: center;
+  height: 56px;
+  margin: 12px;
+  padding: 0 16px;
+  background: rgba(18, 20, 26, 0.82);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 28px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45),
+              inset 0 1px 1px rgba(255, 255, 255, 0.12);
+  color: #f3f4f6;
+  box-sizing: border-box;
+  width: calc(100% - 24px);
+  -webkit-app-region: drag; /* Make the whole bar draggable */
+}
+
+/* Drag handle styling */
+.drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.25);
+  margin-right: 12px;
+  cursor: grab;
+  transition: color 0.2s ease;
+}
+
+.transcription-bar:hover .drag-handle {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.icon-drag {
+  display: block;
+}
+
+/* Status Led indicator */
+.status-indicator-container {
+  display: flex;
+  align-items: center;
+  margin-right: 14px;
+}
+
+.status-led {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  position: relative;
+  transition: background-color 0.4s ease, box-shadow 0.4s ease;
+}
+
+/* Status colors and glowing animations */
+.status-led.idle {
+  background-color: #4b5563; /* Gray */
+  box-shadow: 0 0 4px rgba(75, 85, 99, 0.4);
+}
+
+.status-led.listening {
+  background-color: #10b981; /* Green */
+  box-shadow: 0 0 12px #10b981;
+  animation: pulse-green 1.5s infinite ease-in-out;
+}
+
+.status-led.processing {
+  background-color: #3b82f6; /* Blue */
+  box-shadow: 0 0 12px #3b82f6;
+  animation: pulse-blue 1s infinite ease-in-out;
+}
+
+.status-led.error {
+  background-color: #ef4444; /* Red */
+  box-shadow: 0 0 12px #ef4444;
+}
+
+@keyframes pulse-green {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    transform: scale(1.1);
+    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+@keyframes pulse-blue {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+  }
+  70% {
+    transform: scale(1.1);
+    box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+  }
+}
+
+/* Text display */
+.text-container {
+  flex-grow: 1;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  padding-right: 8px;
+}
+
+#transcription-text {
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #f3f4f6;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: color 0.3s ease;
+}
+
+#transcription-text.placeholder {
+  color: rgba(255, 255, 255, 0.35);
+  font-style: italic;
+  font-weight: 400;
+}
+
+/* Interactive controls */
+.controls-container {
+  display: flex;
+  align-items: center;
+  -webkit-app-region: no-drag; /* interactive elements must not be draggable */
+}
+
+.control-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  padding: 6px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s, color 0.2s, transform 0.1s;
+}
+
+.control-btn:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.control-btn:active {
+  transform: scale(0.92);
+}

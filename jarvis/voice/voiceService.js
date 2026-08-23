@@ -1,7 +1,7 @@
 const { BrowserWindow, ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
-const { parseIntent } = require('./intentParser');
+const { routeIntent } = require('../tools/intentRouter');
 const { executeIntent } = require('../actions/executeIntent');
 const defaultTtsService = require('../tts/ttsService');
 const {
@@ -39,6 +39,8 @@ class VoiceService {
     this.activeSttProvider = null;
     this.pendingVoiceConfirmation = null;
     this.pendingVoiceSelection = null;
+    this.pendingAgentInput = null;
+    this.pendingAgentConfirmation = null;
   }
 
   get isVoiceEnabled() { return this._voiceEnabled; }
@@ -310,7 +312,159 @@ class VoiceService {
     }, confirmed);
   }
 
+  isAgentTaskWindowVisible() {
+    const check = this.intentOptions.isAgentTaskWindowVisible;
+    return typeof check === 'function' ? !!check() : false;
+  }
+
+  async sendAgentVoiceAction(action, payload = {}) {
+    const handler = this.intentOptions.handleAgentVoiceAction;
+    if (typeof handler !== 'function') {
+      return { ok: false, error: 'Голосовое управление агентом недоступно.' };
+    }
+    return await handler(action, payload);
+  }
+
+  async handleAgentTaskEvent(event) {
+    if (!event || !event.task_id) return false;
+
+    if (event.type === 'final_report' || event.type === 'error') {
+      if (this.pendingAgentInput && this.pendingAgentInput.taskId === event.task_id) this.pendingAgentInput = null;
+      if (this.pendingAgentConfirmation && this.pendingAgentConfirmation.taskId === event.task_id) this.pendingAgentConfirmation = null;
+      return false;
+    }
+
+    if (!this._voiceEnabled) return false;
+
+    if (event.type === 'needs_input') {
+      const state = event.payload && event.payload.state;
+      const plan = state && Array.isArray(state.plan) ? state.plan : [];
+      const askStep = plan.find((step) => step && step.action === 'ask_user' && step.enabled !== false);
+      const args = askStep && askStep.args && typeof askStep.args === 'object' ? askStep.args : {};
+      const choices = Array.isArray(args.choices) ? args.choices.map((choice) => String(choice)) : [];
+      if (choices.length === 0) return false;
+      this.pendingAgentInput = { taskId: event.task_id, choices };
+      this.pendingAgentConfirmation = null;
+      const question = String(args.question || 'Выберите вариант.');
+      const numbered = choices.slice(0, 5).map((choice, index) => `${index + 1}: ${choice}`).join('. ');
+      await this._speakVoiceResult({ message: `${question} ${numbered}` });
+      return true;
+    }
+
+    if (event.type === 'needs_confirmation') {
+      const result = event.payload && event.payload.result ? event.payload.result : {};
+      const strong = !!result.requiresStrongConfirmation;
+      this.pendingAgentConfirmation = {
+        taskId: event.task_id,
+        strong,
+        stage: strong ? 'understand' : 'confirm',
+      };
+      this.pendingAgentInput = null;
+      const message = strong
+        ? 'Нужно сильное подтверждение. Сначала скажите: понимаю.'
+        : 'Нужно подтверждение. Скажите: подтверждаю, или: отмена.';
+      await this._speakVoiceResult({ message });
+      return true;
+    }
+
+    return false;
+  }
+
+  async handlePendingAgentVoiceResponse(text) {
+    if (!this.pendingAgentInput && !this.pendingAgentConfirmation) return false;
+
+    if (!this.isAgentTaskWindowVisible()) {
+      const result = { ok: false, type: 'voice', message: 'Откройте окно задачи агента для голосового ответа.' };
+      this.broadcastStatus('ignored', result.message, { result });
+      await this._speakVoiceResult(result);
+      return true;
+    }
+
+    if (this.pendingAgentInput) {
+      const pending = this.pendingAgentInput;
+      if (this.isVoiceCancel(text)) {
+        this.pendingAgentInput = null;
+        await this.sendAgentVoiceAction('cancel', { taskId: pending.taskId });
+        const result = { ok: true, type: 'voice', message: 'Задача агента отменена.' };
+        this.broadcastStatus('result', result.message, { result });
+        await this._speakVoiceResult(result);
+        return true;
+      }
+
+      const index = this.voiceSelectionIndex(text);
+      if (index < 0 || !pending.choices[index]) {
+        const result = { ok: false, type: 'voice', message: 'Назовите номер варианта от одного до пяти.' };
+        this.broadcastStatus('ignored', result.message, { result });
+        await this._speakVoiceResult(result);
+        return true;
+      }
+
+      this.pendingAgentInput = null;
+      const choice = pending.choices[index];
+      const actionResult = await this.sendAgentVoiceAction('user_choice', { taskId: pending.taskId, index, choice });
+      const result = {
+        ok: actionResult && actionResult.ok !== false,
+        type: 'voice',
+        message: actionResult && actionResult.ok === false ? (actionResult.error || 'Не удалось передать выбор.') : `Выбран вариант ${index + 1}.`,
+      };
+      this.broadcastStatus(result.ok ? 'result' : 'error', result.message, { result });
+      await this._speakVoiceResult(result);
+      return true;
+    }
+
+    const pending = this.pendingAgentConfirmation;
+    if (this.isVoiceCancel(text)) {
+      this.pendingAgentConfirmation = null;
+      await this.sendAgentVoiceAction('reject_confirmation', { taskId: pending.taskId });
+      const result = { ok: true, type: 'voice', message: 'Действие агента отклонено.' };
+      this.broadcastStatus('result', result.message, { result });
+      await this._speakVoiceResult(result);
+      return true;
+    }
+
+    const normalized = this.normalizeVoiceResponse(text);
+    if (pending.strong && pending.stage === 'understand') {
+      if (normalized !== 'понимаю') {
+        const result = { ok: false, type: 'voice', message: 'Для первого этапа скажите точно: понимаю.' };
+        this.broadcastStatus('ignored', result.message, { result });
+        await this._speakVoiceResult(result);
+        return true;
+      }
+      pending.stage = 'confirm';
+      const result = { ok: true, type: 'voice', message: 'Принято. Теперь скажите точно: подтверждаю.' };
+      this.broadcastStatus('result', result.message, { result });
+      await this._speakVoiceResult(result);
+      return true;
+    }
+
+    const confirmed = pending.strong ? normalized === 'подтверждаю' : this.isVoiceConfirm(text);
+    if (!confirmed) {
+      const result = {
+        ok: false,
+        type: 'voice',
+        message: pending.strong ? 'Скажите точно: подтверждаю, или: отмена.' : 'Скажите: подтверждаю, или: отмена.',
+      };
+      this.broadcastStatus('ignored', result.message, { result });
+      await this._speakVoiceResult(result);
+      return true;
+    }
+
+    this.pendingAgentConfirmation = null;
+    const action = pending.strong ? 'strong_confirm' : 'confirm';
+    const actionResult = await this.sendAgentVoiceAction(action, { taskId: pending.taskId });
+    const result = {
+      ok: actionResult && actionResult.ok !== false,
+      type: 'voice',
+      message: actionResult && actionResult.ok === false ? (actionResult.error || 'Подтверждение не принято.') : 'Подтверждение принято.',
+    };
+    this.broadcastStatus(result.ok ? 'result' : 'error', result.message, { result });
+    await this._speakVoiceResult(result);
+    return true;
+  }
+
   async handlePendingVoiceResponse(text) {
+    if (await this.handlePendingAgentVoiceResponse(text)) return true;
+
     if (this.pendingVoiceConfirmation) {
       if (this.isVoiceCancel(text)) {
         this.pendingVoiceConfirmation = null;
@@ -394,7 +548,7 @@ class VoiceService {
     const now = Date.now();
     if (now - this.lastCommandTime < COOLDOWN_MS) { this.broadcastStatus('ignored', 'Cooldown'); return; }
 
-    const intent = parseIntent(text);
+    const intent = await routeIntent(text);
     if (!intent.ok) { this.broadcastStatus('ignored', `Not recognized: ${intent.reason}`); return; }
     this.broadcastStatus('intent', JSON.stringify(intent));
     try {
@@ -580,6 +734,8 @@ class VoiceService {
     this.stopAudioCapture();
     this.stopWorker();
     this.destroyAudioCaptureWindow();
+    this.pendingAgentInput = null;
+    this.pendingAgentConfirmation = null;
     console.log('[voiceService] Voice disabled.');
     this.notifyStateChange();
   }
@@ -595,6 +751,8 @@ class VoiceService {
     this.stopAudioCapture();
     this.stopWorker();
     this.destroyAudioCaptureWindow();
+    this.pendingAgentInput = null;
+    this.pendingAgentConfirmation = null;
     this._clearReadyTimeout();
     this.workerProcess = null;
     this.workerReady = false;

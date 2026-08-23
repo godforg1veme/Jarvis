@@ -1,7 +1,7 @@
 # Jarvis Unified Intent Routing Design
 
 Date: 2026-08-23
-Status: approved design, pending implementation planning
+Status: implemented and verified, including Electron smoke
 
 ## Goal
 
@@ -459,4 +459,3 @@ must not be required for the automated suite.
 - conversation memory for simple commands;
 - changing confirmation policy or Tool Gateway behavior;
 - broad cleanup of unrelated voice, renderer, or agent code.
-

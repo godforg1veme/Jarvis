@@ -1,5 +1,9 @@
 # Jarvis Desktop Agent Implementation Plan
 
+Status (2026-08-23): core v1 is implemented and verified. Protocol, client,
+gateway, plan editing, context transfer, voice interaction, controlled
+acceptance, and Electron task-window checks pass.
+
 Goal: implement the Desktop/File/App/Window Agent described in
 `docs/superpowers/specs/2026-06-18-jarvis-desktop-agent-design.md`.
 
@@ -32,7 +36,7 @@ tool execution and safety.
 - [x] Add preload exposure for agent task events/actions only.
 - [x] Add IPC for cancel, stop-after-current-step, confirm, strong confirm,
   and user input.
-- [ ] Add IPC for disabling plan steps.
+- [x] Add IPC for disabling plan steps.
 - [x] Add a smoke path that opens the task window and displays a simple plan.
 
 ## Phase 3: Smart Router And Escalation
@@ -41,8 +45,8 @@ tool execution and safety.
   detection, batch detection, candidate/confirmation escalation.
 - [x] Integrate text launcher routing without breaking simple fast paths.
 - [x] Integrate voice routing for agent triggers.
-- [ ] Transfer existing fast-path candidates/confirmations into an agent task.
-- [ ] Explain auto-escalation in the task timeline.
+- [x] Transfer existing fast-path candidates/confirmations into an agent task.
+- [x] Explain auto-escalation in the task timeline.
 - [x] Enforce one active task at a time.
 - [x] Add router tests for simple local commands, `/agent`, natural triggers,
   multi-step commands, and escalation on `needsSelection`/`needsConfirmation`.
@@ -69,7 +73,7 @@ tool execution and safety.
 - [x] Add permanent delete behind strong confirmation.
 - [x] Add auto-name conflict resolution.
 - [x] Add batch limit enforcement at 20 items.
-- [ ] Add tests for all file policies, including overwrite and batch mutation.
+- [x] Add tests for all file policies, including overwrite and batch mutation.
 
 ## Phase 6: App Gateway
 
@@ -94,12 +98,12 @@ tool execution and safety.
 - [x] Normalize Python draft plans into concrete Node plans.
 - [x] Add dependency checks for disabled steps.
 - [x] Add candidate-first `ask_user` UI.
-- [ ] Add voice selection support for `ask_user` steps.
+- [x] Add voice selection support for `ask_user` steps.
 - [x] Add ordinary confirmation.
 - [x] Add two-step strong confirmation in UI.
-- [ ] Add two-step strong confirmation by voice: `понимаю`, then
+- [x] Add two-step strong confirmation by voice: `понимаю`, then
   `подтверждаю`.
-- [ ] Execute plans step by step through the gateway.
+- [x] Execute plans step by step through the gateway.
 - [x] Stop on first execution error.
 - [x] Produce compact final reports with completed/skipped/failed steps.
 
@@ -121,13 +125,29 @@ tool execution and safety.
 - [x] Run router/gateway/window tests.
 - [x] Run `node scripts/testVoskLoad.js`.
 - [x] Run at least one `node voice/testCommand.js "<agent command>"`.
-- [ ] Run `npm start` and visually verify the agent task window.
-- [ ] Manually smoke the acceptance command:
+- [x] Run `npm start` and visually verify the agent task window.
+- [x] Smoke the acceptance command in a controlled profile:
   `Агент, найди все png на рабочем столе и перемести до 20 штук в папку Images`.
 - [x] Record any missing local model/key/runtime limitations honestly.
 
 Verification notes:
 
 - `node voice/testCommand.js "Agent, find all png on desktop and move up to 20 files to Images"` parses `desktop_agent`, but standalone execution returns "Desktop Agent недоступен" because the CLI test does not provide Electron's `startAgentTask` callback.
-- `node scripts/testDesktopAgentClient.js` covers the demo agent flow through fake search, ordinary confirmation, strong confirmation, batch move, and final report without touching real files.
-- In-app browser blocked direct `file://` visual verification by policy. No workaround server was started.
+- `node scripts/testDesktopAgentClient.js` covers the protocol flow through
+  mocked tools, including initial context and step-by-step gateway execution.
+- `node scripts/testDesktopAgentAcceptance.js` runs the actual Python runtime
+  and actual Node Tool Gateway in an isolated temporary user profile. It finds
+  two temporary PNGs, exercises ordinary and strong confirmations, moves both,
+  verifies the result, and cleans the profile up.
+- The real Electron task window was inspected through candidate selection,
+  disabling/re-enabling dependent plan steps, validation, and ordinary
+  confirmation. The confirmation was rejected/stopped before any real user file
+  mutation. A follow-up fix clears old events between task ids and compacts the
+  live timeline.
+- Exact voice choice handling and the two-stage `понимаю` / `подтверждаю`
+  contract are covered by `scripts/testVoiceServiceAgentInteractions.js`; a
+  plain `да` does not satisfy strong confirmation.
+- A generic Gemini planning smoke reached the configured provider, which
+  returned `FAILED_PRECONDITION: User location is not supported for API use`.
+  Deterministic local Desktop Agent planning and the controlled acceptance flow
+  remain operational.

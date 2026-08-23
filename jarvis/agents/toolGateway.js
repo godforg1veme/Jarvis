@@ -40,19 +40,30 @@ const ACTION_POLICIES = {
   'window.layout': POLICY.CONFIRM,
 
   'file.permanent_delete': POLICY.STRONG,
-  'file.overwrite': POLICY.STRONG,
   'file.move_batch': POLICY.STRONG,
   'file.copy_batch': POLICY.STRONG,
   'file.rename_batch': POLICY.STRONG,
   'file.delete_batch': POLICY.STRONG,
 };
 
+const OVERWRITE_CAPABLE_ACTIONS = new Set([
+  'file.create_folder',
+  'file.create_text_file',
+  'file.move',
+  'file.copy',
+]);
+
 function normalizeAction(action) {
   return String(action || '').trim();
 }
 
-function policyForAction(action) {
-  return ACTION_POLICIES[normalizeAction(action)] || '';
+function policyForAction(action, args = {}) {
+  const normalizedAction = normalizeAction(action);
+  const basePolicy = ACTION_POLICIES[normalizedAction] || '';
+  if (basePolicy && args.overwrite === true && OVERWRITE_CAPABLE_ACTIONS.has(normalizedAction)) {
+    return POLICY.STRONG;
+  }
+  return basePolicy;
 }
 
 function normalizePath(inputPath, options = {}) {
@@ -83,13 +94,16 @@ function validateToolRequest(request) {
   const action = normalizeAction(request.action);
   if (!action) throw new Error('tool request action is required');
 
-  const policy = policyForAction(action);
-  if (!policy) throw new Error(`unknown tool action: ${action}`);
-
   const args = request.args || {};
   if (!args || typeof args !== 'object' || Array.isArray(args)) {
     throw new Error('tool request args must be an object');
   }
+  if (Object.prototype.hasOwnProperty.call(args, 'overwrite') && typeof args.overwrite !== 'boolean') {
+    throw new Error('overwrite must be a boolean');
+  }
+
+  const policy = policyForAction(action, args);
+  if (!policy) throw new Error(`unknown tool action: ${action}`);
 
   return {
     action,

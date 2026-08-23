@@ -22,8 +22,18 @@ function run() {
   assert.strictEqual(normalized.plan[0].policy, POLICY.OBSERVE);
   assert.strictEqual(normalized.plan[1].policy, POLICY.STRONG);
   assert.strictEqual(normalized.plan[1].requiresStrongConfirmation, true);
-  assert.strictEqual(normalized.plan[2].enabled, false);
+  assert.strictEqual(normalized.plan[2].enabled, true);
+  assert.strictEqual(normalized.plan[2].status, 'blocked');
   assert(normalized.dependencyErrors.some((error) => error.dependencyId === 'missing'));
+
+  const disabledDependency = normalizePlanDraft([
+    { id: 'search', action: 'file.search', enabled: false },
+    { id: 'move', action: 'file.move_batch', depends_on: ['search'] },
+  ]);
+  assert.strictEqual(disabledDependency.plan[0].enabled, false);
+  assert.strictEqual(disabledDependency.plan[1].enabled, true);
+  assert.strictEqual(disabledDependency.plan[1].status, 'blocked');
+  assert(disabledDependency.dependencyErrors.some((error) => error.stepId === 'move'));
 
   const limited = normalizePlanDraft(
     Array.from({ length: 12 }, (_, index) => ({ id: `s${index}`, action: 'report' })),

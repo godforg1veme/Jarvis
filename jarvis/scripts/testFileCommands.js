@@ -39,6 +39,7 @@ function makeTempTree() {
   fs.mkdirSync(path.join(root, 'Downloads'), { recursive: true });
   fs.mkdirSync(path.join(root, 'node_modules'), { recursive: true });
   fs.mkdirSync(path.join(root, 'Desktop', 'проверка'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'Desktop', 'image.png'), 'png');
   fs.writeFileSync(path.join(root, 'Documents', 'config.json'), '{}');
   fs.writeFileSync(path.join(root, 'Downloads', 'invoice.pdf'), 'pdf');
   fs.writeFileSync(path.join(root, 'Downloads', 'setup.exe'), 'exe');
@@ -62,6 +63,10 @@ function testSearchAndIndex() {
   assert.strictEqual(folderResults[0].name, 'проверка');
   assert.strictEqual(folderResults[0].type, 'directory');
   assert.strictEqual(folderResults[0].dangerous, false);
+
+  const wildcardResults = searchDirectory(path.join(root, 'Desktop'), '*.png', { maxResults: 10, maxDepth: 2 });
+  assert.strictEqual(wildcardResults.length, 1);
+  assert.strictEqual(wildcardResults[0].name, 'image.png');
 
   const broadResults = searchFiles({ query: 'setup.exe', location: 'computer' }, {
     standardLocations: [{ id: 'downloads', path: downloads }],

@@ -83,34 +83,27 @@ function normalizePlanDraft(plan, options = {}) {
   });
 
   const byId = new Map(normalized.map((step) => [step.id, step]));
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const step of normalized) {
-      for (const dependencyId of step.dependsOn) {
-        const dependency = byId.get(dependencyId);
-        if (!dependency) {
-          if (step.enabled) changed = true;
-          step.enabled = false;
-          step.status = 'blocked';
-          dependencyErrors.push({
-            stepId: step.id,
-            dependencyId,
-            message: `dependency "${dependencyId}" does not exist`,
-          });
-          continue;
-        }
+  for (const step of normalized) {
+    if (!step.enabled) continue;
+    for (const dependencyId of step.dependsOn) {
+      const dependency = byId.get(dependencyId);
+      if (!dependency) {
+        step.status = 'blocked';
+        dependencyErrors.push({
+          stepId: step.id,
+          dependencyId,
+          message: `dependency "${dependencyId}" does not exist`,
+        });
+        continue;
+      }
 
-        if (dependency.enabled === false && step.enabled) {
-          changed = true;
-          step.enabled = false;
-          step.status = 'blocked';
-          dependencyErrors.push({
-            stepId: step.id,
-            dependencyId,
-            message: `dependency "${dependencyId}" is disabled`,
-          });
-        }
+      if (dependency.enabled === false) {
+        step.status = 'blocked';
+        dependencyErrors.push({
+          stepId: step.id,
+          dependencyId,
+          message: `dependency "${dependencyId}" is disabled`,
+        });
       }
     }
   }

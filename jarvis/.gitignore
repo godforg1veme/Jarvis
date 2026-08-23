@@ -39,6 +39,7 @@ error.txt
 
 # Downloaded archives and package experiments
 *.tgz
+*.whl
 
 # Agent/tool local state
 .superpowers/

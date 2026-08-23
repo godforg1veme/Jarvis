@@ -1,22 +1,15 @@
-const { parseIntent } = require("./intentParser");
+require('../tools/loadEnv').loadEnvFile();
+const { routeIntent } = require("../tools/intentRouter");
 
 const { executeIntent } = require("../actions/executeIntent");
-
-
 
 async function main() {
 
   const text = process.argv.slice(2).join(" ") || "джарвис включи доту";
 
-
-
   console.log("[test] text:", text);
 
-
-
-  const intent = parseIntent(text);
-
-
+  const intent = await routeIntent(text);
 
   console.log("[test] intent:", intent);
 

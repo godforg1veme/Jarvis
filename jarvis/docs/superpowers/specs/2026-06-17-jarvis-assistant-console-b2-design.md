@@ -1,7 +1,7 @@
 # Jarvis Assistant Console B2 Design
 
 Date: 2026-06-17
-Status: approved direction, ready for implementation planning
+Status: implemented and verified, including runtime visual smoke
 
 ## Goal
 

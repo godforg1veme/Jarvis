@@ -17,7 +17,13 @@ launching, local tools, command history, and optional AI intent resolution.
 - Optional faster-whisper runtime lives in `stt_runtime/`.
 - Text-to-speech lives in `tts/`.
 - Local tools live in `tools/`.
+- Simple single-step AI fallback lives in `tools/intentRouter.js` and
+  `tools/aiIntentResolver.js`; it uses OpenRouter only after deterministic
+  parsing fails.
 - Intent execution lives in `actions/`.
+- Desktop Agent orchestration and its safe tool gateway live in `agents/`.
+- The Python LangGraph/Gemini runtime in `agent_runtime/` is the only stateful
+  AI planning layer; Node Tool Gateway remains the execution authority.
 - Local/generated state lives in `data/`.
 - Local TTS voice/model files live in `voices/`.
 
@@ -39,8 +45,8 @@ launching, local tools, command history, and optional AI intent resolution.
 - Do not edit secrets or add API keys to the repo. Use environment variables such as `OPENROUTER_API_KEY`.
 - Ask before adding new production dependencies.
 - Do not edit `node_modules/`, `models/`, `voices/`, `build/`, or large generated files unless explicitly requested.
-- Treat `data/app-index.json`, `data/history.json`, `data/ai-cache.json`, `data/tts-cache/`, and logs as generated/local state.
-- `start.bat` runs `node scripts/ensureTts.js` before Electron so Silero/Piper dependencies and model files are prepared automatically.
+- Treat `data/app-index.json`, `data/history.json`, `data/ai-cache.json`, `data/ui-state.local.json`, `data/tts-cache/`, and logs as generated/local state.
+- `start.bat` runs `node scripts/ensureTts.js` and `node scripts/ensureStt.js` before Electron so the selected local speech runtimes are prepared automatically.
 
 ## Code Style
 

@@ -1,5 +1,8 @@
 # Jarvis Desktop/File/App/Window Agent Design
 
+Status: core v1 implemented and verified; Browser Agent remains the explicit
+next phase and is out of scope for this implementation.
+
 ## Goal
 
 Build a real Desktop Agent for Jarvis that can safely operate local files,
@@ -558,4 +561,3 @@ Expected behavior:
 9. Execution stops on first error.
 10. The report shows completed, skipped, and failed steps.
 11. History is written to generated local state without file contents.
-

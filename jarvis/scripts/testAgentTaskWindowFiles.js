@@ -19,6 +19,7 @@ function run() {
   assert(html.includes('Live process'));
   assert(html.includes('Plan draft'));
   assert(html.includes('reject-btn'));
+  assert(html.includes('plan-validation'));
   assert(css.includes('grid-template-columns: 190px'));
   assert(css.includes('.limits'));
   assert(js.includes('needs_input'));
@@ -26,6 +27,14 @@ function run() {
   assert(js.includes('requires_strong_confirmation'));
   assert(js.includes('strong_confirm'));
   assert(js.includes('Подтверждаю риск'));
+  assert(js.includes("sendAction('disable_steps'"));
+  assert(js.includes('disabledStepIds'));
+  assert(js.includes('plan_validation_error'));
+  assert(js.includes('resetTaskView'));
+  assert(js.includes('switchTaskIfNeeded'));
+  assert(js.includes('summarizeEvent'));
+  assert(!js.includes('JSON.stringify(event.payload || event)'));
+  assert(css.includes('.plan-validation'));
   assert(preload.includes('jarvisAgentTask'));
   assert(windowModule.includes('showInactive'));
 

@@ -95,6 +95,23 @@ async function testPendingConfirmation() {
   assert.strictEqual(sent[1].options.taskId, 'confirm-task');
 }
 
+function testInitialContextForwarding() {
+  const sent = [];
+  const client = new DesktopAgentClient();
+  client.send = (type, payload, options = {}) => {
+    sent.push({ type, payload, options });
+    return 'start-context';
+  };
+  const initialContext = {
+    kind: 'candidate_selection',
+    candidates: [{ type: 'file', name: 'one.txt', path: 'C:\\Temp\\one.txt' }],
+  };
+  client.startTask('open a candidate', { taskId: 'context-task', initialContext });
+  assert.strictEqual(sent[0].type, 'start_task');
+  assert.deepStrictEqual(sent[0].payload.initial_context, initialContext);
+  assert.strictEqual(sent[0].options.taskId, 'context-task');
+}
+
 function waitForTaskEvent(client, taskId, predicate, timeoutMs = 5000) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -198,6 +215,7 @@ function testHistory() {
 async function run() {
   await testClient();
   await testPendingConfirmation();
+  testInitialContextForwarding();
   await testDemoFlowWithConfirmations();
   testHistory();
   console.log('[testDesktopAgentClient] client and history tests passed');

@@ -12,6 +12,7 @@ function scoreFileName(fileName, query) {
   const name = normalizeQuery(fileName);
   const q = normalizeQuery(query);
   if (!name || !q) return 0;
+  if (q.startsWith('*.') && name.endsWith(q.slice(1))) return 90;
   if (name === q) return 100;
   if (normalizeExtension(name) && q.includes('.') && name.endsWith(q)) return 90;
   if (name.startsWith(q)) return 80;

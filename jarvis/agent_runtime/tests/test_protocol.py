@@ -3,9 +3,9 @@ import unittest
 from pathlib import Path
 
 import agent_runtime.server as server_module
-from agent_runtime.client_protocol import ProtocolError, encode_event, make_event, parse_message
+from agent_runtime.client_protocol import ProtocolError, ProtocolMessage, encode_event, make_event, parse_message
 from agent_runtime.graphs.desktop_graph import run_desktop_task
-from agent_runtime.server import AgentRuntimeServer
+from agent_runtime.server import AgentRuntimeServer, apply_disabled_steps
 
 
 class ProtocolTests(unittest.TestCase):
@@ -28,6 +28,43 @@ class ProtocolTests(unittest.TestCase):
         state = run_desktop_task("Агент, найди все png на рабочем столе и перемести до 20 штук в папку Images")
         self.assertEqual(state["phase"], "needs_input")
         self.assertTrue(any(step["action"] == "ask_user" for step in state["plan"]))
+
+    def test_disabling_steps_reports_broken_dependencies_and_blocks_continue(self):
+        plan = [
+            {"id": "search", "action": "file.search", "depends_on": []},
+            {"id": "move", "action": "file.move_batch", "depends_on": ["search"]},
+        ]
+        next_plan, errors = apply_disabled_steps(plan, ["search"])
+        self.assertFalse(next_plan[0]["enabled"])
+        self.assertTrue(next_plan[1]["enabled"])
+        self.assertEqual(next_plan[1]["status"], "blocked")
+        self.assertEqual(errors[0]["dependencyId"], "search")
+
+        runtime = AgentRuntimeServer()
+        runtime.tasks["disable-task"] = {
+            "task_id": "disable-task",
+            "kind": "generic_plan",
+            "user_command": "test",
+            "state": {"phase": "planning", "plan": plan, "dependency_errors": []},
+            "plan": plan,
+            "next_step_index": 0,
+        }
+        events = runtime.handle_task_action(ProtocolMessage(
+            "task_action", "disable-1", "disable-task",
+            {"action": "disable_steps", "disabledStepIds": ["search"]},
+        ))
+        self.assertTrue(any(event["type"] == "plan_validation_error" for event in events))
+
+        blocked = runtime.handle_task_action(ProtocolMessage(
+            "task_action", "continue-1", "disable-task", {"action": "continue"},
+        ))
+        self.assertEqual(blocked[0]["type"], "plan_validation_error")
+
+        valid = runtime.handle_task_action(ProtocolMessage(
+            "task_action", "disable-2", "disable-task",
+            {"action": "disable_steps", "disabledStepIds": ["search", "move"]},
+        ))
+        self.assertFalse(any(event["type"] == "plan_validation_error" for event in valid))
 
     def test_open_desktop_folder_uses_user_desktop(self):
         state = run_desktop_task('открой папку "проверка" на рабочем столе', "folder-task")
@@ -134,6 +171,108 @@ class ProtocolTests(unittest.TestCase):
             self.assertTrue(any(event["type"] == "final_report" for event in events))
         finally:
             server_module.run_desktop_task = original
+
+    def test_fast_path_candidate_context_reuses_selected_file(self):
+        runtime = AgentRuntimeServer()
+        task_id = "fast-path-file"
+        source_path = str(Path.home() / "Desktop" / "chosen.txt")
+        start_events = runtime.handle_message(ProtocolMessage(
+            "start_task",
+            "start-fast-file",
+            task_id,
+            {
+                "user_command": "открой выбранный файл",
+                "initial_context": {
+                    "kind": "candidate_selection",
+                    "reason": "Выберите файл.",
+                    "candidates": [
+                        {"type": "file", "name": "chosen.txt", "path": source_path},
+                        {"type": "file", "name": "other.txt", "path": str(Path.home() / "Desktop" / "other.txt")},
+                    ],
+                },
+            },
+        ))
+        self.assertTrue(any(event["type"] == "needs_input" for event in start_events))
+
+        choice_events = runtime.handle_message(ProtocolMessage(
+            "task_action",
+            "choose-fast-file",
+            task_id,
+            {"action": "user_choice", "index": 0, "choice": "chosen.txt"},
+        ))
+        request = next(event for event in choice_events if event["type"] == "tool_request")
+        self.assertEqual(request["payload"]["action"], "file.open")
+        self.assertEqual(request["payload"]["args"]["path"], source_path)
+        self.assertTrue(any("без повторного поиска" in event.get("payload", {}).get("message", "") for event in choice_events))
+
+    def test_fast_path_confirmation_context_continues_with_original_path(self):
+        runtime = AgentRuntimeServer()
+        task_id = "fast-path-confirm"
+        source_path = str(Path.home() / "Desktop" / "confirmed.txt")
+        start_events = runtime.handle_message(ProtocolMessage(
+            "start_task",
+            "start-fast-confirm",
+            task_id,
+            {
+                "user_command": "открой найденный файл",
+                "initial_context": {
+                    "kind": "confirmation",
+                    "reason": "Подтвердите открытие.",
+                    "confirmation": {"action": "open", "path": source_path},
+                },
+            },
+        ))
+        self.assertTrue(any(event["type"] == "plan_draft" for event in start_events))
+
+        continue_events = runtime.handle_message(ProtocolMessage(
+            "task_action", "continue-fast-confirm", task_id, {"action": "continue"},
+        ))
+        request = next(event for event in continue_events if event["type"] == "tool_request")
+        self.assertEqual(request["payload"]["action"], "file.open")
+        self.assertEqual(request["payload"]["args"]["path"], source_path)
+
+    def test_generic_ask_user_choice_resumes_plan(self):
+        runtime = AgentRuntimeServer()
+        task_id = "generic-choice"
+        plan = [
+            {
+                "id": "choose",
+                "title": "Choose",
+                "action": "ask_user",
+                "policy": "observe",
+                "args": {"question": "Choose", "choices": ["One", "Two"]},
+                "depends_on": [],
+                "enabled": True,
+            },
+            {
+                "id": "report",
+                "title": "Report",
+                "action": "report",
+                "policy": "observe",
+                "args": {"message": "done"},
+                "depends_on": ["choose"],
+                "enabled": True,
+            },
+        ]
+        runtime.tasks[task_id] = {
+            "task_id": task_id,
+            "kind": "generic_plan",
+            "user_command": "choose",
+            "state": {"phase": "planning", "plan": plan, "dependency_errors": []},
+            "plan": plan,
+            "next_step_index": 0,
+            "observations": [],
+        }
+        prompt_events = runtime.handle_task_action(ProtocolMessage(
+            "task_action", "continue-choice", task_id, {"action": "continue"},
+        ))
+        self.assertTrue(any(event["type"] == "needs_input" for event in prompt_events))
+        final_events = runtime.handle_task_action(ProtocolMessage(
+            "task_action", "answer-choice", task_id, {"action": "user_choice", "index": 1, "choice": "Two"},
+        ))
+        self.assertTrue(any(event["type"] == "final_report" for event in final_events))
+        final_state = next(event["payload"]["state"] for event in final_events if event["type"] == "final_report")
+        self.assertEqual(final_state["observations"][-1]["choice"], "Two")
 
     def test_generic_file_open_recovers_from_missing_path(self):
         original = server_module.run_desktop_task

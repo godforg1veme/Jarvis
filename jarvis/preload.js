@@ -24,11 +24,12 @@ contextBridge.exposeInMainWorld('jarvis', {
 
   // Hide window (after app launch)
   hideWindow: () => ipcRenderer.invoke('hide-window'),
+  hideTranscriptionBar: () => ipcRenderer.invoke('hide-transcription-bar'),
   translateSelected: () => ipcRenderer.invoke('translate-selected'),
   analyzeVisualArea: (command) => ipcRenderer.invoke('visual-analyze', { command }),
   continueVisualDialog: (command) => ipcRenderer.invoke('visual-continue', { command }),
   clearVisualContext: () => ipcRenderer.invoke('visual-clear-context'),
-  startAgentTask: (command) => ipcRenderer.invoke('agent-start-task', { command }),
+  startAgentTask: (command, options = {}) => ipcRenderer.invoke('agent-start-task', { command, options }),
 
   // Focus input listener from main process
   onFocusInput: (callback) => ipcRenderer.on('focus-input', (_event, ...args) => callback(...args)),
@@ -41,6 +42,7 @@ contextBridge.exposeInMainWorld('jarvis', {
 contextBridge.exposeInMainWorld("jarvisVoice", {
   start: () => ipcRenderer.invoke("voice:start"),
   stop: () => ipcRenderer.invoke("voice:stop"),
+  getState: () => ipcRenderer.invoke("voice:state"),
   sendPcm: (arrayBuffer) => ipcRenderer.send("voice:pcm", arrayBuffer),
   onStatus: (callback) => {
     ipcRenderer.on("voice:status", (_event, payload) => callback(payload));

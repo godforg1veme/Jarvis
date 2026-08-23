@@ -8,6 +8,7 @@ const path = require('path');
 const USER_APPS_PATH = path.join(__dirname, '..', 'data', 'apps.user.json');
 const AI_SETTINGS_PATH = path.join(__dirname, '..', 'data', 'ai-settings.json');
 const AI_THINKING_STATUS = 'AI: пытаюсь понять запрос...';
+const RUN_PROGRAM_AI_CAPABILITIES = ['launch_app', 'search_app'];
 
 /**
  * Execute app launch: resolve query → launch app
@@ -95,11 +96,7 @@ function isDangerousAiQuery(query) {
 function aiVariantsFromIntent(aiResult) {
   const queries = [];
 
-  if (Array.isArray(aiResult?.expandedQueries)) {
-    queries.push(...aiResult.expandedQueries);
-  }
-
-  if (queries.length === 0 && aiResult?.appQuery) {
+  if (aiResult?.appQuery) {
     queries.push(aiResult.appQuery);
   }
 
@@ -306,7 +303,11 @@ async function execute(args, confirmed) {
   // /aidebug should only show AI intent JSON, never launch anything.
   if (args._aidebug) {
     try {
-      const aiResult = await aiIntentResolver.resolveIntentWithAi(originalInput);
+      const aiResult = await aiIntentResolver.resolveCommandWithAi(originalInput, {
+        mode: 'launcher-debug',
+        capabilities: RUN_PROGRAM_AI_CAPABILITIES,
+        allowDesktopAgent: true,
+      });
       return {
         ok: true,
         type: 'ai',
@@ -347,13 +348,31 @@ async function execute(args, confirmed) {
     const aiStatuses = [AI_THINKING_STATUS];
 
     try {
-      const aiResult = await aiIntentResolver.resolveIntentWithAi(originalInput);
-      const canUseAi = ['open_app', 'search_app'].includes(aiResult.intent) && aiResult.confidence >= 0.6;
+      const aiResult = await aiIntentResolver.resolveCommandWithAi(originalInput, {
+        mode: 'launcher',
+        capabilities: RUN_PROGRAM_AI_CAPABILITIES,
+        allowDesktopAgent: true,
+      });
+
+      if (aiResult.route === 'desktop_agent') {
+        return addAiStatus({
+          ok: false,
+          type: 'agent',
+          title: 'Desktop Agent',
+          content: 'Команда требует многошагового плана. Передаю её Desktop Agent.',
+          needsAgent: true,
+          command: originalInput,
+        }, [AI_THINKING_STATUS, 'AI определил: требуется Desktop Agent']);
+      }
+
+      const canUseAi = aiResult.route === 'direct' &&
+        ['launch_app', 'search_app'].includes(aiResult.action) &&
+        aiResult.confidence >= 0.75;
 
       if (canUseAi) {
         const aiStatusesWithUnderstood = [
           AI_THINKING_STATUS,
-          `AI понял: ${aiResult.appQuery || aiResult.expandedQueries?.[0] || aiResult.original || originalInput}`,
+          `AI понял: ${aiResult.appQuery || originalInput}`,
         ];
         const aiVariants = aiVariantsFromIntent(aiResult);
 
@@ -375,7 +394,7 @@ async function execute(args, confirmed) {
 
       return addAiStatus(notFoundResponse(resolved.result, originalInput), [
         ...aiStatuses,
-        aiResult.intent === 'unknown' ? `AI не уверен: ${aiResult.reason || 'confidence < 0.6'}` : `AI не нашёл candidates: confidence ${aiResult.confidence}`,
+        aiResult.route === 'unknown' ? `AI не уверен: ${aiResult.reason || 'confidence < 0.75'}` : `AI не нашёл candidates: confidence ${aiResult.confidence}`,
       ]);
     } catch (err) {
       return addAiStatus(notFoundResponse(resolved.result, originalInput), [

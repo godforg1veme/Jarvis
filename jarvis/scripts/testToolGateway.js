@@ -23,7 +23,11 @@ async function run() {
   assert.strictEqual(policyForAction('file.search'), POLICY.OBSERVE);
   assert.strictEqual(policyForAction('file.move_batch'), POLICY.STRONG);
   assert.strictEqual(policyForAction('file.create_text_file'), POLICY.CONFIRM);
+  assert.strictEqual(policyForAction('file.create_text_file', { overwrite: true }), POLICY.STRONG);
+  assert.strictEqual(policyForAction('file.copy', { overwrite: true }), POLICY.STRONG);
+  assert.strictEqual(policyForAction('file.overwrite'), '');
   assert.throws(() => validateToolRequest({ action: 'file.nope', args: {} }), /unknown tool action/);
+  assert.throws(() => validateToolRequest({ action: 'file.copy', args: { overwrite: 'true' } }), /overwrite must be a boolean/);
 
   const root = makeTempTree();
   const desktop = path.join(root, 'Desktop');
@@ -102,6 +106,20 @@ async function run() {
   assert.strictEqual(textFile.ok, true);
   assert.strictEqual(fs.readFileSync(path.join(root, 'note.txt'), 'utf8'), 'hello');
 
+  const overwriteBlocked = await executeToolRequest({
+    action: 'file.create_text_file',
+    args: { path: path.join(root, 'note.txt'), content: 'replaced', overwrite: true },
+  }, { allowRoots: [root], confirmed: true });
+  assert.strictEqual(overwriteBlocked.requiresStrongConfirmation, true);
+  assert.strictEqual(fs.readFileSync(path.join(root, 'note.txt'), 'utf8'), 'hello');
+
+  const overwrittenText = await executeToolRequest({
+    action: 'file.create_text_file',
+    args: { path: path.join(root, 'note.txt'), content: 'replaced', overwrite: true },
+  }, { allowRoots: [root], strongConfirmed: true });
+  assert.strictEqual(overwrittenText.ok, true);
+  assert.strictEqual(fs.readFileSync(path.join(root, 'note.txt'), 'utf8'), 'replaced');
+
   const missingParent = await executeToolRequest({
     action: 'file.create_text_file',
     args: { path: path.join(root, 'Missing', 'note.txt') },
@@ -126,6 +144,21 @@ async function run() {
   }, { allowRoots: [root], confirmed: true });
   assert.strictEqual(copied.ok, true);
   assert.strictEqual(fs.existsSync(path.join(root, 'Images', 'copy-me.txt')), true);
+
+  fs.writeFileSync(path.join(root, 'Images', 'copy-me.txt'), 'old-copy');
+  const copyOverwriteBlocked = await executeToolRequest({
+    action: 'file.copy',
+    args: { from: copySource, to: path.join(root, 'Images', 'copy-me.txt'), overwrite: true },
+  }, { allowRoots: [root], confirmed: true });
+  assert.strictEqual(copyOverwriteBlocked.requiresStrongConfirmation, true);
+  assert.strictEqual(fs.readFileSync(path.join(root, 'Images', 'copy-me.txt'), 'utf8'), 'old-copy');
+
+  const copiedOverExisting = await executeToolRequest({
+    action: 'file.copy',
+    args: { from: copySource, to: path.join(root, 'Images', 'copy-me.txt'), overwrite: true },
+  }, { allowRoots: [root], strongConfirmed: true });
+  assert.strictEqual(copiedOverExisting.ok, true);
+  assert.strictEqual(fs.readFileSync(path.join(root, 'Images', 'copy-me.txt'), 'utf8'), 'copy');
 
   const moved = await executeToolRequest({
     action: 'file.move',
@@ -168,6 +201,49 @@ async function run() {
   }, { allowRoots: [root], strongConfirmed: true });
   assert.strictEqual(batchMoved.ok, true);
   assert.strictEqual(batchMoved.results.length, 2);
+
+  const renameBatchSources = ['rename-a.txt', 'rename-b.txt'].map((name) => {
+    const filePath = path.join(root, name);
+    fs.writeFileSync(filePath, name);
+    return filePath;
+  });
+  const batchRenamed = await executeToolRequest({
+    action: 'file.rename_batch',
+    args: {
+      paths: [
+        { path: renameBatchSources[0], newName: 'renamed-a.txt' },
+        { path: renameBatchSources[1], newName: 'renamed-b.txt' },
+      ],
+    },
+  }, { allowRoots: [root], strongConfirmed: true });
+  assert.strictEqual(batchRenamed.ok, true);
+  assert.strictEqual(fs.existsSync(path.join(root, 'renamed-a.txt')), true);
+  assert.strictEqual(fs.existsSync(path.join(root, 'renamed-b.txt')), true);
+
+  const copiedBatch = await executeToolRequest({
+    action: 'file.copy_batch',
+    args: {
+      paths: [
+        { path: path.join(root, 'renamed-a.txt'), to: path.join(batchDir, 'copied-a.txt') },
+        { path: path.join(root, 'renamed-b.txt'), to: path.join(batchDir, 'copied-b.txt') },
+      ],
+    },
+  }, { allowRoots: [root], strongConfirmed: true });
+  assert.strictEqual(copiedBatch.ok, true);
+  assert.strictEqual(fs.existsSync(path.join(batchDir, 'copied-a.txt')), true);
+  assert.strictEqual(fs.existsSync(path.join(batchDir, 'copied-b.txt')), true);
+
+  const trashedBatch = [];
+  const batchDeleted = await executeToolRequest({
+    action: 'file.delete_batch',
+    args: { paths: [path.join(batchDir, 'copied-a.txt'), path.join(batchDir, 'copied-b.txt')] },
+  }, {
+    allowRoots: [root],
+    strongConfirmed: true,
+    shell: { trashItem: async (targetPath) => { trashedBatch.push(targetPath); } },
+  });
+  assert.strictEqual(batchDeleted.ok, true);
+  assert.strictEqual(trashedBatch.length, 2);
 
   const tooMany = await executeToolRequest({
     action: 'file.copy_batch',
