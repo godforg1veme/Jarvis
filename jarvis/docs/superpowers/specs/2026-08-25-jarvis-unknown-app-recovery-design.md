@@ -1,7 +1,7 @@
 # Jarvis Unknown App Recovery Design
 
 Date: 2026-08-25
-Status: proposed; conversational design approved, written spec awaiting review
+Status: approved for implementation planning
 
 ## Goal
 
