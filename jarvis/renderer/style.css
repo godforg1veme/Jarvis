@@ -498,6 +498,23 @@ button {
   color: #ffd28a;
 }
 
+.recovery-cancel-button {
+  grid-column: 2 / -1;
+  justify-self: end;
+  margin-top: 8px;
+  border: 1px solid rgba(248, 113, 113, 0.24);
+  border-radius: 9px;
+  background: rgba(127, 29, 29, 0.16);
+  color: #fecaca;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 6px 10px;
+}
+
+.recovery-cancel-button:hover {
+  background: rgba(127, 29, 29, 0.28);
+}
+
 .result-tip {
   grid-column: 2 / -1;
   margin-top: 8px;

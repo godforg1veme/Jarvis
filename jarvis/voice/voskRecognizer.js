@@ -24,7 +24,6 @@ class VoskStreamRecognizer {
   constructor() {
     this.model = null;
     this.recognizer = null;
-    this.audioPcm = Buffer.alloc(0);
     this.sampleRate = SAMPLE_RATE;
   }
 
@@ -91,9 +90,6 @@ class VoskStreamRecognizer {
       return { partial: "", final: "", hasFinal: false };
     }
 
-    // Accumulate audio
-    this.audioPcm = Buffer.concat([this.audioPcm, pcmBuffer]);
-
     // Accept waveform — returns true when end of speech is detected
     const hasResult = this.recognizer.acceptWaveform(pcmBuffer);
 
@@ -129,14 +125,6 @@ class VoskStreamRecognizer {
       final: finalText,
       hasFinal: finalText.length > 0,
     };
-  }
-
-  getAudioBase64() {
-    return this.audioPcm.toString("base64");
-  }
-
-  resetAudio() {
-    this.audioPcm = Buffer.alloc(0);
   }
 
   free() {

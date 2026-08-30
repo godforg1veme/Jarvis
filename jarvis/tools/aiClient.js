@@ -174,12 +174,17 @@ function validateAndSanitizeVisionMessages(messages) {
 
 async function fetchWithTimeout(url, options, timeoutMs) {
   const controller = new AbortController();
+  const callerSignal = options && options.signal;
+  const abortFromCaller = () => controller.abort(callerSignal.reason);
+  if (callerSignal?.aborted) abortFromCaller();
+  else if (callerSignal) callerSignal.addEventListener('abort', abortFromCaller, { once: true });
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     return await fetch(url, { ...options, signal: controller.signal });
   } finally {
     clearTimeout(timer);
+    if (callerSignal) callerSignal.removeEventListener('abort', abortFromCaller);
   }
 }
 
@@ -217,6 +222,7 @@ async function requestOpenRouterChat(messages, options = {}) {
           'X-Title': 'Jarvis',
         },
         body: JSON.stringify(body),
+        signal: options.signal,
       }, timeoutMs);
 
       const responseText = await response.text();

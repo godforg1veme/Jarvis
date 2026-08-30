@@ -8,7 +8,10 @@ require('./tools/loadEnv').loadEnvFile();
 const { app, BrowserWindow, globalShortcut, ipcMain, session, screen, Tray, Menu, nativeImage, clipboard, desktopCapturer, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
+const { buildWindowsAutoStartSettings } = require('./startup/windowsAutoStart');
 const appIndexer = require('./tools/appIndexer');
+const { AppRecoveryService } = require('./tools/appRecoveryService');
 const { setupVoiceIpc } = require('./voice/voiceIpc');
 const { VoiceService } = require('./voice/voiceService');
 const { buildTrayMenuTemplate } = require('./trayMenu');
@@ -45,9 +48,76 @@ let desktopAgentClient = null;
 let activeAgentTaskId = null;
 let lastExternalForegroundHwnd = null;
 let suppressNextDesktopAgentExit = false;
+let appRecoveryService = null;
+const appSelectionTickets = new Map();
 const HISTORY_PATH = path.join(__dirname, 'data', 'history.json');
 const APPS_PATH = path.join(__dirname, 'data', 'apps.default.json');
 const UI_STATE_PATH = path.join(__dirname, 'data', 'ui-state.local.json');
+
+function recoveryResult(snapshot) {
+  return {
+    ok: snapshot && snapshot.state === 'completed',
+    type: 'app_recovery',
+    title: 'Поиск приложения',
+    content: snapshot?.error || snapshot?.result?.message || 'Ищу приложение на компьютере.',
+    recovery: snapshot,
+  };
+}
+
+function getAppRecoveryService() {
+  if (!appRecoveryService) {
+    appRecoveryService = new AppRecoveryService({
+      emit: snapshot => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('app-recovery-state', snapshot);
+        }
+      },
+    });
+  }
+  return appRecoveryService;
+}
+
+function isTrustedMainRenderer(event) {
+  return !!(mainWindow && !mainWindow.isDestroyed() && event?.sender?.id === mainWindow.webContents.id);
+}
+
+function requireOpaqueId(value, prefix) {
+  const id = String(value || '');
+  if (id.length > 100 || !new RegExp(`^${prefix}-[a-zA-Z0-9-]+$`).test(id)) throw new Error('invalid opaque id');
+  return id;
+}
+
+function registerAppSelection(result) {
+  if (!result?.needsSelection || !Array.isArray(result.candidates)) return result;
+  const now = Date.now();
+  for (const [candidateId, ticket] of appSelectionTickets) {
+    if (now > ticket.expiresAt) appSelectionTickets.delete(candidateId);
+  }
+  const candidates = result.candidates.map(candidate => {
+    const candidateId = `selection-${crypto.randomUUID()}`;
+    appSelectionTickets.set(candidateId, { candidate, expiresAt: now + 10 * 60 * 1000 });
+    return {
+      candidateId,
+      name: candidate.name,
+      aliases: candidate.aliases || [],
+      type: candidate.type,
+      source: candidate.source,
+      score: candidate.score,
+      reason: candidate.reason,
+      icon: candidate.icon,
+    };
+  });
+  return { ...result, candidates };
+}
+
+async function launchRegisteredSelection(candidateId) {
+  const id = requireOpaqueId(candidateId, 'selection');
+  const ticket = appSelectionTickets.get(id);
+  appSelectionTickets.delete(id);
+  if (!ticket || Date.now() > ticket.expiresAt) throw new Error('app selection expired');
+  const launchApp = require('./tools/launchApp');
+  return launchApp.launch(ticket.candidate);
+}
 
 // --- Helpers ---
 function ensureDir(dir) {
@@ -392,10 +462,11 @@ function ensureWindowsAutoStart() {
   if (process.platform !== 'win32') return;
 
   try {
-    app.setLoginItemSettings({
-      openAtLogin: true,
-      args: ['--hidden'],
-    });
+    app.setLoginItemSettings(buildWindowsAutoStartSettings({
+      isPackaged: app.isPackaged,
+      execPath: process.execPath,
+      appPath: app.getAppPath(),
+    }));
   } catch (err) {
     console.warn('[main] Failed to enable Windows autostart:', err.message);
   }
@@ -674,6 +745,13 @@ app.whenReady().then(() => {
       clearVisualContext: handleClearVisualContext,
       executeFileCommand: handleFileCommand,
       startAgentTask: (command) => handleStartAgentTask(command, { source: 'voice' }),
+      startAppRecovery: (command, recoveryOptions = {}) => getAppRecoveryService().start(command, {
+        ...recoveryOptions,
+        inputChannel: 'voice',
+      }),
+      selectAppRecovery: (recoveryId, candidateId) => getAppRecoveryService().select(recoveryId, candidateId),
+      confirmAppRecovery: (recoveryId) => getAppRecoveryService().confirm(recoveryId),
+      cancelAppRecovery: (recoveryId) => getAppRecoveryService().cancel(recoveryId, 'voice cancelled'),
       isAgentTaskWindowVisible: () => {
         const win = getAgentTaskWindow();
         return !!(win && !win.isDestroyed() && win.isVisible());
@@ -722,18 +800,72 @@ app.whenReady().then(() => {
     }
     try {
       const toolModule = require(`./tools/${tool}`);
-      return await toolModule.execute(args);
+      const result = await toolModule.execute(args);
+      if (tool === 'runProgram' && result?.needsRecovery) {
+        const snapshot = await getAppRecoveryService().start(result.query, {
+          inputChannel: 'text',
+          normalizedQuery: result.normalizedQuery,
+        });
+        return recoveryResult(snapshot);
+      }
+      if (tool === 'runProgram' && result?.needsSelection) return registerAppSelection(result);
+      return result;
     } catch (err) {
       return { ok: false, type: 'error', title: 'Ошибка', content: err.message, error: err.message };
     }
   });
 
-  ipcMain.handle('launch-selected-app', async (event, app) => {
+  ipcMain.handle('launch-selected-app', async (event, request) => {
     try {
-      const launchApp = require('./tools/launchApp');
-      return await launchApp.launch(app);
+      if (!isTrustedMainRenderer(event)) throw new Error('untrusted renderer');
+      return await launchRegisteredSelection(request && request.candidateId);
     } catch (err) {
       return { ok: false, type: 'run', title: 'Ошибка запуска', content: err.message, error: err.message };
+    }
+  });
+
+  ipcMain.handle('app-recovery-select', (event, { recoveryId, candidateId } = {}) => {
+    try {
+      if (!isTrustedMainRenderer(event)) throw new Error('untrusted renderer');
+      return recoveryResult(getAppRecoveryService().select(
+        requireOpaqueId(recoveryId, 'recovery'),
+        requireOpaqueId(candidateId, 'candidate'),
+      ));
+    } catch (error) {
+      return { ok: false, type: 'app_recovery', content: error.message, error: error.message };
+    }
+  });
+
+  ipcMain.handle('app-recovery-confirm', async (event, { recoveryId } = {}) => {
+    try {
+      if (!isTrustedMainRenderer(event)) throw new Error('untrusted renderer');
+      return recoveryResult(await getAppRecoveryService().confirm(requireOpaqueId(recoveryId, 'recovery')));
+    } catch (error) {
+      return { ok: false, type: 'app_recovery', content: error.message, error: error.message };
+    }
+  });
+
+  ipcMain.handle('app-recovery-cancel', (event, { recoveryId } = {}) => {
+    try {
+      if (!isTrustedMainRenderer(event)) throw new Error('untrusted renderer');
+      return recoveryResult(getAppRecoveryService().cancel(requireOpaqueId(recoveryId, 'recovery'), 'text cancelled'));
+    } catch (error) {
+      return { ok: false, type: 'app_recovery', content: error.message, error: error.message };
+    }
+  });
+
+  ipcMain.handle('app-recovery-details', (event, { recoveryId, candidateId } = {}) => {
+    try {
+      if (!isTrustedMainRenderer(event)) throw new Error('untrusted renderer');
+      return {
+        ok: true,
+        details: getAppRecoveryService().details(
+          requireOpaqueId(recoveryId, 'recovery'),
+          requireOpaqueId(candidateId, 'candidate'),
+        ),
+      };
+    } catch (error) {
+      return { ok: false, error: error.message };
     }
   });
 
@@ -761,6 +893,13 @@ app.whenReady().then(() => {
 
   ipcMain.handle('get-apps', async () => {
     const userApps = loadJSON(path.join(__dirname, 'data', 'apps.user.json'), { apps: [] }).apps || [];
+    const learnedApps = require('./tools/learnedAppStore').load({ quarantine: false }).apps.map(app => ({
+      name: app.displayName,
+      aliases: app.aliases || [],
+      command: '',
+      icon: '◆',
+      source: 'apps.learned',
+    }));
     const defaultApps = loadJSON(APPS_PATH, []);
     const indexData = loadJSON(path.join(__dirname, 'data', 'app-index.json'), { apps: [] });
     const indexedApps = (indexData.apps || []).map(a => ({
@@ -769,8 +908,8 @@ app.whenReady().then(() => {
       command: a.path || a.aumid || '',
       icon: a.type === 'uwp' ? '📱' : a.type === 'lnk' ? '🔗' : '📦',
     }));
-    const allApps = [...userApps, ...defaultApps];
-    const existingNames = new Set(userApps.concat(defaultApps).map(a => a.name.toLowerCase()));
+    const allApps = [...userApps, ...learnedApps, ...defaultApps];
+    const existingNames = new Set(userApps.concat(learnedApps, defaultApps).map(a => a.name.toLowerCase()));
     for (const app of indexedApps) {
       if (!existingNames.has(app.name.toLowerCase())) {
         allApps.push(app);
@@ -793,12 +932,6 @@ app.whenReady().then(() => {
   ipcMain.handle('add-app', (event, args) => {
     const runProgram = require('./tools/runProgram');
     return runProgram.addApp(args);
-  });
-
-  ipcMain.handle('learn-app', (event, args) => {
-    const { alias, appName, appPath, appType } = args;
-    const runProgram = require('./tools/runProgram');
-    return runProgram.learnApp(alias, { name: appName, type: appType, path: appPath });
   });
 
   ipcMain.handle('get-settings', () => loadJSON(path.join(__dirname, 'data', 'settings.json'), {}));

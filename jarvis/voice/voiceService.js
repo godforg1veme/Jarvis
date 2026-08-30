@@ -4,6 +4,7 @@ const path = require('path');
 const { routeIntent } = require('../tools/intentRouter');
 const { executeIntent } = require('../actions/executeIntent');
 const defaultTtsService = require('../tts/ttsService');
+const { SttInputWriter } = require('./sttInputWriter');
 const {
   getSttSettings,
   resolveSttPythonPath,
@@ -37,8 +38,10 @@ class VoiceService {
     this.intentOptions = options.intentOptions || {};
     this.sttSettings = options.sttSettings || getSttSettings();
     this.activeSttProvider = null;
+    this.sttInputWriter = null;
     this.pendingVoiceConfirmation = null;
     this.pendingVoiceSelection = null;
+    this.pendingVoiceRecovery = null;
     this.pendingAgentInput = null;
     this.pendingAgentConfirmation = null;
   }
@@ -72,6 +75,11 @@ class VoiceService {
   }
 
   // --- Worker lifecycle ---
+
+  _resetSttInputWriter() {
+    if (this.sttInputWriter) this.sttInputWriter.destroy();
+    this.sttInputWriter = null;
+  }
 
   _buildWorkerLaunch() {
     const provider = String(this.sttSettings.provider || 'vosk').toLowerCase();
@@ -132,6 +140,12 @@ class VoiceService {
       this.workerProcess = null;
       return false;
     }
+    this._resetSttInputWriter();
+    this.sttInputWriter = new SttInputWriter(this.workerProcess.stdin, {
+      onRecovered: (dropped) => {
+        console.warn(`[voiceService] STT input recovered after dropping ${dropped} PCM block(s).`);
+      },
+    });
 
     this.workerProcess.stdout.setEncoding('utf8');
     let stdoutBuffer = '';
@@ -155,6 +169,7 @@ class VoiceService {
     this.workerProcess.on('exit', (code, signal) => {
       if (gen !== this._workerGeneration) return;
       this._clearReadyTimeout();
+      this._resetSttInputWriter();
       this.workerProcess = null;
       this.workerReady = false;
       if (!this.stopRequested && code !== 0) {
@@ -170,6 +185,7 @@ class VoiceService {
     this.workerProcess.on('error', (err) => {
       this._clearReadyTimeout();
       console.error('[voiceService] Worker error:', err);
+      this._resetSttInputWriter();
       this.workerProcess = null;
       this.workerReady = false;
     });
@@ -189,24 +205,25 @@ class VoiceService {
     this._clearReadyTimeout();
     if (this.workerProcess) {
       try {
-        if (this.workerProcess.stdin && this.workerProcess.stdin.writable) {
-          this.workerProcess.stdin.write(JSON.stringify({ type: 'stop' }) + '\n');
-        }
+        if (this.sttInputWriter) this.sttInputWriter.writeControl({ type: 'stop' });
+        this._resetSttInputWriter();
         setTimeout(() => {
           if (this.workerProcess) { try { this.workerProcess.kill(); } catch (e) {} }
         }, 2000);
       } catch (e) {}
     } else {
+      this._resetSttInputWriter();
       this.workerReady = false;
     }
   }
 
   sendPcmToWorker(pcmBuffer) {
-    if (!this.workerProcess || !this.workerReady || !this.workerProcess.stdin.writable) return;
+    if (!this.workerProcess || !this.workerReady || !this.sttInputWriter) return;
     try {
-      const base64 = Buffer.from(pcmBuffer).toString('base64');
-      this.workerProcess.stdin.write(JSON.stringify({ type: 'pcm', base64 }) + '\n');
-    } catch (e) {}
+      this.sttInputWriter.writePcm(pcmBuffer);
+    } catch (error) {
+      console.error('[voiceService] Invalid PCM block:', error.message);
+    }
   }
 
   // --- Message handling ---
@@ -243,12 +260,16 @@ class VoiceService {
 
   isVoiceConfirm(text) {
     const normalized = this.normalizeVoiceResponse(text);
-    return ['да', 'запусти', 'открой', 'подтверждаю'].some((phrase) => normalized === phrase || normalized.includes(phrase));
+    return ['да', 'запусти', 'открой', 'подтверждаю'].some((phrase) =>
+      normalized === phrase || normalized.startsWith(`${phrase} `) || normalized.endsWith(` ${phrase}`),
+    );
   }
 
   isVoiceCancel(text) {
     const normalized = this.normalizeVoiceResponse(text);
-    return ['нет', 'отмена', 'не надо', 'отмени'].some((phrase) => normalized === phrase || normalized.includes(phrase));
+    return ['нет', 'отмена', 'не надо', 'отмени'].some((phrase) =>
+      normalized === phrase || normalized.startsWith(`${phrase} `) || normalized.endsWith(` ${phrase}`),
+    );
   }
 
   voiceSelectionIndex(text) {
@@ -465,6 +486,66 @@ class VoiceService {
   async handlePendingVoiceResponse(text) {
     if (await this.handlePendingAgentVoiceResponse(text)) return true;
 
+    if (this.pendingVoiceRecovery) {
+      const pending = this.pendingVoiceRecovery;
+      const snapshot = pending.snapshot;
+      if (this.isVoiceCancel(text)) {
+        this.pendingVoiceRecovery = null;
+        await this.intentOptions.cancelAppRecovery?.(snapshot.recoveryId);
+        const result = { ok: true, type: 'voice', message: 'Поиск и запуск отменены.' };
+        this.broadcastStatus('result', result.message, { result });
+        await this._speakVoiceResult(result);
+        return true;
+      }
+
+      const normalizedNewCommand = this.normalizeVoiceResponse(text);
+      const looksLikeNewCommand = /^(?:открой|открыть|запусти|запустить|найди|покажи|переведи|закрой|выключи)\s+\S/u.test(normalizedNewCommand);
+      if (looksLikeNewCommand) {
+        this.pendingVoiceRecovery = null;
+        await this.intentOptions.cancelAppRecovery?.(snapshot.recoveryId);
+        return false;
+      }
+
+      if (snapshot.state === 'awaiting_selection') {
+        const index = this.voiceSelectionIndex(text);
+        const candidate = snapshot.candidates?.[index];
+        if (index < 0 || !candidate) {
+          const result = { ok: false, type: 'voice', message: 'Скажите: первый, второй, третий, или отмена.' };
+          this.broadcastStatus('ignored', result.message, { result });
+          await this._speakVoiceResult(result);
+          return true;
+        }
+        const selected = await this.intentOptions.selectAppRecovery?.(snapshot.recoveryId, candidate.candidateId);
+        this.pendingVoiceRecovery = { snapshot: selected };
+        const result = { ok: true, type: 'voice', message: `Выбран ${candidate.displayName}. Запустить? Скажите да или нет.` };
+        this.broadcastStatus('result', result.message, { result });
+        await this._speakVoiceResult(result);
+        return true;
+      }
+
+      if (snapshot.state === 'awaiting_confirmation') {
+        if (!this.isVoiceConfirm(text)) {
+          const result = { ok: false, type: 'voice', message: 'Скажите да или нет.' };
+          this.broadcastStatus('ignored', result.message, { result });
+          await this._speakVoiceResult(result);
+          return true;
+        }
+        this.pendingVoiceRecovery = null;
+        const completed = await this.intentOptions.confirmAppRecovery?.(snapshot.recoveryId);
+        const result = {
+          ok: completed?.state === 'completed',
+          type: 'voice',
+          message: completed?.result?.warning || completed?.result?.message || completed?.error || 'Запуск завершён.',
+        };
+        this.broadcastStatus(result.ok ? 'result' : 'error', result.message, { result, recovery: completed });
+        this.lastCommandTime = Date.now();
+        await this._speakVoiceResult(result);
+        return true;
+      }
+
+      this.pendingVoiceRecovery = null;
+    }
+
     if (this.pendingVoiceConfirmation) {
       if (this.isVoiceCancel(text)) {
         this.pendingVoiceConfirmation = null;
@@ -553,7 +634,13 @@ class VoiceService {
     this.broadcastStatus('intent', JSON.stringify(intent));
     try {
       const result = await executeIntent(intent, this.intentOptions);
-      if (result && result.needsConfirmation && result.commandToConfirm) {
+      if (result && result.recovery) {
+        this.pendingVoiceRecovery = ['awaiting_selection', 'awaiting_confirmation'].includes(result.recovery.state)
+          ? { snapshot: result.recovery }
+          : null;
+        this.pendingVoiceConfirmation = null;
+        this.pendingVoiceSelection = null;
+      } else if (result && result.needsConfirmation && result.commandToConfirm) {
         this.pendingVoiceConfirmation = result.commandToConfirm;
         this.pendingVoiceSelection = null;
       } else if (result && result.needsSelection && Array.isArray(result.candidates)) {
@@ -736,6 +823,7 @@ class VoiceService {
     this.destroyAudioCaptureWindow();
     this.pendingAgentInput = null;
     this.pendingAgentConfirmation = null;
+    this.pendingVoiceRecovery = null;
     console.log('[voiceService] Voice disabled.');
     this.notifyStateChange();
   }
@@ -753,6 +841,7 @@ class VoiceService {
     this.destroyAudioCaptureWindow();
     this.pendingAgentInput = null;
     this.pendingAgentConfirmation = null;
+    this.pendingVoiceRecovery = null;
     this._clearReadyTimeout();
     this.workerProcess = null;
     this.workerReady = false;

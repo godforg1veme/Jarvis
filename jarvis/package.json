@@ -12,7 +12,6 @@
     "electron": "^42.4.0"
   },
   "dependencies": {
-    "undici": "^8.4.1",
     "vosk": "^0.3.39"
   }
 }

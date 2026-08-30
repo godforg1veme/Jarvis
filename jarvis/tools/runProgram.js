@@ -2,6 +2,9 @@ const appResolver = require('./appResolver');
 const launchApp = require('./launchApp');
 const queryExpander = require('./queryExpander');
 const aiIntentResolver = require('./aiIntentResolver');
+const { evaluateLaunchPolicy } = require('./launchPolicy');
+const { normalizeAlias } = require('./appIdentity');
+const { isAbsoluteLocalPath } = require('./launchDescriptor');
 const fs = require('fs');
 const path = require('path');
 
@@ -41,6 +44,23 @@ function notFoundResponse(result, query) {
     notFound: true,
     candidates: undefined,
   };
+}
+
+function recoveryResponse(originalQuery, normalizedQuery = '') {
+  return {
+    ok: false,
+    type: 'recovery',
+    title: 'Ищу неизвестное приложение',
+    content: `Локальный поиск не нашёл "${normalizedQuery || originalQuery}". Запускаю расширенный поиск.`,
+    needsRecovery: true,
+    query: originalQuery,
+    normalizedQuery: normalizedQuery || originalQuery,
+    inputChannel: 'text',
+  };
+}
+
+function isExplicitLaunchRequest(value) {
+  return /^(?:\/run\s+|(?:джарвис[\s,]+)?(?:открой|открыть|запусти|запустить|open|run|launch)(?:\s|$))/iu.test(String(value || '').trim());
 }
 
 function selectionResponse(result) {
@@ -337,11 +357,25 @@ async function execute(args, confirmed) {
     if (args._noLaunch) {
       return noLaunchResponse(resolved.result);
     }
+    if (resolved.result.source === 'apps.learned' && resolved.result.launch) {
+      const policy = evaluateLaunchPolicy(resolved.result.launch, {
+        launch: resolved.result.launch,
+        fingerprint: resolved.result.fingerprint,
+      });
+      if (policy.decision === 'confirmation_required') {
+        return recoveryResponse(originalInput, resolved.result.name);
+      }
+      if (policy.decision === 'blocked') return notFoundResponse({ message: policy.reason }, originalInput);
+    }
     return launchApp.launch(resolved.result);
   }
 
   if (resolved.type === 'selection') {
     return selectionResponse(resolved.result);
+  }
+
+  if (isExplicitLaunchRequest(originalInput)) {
+    return recoveryResponse(originalInput);
   }
 
   if (shouldUseAiFallback()) {
@@ -389,6 +423,8 @@ async function execute(args, confirmed) {
           if (aiResolved.type === 'selection') {
             return addAiStatus(selectionResponse(aiResolved.result), aiStatusesWithUnderstood);
           }
+
+          return addAiStatus(recoveryResponse(originalInput, aiResult.appQuery), aiStatusesWithUnderstood);
         }
       }
 
@@ -422,6 +458,15 @@ function addApp(args) {
   }
 
   const expandedPath = appPath.replace(/%([^%]+)%/g, (_, name) => process.env[name] || '');
+  const normalizedAlias = normalizeAlias(alias);
+  if (!normalizedAlias || !isAbsoluteLocalPath(expandedPath)) {
+    return {
+      ok: false,
+      type: 'run',
+      title: 'Ошибка',
+      content: 'Алиас должен быть непустым, а путь — абсолютным локальным путём.',
+    };
+  }
 
   // Determine type
   let type = 'exe';
@@ -431,7 +476,7 @@ function addApp(args) {
 
   const newApp = {
     name: alias,
-    aliases: [alias.toLowerCase().replace(/[^a-z0-9]/g, '')],
+    aliases: [normalizedAlias],
     type,
     path: expandedPath,
   };
@@ -448,8 +493,8 @@ function addApp(args) {
 
   // Check if already exists
   const existingIndex = userData.apps.findIndex(a =>
-    a.name.toLowerCase() === alias.toLowerCase() ||
-    (a.aliases || []).includes(alias.toLowerCase().replace(/[^a-z0-9]/g, ''))
+    normalizeAlias(a.name) === normalizedAlias ||
+    (a.aliases || []).map(normalizeAlias).includes(normalizedAlias)
   );
 
   if (existingIndex >= 0) {
@@ -473,48 +518,10 @@ function getSchema() {
   return 'run: запуск приложения. Args: { app: string }. Пример: /run notepad\naidebug: AI intent JSON без запуска. Args: { app: string, _aidebug: true }. Пример: /aidebug браузер от мозиллы\nappinfo: информация о выборе appResolver. Args: { app: string, _appinfo: true }. Пример: /appinfo code\naddapp: добавить приложение. Args: { alias, path }. Пример: /addapp myapp "C:\\path\\to\\app.exe"';
 }
 
-/**
- * Learning mode: remember alias → app mapping from user selection
- */
-function learnApp(alias, app) {
-  if (!alias || !app || !app.name) {
-    return { ok: false, message: 'Missing alias or app data' };
-  }
-
-  const normalizedAlias = alias.toLowerCase().trim();
-  const userEntry = {
-    name: app.name,
-    aliases: [normalizedAlias.replace(/[^a-z0-9]/g, '')],
-    type: app.type || 'exe',
-    path: app.path || '',
-    aumid: app.aumid || '',
-    learnedFrom: 'learning-mode',
-  };
-
-  let userData;
-  try {
-    userData = JSON.parse(fs.readFileSync(USER_APPS_PATH, 'utf-8'));
-  } catch {
-    userData = { apps: [] };
-  }
-
-  if (!userData.apps) userData.apps = [];
-
-  // Check if this alias already exists
-  const existingIndex = userData.apps.findIndex(a =>
-    (a.aliases || []).includes(normalizedAlias)
-  );
-
-  if (existingIndex >= 0) {
-    // Update existing entry
-    userData.apps[existingIndex] = { ...userData.apps[existingIndex], ...userEntry };
-  } else {
-    userData.apps.push(userEntry);
-  }
-
-  fs.writeFileSync(USER_APPS_PATH, JSON.stringify(userData, null, 2), 'utf-8');
-
-  return { ok: true, message: `Запомнил: ${normalizedAlias} → ${app.name}` };
-}
-
-module.exports = { execute, addApp, learnApp, getSchema };
+module.exports = {
+  execute,
+  addApp,
+  getSchema,
+  recoveryResponse,
+  isExplicitLaunchRequest,
+};

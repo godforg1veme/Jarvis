@@ -10,6 +10,16 @@
     "maxRetries": 1,
     "complexityPolicy": "static-v1"
   },
+  "appRecovery": {
+    "enableAi": true,
+    "provider": "openrouter",
+    "model": "openrouter/free",
+    "timeoutMs": 30000,
+    "shortlistLimit": 30,
+    "singleThreshold": 0.85,
+    "selectionThreshold": 0.6,
+    "scoreGap": 0.08
+  },
   "fallbackModels": ["openrouter/free"],
   "maxRetries": 2,
   "timeoutMs": 30000,

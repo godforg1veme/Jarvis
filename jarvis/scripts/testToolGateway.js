@@ -299,15 +299,18 @@ async function run() {
 
   const launchBlocked = await executeToolRequest({
     action: 'app.launch',
-    args: { app: { name: 'Code', type: 'exe', path: 'C:\\Code.exe' } },
+    args: { candidateId: 'candidate-code' },
   });
   assert.strictEqual(launchBlocked.requiresConfirmation, true);
 
   const launched = await executeToolRequest({
     action: 'app.launch',
-    args: { app: { name: 'Code', type: 'exe', path: 'C:\\Code.exe' } },
+    args: { candidateId: 'candidate-code' },
   }, {
     confirmed: true,
+    resolveAppCandidate: candidateId => candidateId === 'candidate-code'
+      ? { name: 'Code', type: 'exe', path: 'C:\\Code.exe' }
+      : null,
     launchApp: { launch: async (app) => ({ ok: true, app }) },
   });
   assert.strictEqual(launched.ok, true);

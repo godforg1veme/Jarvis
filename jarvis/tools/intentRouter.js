@@ -55,6 +55,17 @@ function mapAiResultToIntent(aiResult, rawText, options = {}) {
 
   if (aiResult.action === 'launch_app' || aiResult.action === 'close_app') {
     const appId = resolveKnownAppId(aiResult.appQuery, options.apps || defaultApps);
+    if (!appId && aiResult.action === 'launch_app') {
+      return {
+        ok: true,
+        action: 'recover_app',
+        appQuery: aiResult.appQuery,
+        command: rawText,
+        confidence: aiResult.confidence,
+        source: 'openrouter',
+        rawText,
+      };
+    }
     if (!appId) return failedIntent(rawText, 'AI предложил неизвестное или неоднозначное приложение.');
     return {
       ok: true,

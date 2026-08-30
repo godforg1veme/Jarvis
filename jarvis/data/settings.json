@@ -14,5 +14,13 @@
     "D:\\Projects"
   ],
   "maxDepth": 5,
-  "maxFiles": 30000
+  "maxFiles": 30000,
+  "appRecovery": {
+    "quickTimeoutMs": 5000,
+    "extendedTimeoutMs": 120000,
+    "quickMaxEntries": 3000,
+    "maxEntries": 30000,
+    "maxCandidates": 1000,
+    "maxDepth": 8
+  }
 }

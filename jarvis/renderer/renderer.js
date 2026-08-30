@@ -10,6 +10,8 @@ const state = {
   selectedCandidateIndex: 0,
   results: [],
   confirmingCommand: null,
+  confirmingRecovery: null,
+  recovery: null,
   debounceTimer: null,
 };
 
@@ -368,7 +370,7 @@ inputEl.addEventListener('input', () => {
 });
 
 inputEl.addEventListener('keydown', (e) => {
-  if (state.confirmingCommand) return;
+  if (state.confirmingCommand || state.confirmingRecovery) return;
 
   if (e.key === 'ArrowDown') {
     e.preventDefault();
@@ -381,6 +383,10 @@ inputEl.addEventListener('keydown', (e) => {
     handleEnter();
   } else if (e.key === 'Escape') {
     e.preventDefault();
+    if (state.recovery && !['completed', 'cancelled', 'failed'].includes(state.recovery.state)) {
+      window.jarvis.cancelAppRecovery(state.recovery.recoveryId);
+      return;
+    }
     if (isVoiceDebugOpen()) {
       setVoiceDebugOpen(false);
       return;
@@ -390,6 +396,12 @@ inputEl.addEventListener('keydown', (e) => {
     showHistory();
   }
 });
+
+if (window.jarvis.onAppRecoveryState) {
+  window.jarvis.onAppRecoveryState((snapshot) => {
+    displayRecovery(snapshot);
+  });
+}
 
 // --- History ---
 function showHistory() {
@@ -492,7 +504,7 @@ window.jarvisDisplayResult = displayResult;
 
 // --- Handle Enter ---
 async function handleEnter() {
-  if (state.confirmingCommand) return;
+  if (state.confirmingCommand || state.confirmingRecovery) return;
 
   const val = inputEl.value.trim();
   if (!val) return;
@@ -608,22 +620,23 @@ function updateHistoryPanel() {
 }
 
 function candidateLabel(candidate) {
+  const candidateName = candidate.displayName || candidate.name || 'Без названия';
   if (candidate.type === 'file') {
     const warning = candidate.warning ? '⚠ ' : '';
     const size = candidate.size ? ` · ${candidate.size} B` : '';
     const detail = candidate.directory || candidate.path || '';
-    return `${warning}${candidate.name}${detail ? ` — ${detail}` : ''}${size}`;
+    return `${warning}${candidateName}${detail ? ` — ${detail}` : ''}${size}`;
   }
 
   const source = candidate.source || candidate.type || '?';
   const score = typeof candidate.score === 'number' ? ` · score ${candidate.score.toFixed(2)}` : '';
   const detail = candidate.command || candidate.path || candidate.aumid || '';
-  return `${candidate.icon || ''} ${candidate.name} (${source}${score})${detail ? ` — ${detail}` : ''}`;
+  return `${candidate.icon || ''} ${candidateName} (${source}${score})${detail ? ` — ${detail}` : ''}`;
 }
 
 async function launchCandidate(candidate) {
   if (window.jarvis.launchSelectedApp) {
-    return await window.jarvis.launchSelectedApp(candidate);
+    return await window.jarvis.launchSelectedApp(candidate.candidateId);
   }
 
   return await window.jarvis.executeTool('runProgram', {
@@ -638,6 +651,13 @@ async function launchSelectedCandidate() {
 
   const candidate = item.candidates[state.selectedCandidateIndex];
   if (!candidate) return;
+
+  if (item.recovery) {
+    const result = await window.jarvis.selectAppRecovery(item.recoveryId, candidate.candidateId);
+    if (result && result.recovery) displayRecovery(result.recovery);
+    else displayResult(result);
+    return;
+  }
 
   if (candidate.type === 'file') {
     const result = await window.jarvis.executeTool('fileCommander', {
@@ -682,6 +702,7 @@ function moveCandidateSelection(delta) {
 function agentEscalationContext(result, toolName) {
   if (!result || !['runProgram', 'fileCommander'].includes(toolName)) return null;
   if (result.needsSelection && Array.isArray(result.candidates) && result.candidates.length > 0) {
+    if (toolName === 'runProgram') return null;
     return {
       kind: 'candidate_selection',
       reason: result.type === 'file' || toolName === 'fileCommander'
@@ -702,6 +723,11 @@ function agentEscalationContext(result, toolName) {
 
 // --- Execute Command ---
 async function executeCommand(rawInput) {
+  if (state.recovery && !['completed', 'cancelled', 'failed'].includes(state.recovery.state)) {
+    await window.jarvis.cancelAppRecovery(state.recovery.recoveryId);
+    state.recovery = null;
+    state.confirmingRecovery = null;
+  }
   const toolName = parseTool(rawInput);
   const args = parseArgs(rawInput, toolName);
 
@@ -999,6 +1025,11 @@ function parseArgs(input, toolName) {
 function displayResult(result, rawInput) {
   if (!result) return;
 
+  if (result.recovery) {
+    displayRecovery(result.recovery);
+    return;
+  }
+
   if (result.needsConfirmation && result.commandToConfirm) {
     state.confirmingCommand = result.commandToConfirm;
     confirmText.textContent = result.content || result.message || 'Нужно подтверждение.';
@@ -1086,8 +1117,78 @@ function displayResult(result, rawInput) {
   renderResults();
 }
 
+function recoveryStateText(snapshot) {
+  if (snapshot.state === 'quick_discovery') return 'Проверяю системные источники и настроенные папки…';
+  if (snapshot.state === 'extended_discovery') {
+    const progress = snapshot.progress || {};
+    return `Ищу по локальным дискам… Проверено: ${progress.visited || 0}, найдено: ${progress.found || 0}`;
+  }
+  if (snapshot.state === 'ai_ranking') return 'AI сопоставляет локально найденные кандидаты…';
+  if (snapshot.state === 'awaiting_selection') return 'Найдено несколько вариантов. Выберите приложение.';
+  if (snapshot.state === 'awaiting_confirmation') return 'Проверьте найденное приложение и подтвердите запуск.';
+  if (snapshot.state === 'launching') return 'Запускаю подтверждённое приложение…';
+  if (snapshot.state === 'learning') return 'Сохраняю алиасы для локального поиска…';
+  if (snapshot.state === 'completed') return snapshot.result?.warning || snapshot.result?.message || 'Приложение запущено и запомнено.';
+  if (snapshot.state === 'cancelled') return 'Поиск отменён.';
+  return snapshot.error || 'Не удалось найти приложение.';
+}
+
+function displayRecovery(snapshot) {
+  if (!snapshot) return;
+  state.recovery = snapshot;
+  state.results = [{
+    type: 'run',
+    title: 'Поиск неизвестного приложения',
+    content: recoveryStateText(snapshot),
+    candidates: snapshot.state === 'awaiting_selection' ? snapshot.candidates || [] : [],
+    needsSelection: snapshot.state === 'awaiting_selection',
+    recovery: true,
+    recoveryId: snapshot.recoveryId,
+    recoveryState: snapshot.state,
+    success: snapshot.state === 'completed',
+    error: snapshot.state === 'failed',
+  }];
+  state.selectedIndex = 0;
+  state.selectedCandidateIndex = 0;
+
+  const confirmationCandidate = snapshot.candidates?.find(candidate => candidate.candidateId === snapshot.selectedCandidateId)
+    || (snapshot.candidates?.length === 1 ? snapshot.candidates[0] : null);
+  if (snapshot.state === 'awaiting_confirmation' && confirmationCandidate) {
+    const candidate = confirmationCandidate;
+    state.confirmingRecovery = { recoveryId: snapshot.recoveryId, candidate };
+    confirmText.textContent = `Запустить ${candidate.displayName} (${candidate.publisher || candidate.location || candidate.type})?`;
+    confirmYes.textContent = 'Запустить';
+    confirmDialog.classList.remove('hidden');
+    confirmYes.focus();
+    if (window.jarvis.getAppRecoveryDetails) {
+      window.jarvis.getAppRecoveryDetails(snapshot.recoveryId, candidate.candidateId).then(result => {
+        if (!result?.ok || state.confirmingRecovery?.recoveryId !== snapshot.recoveryId) return;
+        const target = result.details?.target ? ` — ${result.details.target}` : '';
+        confirmText.textContent = `Запустить ${candidate.displayName} (${candidate.publisher || candidate.location || candidate.type})${target}?`;
+      });
+    }
+  } else if (!['launching', 'learning'].includes(snapshot.state)) {
+    state.confirmingRecovery = null;
+    confirmDialog.classList.add('hidden');
+    confirmYes.textContent = 'Подтвердить';
+  }
+  renderResults();
+}
+
 // --- Confirm Dialog ---
 confirmYes.addEventListener('click', async () => {
+  if (state.confirmingRecovery) {
+    const pending = state.confirmingRecovery;
+    state.confirmingRecovery = null;
+    confirmDialog.classList.add('hidden');
+    confirmYes.textContent = 'Подтвердить';
+    const result = await window.jarvis.confirmAppRecovery(pending.recoveryId);
+    if (result?.recovery) {
+      displayRecovery(result.recovery);
+      if (result.recovery.state === 'completed' && window.jarvis.hideWindow) window.jarvis.hideWindow();
+    } else displayResult(result);
+    return;
+  }
   if (!state.confirmingCommand) return;
   const cmd = state.confirmingCommand;
   confirmDialog.classList.add('hidden');
@@ -1102,10 +1203,27 @@ confirmYes.addEventListener('click', async () => {
 });
 
 confirmNo.addEventListener('click', () => {
+  if (state.confirmingRecovery) {
+    const pending = state.confirmingRecovery;
+    state.confirmingRecovery = null;
+    confirmDialog.classList.add('hidden');
+    confirmYes.textContent = 'Подтвердить';
+    window.jarvis.cancelAppRecovery(pending.recoveryId).then(result => {
+      if (result?.recovery) displayRecovery(result.recovery);
+    });
+    return;
+  }
   confirmDialog.classList.add('hidden');
   state.confirmingCommand = null;
   clearResults();
   showHistory();
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && (state.confirmingRecovery || state.confirmingCommand)) {
+    event.preventDefault();
+    confirmNo.click();
+  }
 });
 
 // --- Render Results ---
@@ -1178,6 +1296,19 @@ function renderResults() {
       });
 
       div.appendChild(candidateDiv);
+    }
+
+    if (item.recovery && !['completed', 'cancelled', 'failed'].includes(item.recoveryState)) {
+      const cancelButton = document.createElement('button');
+      cancelButton.type = 'button';
+      cancelButton.className = 'recovery-cancel-button';
+      cancelButton.textContent = 'Отменить поиск';
+      cancelButton.addEventListener('click', async (event) => {
+        event.stopPropagation();
+        const result = await window.jarvis.cancelAppRecovery(item.recoveryId);
+        if (result?.recovery) displayRecovery(result.recovery);
+      });
+      div.appendChild(cancelButton);
     }
 
     // If notFound, add tip

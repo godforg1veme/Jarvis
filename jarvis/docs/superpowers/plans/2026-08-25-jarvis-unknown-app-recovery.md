@@ -1,7 +1,15 @@
 # Jarvis Unknown App Recovery Implementation Plan
 
 Date: 2026-08-25
-Status: planned; implementation not started
+Status: implementation and automated verification complete
+
+Implementation summary (2026-08-30): the two-stage recovery flow, strict AI
+candidate matching, same-channel confirmation, structured server-side launch,
+learned alias storage, and script/custom-command fingerprint policy are in
+place. Syntax checks and 26 focused regression tests pass. Renderer startup was
+smoke-tested; the existing blur-to-hide behavior prevented the frameless main
+window from remaining targetable by the Windows automation tool, so recovery
+UI behavior is additionally covered by renderer and IPC tests.
 
 Design reference:
 `docs/superpowers/specs/2026-08-25-jarvis-unknown-app-recovery-design.md`

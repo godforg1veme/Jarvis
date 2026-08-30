@@ -13,6 +13,10 @@ voices/
 # Runtime state generated on this PC
 data/app-index.json
 data/apps.user.json
+data/apps.learned.json
+data/apps.learned.json.backup
+data/apps.learned.corrupt-*.json
+data/apps.learned.json.*.tmp
 data/history.json
 data/ai-cache.json
 data/file-index.json

@@ -468,10 +468,11 @@ async function executeAppAction(action, args, options = {}) {
   }
 
   if (action === 'app.launch') {
-    const app = args.app || null;
-    if (!app || typeof app !== 'object') {
-      throw new Error('resolved app object is required for app.launch');
-    }
+    const candidateId = String(args.candidateId || '').trim();
+    if (!/^candidate-[a-zA-Z0-9-]+$/.test(candidateId)) throw new Error('opaque candidateId is required for app.launch');
+    if (typeof options.resolveAppCandidate !== 'function') throw new Error('trusted app candidate resolver is unavailable');
+    const app = options.resolveAppCandidate(candidateId);
+    if (!app || typeof app !== 'object') throw new Error('app candidate is unavailable or expired');
     const result = await launchApp.launch(app);
     return { ok: result.ok !== false, action, policy: POLICY.CONFIRM, result };
   }

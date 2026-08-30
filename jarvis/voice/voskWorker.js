@@ -1,4 +1,9 @@
 const { VoskStreamRecognizer } = require("./voskRecognizer");
+const {
+  FRAME_TYPES,
+  SttFrameDecoder,
+  decodeControlPayload,
+} = require("./sttFrameProtocol");
 
 let recognizer = null;
 
@@ -31,32 +36,33 @@ async function initRecognizer() {
 
 let pcmChunkCount = 0;
 
-function handleLine(line) {
-  if (!line || line.trim() === "") return;
-
-  let msg;
+function stopRecognizer() {
   try {
-    msg = JSON.parse(line);
-  } catch (e) {
-    sendResponse({ type: "error", message: "Invalid JSON: " + e.message });
-    return;
-  }
-
-  if (msg.type === "stop") {
-    try {
-      if (recognizer) {
-        recognizer.free();
-        recognizer = null;
-      }
-    } catch (e) {
-      log("Error freeing recognizer: " + e.message);
+    if (recognizer) {
+      recognizer.free();
+      recognizer = null;
     }
+  } catch (error) {
+    log("Error freeing recognizer: " + error.message);
+  }
+}
+
+function handleFrame(frame) {
+  if (frame.type === FRAME_TYPES.CONTROL) {
+    const message = decodeControlPayload(frame.payload);
+    if (message.type !== "stop") {
+      sendResponse({ type: "error", message: "Unknown control message type: " + message.type });
+      return;
+    }
+    try {
+      stopRecognizer();
+    } catch (error) {}
     sendResponse({ type: "stopped" });
     process.exit(0);
     return;
   }
 
-  if (msg.type === "pcm") {
+  if (frame.type === FRAME_TYPES.PCM) {
     if (!recognizer) {
       sendResponse({
         type: "error",
@@ -66,7 +72,7 @@ function handleLine(line) {
     }
 
     try {
-      const pcmBuffer = Buffer.from(msg.base64, "base64");
+      const pcmBuffer = frame.payload;
       pcmChunkCount++;
 
       // Check if audio has non-zero samples
@@ -92,13 +98,10 @@ function handleLine(line) {
       }
 
       if (result.hasFinal && result.final) {
-        const audioBase64 = recognizer.getAudioBase64();
         sendResponse({
           type: "final",
           text: result.final,
-          audioBase64: audioBase64,
         });
-        recognizer.resetAudio();
       } else if (result.partial) {
         sendResponse({
           type: "partial",
@@ -114,30 +117,31 @@ function handleLine(line) {
     }
     return;
   }
-
-  sendResponse({ type: "error", message: "Unknown message type: " + msg.type });
 }
 
-// --- Read stdin line by line ---
-process.stdin.setEncoding("utf8");
-let buffer = "";
+// --- Read versioned binary STT frames from stdin ---
+const frameDecoder = new SttFrameDecoder();
 
 process.stdin.on("data", (chunk) => {
-  buffer += chunk;
-  const lines = buffer.split("\n");
-  buffer = lines.pop();
-  for (const line of lines) {
-    handleLine(line);
+  try {
+    for (const frame of frameDecoder.push(chunk)) handleFrame(frame);
+  } catch (error) {
+    sendResponse({ type: "error", message: "STT input protocol error: " + error.message });
+    log("Input protocol error: " + error.message);
+    stopRecognizer();
+    process.exit(1);
   }
 });
 
 process.stdin.on("end", () => {
-  if (buffer.trim()) {
-    handleLine(buffer);
+  try {
+    frameDecoder.end();
+  } catch (error) {
+    sendResponse({ type: "error", message: "STT input protocol error: " + error.message });
+    log("Input protocol error: " + error.message);
+    process.exitCode = 1;
   }
-  if (recognizer) {
-    recognizer.free();
-  }
+  stopRecognizer();
 });
 
 // --- Error handlers ---
@@ -160,16 +164,12 @@ process.on("unhandledRejection", (reason) => {
 });
 
 process.on("SIGTERM", () => {
-  if (recognizer) {
-    recognizer.free();
-  }
+  stopRecognizer();
   process.exit(0);
 });
 
 process.on("SIGINT", () => {
-  if (recognizer) {
-    recognizer.free();
-  }
+  stopRecognizer();
   process.exit(0);
 });
 

@@ -6,6 +6,7 @@
     "device": "cuda",
     "computeType": "int8_float16",
     "language": "ru",
+    "performanceProfile": "quality",
     "beamSize": 5,
     "vadFilter": true,
     "minSpeechMs": 600,

@@ -38,6 +38,21 @@ Jarvis has two deliberately separate AI levels:
 The simple fallback uses `OPENROUTER_API_KEY`. Desktop Agent planning uses
 `GEMINI_API_KEY` or `GOOGLE_API_KEY` through the separate `agentAi` settings.
 
+## Unknown App Recovery
+
+When an explicit app launch misses the deterministic resolver, Jarvis first
+checks bounded local sources and can then scan fixed local disks with progress
+and cancellation. OpenRouter may rank only opaque IDs for locally validated
+candidates; it never receives or returns a launch path. The user confirms the
+first recovered launch through the same text or voice channel, and a successful
+launch is stored locally in `data/apps.learned.json`.
+
+Ordinary learned apps launch locally on later requests. Scripts and explicit
+custom commands are fingerprinted with SHA-256 and require confirmation again
+after their content or structured arguments change. Conflicting learned aliases
+never replace manual `apps.user.json` entries. Recovery continues with local
+ranking when OpenRouter is unavailable.
+
 ## Setup
 
 ```powershell
@@ -82,6 +97,7 @@ Do not commit local runtime state:
 
 - `data/app-index.json`
 - `data/apps.user.json`
+- `data/apps.learned.json` and its backups/quarantines
 - `data/history.json`
 - `data/ai-cache.json`
 - `data/agent-history.json`

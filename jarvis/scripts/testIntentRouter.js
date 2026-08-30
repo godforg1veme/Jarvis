@@ -230,7 +230,9 @@ async function testRouting() {
   const unknownApp = mapAiResultToIntent({
     route: 'direct', action: 'launch_app', appQuery: 'imaginary app', confidence: 0.9,
   }, 'открой что-то');
-  assert.strictEqual(unknownApp.ok, false);
+  assert.strictEqual(unknownApp.ok, true);
+  assert.strictEqual(unknownApp.action, 'recover_app');
+  assert.strictEqual(unknownApp.appQuery, 'imaginary app');
 }
 
 function testCacheIdentity() {
@@ -303,7 +305,7 @@ async function testLauncherUsesLocalResolverForAiAppQuery() {
   try {
     delete require.cache[require.resolve('../tools/runProgram')];
     const runProgram = require('../tools/runProgram');
-    const result = await runProgram.execute({ app: 'открой старый текстовый редактор', _noLaunch: true });
+    const result = await runProgram.execute({ app: 'старый текстовый редактор', _noLaunch: true });
     assert.strictEqual(result.ok, true);
     assert.strictEqual(result.data.name, 'Notepad');
     assert(seenQueries.includes('notepad'));
@@ -342,7 +344,7 @@ async function testLauncherKeepsAmbiguousAiCandidates() {
   try {
     delete require.cache[require.resolve('../tools/runProgram')];
     const runProgram = require('../tools/runProgram');
-    const result = await runProgram.execute({ app: 'открой редактор кода', _noLaunch: true });
+    const result = await runProgram.execute({ app: 'редактор кода', _noLaunch: true });
     assert.strictEqual(result.needsSelection, true);
     assert.strictEqual(result.candidates.length, 2);
   } finally {

@@ -119,6 +119,47 @@ async function executeIntent(intent, options = {}) {
 
   }
 
+  if (intent.action === "recover_app") {
+
+    if (typeof options.startAppRecovery !== "function") {
+
+      return {
+
+        ok: false,
+
+        message: "Поиск неизвестных приложений недоступен."
+
+      };
+
+    }
+
+    const recovery = await options.startAppRecovery(intent.command || intent.rawText || intent.appQuery || "", {
+      inputChannel: "voice",
+      normalizedQuery: intent.appQuery || "",
+    });
+
+    const count = Array.isArray(recovery && recovery.candidates) ? recovery.candidates.length : 0;
+    let message = recovery && recovery.error ? recovery.error : "Ищу приложение на компьютере.";
+    if (recovery && recovery.state === "awaiting_confirmation" && count === 1) {
+      message = `Нашёл ${recovery.candidates[0].displayName}. Запустить? Скажите да или нет.`;
+    } else if (recovery && recovery.state === "awaiting_selection") {
+      message = `Нашёл несколько вариантов: ${recovery.candidates.map((candidate, index) => `${index + 1}: ${candidate.displayName}`).join("; ")}. Назовите номер.`;
+    }
+
+    return {
+
+      ok: recovery && !["failed", "cancelled"].includes(recovery.state),
+
+      type: "app_recovery",
+
+      message,
+
+      recovery,
+
+    };
+
+  }
+
   if (["open_file", "reveal_file", "find_file"].includes(intent.action)) {
 
     const executeFileCommand = options.executeFileCommand || (async (args) => {

@@ -1,11 +1,19 @@
 import argparse
-import base64
 import json
 import math
 import os
 import sys
 from collections import deque
 from pathlib import Path
+
+from stt_frame_protocol import (
+    FRAME_TYPE_CONTROL,
+    FRAME_TYPE_PCM,
+    SttFrameProtocolError,
+    decode_control,
+    read_frames,
+)
+from stt_profiles import resolve_performance_profile
 
 try:
     import numpy as np
@@ -110,7 +118,11 @@ class FasterWhisperStream:
         model_name = self.settings.get("model", "small")
         device = self.settings.get("device", "cuda")
         compute_type = self.settings.get("computeType", "int8_float16")
-        log(f"loading model={model_name} device={device} compute_type={compute_type}")
+        profile, beam_size, vad_filter = resolve_performance_profile(self.settings)
+        log(
+            f"loading model={model_name} device={device} compute_type={compute_type} "
+            f"profile={profile} beam_size={beam_size} vad_filter={vad_filter}"
+        )
         self.model = WhisperModel(model_name, device=device, compute_type=compute_type)
         send({
             "type": "ready",
@@ -118,6 +130,7 @@ class FasterWhisperStream:
             "model": model_name,
             "device": device,
             "computeType": compute_type,
+            "performanceProfile": profile,
         })
         log("model loaded")
 
@@ -186,14 +199,12 @@ class FasterWhisperStream:
             send({
                 "type": "final",
                 "text": text,
-                "audioBase64": base64.b64encode(pcm_bytes).decode("ascii"),
             })
 
     def transcribe(self, pcm_bytes):
         audio = pcm_to_float32(pcm_bytes)
         language = self.settings.get("language") or "ru"
-        beam_size = int(self.settings.get("beamSize", 3))
-        vad_filter = bool(self.settings.get("vadFilter", False))
+        _profile, beam_size, vad_filter = resolve_performance_profile(self.settings)
         initial_prompt = self.settings.get("initialPrompt") or None
         hotwords = self.settings.get("hotwords") or None
 
@@ -232,31 +243,28 @@ def main():
         log(f"init failed: {exc}")
         sys.exit(1)
 
-    for line in sys.stdin:
-        line = line.strip()
-        if not line:
-            continue
+    try:
+        for frame_type, payload in read_frames(sys.stdin.buffer):
+            if frame_type == FRAME_TYPE_PCM:
+                try:
+                    stream.handle_pcm(payload)
+                except Exception as exc:
+                    send({"type": "error", "message": f"Processing error: {exc}"})
+                    log(f"processing error: {exc}")
+                continue
 
-        try:
-            message = json.loads(line)
-        except Exception as exc:
-            send({"type": "error", "message": f"Invalid JSON: {exc}"})
-            continue
-
-        message_type = message.get("type")
-        if message_type == "stop":
-            stream.stop()
-            return
-
-        if message_type == "pcm":
-            try:
-                stream.handle_pcm(base64.b64decode(message.get("base64") or ""))
-            except Exception as exc:
-                send({"type": "error", "message": f"Processing error: {exc}"})
-                log(f"processing error: {exc}")
-            continue
-
-        send({"type": "error", "message": f"Unknown message type: {message_type}"})
+            if frame_type == FRAME_TYPE_CONTROL:
+                message = decode_control(payload)
+                if message.get("type") == "stop":
+                    stream.stop()
+                    return
+                send({
+                    "type": "error",
+                    "message": f"Unknown control message type: {message.get('type')}",
+                })
+    except SttFrameProtocolError as exc:
+        send({"type": "error", "message": f"STT input protocol error: {exc}"})
+        log(f"input protocol error: {exc}")
 
 
 if __name__ == "__main__":

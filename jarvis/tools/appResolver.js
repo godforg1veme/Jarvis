@@ -1,25 +1,28 @@
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
+const learnedAppStore = require('./learnedAppStore');
+const { normalizeAlias, compactAlias, stripLaunchTrigger } = require('./appIdentity');
 
 const USER_APPS_PATH = path.join(__dirname, '..', 'data', 'apps.user.json');
 const DEFAULT_APPS_PATH = path.join(__dirname, '..', 'data', 'apps.default.json');
 const INDEX_PATH = path.join(__dirname, '..', 'data', 'app-index.json');
 
 // Source priority order requested for appResolver:
-// apps.user > apps.default > start-menu > app-paths > uwp > registry > scan-roots > where
+// apps.user > apps.learned > apps.default > start-menu > app-paths > uwp > registry > scan-roots > where
 const SOURCE_PRIORITY = {
   'apps.user': 0,
-  'apps.default': 1,
-  'start-menu': 2,
-  'app-paths': 3,
-  uwp: 4,
-  registry: 5,
-  'scan-roots': 6,
-  where: 7,
+  'apps.learned': 1,
+  'apps.default': 2,
+  'start-menu': 3,
+  'app-paths': 4,
+  uwp: 5,
+  registry: 6,
+  'scan-roots': 7,
+  where: 8,
 };
 
-const GUI_SOURCES = new Set(['apps.user', 'apps.default', 'start-menu', 'app-paths', 'uwp', 'registry']);
+const GUI_SOURCES = new Set(['apps.user', 'apps.learned', 'apps.default', 'start-menu', 'app-paths', 'uwp', 'registry']);
 const EXACT_OR_STARTS_WITH_MATCHES = new Set([
   'exactAlias',
   'exactName',
@@ -35,7 +38,7 @@ function loadJSON(filePath, fallback) {
 }
 
 function normalize(str) {
-  return (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  return compactAlias(str);
 }
 
 function isSafeForWhere(name) {
@@ -121,11 +124,11 @@ const TRIGGER_WORDS = [
 ];
 
 function normalizeQuery(raw) {
-  let q = raw.trim();
+  let q = String(raw || '').trim();
   for (const pattern of TRIGGER_WORDS) {
     q = q.replace(pattern, '');
   }
-  return q.trim().replace(/\s+/g, ' ');
+  return stripLaunchTrigger(q) || normalizeAlias(q);
 }
 
 // --- Scoring ---
@@ -133,9 +136,9 @@ function normalizeQuery(raw) {
 // exact name/alias and startsWith are allowed, but contains/partial matching is disabled.
 // This prevents "cal" from matching "Tailscale" or "scalar".
 function scoreApp(app, queryLower, queryNormalized) {
-  const nameLower = (app.name || '').toLowerCase().trim();
+  const nameLower = normalizeAlias(app.name || app.displayName || '');
   const nameNorm = normalize(nameLower);
-  const aliases = (app.aliases || []).map(a => (a || '').toLowerCase().trim()).filter(Boolean);
+  const aliases = (app.aliases || []).map(normalizeAlias).filter(Boolean);
   const aliasesNorm = aliases.map(a => normalize(a));
   const hasNormalizedQuery = queryNormalized.length > 0;
   const isShort = queryLower.length < 5;
@@ -217,6 +220,57 @@ function scoreApp(app, queryLower, queryNormalized) {
   return { score: 0, reason: 'no match', matchType: 'none' };
 }
 
+function learnedRecordToCandidate(record) {
+  const launch = record.launch || {};
+  const candidate = {
+    name: record.displayName,
+    aliases: record.aliases || [],
+    type: launch.type,
+    source: 'apps.learned',
+    learnedId: record.id,
+    launch,
+    trust: record.trust || {},
+    fingerprint: record.fingerprint || null,
+  };
+  if (['exe', 'lnk', 'script'].includes(launch.type)) candidate.path = launch.target;
+  if (launch.type === 'command') candidate.command = launch.target;
+  if (launch.type === 'uwp') candidate.aumid = launch.target;
+  if (launch.type === 'steam') candidate.steamAppId = launch.target;
+  if (launch.type === 'epic') candidate.epicAppName = launch.target;
+  return candidate;
+}
+
+function isLearnedTargetStale(candidate, options = {}) {
+  const existsSync = options.existsSync || fs.existsSync;
+  if (['exe', 'lnk', 'script', 'command'].includes(candidate.type)) {
+    const target = candidate.path || candidate.command;
+    if (!target || !existsSync(target)) return true;
+  }
+  if (candidate.type === 'script' && (!candidate.launch?.interpreter || !existsSync(candidate.launch.interpreter))) return true;
+  return false;
+}
+
+function searchLearned(queryLower, queryNormalized, options = {}) {
+  const records = Array.isArray(options.learnedApps)
+    ? options.learnedApps
+    : learnedAppStore.load().apps;
+  const results = [];
+  for (const record of records) {
+    const candidate = learnedRecordToCandidate(record);
+    if (isLearnedTargetStale(candidate, options)) continue;
+    const score = scoreApp(candidate, queryLower, queryNormalized);
+    if (score.score <= 0) continue;
+    results.push({
+      ...candidate,
+      sourcePriority: sourcePriorityFor(candidate.source),
+      score: score.score,
+      reason: score.reason,
+      matchType: score.matchType,
+    });
+  }
+  return results;
+}
+
 // --- Search in a JSON file ---
 function searchInFile(filePath, queryLower, queryNormalized, sourceName) {
   const data = loadJSON(filePath, { apps: [] });
@@ -248,7 +302,8 @@ function searchInFile(filePath, queryLower, queryNormalized, sourceName) {
 function whereFallback(query) {
   if (!isSafeForWhere(query)) return [];
   try {
-    const output = execSync(`where "${query}"`, { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] });
+    const wherePath = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'where.exe');
+    const output = execFileSync(wherePath, [query], { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] });
     return output.trim().split('\n').map(line => line.trim()).filter(Boolean).map(matchedPath => ({
       name: matchedPath.split('\\').pop().split('.')[0],
       path: matchedPath,
@@ -344,7 +399,7 @@ function resolve(rawQuery, options = {}) {
     return { ok: false, notFound: true, message: 'Пустой запрос' };
   }
 
-  const queryLower = query.toLowerCase();
+  const queryLower = normalizeAlias(query);
   const queryNormalized = normalize(query);
   const isShort = queryLower.length < 5;
 
@@ -355,11 +410,15 @@ function resolve(rawQuery, options = {}) {
   const userResults = searchInFile(USER_APPS_PATH, queryLower, queryNormalized, 'apps.user');
   debug('User candidates:', userResults.map(formatCandidate).join('; ') || 'none');
 
-  // 2. Search in default apps (priority 1)
+  // 2. Search in confirmed learned apps (priority 1)
+  const learnedResults = searchLearned(queryLower, queryNormalized, options);
+  debug('Learned candidates:', learnedResults.map(formatCandidate).join('; ') || 'none');
+
+  // 3. Search in default apps
   const defaultResults = searchInFile(DEFAULT_APPS_PATH, queryLower, queryNormalized, 'apps.default');
   debug('Default candidates:', defaultResults.map(formatCandidate).join('; ') || 'none');
 
-  // 3. Search in app-index.json (priority by source: start-menu/app-paths/uwp/registry/scan-roots/where)
+  // 4. Search in app-index.json (priority by source: start-menu/app-paths/uwp/registry/scan-roots/where)
   const indexData = loadJSON(INDEX_PATH, { apps: [] });
   const indexResults = (indexData.apps || []).map(app => {
     const score = scoreApp(app, queryLower, queryNormalized);
@@ -378,7 +437,7 @@ function resolve(rawQuery, options = {}) {
   }).filter(Boolean);
   debug('Index candidates:', indexResults.map(formatCandidate).join('; ') || 'none');
 
-  // 4. Exact command lookup through where.exe.
+  // 5. Exact command lookup through where.exe.
   // It is intentionally allowed for short queries, but only exact commands match.
   const whereResults = isShort && isSafeForWhere(query) ? whereFallback(query) : [];
   if (whereResults.length > 0) {
@@ -388,7 +447,7 @@ function resolve(rawQuery, options = {}) {
   }
 
   // Combine all results
-  let allCandidates = [...userResults, ...defaultResults, ...indexResults, ...whereResults];
+  let allCandidates = [...userResults, ...learnedResults, ...defaultResults, ...indexResults, ...whereResults];
 
   // 5. Debug before dedupe
   debug('Candidates before dedupe:', allCandidates.length, allCandidates.map(formatCandidate).join('; ') || 'none');
@@ -560,4 +619,11 @@ function resolve(rawQuery, options = {}) {
   return result;
 }
 
-module.exports = { resolve, normalizeQuery, scoreApp, SOURCE_PRIORITY };
+module.exports = {
+  resolve,
+  normalizeQuery,
+  scoreApp,
+  searchLearned,
+  learnedRecordToCandidate,
+  SOURCE_PRIORITY,
+};

@@ -45,7 +45,7 @@ launching, local tools, command history, and optional AI intent resolution.
 - Do not edit secrets or add API keys to the repo. Use environment variables such as `OPENROUTER_API_KEY`.
 - Ask before adding new production dependencies.
 - Do not edit `node_modules/`, `models/`, `voices/`, `build/`, or large generated files unless explicitly requested.
-- Treat `data/app-index.json`, `data/history.json`, `data/ai-cache.json`, `data/ui-state.local.json`, `data/tts-cache/`, and logs as generated/local state.
+- Treat `data/app-index.json`, `data/apps.learned.json`, learned-app backups/quarantines, `data/history.json`, `data/ai-cache.json`, `data/ui-state.local.json`, `data/tts-cache/`, and logs as generated/local state.
 - `start.bat` runs `node scripts/ensureTts.js` and `node scripts/ensureStt.js` before Electron so the selected local speech runtimes are prepared automatically.
 
 ## Code Style

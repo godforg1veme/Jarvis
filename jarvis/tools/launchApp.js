@@ -1,147 +1,18 @@
-const { spawn, exec } = require('child_process');
+const { spawn: defaultSpawn, execFileSync: defaultExecFileSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const { candidateToLaunchDescriptor, normalizeLaunchDescriptor } = require('./launchDescriptor');
 
-/**
- * Launch an app based on its type.
- * @param {Object} app - { type, path, aumid, command, name }
- * @returns {Promise<Object>} - Jarvis result format
- */
-async function launch(app) {
-  if (!app) {
-    return {
-      ok: false,
-      type: 'run',
-      title: 'Ошибка запуска',
-      content: 'Приложение не указано.',
-      error: 'app is required',
-    };
-  }
+const DEFAULT_OBSERVE_MS = 1500;
 
-  switch (app.type) {
-    case 'exe':
-      return launchExe(app);
-    case 'lnk':
-      return launchLnk(app);
-    case 'uwp':
-      return launchUwp(app);
-    case 'command':
-      return launchCommand(app);
-    default:
-      // Fallback: command entries often have `command` but no `path`.
-      if (app.command) return launchCommand(app);
-      // Otherwise try as exe.
-      return launchExe(app);
-  }
+function windowsSystemPath(...segments) {
+  return path.join(process.env.SystemRoot || 'C:\\Windows', ...segments);
 }
 
-function launchExe(app) {
-  const appPath = app.path;
-  if (!appPath) {
-    return failResult(app.name, 'Path not specified');
+function validateBatchArgument(value, label) {
+  if (/["&|<>^%!()\r\n]/.test(String(value))) {
+    throw new Error(`${label} contains unsafe cmd.exe metacharacters`);
   }
-
-  if (!fs.existsSync(appPath)) {
-    return failResult(app.name, `File not found: ${appPath}`);
-  }
-
-  return new Promise((resolve) => {
-    try {
-      const cwd = path.dirname(appPath);
-      const child = spawn(appPath, [], {
-        detached: true,
-        stdio: 'ignore',
-        cwd,
-        windowsHide: false,
-      });
-      child.unref();
-
-      resolve({
-        ok: true,
-        type: 'run',
-        title: `Запущен: ${app.name || path.basename(appPath)}`,
-        content: `Программа "${app.name || path.basename(appPath)}" успешно запущена.`,
-        data: { name: app.name, path: appPath, type: 'exe' },
-      });
-    } catch (err) {
-      resolve(failResult(app.name, err.message));
-    }
-  });
-}
-
-function launchLnk(app) {
-  const lnkPath = app.path;
-  if (!lnkPath) {
-    return failResult(app.name, 'Path not specified');
-  }
-
-  return new Promise((resolve) => {
-    exec(`cmd /c start "" "${lnkPath}"`, { shell: 'cmd.exe', timeout: 5000 }, (err) => {
-      if (err) {
-        resolve(failResult(app.name, err.message));
-      } else {
-        resolve({
-          ok: true,
-          type: 'run',
-          title: `Запущен: ${app.name}`,
-          content: `Ярлык "${app.name}" успешно запущен.`,
-          data: { name: app.name, path: lnkPath, type: 'lnk' },
-        });
-      }
-    });
-  });
-}
-
-function launchUwp(app) {
-  const aumid = app.aumid;
-  if (!aumid) {
-    return failResult(app.name, 'AUMID not specified for UWP app');
-  }
-
-  return new Promise((resolve) => {
-    exec(`explorer.exe "shell:AppsFolder\\${aumid}"`, { shell: 'cmd.exe', timeout: 5000 }, (err) => {
-      if (err) {
-        resolve(failResult(app.name, err.message));
-      } else {
-        resolve({
-          ok: true,
-          type: 'run',
-          title: `Запущен: ${app.name}`,
-          content: `UWP приложение "${app.name}" успешно запущено.`,
-          data: { name: app.name, aumid, type: 'uwp' },
-        });
-      }
-    });
-  });
-}
-
-function launchCommand(app) {
-  const command = app.command || app.path;
-  if (!command) {
-    return failResult(app.name, 'Command not specified');
-  }
-
-  return new Promise((resolve) => {
-    try {
-      const child = spawn(command, [], {
-        detached: true,
-        stdio: 'ignore',
-        shell: true,
-        windowsHide: false,
-      });
-      child.unref();
-
-      resolve({
-        ok: true,
-        type: 'run',
-        title: `Выполнено: ${app.name || command}`,
-        content: `Команда "${app.name || command}" успешно выполнена.`,
-        data: { name: app.name, command, type: 'command' },
-      });
-    } catch (err) {
-      resolve(failResult(app.name, err.message));
-    }
-  });
 }
 
 function failResult(name, error) {
@@ -154,4 +25,168 @@ function failResult(name, error) {
   };
 }
 
-module.exports = { launch };
+function successResult(name, descriptor) {
+  return {
+    ok: true,
+    type: 'run',
+    title: `Запущен: ${name || 'приложение'}`,
+    content: `Программа "${name || 'приложение'}" успешно запущена.`,
+    data: { name, type: descriptor.type },
+  };
+}
+
+function platformLaunchCommand(descriptor) {
+  const explorer = windowsSystemPath('explorer.exe');
+  if (descriptor.type === 'lnk') return { executable: explorer, args: [descriptor.target] };
+  if (descriptor.type === 'uwp') return { executable: explorer, args: [`shell:AppsFolder\\${descriptor.target}`] };
+  if (descriptor.type === 'steam') return { executable: explorer, args: [`steam://rungameid/${descriptor.target}`] };
+  if (descriptor.type === 'epic') {
+    return {
+      executable: explorer,
+      args: [`com.epicgames.launcher://apps/${encodeURIComponent(descriptor.target)}?action=launch&silent=true`],
+    };
+  }
+  return null;
+}
+
+function descriptorCommand(descriptor) {
+  const platform = platformLaunchCommand(descriptor);
+  if (platform) return platform;
+  if (descriptor.type === 'script') {
+    const ext = path.extname(descriptor.target).toLowerCase();
+    if (ext === '.ps1') {
+      return {
+        executable: descriptor.interpreter,
+        args: ['-NoProfile', '-NonInteractive', '-File', descriptor.target, ...descriptor.args],
+      };
+    }
+    if (ext === '.bat' || ext === '.cmd') {
+      validateBatchArgument(descriptor.target, 'Batch script path');
+      descriptor.args.forEach((arg, index) => validateBatchArgument(arg, `Batch argument #${index + 1}`));
+      return { executable: descriptor.interpreter, args: ['/d', '/c', descriptor.target, ...descriptor.args] };
+    }
+    throw new Error('Unsupported script extension');
+  }
+  return { executable: descriptor.target, args: descriptor.args };
+}
+
+function validateExistingTargets(descriptor, options = {}) {
+  const existsSync = options.existsSync || fs.existsSync;
+  if (['exe', 'lnk', 'script', 'command'].includes(descriptor.type) && !existsSync(descriptor.target)) {
+    throw new Error('Launch target not found');
+  }
+  if (descriptor.type === 'script' && !existsSync(descriptor.interpreter)) {
+    throw new Error('Script interpreter not found');
+  }
+}
+
+function spawnStructured(executable, args, descriptor, name, options = {}) {
+  const spawnImpl = options.spawn || defaultSpawn;
+  const observeMs = Number.isFinite(options.observeMs) ? Math.max(0, options.observeMs) : DEFAULT_OBSERVE_MS;
+
+  return new Promise((resolve) => {
+    let settled = false;
+    let timer = null;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      resolve(result);
+    };
+
+    try {
+      const cwd = ['exe', 'script', 'command'].includes(descriptor.type) && path.win32.isAbsolute(executable)
+        ? path.win32.dirname(executable)
+        : undefined;
+      const child = spawnImpl(executable, args, {
+        detached: true,
+        stdio: 'ignore',
+        cwd,
+        shell: false,
+        windowsHide: false,
+      });
+
+      child.once('error', error => finish(failResult(name, error.message)));
+      child.once('spawn', () => {
+        timer = setTimeout(() => {
+          if (typeof child.unref === 'function') child.unref();
+          finish(successResult(name, descriptor));
+        }, observeMs);
+      });
+      child.once('exit', code => {
+        if (!settled && code !== null && code !== 0) {
+          finish(failResult(name, `Process exited with code ${code}`));
+        } else if (!settled && code === 0) {
+          finish(successResult(name, descriptor));
+        }
+      });
+    } catch (error) {
+      finish(failResult(name, error.message));
+    }
+  });
+}
+
+async function launchDescriptor(rawDescriptor, options = {}) {
+  let descriptor;
+  try {
+    descriptor = normalizeLaunchDescriptor(rawDescriptor);
+    validateExistingTargets(descriptor, options);
+  } catch (error) {
+    return failResult(options.name, error.message);
+  }
+
+  try {
+    const command = descriptorCommand(descriptor);
+    return spawnStructured(command.executable, command.args, descriptor, options.name, options);
+  } catch (error) {
+    return failResult(options.name, error.message);
+  }
+}
+
+async function launch(app, options = {}) {
+  if (!app) return failResult('', 'App is required');
+  let descriptor;
+  try {
+    if (String(app.type || '').toLowerCase() === 'command' && app.command && !path.win32.isAbsolute(app.command)) {
+      const command = String(app.command).trim();
+      const systemRoot = process.env.SystemRoot || 'C:\\Windows';
+      if (/^[a-zA-Z][a-zA-Z0-9+.-]*:$/.test(command)) {
+        descriptor = normalizeLaunchDescriptor({
+          type: 'command',
+          target: path.join(systemRoot, 'explorer.exe'),
+          args: [command],
+        });
+      } else {
+        if (!/^[a-zA-Z0-9._-]+$/.test(command)) throw new Error('Unsafe command name');
+        const execFileSync = options.execFileSync || defaultExecFileSync;
+        let resolved = '';
+        try {
+          resolved = String(execFileSync(windowsSystemPath('System32', 'where.exe'), [command], {
+            encoding: 'utf8', windowsHide: true, timeout: 3000,
+          })).split(/\r?\n/).map(value => value.trim()).find(Boolean) || '';
+        } catch {}
+        if (!resolved) {
+          const fileName = path.extname(command) ? command : `${command}.exe`;
+          const builtIn = path.join(systemRoot, 'System32', fileName);
+          if ((options.existsSync || fs.existsSync)(builtIn)) resolved = builtIn;
+        }
+        if (!resolved) throw new Error('Command was not resolved to a local executable');
+        descriptor = normalizeLaunchDescriptor({ type: 'command', target: resolved, args: [] });
+      }
+    } else {
+      descriptor = candidateToLaunchDescriptor(app);
+    }
+  } catch (error) {
+    return failResult(app.name, error.message);
+  }
+  return launchDescriptor(descriptor, { ...options, name: app.name || app.displayName || options.name });
+}
+
+module.exports = {
+  DEFAULT_OBSERVE_MS,
+  launch,
+  launchDescriptor,
+  descriptorCommand,
+  platformLaunchCommand,
+  windowsSystemPath,
+};
