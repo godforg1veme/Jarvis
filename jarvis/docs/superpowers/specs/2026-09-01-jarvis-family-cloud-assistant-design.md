@@ -1,6 +1,6 @@
 # Jarvis Family Cloud Assistant Design
 
-Status: approved in conversation; pending written-spec review.
+Status: approved by the user on 2026-09-01.
 
 ## Goal
 
@@ -411,4 +411,3 @@ The MVP is ready when all of the following are demonstrated:
 9. The independent WireGuard VPN serves personal devices without exposing
    PostgreSQL or making ASR unusable.
 10. Encrypted off-server backups restore successfully into a clean deployment.
-
