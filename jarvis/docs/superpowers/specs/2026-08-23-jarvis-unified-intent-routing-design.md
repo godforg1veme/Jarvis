@@ -3,6 +3,10 @@
 Date: 2026-08-23
 Status: implemented and verified, including Electron smoke
 
+Documentation status: implemented local routing design. Its statement that the
+Python/Gemini Desktop Agent is the only stateful AI layer is historical for the
+local client and does not include the newer persistent cloud control plane.
+
 ## Goal
 
 Reduce Jarvis from three overlapping AI decision paths to two clearly bounded

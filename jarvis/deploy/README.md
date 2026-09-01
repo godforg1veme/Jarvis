@@ -1,36 +1,54 @@
 # Jarvis server deployment
 
-Target: Ubuntu 22.04 on the DE-4 VPS. The application runs in Docker Compose;
-only ports 80 and 443 are exposed by the application stack. PostgreSQL stays on
-the Compose network and has no host port.
+Current production target: Ubuntu 24.04 LTS on the Jarvis VPS. Docker Compose
+runs the Fastify server and a private PostgreSQL/pgvector instance. The current
+host also runs Xray on port 443, so Jarvis uses the `tunnel` profile and a
+Cloudflare Tunnel instead of binding public web ports.
 
-## 1. Prepare the host
+The original Ubuntu 22.04/Caddy-only deployment plan is historical. The
+`direct` Caddy profile remains available for a different host where ports 80
+and 443 are free, but it must not be started on the current Xray host.
 
-Keep the current root SSH session open until login as the new `jarvis` user has
-been tested in a second terminal. Copy an SSH public key to the server and run:
+## Layout and trust boundaries
+
+- production directory: `/home/deploy/apps/jarvis`;
+- `server` listens only inside the Compose network on port 3210;
+- `postgres` has no host port and must remain private;
+- Cloudflare publishes `jarvis.rilora.ru` to `http://server:3210`;
+- persistent data uses the `postgres-data` and `document-data` volumes;
+- secrets live only in `deploy/.env` and
+  `deploy/secrets/cloudflare-tunnel-token` on the VPS.
+
+Do not commit or paste real values from those files. Use `deploy/env.example`
+as the variable-name reference.
+
+## First-time preparation
+
+The checked-in `bootstrap-ubuntu-22.04.sh` is retained as a historical/bootstrap
+helper and has not been rewritten for the already-provisioned Ubuntu 24.04
+host. Do not run it blindly on production. Verify the current user, SSH access,
+Docker, firewall, Xray, and existing projects first.
+
+For the existing host, create an isolated application directory and verify the
+runtime:
 
 ```bash
-sudo bash deploy/scripts/bootstrap-ubuntu-22.04.sh /root/operator.pub 22
+mkdir -p /home/deploy/apps/jarvis
+chmod 700 /home/deploy/apps/jarvis
+cd /home/deploy/apps/jarvis
+docker --version
+docker compose version
 ```
 
-The script installs Docker, Compose, ffmpeg, the PostgreSQL client, WireGuard,
-restic, UFW, unattended security updates, and a 4 GB emergency swap file. It
-also disables password SSH after validating the SSH configuration.
-
-## 2. Configure without committing secrets
+Copy the repository deployment files without overwriting unrelated projects.
+Create the environment file on the server:
 
 ```bash
 cp deploy/env.example deploy/.env
 chmod 600 deploy/.env
 ```
 
-Set a URL-encoded database password, the BotFather token, the numeric Telegram
-IDs, and model-provider credentials. Keep all token files outside git.
-
-For a server where port 443 is already used by Xray, create a remotely managed
-Cloudflare Tunnel in the dashboard. Add a published application route for
-`jarvis.rilora.ru` with service URL `http://server:3210`. Save only the `eyJ...`
-tunnel token in `deploy/secrets/cloudflare-tunnel-token` and restrict it:
+Create the Cloudflare token file without echoing its value into terminal logs:
 
 ```bash
 mkdir -p deploy/secrets
@@ -39,21 +57,62 @@ nano deploy/secrets/cloudflare-tunnel-token
 chmod 600 deploy/secrets/cloudflare-tunnel-token
 ```
 
-Do not paste the tunnel token into chat or place it in `.env`; the Compose
-service receives it through a read-only Docker secret.
+The Cloudflare dashboard route must target `http://server:3210`. `DNS only` on
+an old A record is not itself a tunnel; the remotely managed tunnel and its
+published hostname must both exist.
 
-## 3. Start and verify
+## Start with Cloudflare Tunnel
+
+On the temporary host with less than 15 GB RAM, only the control plane,
+PostgreSQL, Telegram, and cloud model APIs are supported:
 
 ```bash
+cd /home/deploy/apps/jarvis
 JARVIS_ALLOW_LOW_MEMORY=1 bash deploy/scripts/preflight.sh
-docker compose --profile tunnel --env-file deploy/.env -f deploy/docker-compose.yml up -d --build
-docker compose --env-file deploy/.env -f deploy/docker-compose.yml ps
-bash deploy/scripts/smoke.sh https://your-domain.example
+docker compose --profile tunnel --env-file deploy/.env \
+  -f deploy/docker-compose.yml up -d --build
+docker compose --profile tunnel --env-file deploy/.env \
+  -f deploy/docker-compose.yml ps
+bash deploy/scripts/smoke.sh https://jarvis.rilora.ru
 ```
 
-Remove `JARVIS_ALLOW_LOW_MEMORY=1` after upgrading to DE-4. The temporary 8 GB
-host may run the control plane, PostgreSQL, Telegram, and cloud model APIs, but
-must not run the planned ASR or local LLM workers.
+After upgrading to DE-4, run preflight without `JARVIS_ALLOW_LOW_MEMORY=1`.
+Server-side ASR or a local LLM must still be enabled only after measuring their
+peak RAM, latency, and interaction with PostgreSQL/VPN load.
 
-Do not run the host bootstrap or deployment commands until the exact DE-4 IP
-and SSH access have been verified.
+## Direct HTTPS profile on another host
+
+Use this only when nothing else owns ports 80/443:
+
+```bash
+docker compose --profile direct --env-file deploy/.env \
+  -f deploy/docker-compose.yml up -d --build
+```
+
+Never enable `direct` on the current host while Xray owns port 443.
+
+## Routine operations
+
+```bash
+docker compose --profile tunnel --env-file deploy/.env -f deploy/docker-compose.yml ps
+docker compose --profile tunnel --env-file deploy/.env -f deploy/docker-compose.yml logs --tail=200 server
+docker compose --profile tunnel --env-file deploy/.env -f deploy/docker-compose.yml up -d --build server
+bash deploy/scripts/smoke.sh https://jarvis.rilora.ru
+```
+
+Run migrations through the server startup path and inspect health before
+replacing a running container. Never delete volumes as part of an ordinary
+update. Backups and a tested restore procedure remain required roadmap work.
+
+## Model configuration
+
+The production model is selected through environment variables. The current
+deployment uses the OpenRouter-compatible provider; the exact model may change
+without changing Jarvis identity. Salad support is an architectural target and
+configuration surface, not a guarantee that a Salad endpoint is currently
+active.
+
+Keep the canonical Jarvis behavior in `server/src/prompts/`, not in provider
+dashboard prompts. After changing a model, run `server/npm test` locally and a
+manual identity, correction, and prompt-injection contract probe without
+printing keys or hidden prompts.

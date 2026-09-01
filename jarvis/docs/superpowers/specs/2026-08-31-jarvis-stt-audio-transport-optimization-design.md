@@ -1,5 +1,7 @@
 # Jarvis STT Audio Transport Optimization Design
 
+Status: implemented local-runtime optimization retained as a technical record.
+
 ## Goal
 
 Reduce CPU work, temporary allocations, and memory growth in Jarvis voice

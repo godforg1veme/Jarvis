@@ -1,66 +1,164 @@
 # AGENTS.md
 
-## Project
+This file is the authoritative project context for every coding agent. Read it
+before editing code. `CLAUDE.md` and `gemini.md` point here and must not define a
+different architecture.
 
-Jarvis is a personal Windows desktop assistant built with Electron and Node.js.
-It provides a Spotlight-like launcher, local voice recognition, app
-launching, local tools, command history, and optional AI intent resolution.
+## Product
 
-## Runtime
+Jarvis is a hybrid personal and family AI-assistant platform:
 
-- Target OS: Windows.
-- Runtime: Electron + Node.js, CommonJS modules.
-- UI lives in `renderer/`.
-- Main Electron lifecycle, tray, shortcuts, and IPC live in `main.js`.
-- Preload bridge lives in `preload.js`.
-- Voice recognition lives in `voice/`.
-- Optional faster-whisper runtime lives in `stt_runtime/`.
-- Text-to-speech lives in `tts/`.
-- Local tools live in `tools/`.
-- Simple single-step AI fallback lives in `tools/intentRouter.js` and
-  `tools/aiIntentResolver.js`; it uses OpenRouter only after deterministic
-  parsing fails.
-- Intent execution lives in `actions/`.
-- Desktop Agent orchestration and its safe tool gateway live in `agents/`.
-- The Python LangGraph/Gemini runtime in `agent_runtime/` is the only stateful
-  AI planning layer; Node Tool Gateway remains the execution authority.
-- Local/generated state lives in `data/`.
-- Local TTS voice/model files live in `voices/`.
+- the always-on cloud control plane owns identity, conversations, future
+  memory/knowledge retrieval, model routing, Telegram access, and device
+  orchestration;
+- the Electron application is the Windows client and execution edge for local
+  voice, apps, files, windows, and approved remote actions;
+- Telegram is the first cloud client, not the whole product;
+- PWA, server ASR, camera/vision, private knowledge bases, and full remote
+  device execution are planned or in progress and must not be documented as
+  complete.
 
-## Commands
+The short product model is: **cloud brain and memory, local hands on devices**.
+See `docs/README.md` for current implementation status and historical records.
 
-- Start app: `npm start`
-- Prepare TTS models/dependencies: `node scripts/ensureTts.js`
-- Test selected TTS provider: `node scripts/testTtsSpeak.js "<text>"`
-- Test Piper fallback directly: `node scripts/testPiperSpeak.js "<text>"`
-- Test Vosk model loading: `node scripts/testVoskLoad.js`
-- Prepare faster-whisper STT dependencies: `node scripts/ensureStt.js`
-- Test STT settings/provider wiring: `node scripts/testSttSettings.js` and `node scripts/testVoiceServiceSttProvider.js`
-- Test voice intent parsing/execution manually: `node voice/testCommand.js "<command text>"`
+## Current Architecture
 
-## Safety
+### Cloud control plane
 
-- Do not run commands that can modify the user's system unless the task requires it.
-- Be careful with app launch, PowerShell, and runProgram behavior because this project controls the local PC.
-- Do not edit secrets or add API keys to the repo. Use environment variables such as `OPENROUTER_API_KEY`.
-- Ask before adding new production dependencies.
-- Do not edit `node_modules/`, `models/`, `voices/`, `build/`, or large generated files unless explicitly requested.
-- Treat `data/app-index.json`, `data/apps.learned.json`, learned-app backups/quarantines, `data/history.json`, `data/ai-cache.json`, `data/ui-state.local.json`, `data/tts-cache/`, and logs as generated/local state.
-- `start.bat` runs `node scripts/ensureTts.js` and `node scripts/ensureStt.js` before Electron so the selected local speech runtimes are prepared automatically.
+- `server/` is a Node.js 20+, CommonJS, Fastify service.
+- `server/src/telegram/` handles allowlisted Telegram users and update
+  deduplication.
+- PostgreSQL with pgvector is the source of truth for cloud identity,
+  conversations, and prepared assistant/device/memory domains.
+- `server/src/prompts/` builds the versioned Jarvis persona and keeps trusted
+  policy separate from user-controlled content.
+- `server/src/assistant/` invokes a provider and validates policy-sensitive
+  output with at most one corrective retry.
+- `server/src/providers/` contains OpenAI-compatible and fallback adapters.
+  Provider/model selection is configuration, not Jarvis identity.
+- The deployed text model is currently configured through OpenRouter. Do not
+  hard-code a provider or model into product behavior.
+
+### Windows execution edge
+
+- Target OS: Windows; runtime: Electron + Node.js CommonJS.
+- `main.js` owns Electron lifecycle, tray, shortcuts, windows, and IPC wiring.
+- `preload.js` exposes explicit renderer capabilities.
+- `renderer/` contains the launcher, task UI, voice overlay, and Voice Lab.
+- `voice/` and `stt_runtime/` own local capture, Faster Whisper/Vosk, quality
+  monitoring, and calibration.
+- `tts/` keeps Silero/Piper behind `tts/ttsService.js`.
+- `tools/` and `actions/` implement bounded local operations.
+- `agents/toolGateway.js` is the execution authority for agent-requested OS
+  mutations. `agents/toolPolicy.js` and `agents/toolSchemas.js` are shared
+  policy/validation contracts.
+- `agents/remoteProtocol.js` is the pure initial wire contract for future
+  cloud-to-device commands. A network connection and pairing flow are not yet
+  complete.
+- `agent_runtime/` is the existing Python/LangGraph planner for complex local
+  Desktop Agent tasks. It is no longer the only stateful AI-related component
+  in the overall product because the cloud server persists conversations.
+
+### Deployment
+
+- The current VPS runs Ubuntu 24.04 LTS, not the original planned 22.04.
+- Docker Compose runs `server` and private `postgres`; `cloudflared` is the
+  intended public ingress because host port 443 is occupied by Xray.
+- `deploy/docker-compose.yml` also retains an optional Caddy profile for hosts
+  where 80/443 are available. Do not start both ingress modes accidentally.
+- PostgreSQL must never be published publicly.
+- The current small host may run the control plane and cloud-model client, but
+  local LLM/ASR workers require a measured capacity decision after the DE-4
+  upgrade.
+
+## Safety and Trust Boundaries
+
+- Never add API keys, Telegram tokens, VPN keys, Cloudflare tokens, device
+  tokens, or database passwords to Git, tests, logs, prompts, or chat output.
+- Use environment variables and ignored files under `deploy/secrets/`.
+- Never expose PostgreSQL, worker internals, Docker control endpoints, or a
+  local Windows inbound control port to the public internet.
+- Models may select only declared tool actions with validated structured
+  arguments. Do not implement arbitrary model-generated shell or PowerShell.
+- `observe` and `low_risk` map to user-visible `safe`; confirmation policies
+  map to `changing`. Changing remote actions require confirmation in the client
+  from which the request originated.
+- Never claim an OS action succeeded without a successful Tool Gateway result.
+- Scope cloud data by user before retrieval/ranking. One user may own multiple
+  devices, but users must never share conversations, memory, documents, or
+  device authority implicitly.
+- Do not weaken these boundaries because the deployment is currently private.
+
+## Generated and Local State
+
+Do not edit or commit unless the task explicitly requires it:
+
+- `node_modules/`, `server/node_modules/`, `build/`, `models/`, `voices/`;
+- `.env`, `.env.*` except committed examples, and `deploy/secrets/*`;
+- deployment archives such as `jarvis-server-deploy.zip`;
+- `data/app-index.json`, `data/apps.learned.json` and backups/quarantines;
+- `data/history.json`, `data/ai-cache.json`, `data/agent-history.json`;
+- `data/file-index.json`, `data/ui-state.local.json`, `data/tts-cache/`;
+- `data/stt-profiles.json`, preview settings, device identity, logs, temporary
+  audio, user documents, database dumps, and downloaded models.
+
+`data/stt-settings.json` is a checked-in default and may be changed deliberately
+with its validation tests.
 
 ## Code Style
 
-- Keep CommonJS unless the project is intentionally migrated.
-- Prefer small focused modules over growing `main.js` or `renderer/renderer.js`.
-- Keep IPC contracts explicit between main, preload, renderer, and voice windows.
-- Keep TTS behind the provider interface in `tts/ttsService.js`; voice command handling should call `speak(text)` and avoid depending on Silero/Piper details.
-- Preserve UTF-8 Russian text. If mojibake is present, fix it deliberately with nearby context.
-- Avoid broad refactors while fixing narrow behavior.
+- Keep CommonJS unless a deliberate migration is approved.
+- Prefer focused modules over growing `main.js` or `renderer/renderer.js`.
+- Keep IPC and remote wire contracts explicit and validated at trust boundaries.
+- Keep TTS behind `tts/ttsService.js` and STT settings behind
+  `voice/sttSettings.js`.
+- Preserve UTF-8 Russian text; fix mojibake deliberately with nearby context.
+- Avoid broad refactors during narrow fixes and preserve unrelated dirty-worktree
+  changes.
+- Ask before adding a new production dependency.
 
-## Verification
+## Commands and Verification
 
-- For voice changes, run the relevant STT provider test, `node scripts/testVoiceServiceSttProvider.js`, and at least one intent parser test.
-- For TTS changes, run `node scripts/ensureTts.js`, `node scripts/testTtsProvider.js`, `node scripts/testSileroService.js`, and `node scripts/testTtsSpeak.js "<text>"` when audio verification is needed.
-- For launcher/app resolver changes, test against known aliases in `data/app-aliases.json`.
-- For UI changes, verify the renderer visually when possible.
-- For AI intent changes, test both missing-key and configured-key behavior.
+Windows client:
+
+```powershell
+npm start
+node scripts/ensureTts.js
+node scripts/ensureStt.js
+node scripts/testEverythingSearch.js
+node scripts/testFileCommands.js
+node scripts/testToolGateway.js
+node scripts/testRemoteProtocol.js
+node scripts/testToolPolicyMapping.js
+node scripts/testSttSettings.js
+node scripts/testVoiceServiceSttProvider.js
+node scripts/testVoiceQualityMonitor.js
+node scripts/testVoiceLabController.js
+node scripts/testGeminiVoiceAdvisor.js
+node scripts/testVoiceLabRenderer.js
+python scripts/testFasterWhisperQuality.py
+```
+
+Cloud server:
+
+```powershell
+cd server
+npm test
+npm start
+```
+
+Run the smallest relevant checks first, then adjacent regression suites. For
+configured model changes, test missing-key behavior, fake transport, and a
+manual live contract without printing secrets. For deployment changes, use
+`deploy/scripts/preflight.sh`, Compose health, and `deploy/scripts/smoke.sh`.
+
+## Documentation Policy
+
+- `README.md` is the product entry point and reports only verified current
+  capabilities plus clearly labelled roadmap items.
+- `docs/README.md` is the documentation index and status authority.
+- `docs/superpowers/specs/` and `docs/superpowers/plans/` are decision and
+  implementation history. Preserve them; add a status/supersession note rather
+  than rewriting history as if an old plan had always described the new system.
+- Update this file whenever runtime ownership, safety boundaries, verification
+  commands, or product status materially changes.

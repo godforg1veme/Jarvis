@@ -1,5 +1,8 @@
 # Everything Output Encoding Design
 
+Status: implemented and covered by focused decoding tests on 2026-09-01;
+retained as the decoding decision record.
+
 ## Problem
 
 On Russian Windows, `ES.exe` can write search results using the active OEM

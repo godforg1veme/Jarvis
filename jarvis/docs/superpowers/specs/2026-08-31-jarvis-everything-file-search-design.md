@@ -1,6 +1,7 @@
 # Jarvis Everything File Search Design
 
-Status: approved for specification review
+Status: implemented; focused Everything, file-command, and Tool Gateway tests
+pass on 2026-09-01.
 
 ## Goal
 

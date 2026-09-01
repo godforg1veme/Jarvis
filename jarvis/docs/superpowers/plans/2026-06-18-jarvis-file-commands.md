@@ -3,6 +3,9 @@
 **Status (2026-08-23):** Implemented and verified. Deterministic file-command,
 voice parser, wildcard search, Vosk load/stream, and Electron smoke checks pass.
 
+Documentation status: completed execution record. Everything integration is a
+later extension documented separately.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build safe natural-language file commands so Jarvis can open, reveal, and find files from text or voice.

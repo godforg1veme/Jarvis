@@ -1,6 +1,10 @@
 # Jarvis System Instruction Design
 
-Status: approved in conversation on 2026-09-01; awaiting written-spec review.
+Status: implemented and verified on the Telegram/OpenRouter path on 2026-09-01.
+
+The provider remains replaceable. The currently deployed configuration uses an
+OpenRouter-compatible model, while the canonical Jarvis identity and behavior
+live in this repository rather than in the base model.
 
 ## Goal
 

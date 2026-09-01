@@ -1,111 +1,138 @@
 # Jarvis
 
-Jarvis is a personal Windows desktop assistant built with Electron and Node.js.
-It provides a Spotlight-like launcher, app launching, local tools, command
-history, local speech recognition, text-to-speech, and optional AI intent
-resolution.
+Jarvis — гибридная платформа персонального и семейного AI-ассистента. Облачная
+часть остаётся доступной независимо от домашних компьютеров, хранит раздельные
+диалоги пользователей и обращается к моделям. Локальное Windows-приложение
+принимает голосовые и текстовые команды и служит исполнительным контуром для
+работы с приложениями, файлами и окнами.
 
-## Project Layout
+Коротко: **облачный мозг и память + локальные руки на устройствах**. Telegram —
+первый облачный клиент, а не граница продукта. Архитектура рассчитана на PWA,
+серверное распознавание речи, камеры, персональные базы знаний и несколько
+устройств одного пользователя.
 
-- `main.js` - Electron lifecycle, tray, global shortcuts, IPC, and app windows.
-- `preload.js` - safe renderer bridge.
-- `renderer/` - launcher UI, agent task window, voice overlay, and transcription bar.
-- `voice/` - speech worker selection, audio capture window, and intent parsing.
-- `stt_runtime/` - optional Python runtime for faster-whisper speech recognition.
-- `tts/` - provider-based text-to-speech service for Silero and Piper.
-- `agents/` - Node orchestration, routing, task history, and the safe tool gateway.
-- `agent_runtime/` - Python LangGraph runtime for stateful Desktop Agent tasks.
-- `actions/` - intent execution helpers such as app launch and process actions.
-- `tools/` - local tools, app resolver/indexer, AI client, screen vision, and selection helpers.
-- `scripts/` - setup and verification scripts.
-- `data/` - checked-in defaults plus ignored local runtime state.
-- `assets/` - small source assets such as tray icons.
+## Текущее состояние
 
-## AI Routing
+Реализовано и проверено:
 
-Jarvis has two deliberately separate AI levels:
+- Windows-приложение Electron с лаунчером, голосовым управлением и TTS;
+- безопасные локальные инструменты для приложений, файлов и окон;
+- поиск файлов по всем локальным дискам через Everything с ограниченным
+  резервным поиском;
+- Voice Lab для настройки Faster Whisper, профилей микрофона и калибровки;
+- облачный Node.js/Fastify-сервер, PostgreSQL с pgvector и Docker Compose;
+- Telegram-бот с allowlist, пользовательской изоляцией, дедупликацией обновлений
+  и сохранением переписки;
+- OpenAI-совместимый шлюз моделей с fallback-провайдером;
+- единая системная инструкция Jarvis, адаптеры моделей и проверка ответов;
+- базовые контракты удалённых команд и единая политика локальных инструментов.
 
-1. Deterministic launcher and voice parsers run first. If they cannot classify
-   a simple one-step command, `tools/intentRouter.js` and
-   `tools/aiIntentResolver.js` use OpenRouter to return a validated schema-v2
-   intent. The model may name an action, app, file query, or known location,
-   but it cannot supply executable paths, shell commands, or arbitrary tools.
-2. Complex, stateful, batch, and multi-step work is passed with the original
-   user text to the Python/Gemini Desktop Agent in `agent_runtime/`. The Node
-   Tool Gateway in `agents/` remains the authority for any system-changing
-   execution.
+Развивается:
 
-The simple fallback uses `OPENROUTER_API_KEY`. Desktop Agent planning uses
-`GEMINI_API_KEY` or `GOOGLE_API_KEY` through the separate `agentAi` settings.
+- долговременная память и персональная база знаний поверх уже подготовленной
+  схемы PostgreSQL/pgvector;
+- подключение Windows-устройств к облаку по исходящему защищённому соединению;
+- выполнение подтверждённых команд на выбранном устройстве пользователя;
+- серверная транскрибация голосовых сообщений;
+- переключение между OpenRouter, Salad и другими совместимыми провайдерами;
+- PWA, обработка изображений и работа с камерой.
 
-## Unknown App Recovery
+Планы не следует описывать как готовые функции. Актуальная карта документации и
+статусы находятся в [`docs/README.md`](docs/README.md).
 
-When an explicit app launch misses the deterministic resolver, Jarvis first
-checks bounded local sources and can then scan fixed local disks with progress
-and cancellation. OpenRouter may rank only opaque IDs for locally validated
-candidates; it never receives or returns a launch path. The user confirms the
-first recovered launch through the same text or voice channel, and a successful
-launch is stored locally in `data/apps.learned.json`.
+## Архитектура
 
-Ordinary learned apps launch locally on later requests. Scripts and explicit
-custom commands are fingerprinted with SHA-256 and require confirmation again
-after their content or structured arguments change. Conflicting learned aliases
-never replace manual `apps.user.json` entries. Recovery continues with local
-ranking when OpenRouter is unavailable.
+```text
+Telegram / будущая PWA / локальный Electron
+                    |
+          Jarvis cloud control plane
+   identity · conversations · prompt policy
+   model gateway · PostgreSQL/pgvector · audit
+                    |
+       outbound connection to Windows agents
+                    |
+      Node Tool Gateway -> local OS actions
+```
 
-## Setup
+Облачный сервер отвечает за идентичность Jarvis, маршрутизацию моделей,
+пользовательский контекст и постоянные данные. Базовая модель не определяет
+личность ассистента. Канонический prompt pipeline находится в `server/src/prompts/`,
+а ответы дополнительно проверяются в `server/src/assistant/`.
+
+Windows-клиент остаётся единственной стороной, которая непосредственно меняет
+состояние компьютера. LLM не создаёт произвольные shell- или PowerShell-команды:
+она может запросить только объявленное действие с валидируемыми аргументами.
+Безопасные операции выполняются по политике инструмента, изменяющие требуют
+подтверждения в исходном клиенте.
+
+## Структура проекта
+
+- `server/` — постоянно работающий облачный control plane, Telegram и модели.
+- `deploy/` — Docker Compose, PostgreSQL/pgvector и операции VPS.
+- `main.js`, `preload.js`, `renderer/` — Electron lifecycle и интерфейсы Windows.
+- `voice/`, `stt_runtime/` — локальный голос, Faster Whisper и Voice Lab.
+- `tts/` — Silero/Piper за общим TTS-интерфейсом.
+- `tools/`, `actions/` — локальные инструменты и их выполнение.
+- `agents/` — Desktop Agent, Tool Gateway и контракты удалённых устройств.
+- `agent_runtime/` — существующий Python/LangGraph runtime локального агента.
+- `data/` — настройки по умолчанию и игнорируемое локальное состояние.
+- `docs/` — карта документации, спецификации и планы.
+
+## Локальный запуск Windows-клиента
+
+Требования: Windows, Node.js и зависимости из `package.json`.
 
 ```powershell
 npm install
 node scripts/ensureTts.js
-```
-
-`scripts/ensureTts.js` prepares local TTS dependencies and downloads voice
-models into `voices/`. `scripts/ensureStt.js` prepares the optional
-faster-whisper Python runtime in `stt_runtime/.venv`. Vosk models live in
-`models/`. These machine-local assets are ignored when they are large or
-generated.
-
-## Run
-
-```powershell
+node scripts/ensureStt.js
 npm start
 ```
 
-`start.bat` runs `node scripts/ensureTts.js` and `node scripts/ensureStt.js`
-before launching Electron.
+`start.bat` автоматически подготавливает выбранные локальные TTS/STT runtime
+перед запуском Electron.
 
-## Useful Checks
+Для поиска по всему компьютеру установите Everything 1.4 x64 и официальный
+`es.exe`, включив Everything Service и автозапуск. Пути можно переопределить
+через `EVERYTHING_ES_PATH` и `EVERYTHING_EXE_PATH`.
+
+## Локальный запуск облачного сервера
 
 ```powershell
-node scripts/testVoskLoad.js
-node scripts/ensureStt.js
-node scripts/testSttSettings.js
-node scripts/testVoiceServiceSttProvider.js
-node voice/testCommand.js "джарвис включи доту"
-node scripts/testTtsProvider.js
-node scripts/testSileroService.js
-node scripts/testTtsSpeak.js "тест голоса"
+cd server
+npm install
+npm test
+npm start
 ```
 
-## Agent Context
+Для полноценного запуска требуются PostgreSQL и переменные окружения из
+`deploy/env.example`. Секреты нельзя помещать в репозиторий. Инструкции VPS
+находятся в [`deploy/README.md`](deploy/README.md).
 
-Read `AGENTS.md` before changing code. It contains the project-specific safety
-rules, module boundaries, generated-file policy, and verification expectations.
+## Основные проверки
 
-Do not commit local runtime state:
+```powershell
+node scripts/testEverythingSearch.js
+node scripts/testFileCommands.js
+node scripts/testToolGateway.js
+node scripts/testRemoteProtocol.js
+node scripts/testToolPolicyMapping.js
+node scripts/testSttSettings.js
+node scripts/testVoiceServiceSttProvider.js
+node scripts/testVoiceQualityMonitor.js
+node scripts/testVoiceLabController.js
+node scripts/testGeminiVoiceAdvisor.js
+node scripts/testVoiceLabRenderer.js
+python scripts/testFasterWhisperQuality.py
+cd server
+npm test
+```
 
-- `data/app-index.json`
-- `data/apps.user.json`
-- `data/apps.learned.json` and its backups/quarantines
-- `data/history.json`
-- `data/ai-cache.json`
-- `data/agent-history.json`
-- `data/ui-state.local.json`
-- `data/tts-cache/`
-- `models/`
-- `voices/`
-- logs and temporary audio files
+Перед изменением кода агент обязан прочитать [`AGENTS.md`](AGENTS.md).
 
-Use environment variables for secrets such as `OPENROUTER_API_KEY`; never write
-API keys into the repository.
+## Секреты и локальные данные
+
+API-ключи и токены передаются только через переменные окружения или закрытые
+файлы на сервере. Не коммитьте `.env`, содержимое `deploy/secrets/`, идентичности
+устройств, пользовательские документы, модели, голоса, логи и файлы из `data/`,
+помеченные в `AGENTS.md` как runtime state.

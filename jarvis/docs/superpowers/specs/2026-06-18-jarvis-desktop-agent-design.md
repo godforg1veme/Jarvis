@@ -3,6 +3,9 @@
 Status: core v1 implemented and verified; Browser Agent remains the explicit
 next phase and is out of scope for this implementation.
 
+Documentation status: current for the local Desktop Agent. Cloud device
+pairing and remote command transport are separate roadmap work.
+
 ## Goal
 
 Build a real Desktop Agent for Jarvis that can safely operate local files,

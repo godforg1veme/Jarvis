@@ -1,5 +1,8 @@
 # Voice false-trigger filtering design
 
+Status: implemented; the focused Faster Whisper quality-filter test passes on
+2026-09-01.
+
 ## Goal
 
 Prevent non-speech audio from being transcribed as a launch command, especially

@@ -4,6 +4,9 @@ Status (2026-08-23): core v1 is implemented and verified. Protocol, client,
 gateway, plan editing, context transfer, voice interaction, controlled
 acceptance, and Electron task-window checks pass.
 
+Documentation status: completed core-local-agent record. Browser automation
+and cloud device transport remain separate work.
+
 Goal: implement the Desktop/File/App/Window Agent described in
 `docs/superpowers/specs/2026-06-18-jarvis-desktop-agent-design.md`.
 

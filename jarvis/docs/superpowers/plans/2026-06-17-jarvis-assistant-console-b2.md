@@ -3,6 +3,9 @@
 **Status (2026-08-23):** Implemented and verified. Static JavaScript, UTF-8,
 renderer behavior, Electron startup, and runtime visual smoke checks pass.
 
+Documentation status: completed execution record; do not rerun it as an active
+plan unless intentionally rebuilding the UI.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Rebuild the Jarvis renderer as the approved Assistant Console B2 UI while preserving launcher, voice, confirmation, history, and candidate-selection behavior.

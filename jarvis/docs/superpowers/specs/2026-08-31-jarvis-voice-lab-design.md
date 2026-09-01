@@ -1,5 +1,9 @@
 # Jarvis Voice Lab and Adaptive STT Calibration Design
 
+Status: implemented; automated settings, profile, controller, monitor, advisor,
+quality-filter, and renderer contract checks pass on 2026-09-01. Live
+microphone UX remains a manual verification boundary.
+
 ## Goal
 
 Add a dedicated Voice Lab where the user can inspect the live microphone

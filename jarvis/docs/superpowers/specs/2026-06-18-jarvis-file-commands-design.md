@@ -2,6 +2,9 @@
 
 Status: implemented and verified, including Vosk and Electron smoke checks
 
+Documentation status: implemented local capability. Later Everything search
+extends discovery without replacing the safety model described here.
+
 ## Goal
 
 Add safe natural-language file commands to Jarvis so the user can open, reveal,

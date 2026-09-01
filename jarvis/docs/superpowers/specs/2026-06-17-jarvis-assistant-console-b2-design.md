@@ -3,6 +3,9 @@
 Date: 2026-06-17
 Status: implemented and verified, including runtime visual smoke
 
+Documentation status: implemented local-client design retained as history. It
+does not describe the newer cloud control plane.
+
 ## Goal
 
 Redesign the Jarvis renderer from a plain Spotlight-style launcher into a compact assistant console while preserving the current Electron, Node.js, CommonJS, and vanilla renderer architecture.

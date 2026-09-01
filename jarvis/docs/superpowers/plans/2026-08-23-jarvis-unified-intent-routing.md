@@ -3,6 +3,9 @@
 Date: 2026-08-23
 Status: implementation and verification complete
 
+Documentation status: completed local-routing record. Consult `AGENTS.md` for
+the newer cloud/server architecture before changing provider ownership.
+
 Design reference:
 `docs/superpowers/specs/2026-08-23-jarvis-unified-intent-routing-design.md`
 

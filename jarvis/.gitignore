@@ -23,15 +23,20 @@ data/file-index.json
 data/agent-history.json
 data/tts-cache/
 data/*.log
+data/stt-profiles.json
+data/stt-settings.preview.json
 
 # Local secrets and machine-specific overrides
 .env
 .env.*
 !.env.example
 *.local.json
+deploy/secrets/*
+!deploy/secrets/.gitkeep
 
 # Logs and temporary output
 *.log
+jarvis-server-deploy.zip
 *.tmp
 *.temp
 *.wav

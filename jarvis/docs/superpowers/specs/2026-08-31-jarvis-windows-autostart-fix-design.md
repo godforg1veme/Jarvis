@@ -1,5 +1,8 @@
 # Jarvis Windows Autostart Fix Design
 
+Status: historical targeted design. Inspect the current registry and process
+state before applying any machine-specific migration step.
+
 ## Goal
 
 Make Windows autostart launch Jarvis instead of Electron's `default_app.asar`,

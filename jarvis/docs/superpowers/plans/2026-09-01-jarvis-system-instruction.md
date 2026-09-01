@@ -1,5 +1,8 @@
 # Jarvis System Instruction Implementation Plan
 
+Status: implemented and verified on 2026-09-01. Retained as execution history;
+new work should follow `AGENTS.md` and `docs/README.md`.
+
 ## Objective
 
 Replace Telegram-specific prompt construction and question-specific identity

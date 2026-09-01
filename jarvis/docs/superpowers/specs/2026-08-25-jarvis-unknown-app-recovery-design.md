@@ -3,6 +3,9 @@
 Date: 2026-08-25
 Status: implemented and verified
 
+Documentation status: implemented local-client behavior retained as an active
+technical reference.
+
 ## Goal
 
 Allow Jarvis to recover when normal local application resolution cannot find a

@@ -1,6 +1,17 @@
 # Jarvis Family Cloud Assistant Design
 
-Status: approved by the user on 2026-09-01.
+Status: active architecture, partially implemented as of 2026-09-01.
+
+Implementation update: the Fastify control plane, PostgreSQL/pgvector schema,
+Telegram text client, OpenAI-compatible provider gateway, and canonical Jarvis
+prompt pipeline are implemented and deployed. Long-term retrieval, document
+ingestion, server ASR, device pairing/execution, PWA/vision, VPN operations,
+and tested backups remain roadmap work.
+
+Deployment update: the provisioned host is Ubuntu 24.04 LTS. Xray already owns
+host port 443, so the current ingress is Cloudflare Tunnel to `server:3210`.
+The Ubuntu 22.04 and direct-Caddy text below records the originally approved
+selection and is superseded for the current host by `deploy/README.md`.
 
 ## Goal
 

@@ -3,6 +3,8 @@
 Date: 2026-08-25
 Status: implementation and automated verification complete
 
+Documentation status: completed local-client execution record.
+
 Implementation summary (2026-08-30): the two-stage recovery flow, strict AI
 candidate matching, same-channel confirmation, structured server-side launch,
 learned alias storage, and script/custom-command fingerprint policy are in

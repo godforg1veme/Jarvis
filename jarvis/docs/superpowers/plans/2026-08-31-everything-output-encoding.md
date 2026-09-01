@@ -1,5 +1,8 @@
 # Everything Output Encoding Implementation Plan
 
+Status: implemented and covered by focused decoding tests on 2026-09-01;
+retained as a short execution record.
+
 1. Add deterministic byte-decoding tests for UTF-8, CP866, Windows-1251,
    ASCII, and invalid CSV output.
 2. Change the ES process adapter to capture buffers and decode stdout/stderr at

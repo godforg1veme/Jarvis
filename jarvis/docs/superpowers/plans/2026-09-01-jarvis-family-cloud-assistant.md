@@ -1,10 +1,20 @@
 # Jarvis Family Cloud Assistant Implementation Plan
 
+Status: active roadmap, partially implemented as of 2026-09-01.
+
+Current execution: the shared policy/protocol foundation, Compose/PostgreSQL
+control plane, Telegram text slice, OpenRouter-compatible provider gateway, and
+canonical prompt pipeline exist. Remote device networking, memory retrieval,
+document ingestion, server ASR, Salad runtime, VPN/backups, PWA/vision, and full
+acceptance remain incomplete. Production runs Ubuntu 24.04 with Cloudflare
+Tunnel because Xray owns port 443; older Ubuntu 22.04/Caddy steps below are
+historical plan text, not current operations.
+
 Design: `docs/superpowers/specs/2026-09-01-jarvis-family-cloud-assistant-design.md`
 
 ## Outcome
 
-Deliver an always-on family Jarvis on a DE-4 Ubuntu 22.04 VPS. The first client
+Deliver an always-on family Jarvis on a DE-4-class VPS. The first client
 is Telegram. Each allowed user has isolated conversations, memories, documents,
 and devices. Voice is transcribed on the server. Complex requests use Gemma 4
 12B Q4 on Salad or OpenRouter through a switchable model gateway. An online
@@ -669,4 +679,3 @@ Milestone 1 locally. In parallel, the user can purchase/provision DE-4 with
 Ubuntu 22.04, point a domain to it, and collect the Telegram/OpenRouter
 credentials. Do not deploy remote mutations or copy personal documents until
 identity isolation, TLS, backups, and restore are verified.
-

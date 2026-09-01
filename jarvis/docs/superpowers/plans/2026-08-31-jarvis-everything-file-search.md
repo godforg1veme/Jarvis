@@ -1,5 +1,8 @@
 # Jarvis Everything File Search Implementation Plan
 
+Status: implemented; focused Everything, file-command, and Tool Gateway tests
+pass on 2026-09-01.
+
 **Design:** `docs/superpowers/specs/2026-08-31-jarvis-everything-file-search-design.md`
 
 **Goal:** Make Everything the primary provider for safe file and folder search
