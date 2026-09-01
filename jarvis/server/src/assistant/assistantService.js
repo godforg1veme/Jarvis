@@ -1,0 +1,47 @@
+const { buildCanonicalPrompt } = require('../prompts/promptBuilder');
+const { adaptPrompt } = require('../prompts/promptAdapter');
+const { validateOutput } = require('./outputPolicyValidator');
+
+class ModelPolicyViolationError extends Error {
+  constructor(violations) {
+    super('model response violated the Jarvis policy');
+    this.name = 'ModelPolicyViolationError';
+    this.code = 'MODEL_POLICY_VIOLATION';
+    this.violations = [...violations];
+  }
+}
+
+class AssistantService {
+  constructor(options) {
+    this.provider = options.provider;
+    this.profile = options.profile;
+    this.logger = options.logger || null;
+  }
+
+  async answer(input) {
+    const canonical = buildCanonicalPrompt(input);
+    let correctionViolations = [];
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const messages = adaptPrompt(canonical, this.profile, { correctionViolations });
+      const answer = await this.provider.answer({ ...input, messages });
+      const validation = validateOutput(answer, canonical.runtime);
+      if (validation.ok) return String(answer).trim();
+      correctionViolations = validation.violations;
+      if (this.logger) {
+        this.logger.warn({
+          policyId: canonical.policy.id,
+          provider: this.profile.provider,
+          model: this.profile.model,
+          attempt: attempt + 1,
+          violations: correctionViolations,
+        }, 'model response policy violation');
+      }
+    }
+    throw new ModelPolicyViolationError(correctionViolations);
+  }
+}
+
+module.exports = {
+  AssistantService,
+  ModelPolicyViolationError,
+};

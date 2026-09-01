@@ -1,0 +1,22 @@
+{
+  "name": "jarvis-family-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Always-on Jarvis family assistant control plane",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@fastify/websocket": "^11.3.0",
+    "fastify": "^5.12.1",
+    "grammy": "^1.46.0",
+    "pg": "^8.23.0",
+    "zod": "^4.5.4"
+  }
+}

@@ -1,0 +1,120 @@
+name: jarvis-family
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-jarvis}
+      POSTGRES_USER: ${POSTGRES_USER:-jarvis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/001-extensions.sql:/docker-entrypoint-initdb.d/001-extensions.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [backend]
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4G
+
+  server:
+    build:
+      context: ..
+      dockerfile: deploy/server.Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      JARVIS_SERVER_HOST: 0.0.0.0
+      JARVIS_SERVER_PORT: 3210
+      JARVIS_LOG_LEVEL: ${JARVIS_LOG_LEVEL:-info}
+      JARVIS_TRUST_PROXY: "true"
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN is required}
+      TELEGRAM_ALLOWED_IDS: ${TELEGRAM_ALLOWED_IDS:?TELEGRAM_ALLOWED_IDS is required}
+      JARVIS_MODEL_PROVIDER: ${JARVIS_MODEL_PROVIDER:-echo}
+      JARVIS_MODEL_FALLBACK_PROVIDER: ${JARVIS_MODEL_FALLBACK_PROVIDER:-}
+      JARVIS_MODEL_TIMEOUT_MS: ${JARVIS_MODEL_TIMEOUT_MS:-60000}
+      SALAD_BASE_URL: ${SALAD_BASE_URL:-https://ai.salad.cloud/v1}
+      SALAD_API_KEY: ${SALAD_API_KEY:-}
+      SALAD_MODEL: ${SALAD_MODEL:-}
+      SALAD_AUTH_MODE: ${SALAD_AUTH_MODE:-bearer}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
+      OPENROUTER_REASONING_EFFORT: ${OPENROUTER_REASONING_EFFORT:-}
+      OPENROUTER_REASONING_EXCLUDE: ${OPENROUTER_REASONING_EXCLUDE:-true}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3210/health/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - document-data:/srv/jarvis/documents
+    networks: [backend]
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+
+  caddy:
+    image: caddy:2.10-alpine
+    profiles: ["direct"]
+    restart: unless-stopped
+    environment:
+      JARVIS_DOMAIN: ${JARVIS_DOMAIN:-unused.invalid}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      server:
+        condition: service_healthy
+    networks: [backend]
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token-file /run/secrets/cloudflare_tunnel_token
+    secrets:
+      - cloudflare_tunnel_token
+    depends_on:
+      server:
+        condition: service_healthy
+    networks: [backend]
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
+networks:
+  backend:
+    internal: false
+
+volumes:
+  postgres-data:
+  document-data:
+  caddy-data:
+  caddy-config:
+
+secrets:
+  cloudflare_tunnel_token:
+    file: ./secrets/cloudflare-tunnel-token
