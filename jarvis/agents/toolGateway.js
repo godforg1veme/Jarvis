@@ -7,64 +7,8 @@ const defaultAppResolver = require('../tools/appResolver');
 const defaultLaunchApp = require('../tools/launchApp');
 const { apps: defaultRegistryApps } = require('../actions/appRegistry');
 const { closeAppProcesses: defaultCloseAppProcesses } = require('../actions/processKiller');
-
-const POLICY = {
-  OBSERVE: 'observe',
-  LOW_RISK: 'low_risk',
-  CONFIRM: 'requires_confirmation',
-  STRONG: 'requires_strong_confirmation',
-};
-
-const ACTION_POLICIES = {
-  'file.search': POLICY.OBSERVE,
-  'file.list_directory': POLICY.OBSERVE,
-  'app.resolve': POLICY.OBSERVE,
-  'window.list': POLICY.OBSERVE,
-
-  'file.open': POLICY.LOW_RISK,
-  'file.reveal': POLICY.LOW_RISK,
-  'window.focus': POLICY.LOW_RISK,
-  'window.restore': POLICY.LOW_RISK,
-
-  'file.create_folder': POLICY.CONFIRM,
-  'file.create_text_file': POLICY.CONFIRM,
-  'file.rename': POLICY.CONFIRM,
-  'file.move': POLICY.CONFIRM,
-  'file.copy': POLICY.CONFIRM,
-  'file.delete': POLICY.CONFIRM,
-  'app.launch': POLICY.CONFIRM,
-  'app.close': POLICY.CONFIRM,
-  'window.close': POLICY.CONFIRM,
-  'window.move': POLICY.CONFIRM,
-  'window.resize': POLICY.CONFIRM,
-  'window.layout': POLICY.CONFIRM,
-
-  'file.permanent_delete': POLICY.STRONG,
-  'file.move_batch': POLICY.STRONG,
-  'file.copy_batch': POLICY.STRONG,
-  'file.rename_batch': POLICY.STRONG,
-  'file.delete_batch': POLICY.STRONG,
-};
-
-const OVERWRITE_CAPABLE_ACTIONS = new Set([
-  'file.create_folder',
-  'file.create_text_file',
-  'file.move',
-  'file.copy',
-]);
-
-function normalizeAction(action) {
-  return String(action || '').trim();
-}
-
-function policyForAction(action, args = {}) {
-  const normalizedAction = normalizeAction(action);
-  const basePolicy = ACTION_POLICIES[normalizedAction] || '';
-  if (basePolicy && args.overwrite === true && OVERWRITE_CAPABLE_ACTIONS.has(normalizedAction)) {
-    return POLICY.STRONG;
-  }
-  return basePolicy;
-}
+const { POLICY, ACTION_POLICIES, normalizeAction, policyForAction } = require('./toolPolicy');
+const { validateActionArgs } = require('./toolSchemas');
 
 function normalizePath(inputPath, options = {}) {
   const raw = String(inputPath || '').trim();
@@ -94,13 +38,7 @@ function validateToolRequest(request) {
   const action = normalizeAction(request.action);
   if (!action) throw new Error('tool request action is required');
 
-  const args = request.args || {};
-  if (!args || typeof args !== 'object' || Array.isArray(args)) {
-    throw new Error('tool request args must be an object');
-  }
-  if (Object.prototype.hasOwnProperty.call(args, 'overwrite') && typeof args.overwrite !== 'boolean') {
-    throw new Error('overwrite must be a boolean');
-  }
+  const args = validateActionArgs(action, request.args || {});
 
   const policy = policyForAction(action, args);
   if (!policy) throw new Error(`unknown tool action: ${action}`);
@@ -193,10 +131,11 @@ function listDirectory(args, options = {}) {
   return { ok: true, action: 'file.list_directory', policy: POLICY.OBSERVE, path: dir, entries };
 }
 
-function searchFilesForGateway(args, options = {}) {
-  const result = searchFiles({
+async function searchFilesForGateway(args, options = {}) {
+  const result = await searchFiles({
     query: args.query,
     location: args.location || 'computer',
+    targetType: args.targetType || 'any',
   }, {
     ...options,
     maxResults: args.limit || options.maxResults || 20,
@@ -505,7 +444,7 @@ async function executeToolRequest(request, options = {}) {
   }
 
   try {
-    if (action === 'file.search') return searchFilesForGateway(args, options);
+    if (action === 'file.search') return await searchFilesForGateway(args, options);
     if (action === 'file.list_directory') return listDirectory(args, options);
     if (action === 'file.open' || action === 'file.reveal') return await openOrReveal(action, args, options);
     if (action === 'file.create_folder') return createFolder(args, options);

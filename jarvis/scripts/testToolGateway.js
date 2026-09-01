@@ -48,6 +48,7 @@ async function run() {
     locationPath: desktop,
     standardLocations: [{ id: 'desktop', path: desktop }],
     enableDiskScan: false,
+    useEverything: false,
   });
   assert.strictEqual(searched.ok, true);
   assert.strictEqual(searched.results[0].name, 'image.png');

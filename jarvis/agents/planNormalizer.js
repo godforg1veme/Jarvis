@@ -1,4 +1,4 @@
-const { POLICY, policyForAction } = require('./toolGateway');
+const { POLICY, policyForAction } = require('./toolPolicy');
 
 const INTERNAL_ACTION_POLICIES = {
   ask_user: POLICY.OBSERVE,
