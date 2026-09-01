@@ -187,6 +187,7 @@ function parseIntent(rawText) {
       action: actionMap[fileCommand.action],
       query: fileCommand.query,
       location: fileCommand.location,
+      targetType: fileCommand.targetType,
       confidence: 0.9,
       source: "regex",
       rawText

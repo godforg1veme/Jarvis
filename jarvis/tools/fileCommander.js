@@ -44,28 +44,56 @@ function makeCandidate(file, action) {
   };
 }
 
-function notFoundResult(query, location) {
+function targetNouns(targetType) {
+  if (targetType === 'directory') return { title: 'Папка не найдена', subject: 'Папка', missing: 'не найдена' };
+  if (targetType === 'file') return { title: 'Файл не найден', subject: 'Файл', missing: 'не найден' };
+  return { title: 'Файл или папка не найдены', subject: 'Файл или папка', missing: 'не найдены' };
+}
+
+function degradedPrefix(searchResult) {
+  return searchResult && searchResult.degraded
+    ? 'Everything недоступен, выполнен ограниченный поиск. '
+    : '';
+}
+
+function foundLabel(targetType) {
+  if (targetType === 'directory') return 'Найдено папок';
+  if (targetType === 'file') return 'Найдено файлов';
+  return 'Найдено объектов';
+}
+
+function notFoundResult(query, location, targetType, searchResult) {
+  const nouns = targetNouns(targetType);
+  const prefix = degradedPrefix(searchResult);
   return {
     ok: false,
     type: 'file',
-    title: 'Файл не найден',
-    content: `Не нашёл "${query}" в выбранном месте. Можно поискать в стандартных папках или на компьютере.`,
-    message: `Файл ${query} не найден.`,
+    title: nouns.title,
+    content: `${prefix}Не нашёл "${query}" в выбранном месте.`,
+    message: `${prefix}${nouns.subject} ${query} ${nouns.missing} в пределах выполненного поиска.`,
     notFound: true,
-    data: { query, location, results: [] },
+    degraded: !!(searchResult && searchResult.degraded),
+    data: { query, location, targetType, results: [] },
   };
 }
 
-function selectionResult(query, location, action, results) {
+function selectionResult(query, location, action, results, targetType, searchResult) {
+  const prefix = degradedPrefix(searchResult);
+  const selectionTitle = targetType === 'directory'
+    ? 'Выберите папку'
+    : targetType === 'file'
+      ? 'Выберите файл'
+      : 'Выберите файл или папку';
   return {
     ok: false,
     type: 'file',
-    title: 'Выберите файл',
+    title: selectionTitle,
     content: `Нашёл несколько вариантов для "${query}".`,
-    message: 'Нашёл несколько файлов. Выберите нужный в списке.',
+    message: `${prefix}Нашёл несколько вариантов. Выберите нужный в списке.`,
+    degraded: !!(searchResult && searchResult.degraded),
     needsSelection: true,
     candidates: results.map((file) => makeCandidate(file, action)),
-    data: { query, location, action, results },
+    data: { query, location, action, targetType, results },
   };
 }
 
@@ -101,7 +129,11 @@ function shellUnavailableResult(action) {
 }
 
 async function openFile(shell, file) {
-  if (!shell || typeof shell.openPath !== 'function') return shellUnavailableResult('open');
+  if (!shell || typeof shell.openPath !== 'function') {
+    const result = shellUnavailableResult('open');
+    if (file.type === 'directory') result.title = 'Не удалось открыть папку';
+    return result;
+  }
 
   const error = await shell.openPath(file.path);
   if (error) {
@@ -121,6 +153,7 @@ function revealFile(shell, file) {
 async function execute(args = {}, confirmed = false) {
   const action = mapAction(args.action);
   const query = String(args.query || '').trim();
+  const targetType = args.targetType || 'any';
   const options = args._testOptions || {};
   const shell = options.shell || electronShell;
 
@@ -144,31 +177,38 @@ async function execute(args = {}, confirmed = false) {
       searchOptions.enableDiskScan = true;
     }
 
-    searchResult = searchFiles({ query, location: args.location || 'computer' }, searchOptions);
+    searchResult = await searchFiles({
+      query,
+      location: args.location || 'computer',
+      targetType: args.targetType || 'any',
+    }, searchOptions);
     if (!searchResult.ok) {
       return {
         ok: false,
         type: 'file',
-        title: searchResult.reason === 'missing_location' ? 'Папка не найдена' : 'Не удалось найти файл',
-        content: 'Проверьте название папки или попробуйте поиск на компьютере.',
-        message: 'Не удалось найти файл. Проверьте название папки или попробуйте поиск на компьютере.',
+        title: searchResult.reason === 'missing_location' ? 'Папка поиска не найдена' : 'Не удалось выполнить поиск',
+        content: 'Проверьте название и место поиска.',
+        message: 'Не удалось выполнить поиск. Проверьте название и место поиска.',
         error: searchResult.reason,
       };
     }
 
-    if (searchResult.results.length === 0) return notFoundResult(query, args.location || 'computer');
+    if (searchResult.results.length === 0) {
+      return notFoundResult(query, args.location || 'computer', targetType, searchResult);
+    }
     if (action === 'find') {
       return {
         ok: true,
         type: 'file',
-        title: `Найдено файлов: ${searchResult.results.length}`,
+        title: `${foundLabel(targetType)}: ${searchResult.results.length}`,
         content: searchResult.results.map((file, index) => `${index + 1}. ${file.name}\n   ${file.path}`).join('\n'),
-        message: `Найдено файлов: ${searchResult.results.length}.`,
+        message: `${degradedPrefix(searchResult)}${foundLabel(targetType)}: ${searchResult.results.length}.`,
+        degraded: !!searchResult.degraded,
         data: { query, results: searchResult.results },
       };
     }
     if (searchResult.results.length > 1) {
-      return selectionResult(query, args.location || 'computer', action, searchResult.results);
+      return selectionResult(query, args.location || 'computer', action, searchResult.results, targetType, searchResult);
     }
     selectedFile = searchResult.results[0];
   }
@@ -178,9 +218,9 @@ async function execute(args = {}, confirmed = false) {
     return {
       ok: true,
       type: 'file',
-      title: `Найдено файлов: ${results.length}`,
+      title: `${foundLabel(targetType)}: ${results.length}`,
       content: results.map((file, index) => `${index + 1}. ${file.name}\n   ${file.path}`).join('\n'),
-      message: `Найдено файлов: ${results.length}.`,
+      message: `${foundLabel(targetType)}: ${results.length}.`,
       data: { query: query || selectedFile.name, results },
     };
   }
@@ -191,11 +231,16 @@ async function execute(args = {}, confirmed = false) {
     return confirmationResult(selectedFile, action);
   }
 
-  return await openFile(shell, selectedFile);
+  const opened = await openFile(shell, selectedFile);
+  if (searchResult && searchResult.degraded) {
+    opened.degraded = true;
+    opened.message = `${degradedPrefix(searchResult)}${opened.message || ''}`.trim();
+  }
+  return opened;
 }
 
 function getSchema() {
-  return 'fileCommander: открыть/показать/найти файл. Args: { action: "open"|"reveal"|"find", query: string, location?: string, selectedFile?: object }.';
+  return 'fileCommander: открыть/показать/найти файл или папку. Args: { action: "open"|"reveal"|"find", query: string, location?: string, targetType?: "file"|"directory"|"any", selectedFile?: object }.';
 }
 
 module.exports = {
@@ -203,4 +248,5 @@ module.exports = {
   getSchema,
   formatSize,
   mapAction,
+  targetNouns,
 };

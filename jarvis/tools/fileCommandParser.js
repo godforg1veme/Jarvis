@@ -21,10 +21,18 @@ function detectAction(text) {
   return '';
 }
 
+function detectTargetType(text) {
+  if (/(?:^|\s)(папку|папка|папке|директорию|директория|folder|directory)(?:\s|$)/i.test(text)) {
+    return 'directory';
+  }
+  if (/(?:^|\s)(файл|файлик|file)(?:\s|$)/i.test(text)) return 'file';
+  return 'any';
+}
+
 function stripAction(text) {
   return stripWakeWord(text)
     .replace(/^(открой|открыть|покажи|показать|найди|найти|поиск|ищи|open|show|reveal|find|search)\s+/i, '')
-    .replace(/^(файл|файлик|папку|папка|папке|директорию|директория|folder|directory)\s+/i, '')
+    .replace(/^(файл|файлик|папку|папка|папке|директорию|директория|file|folder|directory)\s+/i, '')
     .trim();
 }
 
@@ -34,10 +42,13 @@ function parseFileCommand(rawText) {
   const action = detectAction(withoutWake);
   if (!action) return null;
 
+  const targetType = detectTargetType(withoutWake);
   const location = normalizeLocation(text) || 'computer';
   let query = stripAction(text);
 
   const locationPhrases = [
+    'on desktop',
+    'desktop',
     'на рабочем столе',
     'рабочем столе',
     'рабочий стол',
@@ -70,7 +81,7 @@ function parseFileCommand(rawText) {
   query = query.replace(/\b(в|на)\s*$/i, '').replace(/\s+/g, ' ').trim();
   if (!query) return null;
 
-  return { action, query, location };
+  return { action, query, location, targetType };
 }
 
 function isFileCommand(rawText) {
@@ -80,6 +91,7 @@ function isFileCommand(rawText) {
 module.exports = {
   cleanText,
   stripWakeWord,
+  detectTargetType,
   parseFileCommand,
   isFileCommand,
 };

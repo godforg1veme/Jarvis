@@ -47,7 +47,7 @@ function makeTempTree() {
   return root;
 }
 
-function testSearchAndIndex() {
+async function testSearchAndIndex() {
   const root = makeTempTree();
   const docs = path.join(root, 'Documents');
   const downloads = path.join(root, 'Downloads');
@@ -68,10 +68,11 @@ function testSearchAndIndex() {
   assert.strictEqual(wildcardResults.length, 1);
   assert.strictEqual(wildcardResults[0].name, 'image.png');
 
-  const broadResults = searchFiles({ query: 'setup.exe', location: 'computer' }, {
+  const broadResults = await searchFiles({ query: 'setup.exe', location: 'computer' }, {
     standardLocations: [{ id: 'downloads', path: downloads }],
     indexPath,
     enableDiskScan: false,
+    useEverything: false,
   });
   assert.strictEqual(broadResults.results[0].name, 'setup.exe');
   assert.strictEqual(broadResults.results[0].dangerous, true);
@@ -81,6 +82,39 @@ function testSearchAndIndex() {
   assert.strictEqual(index.files.some((file) => file.name === 'setup.exe'), true);
   const indexed = searchIndex(indexPath, 'setup.exe');
   assert.strictEqual(indexed[0].name, 'setup.exe');
+
+  const desktopPath = path.join(root, 'Desktop');
+  const providerCalls = [];
+  const providerResult = await searchFiles({
+    query: 'проверка',
+    location: 'desktop',
+    targetType: 'directory',
+  }, {
+    locationPath: desktopPath,
+    standardLocations: [{ id: 'desktop', path: desktopPath }],
+    everythingProvider: async (args) => {
+      providerCalls.push(args.exact);
+      return {
+        ok: true,
+        results: [
+          { type: 'directory', name: 'проверка', path: path.join(desktopPath, 'проверка'), score: 0 },
+          { type: 'directory', name: 'проверка', path: path.join(desktopPath, 'nested', 'проверка'), score: 0 },
+        ],
+      };
+    },
+  });
+  assert.deepStrictEqual(providerCalls, [true]);
+  assert.strictEqual(providerResult.provider, 'everything');
+  assert.deepStrictEqual(providerResult.results.map((result) => result.path), [path.join(desktopPath, 'проверка')]);
+
+  const degraded = await searchFiles({ query: 'invoice.pdf', location: 'downloads', targetType: 'file' }, {
+    locationPath: downloads,
+    standardLocations: [{ id: 'downloads', path: downloads }],
+    everythingProvider: async () => ({ ok: false, reason: 'everything_ipc_unavailable', results: [] }),
+  });
+  assert.strictEqual(degraded.degraded, true);
+  assert.strictEqual(degraded.providerFailure, 'everything_ipc_unavailable');
+  assert.strictEqual(degraded.results[0].name, 'invoice.pdf');
 }
 
 function testTextFileCommandParsing() {
@@ -88,26 +122,37 @@ function testTextFileCommandParsing() {
     action: 'open',
     query: 'invoice.pdf',
     location: 'downloads',
+    targetType: 'file',
   });
   assert.deepStrictEqual(parseFileCommand('покажи config.json в документах'), {
     action: 'reveal',
     query: 'config.json',
     location: 'documents',
+    targetType: 'any',
   });
   assert.deepStrictEqual(parseFileCommand('найди setup.exe на компьютере'), {
     action: 'find',
     query: 'setup.exe',
     location: 'computer',
+    targetType: 'any',
   });
   assert.deepStrictEqual(parseFileCommand('джарвис открой файл vscode.bat на рабочем столе'), {
     action: 'open',
     query: 'vscode.bat',
     location: 'desktop',
+    targetType: 'file',
   });
   assert.deepStrictEqual(parseFileCommand('джарвис открой папку "проверка" на рабочем столе'), {
     action: 'open',
     query: 'проверка',
     location: 'desktop',
+    targetType: 'directory',
+  });
+  assert.deepStrictEqual(parseFileCommand('open directory Project on desktop'), {
+    action: 'open',
+    query: 'project',
+    location: 'desktop',
+    targetType: 'directory',
   });
 }
 
@@ -124,6 +169,7 @@ async function testFileCommander() {
       locationPath: downloads,
       standardLocations: [{ id: 'downloads', path: downloads }],
       enableDiskScan: false,
+      useEverything: false,
       shell: { openPath: async () => '', showItemInFolder: () => {} },
     },
   });
@@ -139,6 +185,7 @@ async function testFileCommander() {
       locationPath: downloads,
       standardLocations: [{ id: 'downloads', path: downloads }],
       enableDiskScan: false,
+      useEverything: false,
       shell: { openPath: async () => '', showItemInFolder: () => {} },
     },
   });
@@ -168,10 +215,12 @@ async function testFileCommander() {
     action: 'open',
     query: 'проверка',
     location: 'desktop',
+    targetType: 'directory',
     _testOptions: {
       locationPath: desktop,
       standardLocations: [{ id: 'desktop', path: desktop }],
       enableDiskScan: false,
+      useEverything: false,
       shell: {
         openPath: async (target) => {
           opened.push(target);
@@ -184,6 +233,20 @@ async function testFileCommander() {
   assert.strictEqual(folderResult.ok, true);
   assert.strictEqual(folderResult.data.type, 'directory');
   assert.strictEqual(opened[0], path.join(desktop, 'проверка'));
+
+  const missingFolder = await fileCommander.execute({
+    action: 'open',
+    query: 'отсутствует',
+    location: 'desktop',
+    targetType: 'directory',
+    _testOptions: {
+      locationPath: desktop,
+      standardLocations: [{ id: 'desktop', path: desktop }],
+      useEverything: false,
+      shell: { openPath: async () => '', showItemInFolder: () => {} },
+    },
+  });
+  assert.strictEqual(missingFolder.title, 'Папка не найдена');
 }
 
 function testVoiceFileIntentParsing() {
@@ -209,12 +272,15 @@ function testVoiceFileIntentParsing() {
   assert.strictEqual(folderIntent.action, 'open_file');
   assert.strictEqual(folderIntent.query, 'проверка');
   assert.strictEqual(folderIntent.location, 'desktop');
+  assert.strictEqual(folderIntent.targetType, 'directory');
+  assert.strictEqual(openIntent.targetType, 'file');
+  assert.strictEqual(revealIntent.targetType, 'any');
 }
 
 async function run() {
   testLocations();
   testSafety();
-  testSearchAndIndex();
+  await testSearchAndIndex();
   testTextFileCommandParsing();
   await testFileCommander();
   testVoiceFileIntentParsing();

@@ -177,6 +177,7 @@ async function executeIntent(intent, options = {}) {
       action: actionMap[intent.action],
       query: intent.query,
       location: intent.location,
+      targetType: intent.targetType || "any",
       source: "voice",
     });
 
