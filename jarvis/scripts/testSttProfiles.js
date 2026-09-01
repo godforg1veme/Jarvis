@@ -1,5 +1,5 @@
 const assert = require('assert');
-const { resolvePerformanceProfile } = require('../voice/sttSettings');
+const { resolvePerformanceProfile, validateSttSettings } = require('../voice/sttSettings');
 
 const quality = resolvePerformanceProfile({ performanceProfile: 'quality', beamSize: 1, vadFilter: false });
 assert.strictEqual(quality.beamSize, 5);
@@ -25,6 +25,22 @@ assert.throws(
 assert.throws(
   () => resolvePerformanceProfile({ performanceProfile: 'custom', beamSize: 2, vadFilter: 'yes' }),
   /vadFilter/,
+);
+assert.throws(
+  () => validateSttSettings({ fasterWhisper: { startRms: 0.9 } }),
+  /startRms/,
+);
+assert.throws(
+  () => validateSttSettings({ advisor: { allowAudio: 'yes' } }),
+  /allowAudio/,
+);
+assert.throws(
+  () => validateSttSettings({ fasterWhisper: { maxNoSpeechProb: 1.1 } }),
+  /maxNoSpeechProb/,
+);
+assert.throws(
+  () => validateSttSettings({ fasterWhisper: { minAvgLogProb: 0.1 } }),
+  /minAvgLogProb/,
 );
 
 console.log('[test] STT performance profiles OK');

@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld('jarvis', {
   addApp: (args) => ipcRenderer.invoke('add-app', args),
   getSettings: () => ipcRenderer.invoke('get-settings'),
   addScanRoot: (path) => ipcRenderer.invoke('add-scan-root', { path }),
+  openVoiceLab: () => ipcRenderer.invoke('voice-lab:open'),
 
   // Hide window (after app launch)
   hideWindow: () => ipcRenderer.invoke('hide-window'),

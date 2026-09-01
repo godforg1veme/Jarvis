@@ -232,6 +232,15 @@ const voiceStartBtn = document.getElementById('voice-start-btn');
 const voiceStopBtn = document.getElementById('voice-stop-btn');
 const voiceToggleBtn = document.getElementById('voice-toggle-btn');
 const voiceDebugToggle = document.getElementById('voice-debug-toggle');
+const voiceLabButton = document.getElementById('voice-lab-button');
+
+if (voiceLabButton) {
+  voiceLabButton.addEventListener('click', async () => {
+    if (window.jarvis?.openVoiceLab) {
+      await window.jarvis.openVoiceLab();
+    }
+  });
+}
 
 function setVoiceToggleState({ enabled = false, busy = false } = {}) {
   if (!voiceToggleBtn) return;
@@ -877,13 +886,20 @@ function parseFileCommandForRenderer(rawText) {
   else if (/^(открой|открыть|open)(\s|$)/.test(withoutWake)) action = 'open';
   if (!action) return null;
 
+  const targetType = /(?:^|\s)(папку|папка|папке|директорию|директория|folder|directory)(?:\s|$)/i.test(withoutWake)
+    ? 'directory'
+    : /(?:^|\s)(файл|файлик|file)(?:\s|$)/i.test(withoutWake)
+      ? 'file'
+      : 'any';
   const location = normalizeFileLocation(text) || 'computer';
   let query = stripFileWakeWord(text)
     .replace(/^(открой|открыть|покажи|показать|найди|найти|поиск|ищи|open|show|reveal|find|search)\s+/i, '')
-    .replace(/^файл\s+/i, '')
+    .replace(/^(файл|файлик|папку|папка|папке|директорию|директория|file|folder|directory)\s+/i, '')
     .trim();
 
   [
+    'on desktop',
+    'desktop',
     'на рабочем столе',
     'рабочем столе',
     'рабочий стол',
@@ -914,7 +930,7 @@ function parseFileCommandForRenderer(rawText) {
   query = query.replace(/\b(в|на)\s*$/i, '').replace(/\s+/g, ' ').trim();
   if (!query) return null;
 
-  return { action, query, location };
+  return { action, query, location, targetType };
 }
 
 function stripAgentPrefixForRenderer(input) {

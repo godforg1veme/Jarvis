@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self';">
+  <title>Jarvis Voice Lab</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="voice-lab">
+    <header class="lab-header">
+      <div>
+        <span class="eyebrow">JARVIS / VOICE LAB</span>
+        <h1>Настройка голоса</h1>
+        <p class="subtitle">Микшер, калибровка и обратимый тест профиля</p>
+      </div>
+      <div class="header-actions">
+        <span id="runtime-state" class="status-chip">Подключение…</span>
+        <button id="close-button" class="icon-button" type="button" title="Закрыть">×</button>
+      </div>
+    </header>
+
+    <main class="lab-content">
+      <section class="hero-panel">
+        <div class="hero-topline">
+          <div>
+            <span class="field-label">Активный профиль</span>
+            <div class="profile-row">
+              <select id="profile-select" aria-label="Активный профиль"></select>
+              <input id="profile-name" type="text" maxlength="80" placeholder="Название нового профиля">
+            </div>
+          </div>
+          <div class="hero-actions">
+            <button id="calibrate-button" class="primary-button" type="button">Автокалибровка</button>
+            <button id="apply-button" class="secondary-button" type="button">Применить временно</button>
+          </div>
+        </div>
+
+        <div class="signal-grid">
+          <div class="signal-card">
+            <div class="signal-card-top"><span>Текущий сигнал</span><strong id="signal-state">Нет данных</strong></div>
+            <div class="level-track"><div id="signal-level" class="level-fill"></div></div>
+            <div class="metric-row"><span>RMS</span><strong id="signal-rms">0.000</strong></div>
+          </div>
+          <div class="signal-card">
+            <div class="signal-card-top"><span>Шумовой фон</span><strong id="quality-state">Нет данных</strong></div>
+            <div class="level-track noise-track"><div id="noise-level" class="level-fill"></div></div>
+            <div class="metric-row"><span>SNR</span><strong id="snr-value">0 дБ</strong></div>
+          </div>
+          <div class="signal-card compact-card">
+            <span class="field-label">Gemini</span>
+            <strong id="gemini-state">Локальный режим</strong>
+            <small id="gemini-detail">Аудио не отправляется</small>
+          </div>
+        </div>
+      </section>
+
+      <div class="content-grid">
+        <section class="panel">
+          <div class="panel-heading">
+            <div><span class="eyebrow">MIXER</span><h2>Быстрая настройка</h2></div>
+            <span class="panel-hint">Изменения применяются после кнопки</span>
+          </div>
+          <div class="control-list">
+            <div class="range-control">
+              <div class="control-label"><label for="q-start-rms">Порог начала речи</label><output id="q-start-rms-value" for="q-start-rms">0.022</output></div>
+              <div class="range-row"><input id="q-start-rms" data-path="fasterWhisper.startRms" type="range" min="0.001" max="0.1" step="0.001"><input id="q-start-rms-number" data-pair="q-start-rms" type="number" min="0.001" max="0.1" step="0.001"></div>
+              <small>Поднимите, если Jarvis реагирует на вентилятор или клавиатуру.</small>
+            </div>
+            <div class="range-control">
+              <div class="control-label"><label for="q-continue-rms">Порог продолжения</label><output id="q-continue-rms-value" for="q-continue-rms">0.012</output></div>
+              <div class="range-row"><input id="q-continue-rms" data-path="fasterWhisper.continueRms" type="range" min="0.0005" max="0.08" step="0.001"><input id="q-continue-rms-number" data-pair="q-continue-rms" type="number" min="0.0005" max="0.08" step="0.001"></div>
+              <small>Нижний порог, который удерживает фразу между словами.</small>
+            </div>
+            <div class="range-control">
+              <div class="control-label"><label for="q-silence-ms">Пауза завершения</label><output id="q-silence-ms-value" for="q-silence-ms">900 мс</output></div>
+              <div class="range-row"><input id="q-silence-ms" data-path="fasterWhisper.silenceMs" type="range" min="200" max="3000" step="50"><input id="q-silence-ms-number" data-pair="q-silence-ms" type="number" min="200" max="5000" step="50"></div>
+              <small>Больше — меньше обрывов, меньше — быстрее ответ.</small>
+            </div>
+            <div class="range-control">
+              <div class="control-label"><label for="q-pre-roll-ms">Захват начала фразы</label><output id="q-pre-roll-ms-value" for="q-pre-roll-ms">300 мс</output></div>
+              <div class="range-row"><input id="q-pre-roll-ms" data-path="fasterWhisper.preRollMs" type="range" min="0" max="1000" step="25"><input id="q-pre-roll-ms-number" data-pair="q-pre-roll-ms" type="number" min="0" max="2000" step="25"></div>
+              <small>Увеличьте, если теряется первое слово.</small>
+            </div>
+            <div class="range-control">
+              <div class="control-label"><label for="q-min-speech-ms">Минимум речи</label><output id="q-min-speech-ms-value" for="q-min-speech-ms">600 мс</output></div>
+              <div class="range-row"><input id="q-min-speech-ms" data-path="fasterWhisper.minSpeechMs" type="range" min="100" max="2000" step="50"><input id="q-min-speech-ms-number" data-pair="q-min-speech-ms" type="number" min="100" max="5000" step="50"></div>
+              <small>Защищает от коротких ложных срабатываний.</small>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel calibration-panel">
+          <div class="panel-heading">
+            <div><span class="eyebrow">CALIBRATION</span><h2>Мастер калибровки</h2></div>
+            <span id="calibration-badge" class="status-chip">Готов</span>
+          </div>
+          <ol id="calibration-steps" class="steps">
+            <li data-step="quiet"><span>1</span><div><strong>Тишина</strong><small>Измерить фон комнаты</small></div></li>
+            <li data-step="speech"><span>2</span><div><strong>Обычная речь</strong><small>Произнести 3–5 команд</small></div></li>
+            <li data-step="complete"><span>3</span><div><strong>Проверка</strong><small>Протестировать кандидат</small></div></li>
+          </ol>
+          <p id="calibration-message" class="callout">Нажмите «Автокалибровка», затем следуйте подсказкам.</p>
+          <button id="calibration-action" class="secondary-button full-button" type="button">Начать калибровку</button>
+          <button id="test-button" class="ghost-button full-button" type="button">Тестировать текущий профиль</button>
+        </section>
+      </div>
+
+      <details id="advanced-panel" class="panel advanced-panel">
+        <summary><span><span class="eyebrow">ADVANCED</span><strong>Расширенный микшер</strong></span><span class="summary-hint">Микрофон · VAD · Whisper · Gemini</span></summary>
+        <div class="advanced-grid">
+          <section class="settings-group">
+            <h3>Микрофон и захват</h3>
+            <label class="field"><span>Device ID <small>оставьте пустым для системного</small></span><input id="capture-device-id" type="text" maxlength="512"></label>
+            <label class="toggle-field"><span>Echo cancellation</span><input id="capture-echo" type="checkbox"></label>
+            <label class="toggle-field"><span>Noise suppression</span><input id="capture-noise" type="checkbox"></label>
+            <label class="toggle-field"><span>Auto gain control</span><input id="capture-agc" type="checkbox"></label>
+          </section>
+          <section class="settings-group">
+            <h3>Faster Whisper</h3>
+            <label class="field"><span>Модель</span><input id="fw-model" type="text" maxlength="100"></label>
+            <label class="field"><span>Устройство</span><select id="fw-device"><option value="cuda">CUDA</option><option value="cpu">CPU</option><option value="auto">Auto</option></select></label>
+            <label class="field"><span>Compute type</span><input id="fw-compute" type="text" maxlength="40"></label>
+            <label class="field"><span>Язык</span><input id="fw-language" type="text" maxlength="12"></label>
+            <label class="field"><span>Performance profile</span><select id="fw-performance"><option value="quality">Quality</option><option value="efficient">Efficient</option><option value="custom">Custom</option></select></label>
+            <label class="range-control compact-range"><div class="control-label"><span>Beam size</span><output id="fw-beam-value">5</output></div><input id="fw-beam" type="range" min="1" max="10" step="1"></label>
+            <label class="toggle-field"><span>Faster Whisper VAD</span><input id="fw-vad" type="checkbox"></label>
+          </section>
+          <section class="settings-group wide-group">
+            <h3>Подсказки распознавателю</h3>
+            <label class="field"><span>Initial prompt</span><textarea id="fw-prompt" maxlength="2000" rows="4"></textarea></label>
+            <label class="field"><span>Hotwords <small>слова через пробел</small></span><textarea id="fw-hotwords" maxlength="2000" rows="3"></textarea></label>
+          </section>
+          <section class="settings-group">
+            <h3>Gemini advisor</h3>
+            <label class="field"><span>Режим</span><select id="advisor-mode"><option value="off">Выключен</option><option value="problems-only">Только при проблемах</option><option value="manual">Только вручную</option></select></label>
+            <label class="field"><span>Минимум образцов</span><input id="advisor-samples" type="number" min="5" max="200" step="1"></label>
+            <label class="field"><span>Пауза между анализами, мин.</span><input id="advisor-cooldown" type="number" min="1" max="1440" step="1"></label>
+            <label class="toggle-field"><span>Разрешить отправку аудио</span><input id="advisor-audio" type="checkbox"></label>
+            <small class="privacy-note">Автоматический режим отправляет только числовые метрики. Аудио уходит только после явного запуска глубокого анализа.</small>
+          </section>
+        </div>
+      </details>
+
+      <section class="panel advisor-panel">
+        <div class="panel-heading">
+          <div><span class="eyebrow">ADVISOR</span><h2>Анализ качества</h2></div>
+          <span id="audio-buffer-state" class="status-chip">Аудио не сохраняется</span>
+        </div>
+        <div class="advisor-actions">
+          <button id="gemini-metrics-button" class="secondary-button" type="button">Анализировать метрики</button>
+          <button id="gemini-deep-button" class="ghost-button" type="button">Глубокий анализ аудио</button>
+          <button id="save-button" class="primary-button" type="button">Сохранить профиль</button>
+          <button id="revert-button" class="ghost-button" type="button">Отменить изменения</button>
+        </div>
+        <p id="advisor-message" class="callout">Gemini подключается только при наличии GEMINI_API_KEY.</p>
+      </section>
+    </main>
+
+    <footer id="lab-status" class="lab-status" aria-live="polite">Готово</footer>
+  </div>
+  <script src="renderer.js"></script>
+</body>
+</html>

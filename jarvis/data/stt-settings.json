@@ -1,6 +1,20 @@
 {
   "provider": "faster-whisper",
   "readyTimeoutMs": 90000,
+  "capture": {
+    "deviceId": "",
+    "channelCount": 1,
+    "echoCancellation": true,
+    "noiseSuppression": true,
+    "autoGainControl": false
+  },
+  "advisor": {
+    "mode": "problems-only",
+    "minSamples": 20,
+    "cooldownMs": 1800000,
+    "allowAudio": false,
+    "model": "gemini-2.5-flash-lite"
+  },
   "fasterWhisper": {
     "model": "large-v3",
     "device": "cuda",
@@ -15,8 +29,10 @@
     "startRms": 0.022,
     "continueRms": 0.012,
     "preRollMs": 300,
-    "initialPrompt": "Голосовые команды Jarvis на русском: джарвис, открой, запусти, включи, выключи, найди, покажи, переведи, файл, папка, браузер, дота, стим.",
-    "hotwords": "джарвис открой запусти включи выключи найди покажи переведи файл папка браузер дота стим"
+    "maxNoSpeechProb": 0.6,
+    "minAvgLogProb": -1.0,
+    "initialPrompt": "Голосовые команды Jarvis на русском: джарвис, открой, запусти, включи, выключи, найди, покажи, переведи, файл, папка, браузер.",
+    "hotwords": "джарвис открой запусти включи выключи найди покажи переведи файл папка браузер"
   },
   "vosk": {
     "modelDir": "models/vosk-model-small-ru-0.22"

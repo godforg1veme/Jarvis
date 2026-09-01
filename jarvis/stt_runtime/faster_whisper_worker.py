@@ -105,6 +105,8 @@ class FasterWhisperStream:
         self.pre_roll_ms = float(settings.get("preRollMs", 300))
         self.start_rms = float(settings.get("startRms", 0.012))
         self.continue_rms = float(settings.get("continueRms", 0.006))
+        self.max_no_speech_prob = float(settings.get("maxNoSpeechProb", 0.6))
+        self.min_avg_logprob = float(settings.get("minAvgLogProb", -1.0))
 
     def load(self):
         add_cuda_dll_directories()
@@ -184,22 +186,48 @@ class FasterWhisperStream:
 
     def finalize_segment(self):
         pcm_bytes = b"".join(self.audio_chunks)
+        segment_metrics = {
+            "totalMs": self.total_ms,
+            "speechMs": self.speech_ms,
+            "silenceMs": self.silence_ms,
+            "audioDurationMs": pcm_duration_ms(pcm_bytes),
+        }
         self.reset_segment()
         if pcm_duration_ms(pcm_bytes) < self.min_speech_ms:
+            segment_metrics["resultEmpty"] = True
+            send({"type": "metrics", "metrics": segment_metrics})
             return
 
         try:
-            text = self.transcribe(pcm_bytes)
+            transcription = self.transcribe(pcm_bytes)
         except Exception as exc:
+            segment_metrics["resultEmpty"] = True
+            send({"type": "metrics", "metrics": segment_metrics})
             send({"type": "error", "message": f"faster-whisper transcription failed: {exc}"})
             log(f"transcription failed: {exc}")
             return
 
+        segment_metrics.update(transcription["metrics"])
+        text = transcription["text"]
+        segment_metrics["resultEmpty"] = not bool(text)
+        send({"type": "metrics", "metrics": segment_metrics})
         if text:
             send({
                 "type": "final",
                 "text": text,
             })
+
+    def is_confident_segment(self, segment):
+        text = getattr(segment, "text", "")
+        no_speech_prob = getattr(segment, "no_speech_prob", None)
+        avg_logprob = getattr(segment, "avg_logprob", None)
+        if not isinstance(text, str) or not text.strip():
+            return False
+        if not isinstance(no_speech_prob, (int, float)) or not math.isfinite(no_speech_prob):
+            return False
+        if not isinstance(avg_logprob, (int, float)) or not math.isfinite(avg_logprob):
+            return False
+        return no_speech_prob <= self.max_no_speech_prob and avg_logprob >= self.min_avg_logprob
 
     def transcribe(self, pcm_bytes):
         audio = pcm_to_float32(pcm_bytes)
@@ -220,8 +248,23 @@ class FasterWhisperStream:
             kwargs["hotwords"] = hotwords
 
         segments, _info = self.model.transcribe(audio, **kwargs)
-        parts = [segment.text.strip() for segment in segments if segment.text and segment.text.strip()]
-        return " ".join(parts).strip()
+        parts = []
+        accepted_segments = 0
+        rejected_segments = 0
+        for segment in segments:
+            if self.is_confident_segment(segment):
+                parts.append(segment.text.strip())
+                accepted_segments += 1
+            else:
+                rejected_segments += 1
+        return {
+            "text": " ".join(parts).strip(),
+            "metrics": {
+                "acceptedSegments": accepted_segments,
+                "rejectedSegments": rejected_segments,
+                "qualityRejected": accepted_segments == 0 and rejected_segments > 0,
+            },
+        }
 
     def stop(self):
         if self.recording and self.audio_chunks:

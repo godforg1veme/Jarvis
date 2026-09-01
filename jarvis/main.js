@@ -14,6 +14,8 @@ const appIndexer = require('./tools/appIndexer');
 const { AppRecoveryService } = require('./tools/appRecoveryService');
 const { setupVoiceIpc } = require('./voice/voiceIpc');
 const { VoiceService } = require('./voice/voiceService');
+const { VoiceLabController } = require('./voice/voiceLabController');
+const { setupVoiceLabIpc } = require('./voice/voiceLabIpc');
 const { buildTrayMenuTemplate } = require('./trayMenu');
 const { createTrayIcon } = require('./trayIcon');
 const { translateSelectedText } = require('./tools/selectedTextTranslator');
@@ -41,9 +43,11 @@ if (process.platform === 'win32') {
 let mainWindow = null;
 let voiceOverlayWindow = null;
 let transcriptionBarWindow = null;
+let voiceLabWindow = null;
 let showTranscriptionBar = true;
 let tray = null;
 let voiceService = null;
+let voiceLabController = null;
 let desktopAgentClient = null;
 let activeAgentTaskId = null;
 let lastExternalForegroundHwnd = null;
@@ -646,6 +650,49 @@ function createTranscriptionBarWindow() {
   });
 }
 
+function openVoiceLab() {
+  if (voiceLabWindow && !voiceLabWindow.isDestroyed()) {
+    voiceLabWindow.show();
+    voiceLabWindow.focus();
+    return;
+  }
+
+  voiceLabWindow = new BrowserWindow({
+    width: 1020,
+    height: 760,
+    minWidth: 860,
+    minHeight: 620,
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: true,
+    backgroundThrottling: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'voice', 'voiceLabPreload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  });
+
+  voiceLabWindow.loadFile(path.join(__dirname, 'renderer', 'voice-lab', 'index.html'));
+  voiceLabWindow.once('ready-to-show', () => {
+    if (voiceLabWindow && !voiceLabWindow.isDestroyed()) {
+      voiceLabWindow.show();
+      voiceLabWindow.focus();
+    }
+  });
+  voiceLabWindow.on('close', (event) => {
+    if (!app.isQuitting) {
+      event.preventDefault();
+      voiceLabWindow.hide();
+    }
+  });
+  voiceLabWindow.on('closed', () => {
+    voiceLabWindow = null;
+  });
+}
+
 // --- Toggle Window ---
 async function showMainWindow() {
   await rememberExternalForegroundWindow();
@@ -697,6 +744,9 @@ function shutdownApp() {
   }
   if (transcriptionBarWindow && !transcriptionBarWindow.isDestroyed()) {
     transcriptionBarWindow.close();
+  }
+  if (voiceLabWindow && !voiceLabWindow.isDestroyed()) {
+    voiceLabWindow.close();
   }
   app.quit();
 }
@@ -761,6 +811,15 @@ app.whenReady().then(() => {
     },
   });
   voiceService.registerIpcHandlers();
+  voiceLabController = new VoiceLabController({ voiceService });
+  setupVoiceLabIpc(voiceLabController, {
+    isAllowedSender: (event) => Boolean(
+      voiceLabWindow
+      && !voiceLabWindow.isDestroyed()
+      && voiceLabWindow.webContents
+      && event?.sender?.id === voiceLabWindow.webContents.id,
+    ),
+  });
 
   // --- Create main window (always, but hidden if --hidden) ---
   createWindow();
@@ -794,6 +853,18 @@ app.whenReady().then(() => {
   const ALLOWED_TOOLS = ['runProgram', 'powershell', 'searchFiles', 'sysinfo', 'fileCommander'];
 
   // --- IPC Handlers ---
+  ipcMain.handle('voice-lab:open', (event) => {
+    if (!isTrustedMainRenderer(event)) return { ok: false, error: 'Voice Lab access denied.' };
+    openVoiceLab();
+    return { ok: true };
+  });
+  ipcMain.handle('voice-lab:close', (event) => {
+    if (!voiceLabWindow || event?.sender?.id !== voiceLabWindow.webContents.id) {
+      return { ok: false, error: 'Voice Lab access denied.' };
+    }
+    voiceLabWindow.hide();
+    return { ok: true };
+  });
   ipcMain.handle('execute-tool', async (event, { tool, args }) => {
     if (!ALLOWED_TOOLS.includes(tool)) {
       return { ok: false, type: 'error', title: 'Ошибка', content: `Неизвестный инструмент: ${tool}` };
@@ -1098,6 +1169,10 @@ app.on('before-quit', () => {
   if (voiceService) {
     voiceService.shutdown();
     voiceService = null;
+  }
+  if (voiceLabWindow && !voiceLabWindow.isDestroyed()) {
+    voiceLabWindow.destroy();
+    voiceLabWindow = null;
   }
   if (desktopAgentClient) {
     desktopAgentClient.stop();

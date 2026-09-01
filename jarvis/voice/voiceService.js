@@ -37,8 +37,13 @@ class VoiceService {
     this.ttsService = options.ttsService || defaultTtsService;
     this.intentOptions = options.intentOptions || {};
     this.sttSettings = options.sttSettings || getSttSettings();
+    this.workerSettingsPath = sttSettingsPath();
     this.activeSttProvider = null;
     this.sttInputWriter = null;
+    this.voiceLabController = null;
+    this.recentPcmChunks = [];
+    this.recentPcmBytes = 0;
+    this.maxRecentPcmBytes = 640000;
     this.pendingVoiceConfirmation = null;
     this.pendingVoiceSelection = null;
     this.pendingVoiceRecovery = null;
@@ -47,6 +52,40 @@ class VoiceService {
   }
 
   get isVoiceEnabled() { return this._voiceEnabled; }
+
+  setVoiceLabController(controller) {
+    this.voiceLabController = controller || null;
+  }
+
+  broadcastVoiceLab(type, payload = {}) {
+    for (const win of BrowserWindow.getAllWindows()) {
+      try {
+        if (win.webContents && !win.webContents.isDestroyed()) {
+          win.webContents.send('voice-lab:event', { type, ...payload });
+        }
+      } catch (e) {}
+    }
+  }
+
+  _rememberRecentPcm(pcmBuffer) {
+    if (!Buffer.isBuffer(pcmBuffer) || pcmBuffer.length === 0) return;
+    const copy = Buffer.from(pcmBuffer);
+    this.recentPcmChunks.push(copy);
+    this.recentPcmBytes += copy.length;
+    while (this.recentPcmBytes > this.maxRecentPcmBytes && this.recentPcmChunks.length > 0) {
+      const removed = this.recentPcmChunks.shift();
+      this.recentPcmBytes -= removed.length;
+    }
+  }
+
+  getRecentPcm() {
+    return this.recentPcmChunks.length ? Buffer.concat(this.recentPcmChunks) : Buffer.alloc(0);
+  }
+
+  clearRecentPcm() {
+    this.recentPcmChunks = [];
+    this.recentPcmBytes = 0;
+  }
 
   notifyStateChange() {
     if (!this.onStateChange) return;
@@ -92,7 +131,7 @@ class VoiceService {
         args: [
           path.join(__dirname, '..', 'stt_runtime', 'faster_whisper_worker.py'),
           '--settings',
-          sttSettingsPath(),
+          this.workerSettingsPath || sttSettingsPath(),
         ],
         cwd: path.join(__dirname, '..'),
         readyTimeoutMs: Number(this.sttSettings.readyTimeoutMs || 90000),
@@ -144,6 +183,7 @@ class VoiceService {
     this.sttInputWriter = new SttInputWriter(this.workerProcess.stdin, {
       onRecovered: (dropped) => {
         console.warn(`[voiceService] STT input recovered after dropping ${dropped} PCM block(s).`);
+        this.voiceLabController?.onInputDrop(dropped);
       },
     });
 
@@ -173,6 +213,7 @@ class VoiceService {
       this.workerProcess = null;
       this.workerReady = false;
       if (!this.stopRequested && code !== 0) {
+        this.voiceLabController?.onWorkerError('worker exited with code ' + (code || 'unknown'));
         console.log(`[voiceService] Worker exited (code=${code}). Auto-restarting in 3s...`);
         setTimeout(() => {
           if (this._voiceEnabled && !this.stopRequested && gen === this._workerGeneration) {
@@ -184,6 +225,7 @@ class VoiceService {
 
     this.workerProcess.on('error', (err) => {
       this._clearReadyTimeout();
+      this.voiceLabController?.onWorkerError(err.message);
       console.error('[voiceService] Worker error:', err);
       this._resetSttInputWriter();
       this.workerProcess = null;
@@ -204,11 +246,12 @@ class VoiceService {
     this.stopRequested = true;
     this._clearReadyTimeout();
     if (this.workerProcess) {
+      const processToStop = this.workerProcess;
       try {
         if (this.sttInputWriter) this.sttInputWriter.writeControl({ type: 'stop' });
         this._resetSttInputWriter();
         setTimeout(() => {
-          if (this.workerProcess) { try { this.workerProcess.kill(); } catch (e) {} }
+          if (this.workerProcess === processToStop) { try { processToStop.kill(); } catch (e) {} }
         }, 2000);
       } catch (e) {}
     } else {
@@ -218,12 +261,42 @@ class VoiceService {
   }
 
   sendPcmToWorker(pcmBuffer) {
-    if (!this.workerProcess || !this.workerReady || !this.sttInputWriter) return;
     try {
-      this.sttInputWriter.writePcm(pcmBuffer);
+      const buffer = Buffer.isBuffer(pcmBuffer) ? pcmBuffer : Buffer.from(pcmBuffer);
+      if (this.voiceLabController) {
+        this.voiceLabController.onPcm(buffer, this.sttSettings);
+        if (this.voiceLabController.shouldBufferAudio()) this._rememberRecentPcm(buffer);
+      }
+      if (!this.workerProcess || !this.workerReady || !this.sttInputWriter) return;
+      this.sttInputWriter.writePcm(buffer);
     } catch (error) {
       console.error('[voiceService] Invalid PCM block:', error.message);
     }
+  }
+
+  async restartForSettings(settings, settingsPath = sttSettingsPath()) {
+    this.sttSettings = settings;
+    this.workerSettingsPath = settingsPath;
+    if (!this._voiceEnabled) return { ok: true, restarted: false };
+
+    this.stopAudioCapture();
+    const processToStop = this.workerProcess;
+    this.stopWorker();
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    if (this.workerProcess === processToStop && processToStop) {
+      try { processToStop.kill(); } catch (e) {}
+      this.workerProcess = null;
+      this.workerReady = false;
+      this._workerGeneration += 1;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+
+    const started = this.startWorker();
+    if (!started) return { ok: false, restarted: true, error: 'Не удалось перезапустить STT worker.' };
+    this.createAudioCaptureWindow();
+    this.startAudioCapture();
+    this._scheduleAudioCaptureStart();
+    return { ok: true, restarted: true };
   }
 
   // --- Message handling ---
@@ -244,8 +317,20 @@ class VoiceService {
       }
       return;
     }
-    if (msg.type === 'final') { this._handleFinalResult(msg.text); return; }
-    if (msg.type === 'error') { this.broadcastStatus('error', msg.message || 'Worker error'); return; }
+    if (msg.type === 'metrics') {
+      this.voiceLabController?.onWorkerMetrics(msg.metrics || {});
+      return;
+    }
+    if (msg.type === 'final') {
+      this.voiceLabController?.onFinalResult(msg.text);
+      this._handleFinalResult(msg.text);
+      return;
+    }
+    if (msg.type === 'error') {
+      this.voiceLabController?.onWorkerError(msg.message);
+      this.broadcastStatus('error', msg.message || 'Worker error');
+      return;
+    }
     if (msg.type === 'stopped') { this.broadcastStatus('stopped', 'Voice worker stopped.'); return; }
   }
 
@@ -768,7 +853,10 @@ class VoiceService {
     }
 
     try {
-      win.webContents.send('voice:audio-capture-command', 'start');
+      win.webContents.send('voice:audio-capture-command', {
+        command: 'start',
+        settings: this.sttSettings.capture || {},
+      });
       this.audioCaptureStarted = true;
     } catch (e) {
       this.audioCaptureStarted = false;
@@ -821,6 +909,7 @@ class VoiceService {
     this.stopAudioCapture();
     this.stopWorker();
     this.destroyAudioCaptureWindow();
+    this.clearRecentPcm();
     this.pendingAgentInput = null;
     this.pendingAgentConfirmation = null;
     this.pendingVoiceRecovery = null;
@@ -839,6 +928,7 @@ class VoiceService {
     this.stopAudioCapture();
     this.stopWorker();
     this.destroyAudioCaptureWindow();
+    this.clearRecentPcm();
     this.pendingAgentInput = null;
     this.pendingAgentConfirmation = null;
     this.pendingVoiceRecovery = null;

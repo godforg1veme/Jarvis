@@ -10,6 +10,12 @@ let captureRequested = false;
 let captureGeneration = 0;
 let retryTimer = null;
 let captureBackend = null;
+let captureSettings = {
+  channelCount: 1,
+  echoCancellation: true,
+  noiseSuppression: true,
+  autoGainControl: false,
+};
 
 function downsample(buffer, sourceRate, targetRate) {
   if (sourceRate === targetRate) return buffer;
@@ -114,7 +120,7 @@ function releaseAudioResources() {
   }
 }
 
-async function startCapture() {
+async function startCapture(nextSettings = {}) {
   captureRequested = true;
   if (isCapturing || isStarting) return;
   if (!window.jarvisAudioCapture) {
@@ -125,12 +131,19 @@ async function startCapture() {
   const generation = ++captureGeneration;
   isStarting = true;
   try {
+    captureSettings = {
+      ...captureSettings,
+      ...(nextSettings || {}),
+    };
+    const audioConstraints = {
+      channelCount: 1,
+      echoCancellation: captureSettings.echoCancellation !== false,
+      noiseSuppression: captureSettings.noiseSuppression !== false,
+      autoGainControl: captureSettings.autoGainControl === true,
+    };
+    if (captureSettings.deviceId) audioConstraints.deviceId = { exact: String(captureSettings.deviceId) };
     mediaStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        channelCount: 1,
-        echoCancellation: true,
-        noiseSuppression: true,
-      },
+      audio: audioConstraints,
     });
     if (!captureRequested || generation !== captureGeneration) return;
 
@@ -205,9 +218,10 @@ function stopCapture() {
 document.addEventListener("DOMContentLoaded", () => {
   if (window.jarvisAudioCapture && window.jarvisAudioCapture.onCommand) {
     window.jarvisAudioCapture.onCommand((command) => {
-      if (command === "start") {
-        startCapture();
-      } else if (command === "stop") {
+      const normalized = typeof command === 'string' ? { command } : (command || {});
+      if (normalized.command === "start") {
+        startCapture(normalized.settings || {});
+      } else if (normalized.command === "stop") {
         stopCapture();
       }
     });
