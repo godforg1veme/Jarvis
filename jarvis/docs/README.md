@@ -31,6 +31,7 @@ unless explicitly marked implemented below.
 | --- | --- |
 | `specs/2026-09-01-jarvis-family-cloud-assistant-design.md` | Partially implemented: control plane, DB, Telegram text, provider gateway, and prompt pipeline are live; memory retrieval, server ASR, device connection, PWA/vision, VPN/backup acceptance remain planned |
 | `plans/2026-09-01-jarvis-family-cloud-assistant.md` | Active roadmap; Milestones 0–3 are partial, later milestones are not complete |
+| `specs/2026-09-01-jarvis-desktop-cloud-client-design.md` | Approved cloud-first Desktop design; implementation is in progress. It defines paired Windows chat, local wake word, server ASR, and per-device sessions without distributing Large Whisper or secrets. |
 | `specs/2026-09-01-jarvis-system-instruction-design.md` | Implemented and verified for the current Telegram/OpenRouter path |
 | `plans/2026-09-01-jarvis-system-instruction.md` | Implemented and verified; retained as execution history |
 
