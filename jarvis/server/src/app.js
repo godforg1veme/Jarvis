@@ -13,8 +13,10 @@ function loggerOptions(config) {
         'databaseUrl',
         'saladApiKey',
         'openrouterApiKey',
+        'asrApiKey',
         '*.saladApiKey',
         '*.openrouterApiKey',
+        '*.asrApiKey',
         '*.token',
         '*.apiKey',
       ],
@@ -64,12 +66,17 @@ function buildApp(options = {}) {
 
   app.setErrorHandler((error, request, reply) => {
     request.log.error({ err: error, requestId: request.id }, 'request failed');
-    const statusCode = Number(error.statusCode) >= 400 && Number(error.statusCode) < 500
+    const statusCode = error && error.name === 'ZodError'
+      ? 400
+      : Number(error.statusCode) >= 400 && Number(error.statusCode) < 500
       ? Number(error.statusCode)
       : 500;
     reply.code(statusCode).send({
       ok: false,
-      error: statusCode === 500 ? 'Internal server error' : 'Invalid request',
+      error: statusCode === 500 ? 'Internal server error' : 'Request failed',
+      ...(typeof error.publicCode === 'string' && /^[A-Z0-9_]{1,80}$/.test(error.publicCode)
+        ? { code: error.publicCode }
+        : {}),
       requestId: request.id,
     });
   });

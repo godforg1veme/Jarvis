@@ -40,6 +40,11 @@ const baseSchema = z.object({
   openrouterModel: z.string().max(255),
   openrouterReasoningEffort: z.enum(['', 'max', 'xhigh', 'high', 'medium', 'low', 'minimal', 'none']),
   openrouterReasoningExclude: z.boolean(),
+  asrProvider: z.enum(['disabled', 'openai-compatible']),
+  asrBaseUrl: z.string().max(2048),
+  asrApiKey: z.string().max(2048),
+  asrModel: z.string().max(255),
+  asrTimeoutMs: z.number().int().min(1000).max(120000),
 });
 
 function validateProvider(config, provider) {
@@ -53,6 +58,17 @@ function validateProvider(config, provider) {
   }
   if (provider === 'openrouter' && (!config.openrouterApiKey || !config.openrouterModel)) {
     throw new Error('OPENROUTER_API_KEY and OPENROUTER_MODEL are required for OpenRouter');
+  }
+}
+
+function validateAsr(config) {
+  if (config.asrProvider !== 'openai-compatible') return;
+  if (!config.asrBaseUrl || !config.asrModel) {
+    throw new Error('ASR_BASE_URL and ASR_MODEL are required for OpenAI-compatible ASR');
+  }
+  const url = new URL(config.asrBaseUrl);
+  if (config.nodeEnv === 'production' && url.protocol !== 'https:') {
+    throw new Error('ASR_BASE_URL must use HTTPS in production');
   }
 }
 
@@ -77,6 +93,11 @@ function loadConfig(env = process.env) {
     openrouterModel: String(env.OPENROUTER_MODEL || '').trim(),
     openrouterReasoningEffort: String(env.OPENROUTER_REASONING_EFFORT || '').trim().toLowerCase(),
     openrouterReasoningExclude: parseBoolean(env.OPENROUTER_REASONING_EXCLUDE),
+    asrProvider: String(env.JARVIS_ASR_PROVIDER || 'disabled').trim().toLowerCase(),
+    asrBaseUrl: String(env.ASR_BASE_URL || '').trim(),
+    asrApiKey: String(env.ASR_API_KEY || '').trim(),
+    asrModel: String(env.ASR_MODEL || '').trim(),
+    asrTimeoutMs: Number(env.JARVIS_ASR_TIMEOUT_MS || 60000),
   };
 
   const config = baseSchema.parse(raw);
@@ -87,6 +108,7 @@ function loadConfig(env = process.env) {
   }
   validateProvider(config, config.modelProvider);
   validateProvider(config, config.modelFallbackProvider);
+  validateAsr(config);
   if (config.modelProvider !== 'echo' && config.modelProvider === config.modelFallbackProvider) {
     throw new Error('model fallback provider must differ from the primary provider');
   }
@@ -97,4 +119,5 @@ module.exports = {
   loadConfig,
   parseAllowedTelegramIds,
   parseBoolean,
+  validateAsr,
 };

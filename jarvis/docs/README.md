@@ -11,9 +11,11 @@ Status snapshot: 2026-09-01.
 Jarvis is a hybrid personal/family AI-assistant platform: an always-on cloud
 control plane provides identity, Telegram access, persistent user-scoped data,
 and model routing; Windows clients provide local voice and bounded device
-execution. Telegram is the first client. PWA, server ASR, camera/vision,
-knowledge retrieval, and complete remote device control remain roadmap work
-unless explicitly marked implemented below.
+execution. Telegram is the first client. PWA, camera/vision, knowledge
+retrieval, and complete remote device control remain roadmap work unless
+explicitly marked implemented below. The server ASR interface is implemented,
+but a concrete ASR provider remains deliberately disabled until the DE-4
+benchmark selects one.
 
 ## Authoritative current documents
 
@@ -22,6 +24,7 @@ unless explicitly marked implemented below.
 | `README.md` | Product overview, current capabilities, architecture, setup |
 | `AGENTS.md` | Authoritative runtime, safety, code, and verification rules |
 | `deploy/README.md` | Current Ubuntu 24.04 and Cloudflare Tunnel operations |
+| `updates/2026-09-01-cloud-desktop-memory-rollout.md` | Итог текущего развёртывания Desktop, памяти, устройств и известных ограничений |
 | `CLAUDE.md`, `gemini.md` | Thin pointers to the authoritative agent context |
 | This file | Status and supersession index |
 
@@ -29,9 +32,9 @@ unless explicitly marked implemented below.
 
 | Document | Status |
 | --- | --- |
-| `specs/2026-09-01-jarvis-family-cloud-assistant-design.md` | Partially implemented: control plane, DB, Telegram text, provider gateway, and prompt pipeline are live; memory retrieval, server ASR, device connection, PWA/vision, VPN/backup acceptance remain planned |
+| `specs/2026-09-01-jarvis-family-cloud-assistant-design.md` | Partially implemented: control plane, DB, Telegram/Desktop text, provider gateway and prompt pipeline are live. User-scoped memory MVP is live across Telegram and paired Desktop; knowledge retrieval, server ASR, PWA/vision, VPN/backup acceptance remain planned. |
 | `plans/2026-09-01-jarvis-family-cloud-assistant.md` | Active roadmap; Milestones 0–3 are partial, later milestones are not complete |
-| `specs/2026-09-01-jarvis-desktop-cloud-client-design.md` | Approved cloud-first Desktop design; implementation is in progress. It defines paired Windows chat, local wake word, server ASR, and per-device sessions without distributing Large Whisper or secrets. |
+| `specs/2026-09-01-jarvis-desktop-cloud-client-design.md` | Implemented and packaged: paired Windows chat, DPAPI device credentials, device-scoped HTTPS/WSS sessions, local wake word, server ASR contract, and NSIS installer. Live VPS configuration and clean-machine acceptance remain operational steps. |
 | `specs/2026-09-01-jarvis-system-instruction-design.md` | Implemented and verified for the current Telegram/OpenRouter path |
 | `plans/2026-09-01-jarvis-system-instruction.md` | Implemented and verified; retained as execution history |
 
@@ -40,6 +43,11 @@ Production reality supersedes those deployment details: the current VPS is
 Ubuntu 24.04, Xray owns port 443, and Jarvis uses Cloudflare Tunnel. The exact
 OpenRouter model is configuration and may be replaced without changing Jarvis
 identity.
+
+The current Tunnel hostname `jarvis.rilora.ru` and `/health/ready` were verified
+on 2026-09-01. The assistant receives only owner-scoped device context; direct
+attachment questions are answered by the server rather than delegated to a
+model.
 
 ## Implemented Windows specifications
 

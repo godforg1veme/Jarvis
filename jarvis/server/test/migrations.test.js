@@ -7,7 +7,11 @@ const { listMigrationFiles, runMigrations } = require('../src/db/migrate');
 
 test('migration files are ordered and narrowly named', () => {
   const files = listMigrationFiles();
-  assert.deepEqual(files, ['001_identity_and_conversations.sql', '002_assistant_domain.sql']);
+  assert.deepEqual(files, [
+    '001_identity_and_conversations.sql',
+    '002_assistant_domain.sql',
+    '003_desktop_cloud_client.sql',
+  ]);
 });
 
 test('migration runner locks, parameterizes names, and commits', async () => {

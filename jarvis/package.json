@@ -1,17 +1,68 @@
 {
   "name": "jarvis",
   "version": "1.0.0",
-  "description": "Spotlight-like launcher for Windows",
+  "description": "Cloud-first Windows client for the Jarvis personal assistant",
   "main": "main.js",
   "scripts": {
-    "start": "start.bat"
+    "start": "electron .",
+    "start:legacy": "start.bat",
+    "test:cloud": "node --test cloud/*.test.js voice/cloudVoiceService.test.js tts/windowsSapiService.test.js",
+    "dist:win": "node scripts/checkCloudPackageAssets.js && node scripts/prepareWakeWordRuntime.js && node scripts/prepareReleaseIcon.js && electron-builder --win nsis"
   },
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^42.4.0"
+    "electron": "^42.4.0",
+    "electron-builder": "^26.0.12"
   },
   "dependencies": {
+    "undici": "^7.29.0",
     "vosk": "^0.3.39"
+  },
+  "build": {
+    "appId": "ru.jarvis.desktop",
+    "productName": "Jarvis Desktop",
+    "asar": false,
+    "files": [
+      "**/*",
+      "!server/**",
+      "!docs/**",
+      "!build/**",
+      "!models/**",
+      "!voices/**",
+      "!stt_runtime/**",
+      "!agent_runtime/**",
+      "!deploy/**",
+      "!.superpowers/**",
+      "!data/**",
+      "!.env",
+      "!.env.*",
+      "!jarvis-server-deploy.zip",
+      "!ref-napi-*.tgz",
+      "!error.txt",
+      "!**/*.test.js"
+    ],
+    "extraResources": [
+      {
+        "from": "models/vosk-model-small-ru-0.22",
+        "to": "models/vosk-model-small-ru-0.22"
+      },
+      {
+        "from": "build/node-runtime",
+        "to": "node-runtime"
+      }
+    ],
+    "win": {
+      "icon": "build/jarvis.ico",
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "Jarvis-Desktop-${version}-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false
+    }
   }
 }

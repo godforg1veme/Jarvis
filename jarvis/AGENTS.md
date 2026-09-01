@@ -45,16 +45,18 @@ See `docs/README.md` for current implementation status and historical records.
 - `main.js` owns Electron lifecycle, tray, shortcuts, windows, and IPC wiring.
 - `preload.js` exposes explicit renderer capabilities.
 - `renderer/` contains the launcher, task UI, voice overlay, and Voice Lab.
-- `voice/` and `stt_runtime/` own local capture, Faster Whisper/Vosk, quality
-  monitoring, and calibration.
+- `voice/` owns Desktop microphone capture, the local Vosk wake-word worker,
+  cloud-voice transport, quality monitoring, and calibration. The default
+  family client uses a bundled Node runtime only for the Vosk wake word; legacy
+  `stt_runtime/`/Faster Whisper remains a development-only local subsystem.
 - `tts/` keeps Silero/Piper behind `tts/ttsService.js`.
 - `tools/` and `actions/` implement bounded local operations.
 - `agents/toolGateway.js` is the execution authority for agent-requested OS
   mutations. `agents/toolPolicy.js` and `agents/toolSchemas.js` are shared
   policy/validation contracts.
-- `agents/remoteProtocol.js` is the pure initial wire contract for future
-  cloud-to-device commands. A network connection and pairing flow are not yet
-  complete.
+- `agents/remoteProtocol.js` validates the Desktop WSS wire contract. Pairing,
+  owner-scoped device sessions, and presence are complete; remote command
+  dispatch/execution remains unfinished.
 - `agent_runtime/` is the existing Python/LangGraph planner for complex local
   Desktop Agent tasks. It is no longer the only stateful AI-related component
   in the overall product because the cloud server persists conversations.
@@ -64,6 +66,10 @@ See `docs/README.md` for current implementation status and historical records.
 - The current VPS runs Ubuntu 24.04 LTS, not the original planned 22.04.
 - Docker Compose runs `server` and private `postgres`; `cloudflared` is the
   intended public ingress because host port 443 is occupied by Xray.
+- The current public Tunnel hostname is `jarvis.rilora.ru`; `/health/ready` was
+  verified through Cloudflare on 2026-09-01. `cloudflared` runs as root only
+  inside its isolated container to read its read-only file-backed secret; the
+  VPS token file must remain mode `0600`.
 - `deploy/docker-compose.yml` also retains an optional Caddy profile for hosts
   where 80/443 are available. Do not start both ingress modes accidentally.
 - PostgreSQL must never be published publicly.
@@ -136,6 +142,8 @@ node scripts/testVoiceQualityMonitor.js
 node scripts/testVoiceLabController.js
 node scripts/testGeminiVoiceAdvisor.js
 node scripts/testVoiceLabRenderer.js
+node --test cloud/*.test.js voice/cloudVoiceService.test.js tts/windowsSapiService.test.js
+npm run dist:win
 python scripts/testFasterWhisperQuality.py
 ```
 

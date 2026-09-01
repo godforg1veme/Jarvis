@@ -15,7 +15,7 @@ function update(id, userId, chatId, text) {
   };
 }
 
-function harness(allowedIds = ['101', '202']) {
+function harness(allowedIds = ['101', '202'], devices = null) {
   const state = { updates: new Set(), users: new Map(), conversations: new Map(), messages: [] };
   const assistantCalls = [];
   const service = new TelegramMessageService({
@@ -55,6 +55,13 @@ function harness(allowedIds = ['101', '202']) {
         return `answer:${input.currentRequest}`;
       },
     },
+    ...(devices ? {
+      deviceService: {
+        async list({ userId }) {
+          return devices.filter((device) => device.user_id === userId);
+        },
+      },
+    } : {}),
   });
   return { service, state, assistantCalls };
 }
@@ -112,4 +119,23 @@ test('passes only the current user conversation history to the provider', async 
   ]);
   assert.equal(assistantCalls[2].currentRequest, 'второй вопрос');
   assert.equal(assistantCalls[2].runtimeContext.channel, 'telegram');
+});
+
+test('passes only the current user device snapshot to the provider', async () => {
+  const { service, assistantCalls } = harness(['101', '202'], [
+    { user_id: 'user-101', name: 'ПК Максима', status: 'online', token_hash: 'do-not-pass' },
+    { user_id: 'user-202', name: 'Чужой ПК', status: 'offline' },
+  ]);
+  await service.handle(update(10, 101, 101, 'Расскажи о моих подключённых устройствах'));
+  assert.deepEqual(assistantCalls[0].devices, [{ user_id: 'user-101', name: 'ПК Максима', status: 'online', token_hash: 'do-not-pass' }]);
+});
+
+test('answers an attachment question from the owner-scoped device service without calling the model', async () => {
+  const { service, assistantCalls } = harness(['101'], [
+    { user_id: 'user-101', name: 'Мой компьютер', status: 'online' },
+    { user_id: 'user-202', name: 'Чужой компьютер', status: 'offline' },
+  ]);
+  const result = await service.handle(update(11, 101, 101, 'К какому ПК я привязан?'));
+  assert.equal(result.answer, 'К твоему аккаунту привязан компьютер «Мой компьютер» — online.');
+  assert.equal(assistantCalls.length, 0);
 });

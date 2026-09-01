@@ -5,7 +5,7 @@ if (process.env.ELECTRON_RUN_AS_NODE) {
 }
 require('./tools/loadEnv').loadEnvFile();
 
-const { app, BrowserWindow, globalShortcut, ipcMain, session, screen, Tray, Menu, nativeImage, clipboard, desktopCapturer, shell } = require('electron');
+const { app, BrowserWindow, globalShortcut, ipcMain, session, screen, Tray, Menu, nativeImage, clipboard, desktopCapturer, shell, safeStorage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -33,6 +33,9 @@ const {
   getAgentTaskWindow,
 } = require('./agents/agentTaskWindow');
 const { executeToolRequest } = require('./agents/toolGateway');
+const { DesktopCloudClient } = require('./cloud/desktopCloudClient');
+const { createSecureCloudTransport } = require('./cloud/secureCloudTransport');
+const { CloudVoiceService } = require('./voice/cloudVoiceService');
 
 if (process.platform === 'win32') {
   // Keep hidden renderer processes alive so microphone capture continues in the tray/background.
@@ -53,6 +56,9 @@ let activeAgentTaskId = null;
 let lastExternalForegroundHwnd = null;
 let suppressNextDesktopAgentExit = false;
 let appRecoveryService = null;
+let desktopCloudClient = null;
+let cloudVoiceService = null;
+let cloudTransport = null;
 const appSelectionTickets = new Map();
 const HISTORY_PATH = path.join(__dirname, 'data', 'history.json');
 const APPS_PATH = path.join(__dirname, 'data', 'apps.default.json');
@@ -83,6 +89,12 @@ function getAppRecoveryService() {
 
 function isTrustedMainRenderer(event) {
   return !!(mainWindow && !mainWindow.isDestroyed() && event?.sender?.id === mainWindow.webContents.id);
+}
+
+function sendCloudEvent(channel, payload) {
+  if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
+    mainWindow.webContents.send(channel, payload);
+  }
 }
 
 function requireOpaqueId(value, prefix) {
@@ -489,14 +501,15 @@ function createTray() {
 
 function updateTrayMenu() {
   if (!tray) return;
-  const isMicOn = voiceService ? voiceService.isVoiceEnabled : false;
+  const isMicOn = cloudVoiceService ? cloudVoiceService.isVoiceEnabled : (voiceService ? voiceService.isVoiceEnabled : false);
 
   const contextMenu = Menu.buildFromTemplate(buildTrayMenuTemplate({
     isMicOn,
     showTranscriptionBar,
     onToggleMic: () => {
-        if (voiceService) {
-          voiceService.toggle();
+        if (cloudVoiceService) {
+          if (cloudVoiceService.isVoiceEnabled) cloudVoiceService.disable();
+          else cloudVoiceService.enable();
           updateTrayMenu();
         }
       },
@@ -531,31 +544,27 @@ function toggleTranscriptionBar(visible) {
 // --- Create Window ---
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 680,
-    height: 540,
-    x: Math.round(screen.getPrimaryDisplay().workAreaSize.width / 2 - 340),
-    y: Math.round(screen.getPrimaryDisplay().workAreaSize.height / 2 - 240),
-    frame: false,
-    transparent: true,
-    resizable: false,
-    skipTaskbar: true,
-    alwaysOnTop: true,
+    width: 1040,
+    height: 740,
+    minWidth: 760,
+    minHeight: 560,
+    frame: true,
+    transparent: false,
+    resizable: true,
+    skipTaskbar: false,
+    alwaysOnTop: false,
     show: false,
     // CRITICAL: disable background throttling so voice capture works when window is hidden
     backgroundThrottling: false,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'cloud', 'cloudPreload.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
     },
   });
 
-  mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
-
-  mainWindow.on('blur', () => {
-    mainWindow.hide();
-  });
+  mainWindow.loadFile(path.join(__dirname, 'renderer', 'cloud-chat', 'index.html'));
 
   mainWindow.on('close', (event) => {
     // Prevent actual close — hide to tray instead
@@ -727,6 +736,18 @@ function shutdownApp() {
     voiceService.shutdown();
     voiceService = null;
   }
+  if (cloudVoiceService) {
+    cloudVoiceService.shutdown();
+    cloudVoiceService = null;
+  }
+  if (desktopCloudClient) {
+    desktopCloudClient.stopSession();
+    desktopCloudClient = null;
+  }
+  if (cloudTransport) {
+    void cloudTransport.close().catch(() => {});
+    cloudTransport = null;
+  }
   if (desktopAgentClient) {
     desktopAgentClient.stop();
     desktopAgentClient = null;
@@ -766,19 +787,24 @@ if (!gotTheLock) {
 // --- App Ready ---
 if (gotTheLock) {
 app.whenReady().then(() => {
+  // Keep the Desktop cloud channel on encrypted DNS. Some ISPs intercept normal
+  // DNS and can redirect the public Jarvis hostname to an unrelated certificate.
+  // This does not bypass TLS validation: HTTPS and WSS certificates remain required.
   const startHidden = process.argv.includes('--hidden');
 
   // --- Permission handler for microphone ---
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
     if (permission === 'media') {
-      return callback(true);
+      const captureWindow = cloudVoiceService && cloudVoiceService.audioCaptureWindow;
+      return callback(Boolean(captureWindow && !captureWindow.isDestroyed() && webContents.id === captureWindow.webContents.id));
     }
     return callback(false);
   });
 
   session.defaultSession.setPermissionCheckHandler((webContents, permission) => {
     if (permission === 'media') {
-      return true;
+      const captureWindow = cloudVoiceService && cloudVoiceService.audioCaptureWindow;
+      return Boolean(captureWindow && !captureWindow.isDestroyed() && webContents.id === captureWindow.webContents.id);
     }
     return false;
   });
@@ -786,63 +812,40 @@ app.whenReady().then(() => {
   // --- Enable Windows autostart by default ---
   ensureWindowsAutoStart();
 
-  voiceService = new VoiceService({
-    onStateChange: () => updateTrayMenu(),
-    intentOptions: {
-      translateSelectedText: handleTranslateSelected,
-      analyzeVisualArea: handleVisualAnalyze,
-      continueVisualDialog: handleVisualContinue,
-      clearVisualContext: handleClearVisualContext,
-      executeFileCommand: handleFileCommand,
-      startAgentTask: (command) => handleStartAgentTask(command, { source: 'voice' }),
-      startAppRecovery: (command, recoveryOptions = {}) => getAppRecoveryService().start(command, {
-        ...recoveryOptions,
-        inputChannel: 'voice',
-      }),
-      selectAppRecovery: (recoveryId, candidateId) => getAppRecoveryService().select(recoveryId, candidateId),
-      confirmAppRecovery: (recoveryId) => getAppRecoveryService().confirm(recoveryId),
-      cancelAppRecovery: (recoveryId) => getAppRecoveryService().cancel(recoveryId, 'voice cancelled'),
-      isAgentTaskWindowVisible: () => {
-        const win = getAgentTaskWindow();
-        return !!(win && !win.isDestroyed() && win.isVisible());
-      },
-      handleAgentVoiceAction,
-      showMainWindow,
+  cloudTransport = createSecureCloudTransport();
+  desktopCloudClient = new DesktopCloudClient({
+    userDataPath: app.getPath('userData'),
+    safeStorage,
+    fetch: cloudTransport.fetch,
+    WebSocket: cloudTransport.WebSocket,
+    allowHttp: !app.isPackaged,
+    onState: (state) => {
+      sendCloudEvent('cloud:state', state);
+      updateTrayMenu();
     },
   });
-  voiceService.registerIpcHandlers();
-  voiceLabController = new VoiceLabController({ voiceService });
-  setupVoiceLabIpc(voiceLabController, {
-    isAllowedSender: (event) => Boolean(
-      voiceLabWindow
-      && !voiceLabWindow.isDestroyed()
-      && voiceLabWindow.webContents
-      && event?.sender?.id === voiceLabWindow.webContents.id,
-    ),
+  cloudVoiceService = new CloudVoiceService({
+    cloudClient: desktopCloudClient,
+    onStatus: (status) => {
+      sendCloudEvent('cloud:voice-status', status);
+      updateTrayMenu();
+    },
+    onResponse: (response) => sendCloudEvent('cloud:message', response),
   });
 
-  // --- Create main window (always, but hidden if --hidden) ---
+  // --- Create cloud chat window (always, but hidden if --hidden) ---
   createWindow();
-  createVoiceOverlayWindow();
-  createTranscriptionBarWindow();
   if (startHidden) {
     mainWindow.hide();
   } else {
     mainWindow.show();
   }
 
+  cloudVoiceService.registerIpcHandlers(isTrustedMainRenderer);
+  desktopCloudClient.startSession();
+
   // --- Tray (always created) ---
   createTray();
-
-  // --- Enable voice by default ---
-  // Ask the renderer UI to start the voice service after the window loads.
-  // Actual microphone capture is handled by VoiceService's hidden audio window.
-  mainWindow.webContents.on('did-finish-load', () => {
-    mainWindow.webContents.send('voice:auto-start');
-  });
-
-  // --- Setup voice IPC backward compatibility ---
-  setupVoiceIpc(mainWindow, voiceService);
 
   // Register global shortcut to show/hide window
   globalShortcut.register('Ctrl+Alt+J', () => {
@@ -853,8 +856,36 @@ app.whenReady().then(() => {
   const ALLOWED_TOOLS = ['runProgram', 'powershell', 'searchFiles', 'sysinfo', 'fileCommander'];
 
   // --- IPC Handlers ---
+  ipcMain.handle('cloud:get-state', (event) => {
+    if (!isTrustedMainRenderer(event) || !desktopCloudClient) return { ok: false, error: 'Access denied.' };
+    return { ok: true, ...desktopCloudClient.getState() };
+  });
+  ipcMain.handle('cloud:pair', async (event, input = {}) => {
+    if (!isTrustedMainRenderer(event) || !desktopCloudClient) return { ok: false, error: 'Access denied.' };
+    try {
+      const serverUrl = String(input.serverUrl || '').trim();
+      const pairingCode = String(input.pairingCode || '').trim();
+      if (!serverUrl || serverUrl.length > 2048 || !pairingCode || pairingCode.length > 64) {
+        return { ok: false, error: 'Проверьте адрес сервера и код подключения.' };
+      }
+      const state = await desktopCloudClient.pair({ serverUrl, pairingCode });
+      return { ok: true, ...state };
+    } catch (error) {
+      return { ok: false, error: 'Не удалось подключить устройство. Проверьте код и адрес сервера.' };
+    }
+  });
+  ipcMain.handle('cloud:send-message', async (event, input = {}) => {
+    if (!isTrustedMainRenderer(event) || !desktopCloudClient) return { ok: false, error: 'Access denied.' };
+    const text = String(input.text || '').trim();
+    if (!text || text.length > 10000) return { ok: false, error: 'Сообщение должно содержать от 1 до 10000 символов.' };
+    try {
+      return await desktopCloudClient.sendText(text);
+    } catch (error) {
+      return { ok: false, error: 'Сервер недоступен. Попробуйте ещё раз.' };
+    }
+  });
   ipcMain.handle('voice-lab:open', (event) => {
-    if (!isTrustedMainRenderer(event)) return { ok: false, error: 'Voice Lab access denied.' };
+    if (!isTrustedMainRenderer(event) || !voiceLabController) return { ok: false, error: 'Voice Lab unavailable in cloud mode.' };
     openVoiceLab();
     return { ok: true };
   });
@@ -1169,6 +1200,18 @@ app.on('before-quit', () => {
   if (voiceService) {
     voiceService.shutdown();
     voiceService = null;
+  }
+  if (cloudVoiceService) {
+    cloudVoiceService.shutdown();
+    cloudVoiceService = null;
+  }
+  if (desktopCloudClient) {
+    desktopCloudClient.stopSession();
+    desktopCloudClient = null;
+  }
+  if (cloudTransport) {
+    void cloudTransport.close().catch(() => {});
+    cloudTransport = null;
   }
   if (voiceLabWindow && !voiceLabWindow.isDestroyed()) {
     voiceLabWindow.destroy();

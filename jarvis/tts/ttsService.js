@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const sileroService = require('./sileroService');
 const piperService = require('./piperService');
+const windowsSapiService = require('./windowsSapiService');
 
 const PROJECT_ROOT = path.join(__dirname, '..');
 const SETTINGS_PATH = path.join(PROJECT_ROOT, 'data', 'tts-settings.json');
@@ -73,6 +74,10 @@ function createTtsService(options = {}) {
     if (provider === 'piper') {
       service = options.piperService
         || (options.createPiperService || piperService.createPiperService)({ settings });
+    }
+    if (provider === 'windows-sapi') {
+      service = options.windowsSapiService
+        || (options.createWindowsSapiService || windowsSapiService.createWindowsSapiService)({ settings });
     }
 
     if (!service) return null;

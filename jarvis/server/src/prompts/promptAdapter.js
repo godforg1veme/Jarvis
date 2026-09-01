@@ -21,10 +21,30 @@ function untrustedRequest(text) {
   ].join('\n');
 }
 
+function untrustedMemoryContext(memories) {
+  if (!Array.isArray(memories) || memories.length === 0) return '';
+  return [
+    '<JARVIS_UNTRUSTED_USER_MEMORY_JSON>',
+    JSON.stringify(memories),
+    '</JARVIS_UNTRUSTED_USER_MEMORY_JSON>',
+  ].join('\n');
+}
+
+function untrustedDeviceContext(devices) {
+  if (!Array.isArray(devices) || devices.length === 0) return '';
+  return [
+    '<JARVIS_UNTRUSTED_VERIFIED_DEVICE_CONTEXT_JSON>',
+    JSON.stringify(devices),
+    '</JARVIS_UNTRUSTED_VERIFIED_DEVICE_CONTEXT_JSON>',
+  ].join('\n');
+}
+
 function adaptPrompt(canonical, profile, options = {}) {
   const trusted = trustedBlock(canonical, options.correctionViolations || []);
   const messages = [
     { role: 'system', content: trusted },
+    ...(untrustedMemoryContext(canonical.memories) ? [{ role: 'user', content: untrustedMemoryContext(canonical.memories) }] : []),
+    ...(untrustedDeviceContext(canonical.devices) ? [{ role: 'user', content: untrustedDeviceContext(canonical.devices) }] : []),
     ...canonical.history.map((message) => ({ ...message })),
   ];
   const request = untrustedRequest(canonical.currentRequest);
@@ -40,5 +60,7 @@ function adaptPrompt(canonical, profile, options = {}) {
 module.exports = {
   adaptPrompt,
   trustedBlock,
+  untrustedDeviceContext,
+  untrustedMemoryContext,
   untrustedRequest,
 };

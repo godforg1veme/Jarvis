@@ -92,6 +92,10 @@ services:
     image: cloudflare/cloudflared:latest
     profiles: ["tunnel"]
     restart: unless-stopped
+    # The image defaults to UID 65532, while Compose mounts file-backed secrets
+    # owner-readable. Run this isolated ingress process as root solely to read
+    # its read-only tunnel token.
+    user: "0:0"
     command: tunnel --no-autoupdate run --token-file /run/secrets/cloudflare_tunnel_token
     secrets:
       - cloudflare_tunnel_token

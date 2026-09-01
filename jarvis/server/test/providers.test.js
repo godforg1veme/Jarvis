@@ -45,3 +45,16 @@ test('fallback provider uses the next provider after a failure', async () => {
   assert.equal(await provider.answer({ text: 'question' }), 'fallback answer');
   assert.deepEqual(events, ['salad']);
 });
+
+test('fallback provider does not retry another model when tools are available', async () => {
+  let fallbackCalls = 0;
+  const provider = new FallbackProvider([
+    { name: 'salad', async answer() { throw new Error('offline'); } },
+    { name: 'openrouter', async answer() { fallbackCalls += 1; return 'must not run'; } },
+  ]);
+  await assert.rejects(
+    provider.answer({ runtimeContext: { toolsAvailable: ['file.open'] } }),
+    /offline/,
+  );
+  assert.equal(fallbackCalls, 0);
+});

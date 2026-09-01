@@ -71,11 +71,52 @@ test('generic adapters keep trusted policy in the system role only', () => {
 
 test('output validator rejects provider identity and unverified tool success', () => {
   assert.deepEqual(validateOutput('Я — Gemini, модель от Google.').violations, ['provider_identity']);
+  assert.deepEqual(validateOutput('Я — **Gemini**, языковая модель от Google.').violations, ['provider_identity']);
   assert.deepEqual(
     validateOutput('Я уже удалил файл.', { hasVerifiedToolResults: false }).violations,
     ['unverified_tool_success'],
   );
   assert.equal(validateOutput('Я — Jarvis. Чем займёмся?').ok, true);
+});
+
+test('prompt builder removes persisted foreign model identities from history', () => {
+  const prompt = buildCanonicalPrompt({
+    currentRequest: 'Продолжим',
+    history: [
+      { role: 'user', content: 'Кто ты?' },
+      { role: 'assistant', content: 'Я — **Gemini**, языковая модель от Google.' },
+      { role: 'assistant', content: 'Я — Jarvis.' },
+    ],
+  });
+  assert.deepEqual(prompt.history, [
+    { role: 'user', content: 'Кто ты?' },
+    { role: 'assistant', content: 'Я — Jarvis.' },
+  ]);
+});
+
+test('prompt adapter passes user memory as data rather than instructions', () => {
+  const prompt = buildCanonicalPrompt({
+    currentRequest: 'Где я живу?',
+    history: [],
+    memories: [{ kind: 'profile', content: 'Я живу в Самаре' }],
+  });
+  const messages = adaptPrompt(prompt, { instructionMode: 'system' });
+  assert.match(messages[1].content, /JARVIS_UNTRUSTED_USER_MEMORY_JSON/);
+  assert.match(messages[1].content, /Самаре/);
+});
+
+test('prompt adapter passes a minimal verified device context as data rather than instructions', () => {
+  const prompt = buildCanonicalPrompt({
+    currentRequest: 'К какому ПК я привязан?',
+    history: [],
+    devices: [{ id: 'do-not-disclose', name: 'Мой компьютер', status: 'online', token: 'never-pass-this' }],
+    runtimeContext: { channel: 'telegram' },
+  });
+  const messages = adaptPrompt(prompt, { instructionMode: 'system' });
+  assert.deepEqual(prompt.devices, [{ name: 'Мой компьютер', status: 'online' }]);
+  assert.equal(prompt.runtime.hasVerifiedDevices, true);
+  assert.match(messages[1].content, /JARVIS_UNTRUSTED_VERIFIED_DEVICE_CONTEXT_JSON/);
+  assert.doesNotMatch(messages[1].content, /do-not-disclose|never-pass-this/);
 });
 
 test('assistant corrects one policy violation and returns the second answer', async () => {

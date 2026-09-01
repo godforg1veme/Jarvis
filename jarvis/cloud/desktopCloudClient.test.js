@@ -1,0 +1,107 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const test = require('node:test');
+const { DEFAULT_CLOUD_SERVER_URL, DesktopCloudClient, normalizeServerUrl, toWebSocketUrl } = require('./desktopCloudClient');
+
+function response(body, status = 200) {
+  return { ok: status >= 200 && status < 300, status, async text() { return JSON.stringify(body); } };
+}
+
+function fakeSafeStorage() {
+  return {
+    isEncryptionAvailable: () => true,
+    encryptString: (value) => Buffer.from(Buffer.from(value, 'utf8').toString('base64'), 'utf8'),
+    decryptString: (value) => Buffer.from(String(value), 'base64').toString('utf8'),
+  };
+}
+
+class FailingSocket {
+  constructor() { throw new Error('offline in test'); }
+}
+
+class HandshakeSocket {
+  constructor(url) {
+    this.url = url;
+    this.readyState = 1;
+    this.listeners = new Map();
+    this.sent = [];
+  }
+  addEventListener(name, listener) { this.listeners.set(name, listener); }
+  send(value) { this.sent.push(JSON.parse(value)); }
+  close() { this.listeners.get('close') && this.listeners.get('close')(); }
+  emit(name, event = {}) { this.listeners.get(name)(event); }
+}
+
+test('cloud client stores the device token separately from its readable state', async () => {
+  const userDataPath = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-cloud-client-'));
+  try {
+    const requests = [];
+    const client = new DesktopCloudClient({
+      userDataPath,
+      safeStorage: fakeSafeStorage(),
+      WebSocket: FailingSocket,
+      fetch: async (url, options = {}) => {
+        requests.push({ url, options });
+        return response({ ok: true, device: { id: 'device-a', name: 'Home PC', status: 'offline' }, token: 'x'.repeat(43) }, 201);
+      },
+    });
+    const state = await client.pair({ serverUrl: 'https://jarvis.example.test', pairingCode: 'JARVIS-ABCD-1234-ABCD-1234' });
+    assert.equal(state.deviceId, 'device-a');
+    assert.equal(JSON.stringify(state).includes('x'.repeat(43)), false);
+    assert.equal(fs.readFileSync(path.join(userDataPath, 'cloud-device.json'), 'utf8').includes('x'.repeat(43)), false);
+    assert.equal(fs.readFileSync(path.join(userDataPath, 'cloud-device.token')).toString('utf8').includes('x'.repeat(43)), false);
+    assert.equal(requests[0].options.headers.Authorization, undefined);
+    client.stopSession();
+  } finally {
+    fs.rmSync(userDataPath, { recursive: true, force: true });
+  }
+});
+
+test('cloud URL normalization rejects an insecure public endpoint and creates a WSS path', () => {
+  assert.throws(() => normalizeServerUrl('http://jarvis.example.test'), /HTTPS/);
+  assert.equal(normalizeServerUrl('http://127.0.0.1:3210'), 'http://127.0.0.1:3210');
+  assert.equal(toWebSocketUrl('https://jarvis.example.test'), 'wss://jarvis.example.test/v1/desktop/session');
+});
+
+test('cloud client suggests the production endpoint before pairing', () => {
+  const userDataPath = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-cloud-client-'));
+  try {
+    const client = new DesktopCloudClient({
+      userDataPath,
+      safeStorage: fakeSafeStorage(),
+      WebSocket: FailingSocket,
+    });
+    assert.equal(client.getState().defaultServerUrl, DEFAULT_CLOUD_SERVER_URL);
+  } finally {
+    fs.rmSync(userDataPath, { recursive: true, force: true });
+  }
+});
+
+test('cloud client sends the credential only in the first WSS hello frame', async () => {
+  const userDataPath = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-cloud-client-'));
+  try {
+    let socket;
+    const client = new DesktopCloudClient({
+      userDataPath,
+      safeStorage: fakeSafeStorage(),
+      WebSocket: class extends HandshakeSocket { constructor(url) { super(url); socket = this; } },
+      fetch: async () => response({ ok: true, device: { id: 'device-a', name: 'Home PC' }, token: 'x'.repeat(43) }, 201),
+    });
+    await client.pair({ serverUrl: 'https://jarvis.example.test', pairingCode: 'JARVIS-ABCD-1234-ABCD-1234' });
+    socket.emit('open');
+    assert.deepEqual(socket.sent[0], {
+      version: 1,
+      type: 'device.hello',
+      payload: { deviceId: 'device-a', token: 'x'.repeat(43), name: 'Home PC' },
+    });
+    assert.equal(client.getState().connection, 'connecting');
+    socket.emit('message', { data: JSON.stringify({ version: 1, type: 'device.welcome', payload: { deviceId: 'device-a', status: 'online' } }) });
+    assert.equal(client.getState().connection, 'online');
+    assert.equal(socket.sent[1].type, 'device.capabilities');
+    client.stopSession();
+  } finally {
+    fs.rmSync(userDataPath, { recursive: true, force: true });
+  }
+});

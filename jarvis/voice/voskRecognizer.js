@@ -1,11 +1,32 @@
-const vosk = require("vosk");
 const path = require("path");
 const fs = require("fs");
 
-vosk.setLogLevel(-1);
-
-const MODEL_PATH = path.join(__dirname, "..", "models", "vosk-model-small-ru-0.22");
 const SAMPLE_RATE = 16000;
+let vosk = null;
+
+function loadVoskBinding() {
+  if (vosk) return vosk;
+  // Vosk loads libvosk.dll through FFI. Arbitrary DLLs cannot be loaded from
+  // app.asar, so production must resolve Vosk's JavaScript entry point from
+  // Electron Builder's explicitly unpacked directory.
+  const unpacked = process.resourcesPath
+    ? path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', 'vosk')
+    : '';
+  vosk = unpacked && fs.existsSync(unpacked) ? require(unpacked) : require('vosk');
+  vosk.setLogLevel(-1);
+  return vosk;
+}
+
+function defaultModelPath() {
+  const modelName = 'vosk-model-small-ru-0.22';
+  const appRoot = path.join(__dirname, '..');
+  const candidates = [
+    process.resourcesPath ? path.join(process.resourcesPath, 'models', modelName) : '',
+    path.join(appRoot, '..', 'models', modelName),
+    path.join(appRoot, 'models', modelName),
+  ];
+  return candidates.find((candidate) => candidate && fs.existsSync(candidate)) || candidates.at(-1);
+}
 
 /**
  * Helper: Vosk v0.3.x returns parsed objects, older versions return JSON strings.
@@ -21,36 +42,36 @@ function parseVoskResult(raw) {
 }
 
 class VoskStreamRecognizer {
-  constructor() {
+  constructor(options = {}) {
     this.model = null;
     this.recognizer = null;
     this.sampleRate = SAMPLE_RATE;
+    this.modelPath = options.modelPath || defaultModelPath();
   }
 
   load() {
-    if (!fs.existsSync(MODEL_PATH)) {
+    if (!fs.existsSync(this.modelPath)) {
       throw new Error(
-        `Vosk model folder not found: ${MODEL_PATH}. ` +
-        `Make sure the folder exists and contains model files.`
+        'Vosk wake-word model folder not found. Reinstall Jarvis Desktop.'
       );
     }
 
     const expectedFiles = ["am", "conf"];
     for (const subdir of expectedFiles) {
-      const subPath = path.join(MODEL_PATH, subdir);
+      const subPath = path.join(this.modelPath, subdir);
       if (!fs.existsSync(subPath)) {
         throw new Error(
-          `Vosk model incomplete: missing "${subdir}" in ${MODEL_PATH}. ` +
-          `The model folder may be corrupted. Re-download vosk-model-small-ru-0.22.`
+          `Vosk model incomplete: missing "${subdir}" in ${this.modelPath}. ` +
+          'The Jarvis Desktop wake-word model may be corrupted. Reinstall the application.'
         );
       }
     }
 
     try {
-      this.model = new vosk.Model(MODEL_PATH);
+      this.model = new (loadVoskBinding().Model)(this.modelPath);
     } catch (error) {
       throw new Error(
-        `Failed to create Vosk Model from ${MODEL_PATH}: ${error.message}. ` +
+        `Failed to create Vosk Model from ${this.modelPath}: ${error.message}. ` +
         `The native vosk addon may be incompatible with this Node.js version.`
       );
     }
@@ -60,7 +81,7 @@ class VoskStreamRecognizer {
     }
 
     try {
-      this.recognizer = new vosk.Recognizer({
+      this.recognizer = new (loadVoskBinding().Recognizer)({
         model: this.model,
         sampleRate: this.sampleRate,
       });
@@ -149,4 +170,4 @@ class VoskStreamRecognizer {
   }
 }
 
-module.exports = { VoskStreamRecognizer };
+module.exports = { VoskStreamRecognizer, defaultModelPath };

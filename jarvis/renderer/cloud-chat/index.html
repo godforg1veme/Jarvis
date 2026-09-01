@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; media-src 'self'">
+  <title>Jarvis Desktop</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="console">
+    <aside class="sidebar" aria-label="Статус Jarvis">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">J</div>
+        <div>
+          <p class="eyebrow">PERSONAL SYSTEM</p>
+          <h1>JARVIS</h1>
+        </div>
+      </div>
+
+      <section class="signal-card" aria-live="polite">
+        <div class="signal-heading">
+          <span id="connection-dot" class="signal-dot offline"></span>
+          <span id="connection-label">Не подключён</span>
+        </div>
+        <p id="device-label">Подключите этот компьютер через Telegram.</p>
+      </section>
+
+      <section class="voice-card">
+        <p class="eyebrow">VOICE CHANNEL</p>
+        <h2 id="voice-title">Голос выключен</h2>
+        <p id="voice-description">После подключения Jarvis будет ждать wake word локально.</p>
+        <button id="voice-toggle" class="voice-button" type="button" disabled>
+          <span class="voice-orbit" aria-hidden="true"></span>
+          <span id="voice-button-label">Включить голос</span>
+        </button>
+        <p id="voice-state" class="voice-state">Микрофон не активен</p>
+      </section>
+
+      <div class="privacy-note">
+        <span aria-hidden="true">◈</span>
+        До wake word звук остаётся на этом ПК. На сервер уходит только завершённая фраза.
+      </div>
+    </aside>
+
+    <section class="main-panel">
+      <header class="topline">
+        <div>
+          <p class="eyebrow">CLOUD BRAIN · LOCAL HANDS</p>
+          <h2>Разговор с Jarvis</h2>
+        </div>
+        <div id="mode-badge" class="mode-badge">ОЖИДАЕТ ПРИВЯЗКИ</div>
+      </header>
+
+      <section id="pairing-card" class="pairing-card">
+        <div class="pairing-copy">
+          <p class="eyebrow">ПЕРВОЕ ПОДКЛЮЧЕНИЕ</p>
+          <h3>Свяжите этот ПК со своим Jarvis</h3>
+          <p>В Telegram отправьте <code>/pair Имя ПК</code>, затем введите полученный одноразовый код.</p>
+        </div>
+        <form id="pairing-form" class="pairing-form">
+          <label>
+            Адрес сервера
+            <input id="server-url" type="url" inputmode="url" autocomplete="url" placeholder="https://jarvis.rilora.ru" required>
+          </label>
+          <label>
+            Код подключения
+            <input id="pairing-code" type="text" autocomplete="one-time-code" placeholder="JARVIS-XXXX-XXXX-XXXX-XXXX" required>
+          </label>
+          <button id="pair-button" class="primary-button" type="submit">Подключить Desktop</button>
+          <p id="pairing-error" class="form-error" role="alert"></p>
+        </form>
+      </section>
+
+      <section id="chat-shell" class="chat-shell is-disabled" aria-label="Чат с Jarvis">
+        <div id="messages" class="messages" aria-live="polite" aria-relevant="additions text">
+          <div class="empty-chat">
+            <div class="empty-glyph">⌁</div>
+            <h3>Я на связи</h3>
+            <p>Подключите Desktop — и продолжим разговор здесь или в Telegram.</p>
+          </div>
+        </div>
+        <form id="message-form" class="composer">
+          <label class="composer-field" for="message-input">
+            <span class="composer-prefix" aria-hidden="true">›</span>
+            <textarea id="message-input" rows="1" maxlength="10000" placeholder="Напишите Jarvis…" disabled></textarea>
+          </label>
+          <button id="send-button" class="send-button" type="submit" disabled aria-label="Отправить сообщение">↑</button>
+        </form>
+      </section>
+    </section>
+  </main>
+  <script src="renderer.js"></script>
+</body>
+</html>

@@ -10,6 +10,17 @@ const { TelegramMessageService } = require('./telegram/messageService');
 const { TelegramUpdateRepository } = require('./telegram/telegramUpdateRepository');
 const { UserRepository } = require('./users/userRepository');
 const { ConversationRepository } = require('./conversations/conversationRepository');
+const { DeviceRepository } = require('./devices/deviceRepository');
+const { createDeviceAuthenticator } = require('./devices/deviceAuth');
+const { DeviceService } = require('./devices/deviceService');
+const { registerDeviceSessionRoute } = require('./devices/deviceSessionRoute');
+const { createAsrProvider } = require('./asr/asrProvider');
+const { DesktopRequestRepository } = require('./desktop/desktopRequestRepository');
+const { DesktopMessageService } = require('./desktop/desktopMessageService');
+const { registerDesktopRoutes } = require('./desktop/desktopRoutes');
+const { FixedWindowRateLimiter } = require('./http/rateLimiter');
+const { MemoryRepository } = require('./memory/memoryRepository');
+const { MemoryService } = require('./memory/memoryService');
 
 async function createRuntime(config, overrides = {}) {
   let pool = overrides.pool || null;
@@ -23,31 +34,69 @@ async function createRuntime(config, overrides = {}) {
     await (overrides.runMigrations || runMigrations)(pool);
   }
 
-  if (!bot && pool && config.telegramBotToken) {
+  let assistant = overrides.assistant || null;
+  let deviceService = null;
+  let memoryService = null;
+  if (pool) {
     const answerProvider = overrides.provider || createAnswerProvider(config, {
       onFallback(name, error) {
         app.log.warn({ provider: name, err: error }, 'model provider fallback');
       },
     });
-    const assistant = overrides.assistant || new AssistantService({
+    assistant = assistant || new AssistantService({
       provider: answerProvider,
       profile: providerProfileForConfig(config),
       logger: app.log,
     });
+    const deviceRepository = overrides.deviceRepository || new DeviceRepository(pool);
+    const authenticateDevice = overrides.authenticateDevice || createDeviceAuthenticator(deviceRepository);
+    deviceService = overrides.deviceService || new DeviceService({ repository: deviceRepository });
+    memoryService = overrides.memoryService || new MemoryService({ repository: overrides.memoryRepository || new MemoryRepository(pool) });
+    const desktopMessageService = overrides.desktopMessageService || new DesktopMessageService({
+      requestRepository: overrides.desktopRequestRepository || new DesktopRequestRepository(pool),
+      conversationRepository: overrides.conversationRepository || new ConversationRepository(pool),
+      assistant,
+      memoryService,
+      deviceService,
+    });
+    if (typeof app.post === 'function' && typeof app.addContentTypeParser === 'function') {
+      registerDesktopRoutes(app, {
+        authenticate: authenticateDevice,
+        deviceService,
+        messageService: desktopMessageService,
+        asr: overrides.asr || createAsrProvider(config),
+        limiter: overrides.desktopRateLimiter || new FixedWindowRateLimiter(),
+      });
+    }
+    if (typeof app.register === 'function' && typeof app.get === 'function') {
+      await registerDeviceSessionRoute(app, {
+        authenticate: authenticateDevice,
+        repository: deviceRepository,
+        logger: app.log,
+      });
+    }
+
+    if (!bot && config.telegramBotToken) {
     const messageService = new TelegramMessageService({
       accessPolicy: createTelegramAccessPolicy(config.telegramAllowedIds),
       updateRepository: new TelegramUpdateRepository(pool),
       userRepository: new UserRepository(pool),
       conversationRepository: new ConversationRepository(pool),
       assistant,
+      deviceService,
+      memoryService,
     });
     bot = createTelegramBot({ token: config.telegramBotToken, messageService, logger: app.log });
+    }
   }
 
   return {
     app,
     bot,
     pool,
+    assistant,
+    deviceService,
+    memoryService,
     async start() {
       await app.listen({ host: config.host, port: config.port });
       if (bot) void bot.start().catch((error) => app.log.error({ err: error }, 'Telegram polling stopped'));
