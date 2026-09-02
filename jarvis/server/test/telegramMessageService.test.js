@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const { createTelegramAccessPolicy } = require('../src/telegram/accessPolicy');
-const { TelegramMessageService } = require('../src/telegram/messageService');
+const { TelegramMessageService, normalizeTelegramMessage } = require('../src/telegram/messageService');
 
 function update(id, userId, chatId, text) {
   return {
@@ -14,6 +14,20 @@ function update(id, userId, chatId, text) {
     },
   };
 }
+
+test('normalizes media-only Telegram messages without treating them as plain text', () => {
+  const input = normalizeTelegramMessage({
+    update_id: 1,
+    message: {
+      message_id: 2,
+      from: { id: 101, first_name: 'User' },
+      chat: { id: 101 },
+      audio: { file_id: 'audio-id', file_unique_id: 'audio-unique', file_size: 12, mime_type: 'audio/ogg', duration: 4 },
+    },
+  });
+  assert.equal(input.text, '');
+  assert.equal(input.attachment.category, 'audio');
+});
 
 function harness(allowedIds = ['101', '202'], devices = null) {
   const state = { updates: new Set(), users: new Map(), conversations: new Map(), messages: [] };

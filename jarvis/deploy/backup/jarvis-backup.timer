@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Jarvis encrypted backup daily
+
+[Timer]
+OnCalendar=*-*-* 03:20:00 UTC
+RandomizedDelaySec=20m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

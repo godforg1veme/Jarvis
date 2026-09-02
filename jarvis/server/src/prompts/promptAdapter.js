@@ -39,11 +39,21 @@ function untrustedDeviceContext(devices) {
   ].join('\n');
 }
 
+function untrustedDocumentContext(documents) {
+  if (!Array.isArray(documents) || documents.length === 0) return '';
+  return [
+    '<JARVIS_UNTRUSTED_DOCUMENT_CONTEXT_JSON>',
+    JSON.stringify(documents),
+    '</JARVIS_UNTRUSTED_DOCUMENT_CONTEXT_JSON>',
+  ].join('\n');
+}
+
 function adaptPrompt(canonical, profile, options = {}) {
   const trusted = trustedBlock(canonical, options.correctionViolations || []);
   const messages = [
     { role: 'system', content: trusted },
     ...(untrustedMemoryContext(canonical.memories) ? [{ role: 'user', content: untrustedMemoryContext(canonical.memories) }] : []),
+    ...(untrustedDocumentContext(canonical.documents) ? [{ role: 'user', content: untrustedDocumentContext(canonical.documents) }] : []),
     ...(untrustedDeviceContext(canonical.devices) ? [{ role: 'user', content: untrustedDeviceContext(canonical.devices) }] : []),
     ...canonical.history.map((message) => ({ ...message })),
   ];
@@ -61,6 +71,7 @@ module.exports = {
   adaptPrompt,
   trustedBlock,
   untrustedDeviceContext,
+  untrustedDocumentContext,
   untrustedMemoryContext,
   untrustedRequest,
 };

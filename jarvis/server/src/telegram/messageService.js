@@ -1,17 +1,31 @@
 const MAX_TEXT_LENGTH = 10000;
 const { attachmentReply, isDeviceAttachmentQuestion } = require('../devices/deviceReplies');
+const { attachmentFromTelegramMessage } = require('../knowledge/fileTypes');
+const { publicDocumentStatus, renderDocumentCitations } = require('../knowledge/knowledgeService');
 
 function normalizeTelegramMessage(update) {
   const message = update && update.message;
   const telegramUserId = message && message.from && String(message.from.id || '');
   const chatId = message && message.chat && String(message.chat.id || '');
   const text = message && typeof message.text === 'string' ? message.text.trim() : '';
+  const attachment = attachmentFromTelegramMessage(message || {});
   const updateId = Number(update && update.update_id);
 
   if (!/^\d{1,20}$/.test(telegramUserId)) throw new Error('invalid Telegram user ID');
   if (!/^-?\d{1,20}$/.test(chatId)) throw new Error('invalid Telegram chat ID');
   if (!Number.isSafeInteger(updateId) || updateId < 0) throw new Error('invalid Telegram update ID');
-  if (!text) throw new Error('message text is required');
+  if (!text && !attachment) {
+    return {
+      updateId,
+      telegramUserId,
+      chatId,
+      messageId: String(message.message_id),
+      displayName: [message.from.first_name, message.from.last_name].filter(Boolean).join(' ').trim().slice(0, 100) || `Telegram ${telegramUserId}`,
+      text: '',
+      attachment: null,
+      ignored: true,
+    };
+  }
   if (text.length > MAX_TEXT_LENGTH) throw new Error('message text is too long');
 
   const displayName = [message.from.first_name, message.from.last_name]
@@ -27,13 +41,14 @@ function normalizeTelegramMessage(update) {
     messageId: String(message.message_id),
     displayName,
     text,
+    attachment,
   };
 }
 
 function commandReply(text) {
-  const command = text.split(/\s+/, 1)[0].split('@', 1)[0].toLowerCase();
+  const command = String(text || '').split(/\s+/, 1)[0].split('@', 1)[0].toLowerCase();
   if (command === '/start') return 'Jarvis подключён. Напишите вопрос обычным сообщением.';
-  if (command === '/help') return 'Доступно: текстовые вопросы, /devices, /pair Имя ПК, /revoke ID устройства, /memory, а также «запомни», «забудь» и «исправь старое → новое».';
+  if (command === '/help') return 'Доступно: текстовые вопросы, загрузка файлов, /documents, /document_delete ID confirm, /devices, /pair Имя ПК, /revoke ID устройства, /memory, а также «запомни», «забудь» и «исправь старое → новое».';
   if (command === '/memory') return null;
   return null;
 }
@@ -55,6 +70,25 @@ class TelegramMessageService {
     this.assistant = options.assistant;
     this.deviceService = options.deviceService || null;
     this.memoryService = options.memoryService || null;
+    this.knowledgeService = options.knowledgeService || null;
+  }
+
+  async documentCommandReply({ text, user }) {
+    if (!this.knowledgeService) return null;
+    const { command, argument } = commandParts(text);
+    if (command === '/documents') {
+      const documents = await this.knowledgeService.list({ userId: user.id });
+      if (documents.length === 0) return 'Личных документов пока нет. Отправь мне файл в Telegram.';
+      return documents.map((document) => `${document.original_name}\n${publicDocumentStatus(document)} · ${document.category} · ${document.id}`).join('\n\n');
+    }
+    if (command === '/document_delete') {
+      const [documentId = '', confirmation = ''] = argument.split(/\s+/, 2);
+      if (!/^[a-f0-9-]{36}$/i.test(documentId)) return 'Укажи ID документа из /documents: /document_delete ID';
+      if (confirmation.toLowerCase() !== 'confirm') return `Удаление необратимо. Подтверди: /document_delete ${documentId} confirm`;
+      const deleted = await this.knowledgeService.remove({ userId: user.id, documentId });
+      return deleted ? `Документ «${deleted.original_name}» удалён.` : 'Документ не найден.';
+    }
+    return null;
   }
 
   async deviceCommandReply({ text, user }) {
@@ -83,11 +117,12 @@ class TelegramMessageService {
     return null;
   }
 
-  async handle(update) {
+  async handle(update, options = {}) {
     const input = normalizeTelegramMessage(update);
     if (!this.accessPolicy.isAllowed(input.telegramUserId)) {
       return { status: 'forbidden' };
     }
+    if (input.ignored) return { status: 'ignored' };
 
     const claimed = await this.updateRepository.claim(input.updateId, input.telegramUserId);
     if (!claimed) return { status: 'duplicate' };
@@ -101,6 +136,30 @@ class TelegramMessageService {
       channel: 'telegram',
       externalChatId: input.chatId,
     });
+
+    if (input.attachment) {
+      if (!this.knowledgeService || typeof options.downloadAttachment !== 'function') {
+        throw new Error('document ingestion is unavailable');
+      }
+      const data = await options.downloadAttachment(input.attachment);
+      const document = await this.knowledgeService.ingest({ userId: user.id, attachment: input.attachment, data });
+      const answer = `Принял «${document.originalName || document.name}». Индексирую; статус появится в /documents.`;
+      await this.conversationRepository.appendMessage({
+        userId: user.id,
+        conversationId: conversation.id,
+        role: 'user',
+        contentType: 'document',
+        content: `Документ: ${document.originalName || document.name}`,
+        externalMessageId: input.messageId,
+      });
+      await this.conversationRepository.appendMessage({
+        userId: user.id,
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: answer,
+      });
+      return { status: 'answered', answer };
+    }
 
     await this.conversationRepository.appendMessage({
       userId: user.id,
@@ -120,14 +179,17 @@ class TelegramMessageService {
       limit: 30,
     });
     const deviceAnswer = await this.deviceCommandReply({ text: input.text, user });
+    const documentAnswer = await this.documentCommandReply({ text: input.text, user });
     const memories = this.memoryService ? await this.memoryService.memoriesForPrompt({ userId: user.id }) : [];
     const devices = this.deviceService ? await this.deviceService.list({ userId: user.id }) : [];
-    const answer = commandReply(input.text) || deviceAnswer || memoryResult.answer || await this.assistant.answer({
+    const documentSources = this.knowledgeService ? await this.knowledgeService.searchForPrompt({ userId: user.id, query: input.text }) : [];
+    const answer = commandReply(input.text) || deviceAnswer || documentAnswer || memoryResult.answer || await this.assistant.answer({
       userId: user.id,
       conversationId: conversation.id,
       currentRequest: input.text,
       history,
       memories,
+      documents: documentSources,
       devices,
       runtimeContext: {
         channel: 'telegram',
@@ -135,7 +197,7 @@ class TelegramMessageService {
         verifiedToolResults: [],
       },
     });
-    const safeAnswer = String(answer || '').trim().slice(0, 10000);
+    const safeAnswer = renderDocumentCitations(String(answer || '').trim(), documentSources).slice(0, 10000);
     if (!safeAnswer) throw new Error('provider returned an empty answer');
 
     await this.conversationRepository.appendMessage({

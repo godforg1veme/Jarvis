@@ -39,3 +39,34 @@ test('validates selected and fallback model providers', () => {
   assert.equal(config.openrouterReasoningEffort, 'medium');
   assert.equal(config.openrouterReasoningExclude, true);
 });
+
+test('requires complete secondary OpenRouter and Gemini fallback profiles', () => {
+  assert.throws(() => loadConfig({
+    OPENROUTER_FALLBACK_API_KEY: 'secondary-key',
+  }), /OPENROUTER_FALLBACK_API_KEY and OPENROUTER_FALLBACK_MODEL/);
+  assert.throws(() => loadConfig({
+    GEMINI_MODEL: 'gemini-test',
+  }), /GEMINI_API_KEY and GEMINI_MODEL/);
+
+  const config = loadConfig({
+    JARVIS_MODEL_PROVIDER: 'salad',
+    SALAD_API_KEY: 'salad-key',
+    SALAD_MODEL: 'salad-model',
+    OPENROUTER_FALLBACK_API_KEY: 'secondary-key',
+    OPENROUTER_FALLBACK_MODEL: 'secondary-model',
+    GEMINI_API_KEY: 'gemini-key',
+    GEMINI_MODEL: 'gemini-test',
+  });
+  assert.equal(config.openrouterFallbackModel, 'secondary-model');
+  assert.equal(config.geminiModel, 'gemini-test');
+});
+
+test('does not accept an identical secondary OpenRouter profile', () => {
+  assert.throws(() => loadConfig({
+    JARVIS_MODEL_PROVIDER: 'openrouter',
+    OPENROUTER_API_KEY: 'same-key',
+    OPENROUTER_MODEL: 'same-model',
+    OPENROUTER_FALLBACK_API_KEY: 'same-key',
+    OPENROUTER_FALLBACK_MODEL: 'same-model',
+  }), /different key or model/);
+});

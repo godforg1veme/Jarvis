@@ -25,6 +25,22 @@ function normalizeMemories(memories, limit = 30) {
     .filter((memory) => memory.content);
 }
 
+function normalizeDocuments(documents, limit = 8) {
+  if (!Array.isArray(documents)) return [];
+  return documents
+    .filter((document) => document && typeof document.content === 'string')
+    .slice(0, limit)
+    .map((document, index) => ({
+      source: /^S[1-9][0-9]*$/.test(String(document.source || '')) ? String(document.source) : `S${index + 1}`,
+      originalName: String(document.originalName || 'Документ').replace(/[\r\n]/g, ' ').slice(0, 255),
+      mediaType: String(document.mediaType || '').slice(0, 100),
+      category: String(document.category || 'document').slice(0, 30),
+      content: document.content.trim().slice(0, 6000),
+      metadata: document.metadata && typeof document.metadata === 'object' ? document.metadata : {},
+    }))
+    .filter((document) => document.content);
+}
+
 function buildRuntimePolicy(runtimeContext = {}) {
   const channel = String(runtimeContext.channel || 'unknown').slice(0, 50);
   const tools = Array.isArray(runtimeContext.toolsAvailable)
@@ -54,6 +70,7 @@ function buildCanonicalPrompt(input) {
     runtime: Object.freeze(buildRuntimePolicy({ ...input.runtimeContext, hasVerifiedDevices: devices.length > 0 })),
     history: Object.freeze(normalizeHistory(input.history)),
     memories: Object.freeze(normalizeMemories(input.memories)),
+    documents: Object.freeze(normalizeDocuments(input.documents)),
     devices: Object.freeze(devices),
     currentRequest,
   });
@@ -64,6 +81,7 @@ module.exports = {
   buildCanonicalPrompt,
   buildRuntimePolicy,
   normalizeDevicePromptContext,
+  normalizeDocuments,
   normalizeMemories,
   normalizeHistory,
 };

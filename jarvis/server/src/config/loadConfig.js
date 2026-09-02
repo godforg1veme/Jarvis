@@ -38,8 +38,18 @@ const baseSchema = z.object({
   saladAuthMode: z.enum(['bearer', 'salad-api-key']),
   openrouterApiKey: z.string().max(2048),
   openrouterModel: z.string().max(255),
+  openrouterFallbackApiKey: z.string().max(2048),
+  openrouterFallbackModel: z.string().max(255),
   openrouterReasoningEffort: z.enum(['', 'max', 'xhigh', 'high', 'medium', 'low', 'minimal', 'none']),
   openrouterReasoningExclude: z.boolean(),
+  geminiApiKey: z.string().max(2048),
+  geminiModel: z.string().max(255),
+  documentStoragePath: z.string().min(1).max(2048),
+  documentMaxBytes: z.number().int().min(1024 * 1024).max(20 * 1024 * 1024),
+  documentUserQuotaBytes: z.number().int().min(20 * 1024 * 1024).max(100 * 1024 * 1024 * 1024),
+  documentWorkerIntervalMs: z.number().int().min(250).max(60000),
+  pdfToTextBin: z.string().min(1).max(2048),
+  ffprobeBin: z.string().min(1).max(2048),
   asrProvider: z.enum(['disabled', 'openai-compatible']),
   asrBaseUrl: z.string().max(2048),
   asrApiKey: z.string().max(2048),
@@ -58,6 +68,27 @@ function validateProvider(config, provider) {
   }
   if (provider === 'openrouter' && (!config.openrouterApiKey || !config.openrouterModel)) {
     throw new Error('OPENROUTER_API_KEY and OPENROUTER_MODEL are required for OpenRouter');
+  }
+}
+
+function validateConfiguredFallbacks(config) {
+  const hasOpenRouterFallbackKey = Boolean(config.openrouterFallbackApiKey);
+  const hasOpenRouterFallbackModel = Boolean(config.openrouterFallbackModel);
+  if (hasOpenRouterFallbackKey !== hasOpenRouterFallbackModel) {
+    throw new Error('OPENROUTER_FALLBACK_API_KEY and OPENROUTER_FALLBACK_MODEL must be configured together');
+  }
+
+  const hasGeminiKey = Boolean(config.geminiApiKey);
+  const hasGeminiModel = Boolean(config.geminiModel);
+  if (hasGeminiKey !== hasGeminiModel) {
+    throw new Error('GEMINI_API_KEY and GEMINI_MODEL must be configured together');
+  }
+
+  if (config.modelProvider === 'openrouter'
+    && hasOpenRouterFallbackKey
+    && config.openrouterApiKey === config.openrouterFallbackApiKey
+    && config.openrouterModel === config.openrouterFallbackModel) {
+    throw new Error('OpenRouter fallback must use a different key or model from the primary provider');
   }
 }
 
@@ -91,8 +122,18 @@ function loadConfig(env = process.env) {
     saladAuthMode: String(env.SALAD_AUTH_MODE || 'bearer').trim().toLowerCase(),
     openrouterApiKey: String(env.OPENROUTER_API_KEY || '').trim(),
     openrouterModel: String(env.OPENROUTER_MODEL || '').trim(),
+    openrouterFallbackApiKey: String(env.OPENROUTER_FALLBACK_API_KEY || '').trim(),
+    openrouterFallbackModel: String(env.OPENROUTER_FALLBACK_MODEL || '').trim(),
     openrouterReasoningEffort: String(env.OPENROUTER_REASONING_EFFORT || '').trim().toLowerCase(),
     openrouterReasoningExclude: parseBoolean(env.OPENROUTER_REASONING_EXCLUDE),
+    geminiApiKey: String(env.GEMINI_API_KEY || '').trim(),
+    geminiModel: String(env.GEMINI_MODEL || '').trim(),
+    documentStoragePath: String(env.JARVIS_DOCUMENT_STORAGE_PATH || '/srv/jarvis/documents').trim(),
+    documentMaxBytes: Number(env.JARVIS_DOCUMENT_MAX_BYTES || (20 * 1024 * 1024)),
+    documentUserQuotaBytes: Number(env.JARVIS_DOCUMENT_USER_QUOTA_BYTES || (1024 * 1024 * 1024)),
+    documentWorkerIntervalMs: Number(env.JARVIS_DOCUMENT_WORKER_INTERVAL_MS || 2000),
+    pdfToTextBin: String(env.JARVIS_PDFTOTEXT_BIN || 'pdftotext').trim(),
+    ffprobeBin: String(env.JARVIS_FFPROBE_BIN || 'ffprobe').trim(),
     asrProvider: String(env.JARVIS_ASR_PROVIDER || 'disabled').trim().toLowerCase(),
     asrBaseUrl: String(env.ASR_BASE_URL || '').trim(),
     asrApiKey: String(env.ASR_API_KEY || '').trim(),
@@ -108,6 +149,7 @@ function loadConfig(env = process.env) {
   }
   validateProvider(config, config.modelProvider);
   validateProvider(config, config.modelFallbackProvider);
+  validateConfiguredFallbacks(config);
   validateAsr(config);
   if (config.modelProvider !== 'echo' && config.modelProvider === config.modelFallbackProvider) {
     throw new Error('model fallback provider must differ from the primary provider');
@@ -119,5 +161,6 @@ module.exports = {
   loadConfig,
   parseAllowedTelegramIds,
   parseBoolean,
+  validateConfiguredFallbacks,
   validateAsr,
 };

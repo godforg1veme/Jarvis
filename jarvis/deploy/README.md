@@ -129,6 +129,30 @@ dashboard prompts. After changing a model, run `server/npm test` locally and a
 manual identity, correction, and prompt-injection contract probe without
 printing keys or hidden prompts.
 
+For resilient text-only answers, primary provider selection remains
+`JARVIS_MODEL_PROVIDER=salad` or `openrouter`. Configure
+`OPENROUTER_FALLBACK_API_KEY` and `OPENROUTER_FALLBACK_MODEL` for the second
+OpenRouter account/model, then optionally `GEMINI_API_KEY` and `GEMINI_MODEL`
+as the final fallback. Keep all values only in `deploy/.env`. Tool-capable
+requests are deliberately never replayed on fallback.
+
+## Private knowledge base and backups
+
+Telegram attachments are limited by the official Bot API download limit of 20
+MiB. Jarvis stores them only in the private `document-data` volume using opaque
+keys. TXT, Markdown, CSV, JSON, XML, HTML, and DOCX are indexed by text. PDF
+text is extracted with `pdftotext` and includes page citations. Images,
+archives, and generic files are indexed by private metadata; audio/video also
+have their container metadata probed with `ffprobe`. Their speech is not yet
+transcribed: that waits for the separately benchmarked server-ASR rollout. Do
+not expose the volume through a public static-file route. The server image
+creates the mountpoint with the unprivileged `node` owner before Docker creates
+a fresh named volume; do not replace it with a root-only bind mount.
+
+Encrypted off-VPS backup setup and the restore drill live in
+[`backup/README.md`](backup/README.md). A backup is not accepted until the
+restore drill has populated an explicitly empty test directory and database.
+
 ## Desktop voice ASR
 
 The Desktop HTTP endpoint is present but returns `ASR_UNAVAILABLE` while

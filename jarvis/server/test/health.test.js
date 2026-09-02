@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { buildApp } = require('../src/app');
+const { buildApp, loggerOptions } = require('../src/app');
 const { loadConfig } = require('../src/config/loadConfig');
 
 function testConfig() {
@@ -33,4 +33,12 @@ test('readiness reports dependency failure without leaking its error', async (t)
     checks: [{ name: 'database', ok: false, detail: 'check failed' }],
   });
   assert.equal(response.body.includes('secret'), false);
+});
+
+test('logger redacts every configured model-provider key', () => {
+  const options = loggerOptions({ logLevel: 'info' });
+  assert.ok(options.redact.paths.includes('openrouterFallbackApiKey'));
+  assert.ok(options.redact.paths.includes('geminiApiKey'));
+  assert.ok(options.redact.paths.includes('*.openrouterFallbackApiKey'));
+  assert.ok(options.redact.paths.includes('*.geminiApiKey'));
 });

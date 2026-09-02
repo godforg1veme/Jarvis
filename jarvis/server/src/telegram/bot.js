@@ -18,12 +18,31 @@ async function replyWithChunks(ctx, text) {
   for (const chunk of splitTelegramText(text)) await ctx.reply(chunk);
 }
 
+async function downloadTelegramAttachment(ctx, token, maxBytes = 20 * 1024 * 1024, fetchImpl = globalThis.fetch) {
+  try {
+    const file = await ctx.getFile();
+    if (!file || !file.file_path) throw new Error('missing file path');
+    const response = await fetchImpl(`https://api.telegram.org/file/bot${token}/${file.file_path}`);
+    if (!response.ok) throw new Error('file response failed');
+    const declaredSize = Number(response.headers.get('content-length') || 0);
+    if (declaredSize > maxBytes) throw new Error('file is too large');
+    const data = Buffer.from(await response.arrayBuffer());
+    if (data.length === 0 || data.length > maxBytes) throw new Error('file is too large');
+    return data;
+  } catch {
+    // Do not retain a caught network error: Telegram's file URL contains the bot token.
+    throw new Error('Telegram document download failed');
+  }
+}
+
 function createTelegramBot(options) {
   const bot = new Bot(options.token);
   const messageService = options.messageService;
 
-  bot.on('message:text', async (ctx) => {
-    const result = await messageService.handle(ctx.update);
+  bot.on('message', async (ctx) => {
+    const result = await messageService.handle(ctx.update, {
+      downloadAttachment: () => downloadTelegramAttachment(ctx, options.token, options.documentMaxBytes, options.fetchImpl),
+    });
     if (result.status === 'forbidden') {
       await ctx.reply('Доступ к этому Jarvis не разрешён.');
       return;
@@ -44,4 +63,4 @@ function createTelegramBot(options) {
   return bot;
 }
 
-module.exports = { createTelegramBot, replyWithChunks, splitTelegramText };
+module.exports = { createTelegramBot, downloadTelegramAttachment, replyWithChunks, splitTelegramText };

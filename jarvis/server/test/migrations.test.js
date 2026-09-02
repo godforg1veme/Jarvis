@@ -11,6 +11,7 @@ test('migration files are ordered and narrowly named', () => {
     '001_identity_and_conversations.sql',
     '002_assistant_domain.sql',
     '003_desktop_cloud_client.sql',
+    '004_private_knowledge_base.sql',
   ]);
 });
 

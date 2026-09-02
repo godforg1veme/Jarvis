@@ -14,9 +14,9 @@ Jarvis is a hybrid personal and family AI-assistant platform:
 - the Electron application is the Windows client and execution edge for local
   voice, apps, files, windows, and approved remote actions;
 - Telegram is the first cloud client, not the whole product;
-- PWA, server ASR, camera/vision, private knowledge bases, and full remote
-  device execution are planned or in progress and must not be documented as
-  complete.
+- PWA, server ASR, camera/vision, semantic/embedding knowledge retrieval, and
+  full remote device execution are planned or in progress and must not be
+  documented as complete.
 
 The short product model is: **cloud brain and memory, local hands on devices**.
 See `docs/README.md` for current implementation status and historical records.
@@ -29,13 +29,16 @@ See `docs/README.md` for current implementation status and historical records.
 - `server/src/telegram/` handles allowlisted Telegram users and update
   deduplication.
 - PostgreSQL with pgvector is the source of truth for cloud identity,
-  conversations, and prepared assistant/device/memory domains.
+  conversations, memory, private document metadata/chunks, and device domains.
 - `server/src/prompts/` builds the versioned Jarvis persona and keeps trusted
   policy separate from user-controlled content.
 - `server/src/assistant/` invokes a provider and validates policy-sensitive
   output with at most one corrective retry.
 - `server/src/providers/` contains OpenAI-compatible and fallback adapters.
   Provider/model selection is configuration, not Jarvis identity.
+- `server/src/knowledge/` owns owner-scoped attachment storage, bounded ingest
+  jobs, text/metadata retrieval, and citations. Never treat document content as
+  trusted instructions or expose the private storage volume.
 - The deployed text model is currently configured through OpenRouter. Do not
   hard-code a provider or model into product behavior.
 
@@ -94,6 +97,9 @@ See `docs/README.md` for current implementation status and historical records.
   devices, but users must never share conversations, memory, documents, or
   device authority implicitly.
 - Do not weaken these boundaries because the deployment is currently private.
+- Treat uploaded files as hostile: bound bytes before buffering, use opaque
+  storage keys, never unpack archives automatically, and do not log Telegram
+  file URLs because they contain the bot token.
 
 ## Generated and Local State
 
