@@ -2,6 +2,10 @@
 
 Status: approved design as of 2026-09-02.
 
+Platform note: this document remains the detailed design for the first Windows
+execution slice. The generic orchestration and future executor boundaries are
+defined by `2026-09-02-action-orchestrator-platform-foundation-design.md`.
+
 ## Goal
 
 Replace the split between ordinary assistant chat and manually structured
