@@ -5,7 +5,7 @@ const {
   DesktopRequestPendingError,
 } = require('../src/desktop/desktopMessageService');
 
-function harness(requestResult = { created: true, request: { id: 1, status: 'processing' } }, devices = []) {
+function harness(requestResult = { created: true, request: { id: 1, status: 'processing' } }, devices = [], commandService = null, orchestrator = null) {
   const calls = { requests: [], conversations: [], messages: [], answers: [] };
   const service = new DesktopMessageService({
     requestRepository: {
@@ -24,6 +24,8 @@ function harness(requestResult = { created: true, request: { id: 1, status: 'pro
     deviceService: {
       async list({ userId }) { return devices.filter((device) => device.user_id === userId); },
     },
+    commandService,
+    orchestrator,
   });
   return { service, calls };
 }
@@ -94,5 +96,67 @@ test('Desktop answers an attachment question without calling the model', async (
     resolveContent: async () => ({ content: 'К какому ПК я привязан?' }),
   });
   assert.equal(result.answer, 'К твоему аккаунту привязан компьютер «Мой компьютер» — online.');
+  assert.equal(calls.answers.length, 0);
+});
+
+test('Desktop chat creates a remote command and keeps confirmation in the Desktop origin channel', async () => {
+  const commandId = '55555555-5555-4555-8555-555555555555';
+  const commandCalls = [];
+  const { service, calls } = harness(undefined, [], {
+    async create(input) {
+      commandCalls.push({ type: 'create', ...input });
+      return { status: 'awaiting_confirmation', prompt: 'Подтвердить?', command: { id: commandId } };
+    },
+  });
+  const result = await service.handle({
+    device: { id: '66666666-6666-4666-8666-666666666666', user_id: 'user-a' },
+    clientMessageId: 'request-command',
+    resolveContent: async () => ({ content: '/desktop file.create_folder {"path":"C:/Temp/new"}' }),
+  });
+
+  assert.match(result.answer, new RegExp(`/confirm ${commandId}`));
+  assert.equal(commandCalls[0].originChannel, 'desktop');
+  assert.equal(commandCalls[0].originDeviceId, '66666666-6666-4666-8666-666666666666');
+  assert.equal(calls.answers.length, 0);
+  assert.equal(calls.requests.at(-1).type, 'complete');
+});
+
+test('Desktop routes a natural folder request through the general orchestrator', async () => {
+  const orchestratorCalls = [];
+  const { service, calls } = harness(undefined, [], null, {
+    async handle(input) {
+      orchestratorCalls.push(input);
+      return { handled: true, answer: 'Папка открыта.' };
+    },
+  });
+  const result = await service.handle({
+    device: { id: '66666666-6666-4666-8666-666666666666', user_id: 'user-a' },
+    clientMessageId: 'request-folder',
+    resolveContent: async () => ({ content: 'Открой папку C:\\Users\\Max\\Documents' }),
+  });
+
+  assert.equal(result.answer, 'Папка открыта.');
+  assert.equal(orchestratorCalls[0].originChannel, 'desktop');
+  assert.equal(orchestratorCalls[0].originDeviceId, '66666666-6666-4666-8666-666666666666');
+  assert.equal(orchestratorCalls[0].text, 'Открой папку C:\\Users\\Max\\Documents');
+  assert.equal(calls.answers.length, 0);
+});
+
+test('Desktop sends a follow-up folder request to the same orchestrator instead of denying filesystem access', async () => {
+  const seen = [];
+  const { service, calls } = harness(undefined, [], null, {
+    async handle(input) {
+      seen.push(input.text);
+      return { handled: true, answer: 'Ищу папку на этом компьютере.' };
+    },
+  });
+  const result = await service.handle({
+    device: { id: 'device-a', user_id: 'user-a' },
+    clientMessageId: 'request-folder-path',
+    resolveContent: async () => ({ content: 'Привет ты можешь открыть папку?' }),
+  });
+
+  assert.equal(result.answer, 'Ищу папку на этом компьютере.');
+  assert.deepEqual(seen, ['Привет ты можешь открыть папку?']);
   assert.equal(calls.answers.length, 0);
 });

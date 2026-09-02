@@ -26,7 +26,11 @@ function publicDocumentStatus(document) {
   const states = {
     pending: 'ожидает индексации',
     processing: 'индексируется',
-    ready: document.extraction_mode === 'metadata' ? 'готов (поиск по имени и метаданным)' : 'готов',
+    ready: document.embedding_status === 'pending'
+      ? 'готов (текстовый поиск; semantic indexing выполняется)'
+      : document.embedding_status === 'failed'
+      ? 'готов (текстовый поиск; semantic indexing недоступен)'
+      : document.extraction_mode === 'metadata' ? 'готов (поиск по имени и метаданным)' : 'готов',
     failed: 'ошибка индексации',
   };
   return states[document.status] || 'неизвестно';
@@ -49,6 +53,7 @@ class KnowledgeService {
     this.userQuotaBytes = Number(options.userQuotaBytes || (1024 * 1024 * 1024));
     this.extract = options.extract || extractDocumentText;
     this.chunk = options.chunk || chunkText;
+    this.embeddingProvider = options.embeddingProvider || null;
   }
 
   async ingest({ userId, attachment, data }) {
@@ -96,6 +101,7 @@ class KnowledgeService {
       await this.repository.completeJob(job.id);
       return { status: 'skipped' };
     }
+    let documentReady = false;
     try {
       const buffer = await this.storage.read(document.storage_key);
       const storagePath = typeof this.storage.pathFor === 'function'
@@ -118,17 +124,63 @@ class KnowledgeService {
         documentId: document.id,
         chunks,
         extractionMode: extracted.mode,
+        embeddingStatus: this.embeddingProvider ? 'pending' : 'not_requested',
       });
+      documentReady = true;
+      if (this.embeddingProvider && typeof this.repository.enqueueEmbedding === 'function') {
+        await this.repository.enqueueEmbedding({ userId: document.user_id, documentId: document.id });
+      }
       await this.repository.completeJob(job.id);
       return { status: 'ready', chunks: chunks.length };
     } catch (error) {
-      await this.repository.failJob({
+      if (documentReady && this.embeddingProvider) {
+        // The text index is already usable. Leave the document ready and let
+        // the worker recreate a missing embedding job on a later pass.
+        await this.repository.completeJob(job.id);
+      } else {
+        await this.repository.failJob({
+          jobId: job.id,
+          userId: document.user_id,
+          documentId: document.id,
+          attempts: job.attempts,
+          maxAttempts: job.max_attempts,
+          failureCode: 'document_ingest_failed',
+        });
+      }
+      throw error;
+    }
+  }
+
+  async processEmbeddingJob(job) {
+    const documentId = job && job.payload && String(job.payload.documentId || '');
+    if (!/^[a-f0-9-]{36}$/i.test(documentId)) throw new Error('invalid document embedding job');
+    if (!this.embeddingProvider) {
+      await this.repository.completeJob(job.id);
+      return { status: 'skipped' };
+    }
+    const document = await this.repository.getForEmbedding(documentId);
+    if (!document) {
+      await this.repository.completeJob(job.id);
+      return { status: 'skipped' };
+    }
+    try {
+      const embeddings = await this.embeddingProvider.embedDocuments(document.chunks.map((chunk) => chunk.content));
+      await this.repository.markEmbeddings({
+        userId: document.user_id,
+        documentId: document.id,
+        embeddings,
+        model: this.embeddingProvider.model,
+      });
+      await this.repository.completeJob(job.id);
+      return { status: 'ready', chunks: embeddings.length };
+    } catch (error) {
+      await this.repository.failEmbeddingJob({
         jobId: job.id,
         userId: document.user_id,
         documentId: document.id,
         attempts: job.attempts,
         maxAttempts: job.max_attempts,
-        failureCode: 'document_ingest_failed',
+        failureCode: 'document_embedding_failed',
       });
       throw error;
     }
@@ -137,7 +189,23 @@ class KnowledgeService {
   async searchForPrompt({ userId, query }) {
     const text = String(query || '').trim();
     if (text.length < 2) return [];
-    const results = await this.repository.search({ userId, query: text, limit: 8 });
+    let queryEmbedding = null;
+    if (this.embeddingProvider) {
+      try {
+        queryEmbedding = await this.embeddingProvider.embedQuery(text);
+      } catch (_) {
+        // FTS remains available when the embedding service is unavailable.
+        queryEmbedding = null;
+      }
+    }
+    let results;
+    try {
+      results = await this.repository.search({ userId, query: text, queryEmbedding, limit: 8 });
+    } catch (error) {
+      if (!queryEmbedding) throw error;
+      // A stale vector profile must degrade to lexical search instead of hiding the knowledge base.
+      results = await this.repository.search({ userId, query: text, queryEmbedding: null, limit: 8 });
+    }
     return results.map((result, index) => ({
       source: `S${index + 1}`,
       originalName: result.original_name,
@@ -186,8 +254,14 @@ class KnowledgeWorker {
     if (this.running) return;
     this.running = true;
     try {
+      if (typeof this.repository.enqueueMissingEmbeddings === 'function') {
+        await this.repository.enqueueMissingEmbeddings({ limit: 20 });
+      }
       const job = await this.repository.claimNextIngest(this.workerId);
-      if (job) await this.service.processJob(job);
+      if (job) {
+        if (job.kind === 'document_embedding') await this.service.processEmbeddingJob(job);
+        else await this.service.processJob(job);
+      }
     } catch (error) {
       if (this.logger && typeof this.logger.warn === 'function') this.logger.warn({ err: error }, 'knowledge ingest job failed');
     } finally {

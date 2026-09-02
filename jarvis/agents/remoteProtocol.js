@@ -5,9 +5,11 @@ const MESSAGE_TYPES = new Set([
   'device.hello',
   'device.capabilities',
   'device.heartbeat',
+  'device.welcome',
   'command.execute',
   'command.cancel',
   'command.result',
+  'workflow.update',
   'server.error',
 ]);
 
@@ -59,10 +61,17 @@ function validateRemoteMessage(input) {
     message.payload.action = requiredId(payload.action, 'tool action');
     message.payload.args = validateActionArgs(message.payload.action, payload.args || {});
     message.payload.confirmed = payload.confirmed === true;
+    message.payload.strongConfirmed = payload.strongConfirmed === true;
   }
 
   if (type === 'command.cancel' || type === 'command.result') {
     message.payload.commandId = requiredId(payload.commandId, 'command id');
+  }
+  if (type === 'workflow.update') {
+    message.payload.workflowId = requiredId(payload.workflowId, 'workflow id');
+    message.payload.status = requiredId(payload.status, 'workflow status');
+    message.payload.answer = optionalText(payload.answer, 10000, 'workflow answer');
+    if (!message.payload.answer) throw new Error('workflow answer is required');
   }
   if (type === 'command.result' && !isRecord(payload.result)) {
     throw new Error('command result must be an object');

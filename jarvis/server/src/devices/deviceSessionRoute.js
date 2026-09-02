@@ -7,6 +7,8 @@ function send(socket, message) {
 function createDeviceSessionHandler(options) {
   const authenticate = options.authenticate;
   const repository = options.repository;
+  const sessionRegistry = options.sessionRegistry || null;
+  const commandService = options.commandService || null;
   const logger = options.logger || null;
 
   return async function handle(socket) {
@@ -35,6 +37,8 @@ function createDeviceSessionHandler(options) {
             const online = await repository.markOnline({ userId: authenticated.user_id, deviceId: authenticated.id });
             if (!online) throw new Error('device became unavailable');
             device = online;
+            const unregister = sessionRegistry ? sessionRegistry.register(device, socket) : () => {};
+            socket.once('close', unregister);
             clearTimeout(authenticationTimer);
             authenticationTimer = null;
             send(socket, { version: 1, type: 'device.welcome', payload: { deviceId: device.id, status: 'online' } });
@@ -57,6 +61,14 @@ function createDeviceSessionHandler(options) {
         if (message.type === 'device.heartbeat' || message.type === 'device.hello') {
           await repository.markOnline({ userId: device.user_id, deviceId: device.id });
         }
+        if (message.type === 'command.result') {
+          if (!commandService) throw new Error('command service is unavailable');
+          await commandService.handleResult({
+            device,
+            commandId: message.payload.commandId,
+            result: message.payload.result,
+          });
+        }
       } catch (error) {
         // Do not log raw frames or errors carrying validation detail: a first
         // hello frame necessarily contains a device credential.
@@ -73,6 +85,9 @@ function createDeviceSessionHandler(options) {
       if (authenticationTimer) clearTimeout(authenticationTimer);
       authenticationTimer = null;
       if (!device) return;
+      const current = !sessionRegistry || sessionRegistry.isCurrent(device.id, socket);
+      if (sessionRegistry) sessionRegistry.unregister(device.id, socket);
+      if (!current) return;
       void repository.markOffline({ userId: device.user_id, deviceId: device.id })
         .catch((error) => logger && logger.warn({ deviceId: device.id, err: error }, 'failed to mark device offline'));
     });

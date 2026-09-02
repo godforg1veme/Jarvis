@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const { createTelegramAccessPolicy } = require('../src/telegram/accessPolicy');
-const { TelegramMessageService, normalizeTelegramMessage } = require('../src/telegram/messageService');
+const { TelegramMessageService, normalizeTelegramMessage, parseRemoteCommand } = require('../src/telegram/messageService');
 
 function update(id, userId, chatId, text) {
   return {
@@ -29,7 +29,7 @@ test('normalizes media-only Telegram messages without treating them as plain tex
   assert.equal(input.attachment.category, 'audio');
 });
 
-function harness(allowedIds = ['101', '202'], devices = null) {
+function harness(allowedIds = ['101', '202'], devices = null, commandService = null) {
   const state = { updates: new Set(), users: new Map(), conversations: new Map(), messages: [] };
   const assistantCalls = [];
   const service = new TelegramMessageService({
@@ -76,6 +76,7 @@ function harness(allowedIds = ['101', '202'], devices = null) {
         },
       },
     } : {}),
+    ...(commandService ? { commandService } : {}),
   });
   return { service, state, assistantCalls };
 }
@@ -152,4 +153,32 @@ test('answers an attachment question from the owner-scoped device service withou
   const result = await service.handle(update(11, 101, 101, 'К какому ПК я привязан?'));
   assert.equal(result.answer, 'К твоему аккаунту привязан компьютер «Мой компьютер» — online.');
   assert.equal(assistantCalls.length, 0);
+});
+
+test('parses only structured Telegram remote commands', () => {
+  assert.deepEqual(parseRemoteCommand('/desktop 22222222-2222-4222-8222-222222222222 file.search {"query":"report"}'), {
+    deviceId: '22222222-2222-4222-8222-222222222222',
+    action: 'file.search',
+    args: { query: 'report' },
+  });
+  assert.equal(parseRemoteCommand('/desktop device file.search {}'), null);
+  assert.match(parseRemoteCommand('/desktop 22222222-2222-4222-8222-222222222222 file.search nope').error, /JSON/);
+});
+
+test('Telegram keeps changing remote actions behind an origin-channel confirmation', async () => {
+  const calls = [];
+  const { service } = harness(['101'], null, {
+    async create(input) {
+      calls.push(['create', input]);
+      return {
+        status: 'awaiting_confirmation',
+        prompt: 'Подтвердить удалённое действие?',
+        command: { id: '33333333-3333-4333-8333-333333333333' },
+      };
+    },
+  });
+  const result = await service.handle(update(12, 101, 101, '/desktop 22222222-2222-4222-8222-222222222222 file.delete {"path":"C:/Temp/old.txt"}'));
+  assert.match(result.answer, /\/confirm 33333333-3333-4333-8333-333333333333/);
+  assert.equal(calls[0][1].originChannel, 'telegram');
+  assert.equal(calls[0][1].userId, 'user-101');
 });

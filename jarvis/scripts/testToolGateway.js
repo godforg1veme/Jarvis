@@ -2,6 +2,7 @@ const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { FileCandidateVault } = require('../agents/fileCandidateVault');
 
 const {
   POLICY,
@@ -28,6 +29,7 @@ async function run() {
   assert.strictEqual(policyForAction('file.overwrite'), '');
   assert.throws(() => validateToolRequest({ action: 'file.nope', args: {} }), /unknown tool action/);
   assert.throws(() => validateToolRequest({ action: 'file.copy', args: { overwrite: 'true' } }), /overwrite must be a boolean/);
+  assert.throws(() => validateToolRequest({ action: 'window.list', args: { deviceId: 'model-invented' } }), /unknown argument/);
 
   const root = makeTempTree();
   const desktop = path.join(root, 'Desktop');
@@ -61,6 +63,47 @@ async function run() {
     shell: { showItemInFolder: () => {} },
   });
   assert.strictEqual(reveal.ok, true);
+
+  const openedFolder = await executeToolRequest({
+    action: 'file.open_folder',
+    args: { path: desktop },
+  }, {
+    allowRoots: [root],
+    shell: { openPath: async () => '' },
+  });
+  assert.strictEqual(openedFolder.ok, true);
+  assert.strictEqual(openedFolder.action, 'file.open_folder');
+
+  const rejectedFileAsFolder = await executeToolRequest({
+    action: 'file.open_folder',
+    args: { path: path.join(desktop, 'image.png') },
+  }, { allowRoots: [root] });
+  assert.strictEqual(rejectedFileAsFolder.ok, false);
+  assert.strictEqual(rejectedFileAsFolder.error, 'path is not a directory');
+
+  const candidateVault = new FileCandidateVault();
+  const publicFolderCandidate = candidateVault.register({ path: desktop, score: 100, source: 'test' });
+  assert.match(publicFolderCandidate.candidateId, /^candidate-file-/);
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(publicFolderCandidate, 'path'), false);
+  const openedCandidateFolder = await executeToolRequest({
+    action: 'file.open_folder',
+    args: { candidateId: publicFolderCandidate.candidateId },
+  }, {
+    allowRoots: [root],
+    resolveFileCandidate: (candidateId, options) => candidateVault.resolve(candidateId, options),
+    shell: { openPath: async () => '' },
+  });
+  assert.strictEqual(openedCandidateFolder.ok, true);
+  assert.strictEqual(openedCandidateFolder.target.type, 'directory');
+  assert.throws(() => candidateVault.resolve(publicFolderCandidate.candidateId), /unavailable or expired/);
+
+  const fileAsFolderCandidate = candidateVault.register({ path: path.join(desktop, 'image.png'), score: 100 });
+  const rejectedOpaqueFileAsFolder = await executeToolRequest({
+    action: 'file.open_folder',
+    args: { candidateId: fileAsFolderCandidate.candidateId },
+  }, { resolveFileCandidate: (candidateId, options) => candidateVault.resolve(candidateId, options) });
+  assert.strictEqual(rejectedOpaqueFileAsFolder.ok, false);
+  assert.match(rejectedOpaqueFileAsFolder.error, /type changed/);
 
   const dangerousOpen = await executeToolRequest({
     action: 'file.open',

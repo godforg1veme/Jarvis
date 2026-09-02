@@ -1,5 +1,34 @@
 const { ACTION_POLICIES, normalizeAction } = require('./toolPolicy');
 
+const ACTION_ARG_KEYS = Object.freeze({
+  'file.search': ['query', 'location', 'targetType', 'limit', 'enableDiskScan'],
+  'file.list_directory': ['path', 'limit'],
+  'file.open': ['path', 'candidateId'],
+  'file.open_folder': ['path', 'candidateId'],
+  'file.reveal': ['path', 'candidateId'],
+  'file.create_folder': ['path', 'overwrite'],
+  'file.create_text_file': ['path', 'content', 'overwrite'],
+  'file.rename': ['from', 'path', 'newName'],
+  'file.move': ['from', 'path', 'to', 'destination', 'overwrite'],
+  'file.copy': ['from', 'path', 'to', 'destination', 'overwrite'],
+  'file.delete': ['path'],
+  'file.permanent_delete': ['path'],
+  'file.move_batch': ['paths', 'items', 'to', 'destination'],
+  'file.copy_batch': ['paths', 'items', 'to', 'destination', 'overwrite'],
+  'file.rename_batch': ['paths', 'items'],
+  'file.delete_batch': ['paths', 'items'],
+  'app.resolve': ['query', 'name', 'infoOnly'],
+  'app.launch': ['candidateId'],
+  'app.close': ['appId'],
+  'window.list': [],
+  'window.focus': ['hwnd'],
+  'window.restore': ['hwnd'],
+  'window.close': ['hwnd'],
+  'window.move': ['hwnd', 'x', 'y', 'width', 'height'],
+  'window.resize': ['hwnd', 'x', 'y', 'width', 'height'],
+  'window.layout': ['items', 'hwnds', 'layout'],
+});
+
 function isRecord(value) {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
@@ -23,13 +52,22 @@ function validateActionArgs(action, input) {
   if (!isRecord(input)) throw new Error('tool request args must be an object');
 
   const args = { ...input };
+  const allowedKeys = new Set(ACTION_ARG_KEYS[normalizedAction] || []);
+  const unknownKey = Object.keys(args).find((key) => !allowedKeys.has(key));
+  if (unknownKey) throw new Error(`unknown argument for ${normalizedAction}: ${unknownKey}`);
   if (Object.prototype.hasOwnProperty.call(args, 'overwrite') && typeof args.overwrite !== 'boolean') {
     throw new Error('overwrite must be a boolean');
   }
 
   if (normalizedAction === 'file.search') requireText(args, ['query'], 'query');
-  if (['file.list_directory', 'file.open', 'file.reveal', 'file.create_folder', 'file.create_text_file', 'file.delete', 'file.permanent_delete'].includes(normalizedAction)) {
+  if (['file.list_directory', 'file.create_folder', 'file.create_text_file', 'file.delete', 'file.permanent_delete'].includes(normalizedAction)) {
     requireText(args, ['path'], 'path');
+  }
+  if (['file.open', 'file.open_folder', 'file.reveal'].includes(normalizedAction)) {
+    requireText(args, ['path', 'candidateId'], 'path or candidateId');
+    if (args.candidateId && !/^candidate-file-[a-zA-Z0-9-]+$/.test(String(args.candidateId))) {
+      throw new Error('opaque file candidateId is invalid');
+    }
   }
   if (normalizedAction === 'file.rename') {
     requireText(args, ['from', 'path'], 'source path');
@@ -67,6 +105,7 @@ function validateActionArgs(action, input) {
 }
 
 module.exports = {
+  ACTION_ARG_KEYS,
   isRecord,
   validateActionArgs,
 };

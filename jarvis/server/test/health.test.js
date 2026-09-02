@@ -41,4 +41,6 @@ test('logger redacts every configured model-provider key', () => {
   assert.ok(options.redact.paths.includes('geminiApiKey'));
   assert.ok(options.redact.paths.includes('*.openrouterFallbackApiKey'));
   assert.ok(options.redact.paths.includes('*.geminiApiKey'));
+  assert.ok(options.redact.paths.includes('embeddingApiKey'));
+  assert.ok(options.redact.paths.includes('*.embeddingApiKey'));
 });

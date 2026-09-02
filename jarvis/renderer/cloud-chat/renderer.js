@@ -130,13 +130,19 @@ elements.messageForm.addEventListener('submit', async (event) => {
   appendMessage('user', text);
   elements.messageInput.value = '';
   elements.sendButton.disabled = true;
-  const result = await cloud.sendMessage(text);
-  elements.sendButton.disabled = false;
-  if (!result || !result.ok) {
-    appendMessage('system', result && result.error ? result.error : 'Сервер не ответил.');
-    return;
+  try {
+    const result = await cloud.sendMessage(text);
+    if (!result || !result.ok) {
+      appendMessage('system', result && result.error ? result.error : 'Сервер не ответил.');
+      return;
+    }
+    appendMessage('assistant', result.answer);
+  } catch (_) {
+    appendMessage('system', 'Сервер недоступен. Попробуйте ещё раз.');
+  } finally {
+    elements.sendButton.disabled = !state.paired;
+    elements.messageInput.focus();
   }
-  appendMessage('assistant', result.answer);
 });
 
 elements.messageInput.addEventListener('keydown', (event) => {

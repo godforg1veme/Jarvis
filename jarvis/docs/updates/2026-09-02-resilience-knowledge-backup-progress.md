@@ -31,3 +31,25 @@ Status: 2026-09-02. This update supersedes the relevant roadmap status in the
 - A full production deployment and restore drill have not run yet.
 - Audio/video speech content requires the later server-ASR benchmark and
   provider rollout; their metadata is already stored privately.
+
+## Semantic retrieval and confirmed Desktop commands
+
+- OpenAI-compatible embeddings are configured only through environment
+  variables. Production currently uses OpenRouter with
+  `openai/text-embedding-3-small` (1536 dimensions). Document and query
+  embeddings are bounded, owner-scoped, processed by background jobs, and
+  combined with PostgreSQL FTS through reciprocal-rank fusion. Provider
+  failures preserve lexical search.
+- Remote commands now have persisted lifecycle state, source-client confirmation,
+  expiry, audit events, authenticated WSS delivery, Tool Gateway execution, and
+  a Desktop command journal that prevents replay after a client restart.
+- The Action Orchestrator now converts natural Desktop/Telegram requests into a
+  bounded strict plan, persists workflows and action runs, resumes from WSS
+  results, and delivers delayed completion to the originating client. Search
+  paths remain local behind short-lived opaque candidate IDs.
+- Migration 006 and the updated control plane passed VPS preflight, Compose
+  health and public Cloudflare smoke checks on 2026-09-02. A real Telegram TXT
+  document produced a ready production vector and answered a low-lexical-overlap
+  query with the expected citation. A Telegram-origin file deletion displayed
+  its confirmation in Telegram; replying `нет` cancelled it and left the file
+  intact. Live multi-device acceptance remains outstanding.

@@ -105,3 +105,63 @@ test('cloud client sends the credential only in the first WSS hello frame', asyn
     fs.rmSync(userDataPath, { recursive: true, force: true });
   }
 });
+
+test('cloud client executes an approved remote command once and returns the cached result on replay', async () => {
+  const userDataPath = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-cloud-client-'));
+  try {
+    let socket;
+    let executions = 0;
+    const commandId = '44444444-4444-4444-8444-444444444444';
+    const client = new DesktopCloudClient({
+      userDataPath,
+      safeStorage: fakeSafeStorage(),
+      capabilities: { localActions: ['file.search'], protocolVersion: 1 },
+      executeRemoteCommand: async (request, options) => {
+        executions += 1;
+        assert.equal(request.action, 'file.search');
+        assert.equal(options.confirmed, false);
+        return { ok: true, action: request.action, results: [] };
+      },
+      WebSocket: class extends HandshakeSocket { constructor(url) { super(url); socket = this; } },
+      fetch: async () => response({ ok: true, device: { id: 'device-a', name: 'Home PC' }, token: 'x'.repeat(43) }, 201),
+    });
+    await client.pair({ serverUrl: 'https://jarvis.example.test', pairingCode: 'JARVIS-ABCD-1234-ABCD-1234' });
+    socket.emit('open');
+    socket.emit('message', { data: JSON.stringify({ version: 1, type: 'device.welcome', payload: { deviceId: 'device-a', status: 'online' } }) });
+    const frame = JSON.stringify({ version: 1, type: 'command.execute', payload: { commandId, action: 'file.search', args: { query: 'report' }, confirmed: false } });
+    socket.emit('message', { data: frame });
+    await new Promise((resolve) => setImmediate(resolve));
+    socket.emit('message', { data: frame });
+    await new Promise((resolve) => setImmediate(resolve));
+    const results = socket.sent.filter((message) => message.type === 'command.result');
+    assert.equal(executions, 1);
+    assert.equal(results.length, 2);
+    assert.equal(results[0].payload.result.ok, true);
+    client.stopSession();
+  } finally {
+    fs.rmSync(userDataPath, { recursive: true, force: true });
+  }
+});
+
+test('cloud client forwards a validated asynchronous workflow result to the renderer bridge', async () => {
+  const userDataPath = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-cloud-client-'));
+  try {
+    let socket;
+    const updates = [];
+    const client = new DesktopCloudClient({
+      userDataPath,
+      safeStorage: fakeSafeStorage(),
+      onWorkflowUpdate: (update) => updates.push(update),
+      WebSocket: class extends HandshakeSocket { constructor(url) { super(url); socket = this; } },
+      fetch: async () => response({ ok: true, device: { id: 'device-a', name: 'Home PC' }, token: 'x'.repeat(43) }, 201),
+    });
+    await client.pair({ serverUrl: 'https://jarvis.example.test', pairingCode: 'JARVIS-ABCD-1234-ABCD-1234' });
+    socket.emit('open');
+    socket.emit('message', { data: JSON.stringify({ version: 1, type: 'device.welcome', payload: { deviceId: 'device-a', status: 'online' } }) });
+    socket.emit('message', { data: JSON.stringify({ version: 1, type: 'workflow.update', payload: { workflowId: 'workflow-1', status: 'completed', answer: 'Папка открыта.' } }) });
+    assert.deepEqual(updates, [{ workflowId: 'workflow-1', status: 'completed', answer: 'Папка открыта.' }]);
+    client.stopSession();
+  } finally {
+    fs.rmSync(userDataPath, { recursive: true, force: true });
+  }
+});

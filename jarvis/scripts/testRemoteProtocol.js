@@ -22,6 +22,16 @@ const command = createRemoteMessage('command.execute', {
 assert.strictEqual(command.payload.action, 'file.search');
 assert.strictEqual(command.payload.confirmed, false);
 
+const workflowUpdate = createRemoteMessage('workflow.update', {
+  workflowId: 'workflow-1',
+  status: 'completed',
+  answer: 'Папка открыта.',
+});
+assert.strictEqual(workflowUpdate.payload.answer, 'Папка открыта.');
+assert.throws(() => createRemoteMessage('workflow.update', {
+  workflowId: 'workflow-1', status: 'completed', answer: '',
+}), /answer is required/);
+
 assert.throws(() => validateRemoteMessage({ version: 2, type: 'device.heartbeat', payload: {} }), /unsupported/);
 assert.throws(() => createRemoteMessage('device.hello', { deviceId: 'x', token: '' }), /token is required/);
 assert.throws(() => createRemoteMessage('command.execute', {

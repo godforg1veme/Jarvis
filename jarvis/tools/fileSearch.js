@@ -169,9 +169,10 @@ async function searchFiles(args = {}, options = {}) {
     return { ok: false, reason: 'missing_query', results: [] };
   }
 
+  const directLocation = path.isAbsolute(String(location || '')) ? path.resolve(String(location)) : '';
   const explicitPath = isBroadLocation(location)
     ? ''
-    : options.locationPath || resolveLocationPath(location, options.env || process.env);
+    : options.locationPath || directLocation || resolveLocationPath(location, options.env || process.env);
   if (!isBroadLocation(location) && !explicitPath) {
     return { ok: false, reason: 'unknown_location', results: [] };
   }

@@ -39,9 +39,18 @@ function win32TypeDefinition() {
   ].join('\n');
 }
 
-function buildListWindowsScript() {
+function powerShellPreamble() {
   return [
     "$ErrorActionPreference = 'Stop'",
+    '$utf8 = [System.Text.UTF8Encoding]::new($false)',
+    '[Console]::OutputEncoding = $utf8',
+    '$OutputEncoding = $utf8',
+  ];
+}
+
+function buildListWindowsScript() {
+  return [
+    ...powerShellPreamble(),
     win32TypeDefinition(),
     '$windows = New-Object System.Collections.Generic.List[object]',
     '$callback = [JarvisWin32+EnumWindowsProc]{',
@@ -53,11 +62,11 @@ function buildListWindowsScript() {
     '  [JarvisWin32]::GetWindowText($hWnd, $builder, $builder.Capacity) | Out-Null',
     '  $title = $builder.ToString()',
     '  if ([string]::IsNullOrWhiteSpace($title)) { return $true }',
-    '  $pid = 0',
-    '  [JarvisWin32]::GetWindowThreadProcessId($hWnd, [ref]$pid) | Out-Null',
+    '  [uint32]$processId = 0',
+    '  [JarvisWin32]::GetWindowThreadProcessId($hWnd, [ref]$processId) | Out-Null',
     '  $processName = ""',
-    '  try { $processName = (Get-Process -Id $pid -ErrorAction Stop).ProcessName } catch {}',
-    '  $windows.Add([pscustomobject]@{ hwnd = $hWnd.ToInt64(); title = $title; processId = $pid; processName = $processName; minimized = [JarvisWin32]::IsIconic($hWnd); maximized = [JarvisWin32]::IsZoomed($hWnd) }) | Out-Null',
+    '  try { $processName = (Get-Process -Id $processId -ErrorAction Stop).ProcessName } catch {}',
+    '  $windows.Add([pscustomobject]@{ hwnd = $hWnd.ToInt64(); title = $title; processId = $processId; processName = $processName; minimized = [JarvisWin32]::IsIconic($hWnd); maximized = [JarvisWin32]::IsZoomed($hWnd) }) | Out-Null',
     '  return $true',
     '}',
     '[JarvisWin32]::EnumWindows($callback, [IntPtr]::Zero) | Out-Null',
@@ -67,7 +76,7 @@ function buildListWindowsScript() {
 
 function buildShowWindowScript(hwnd, command) {
   return [
-    "$ErrorActionPreference = 'Stop'",
+    ...powerShellPreamble(),
     win32TypeDefinition(),
     `$hwnd = [IntPtr]${Number(hwnd)}`,
     `[JarvisWin32]::ShowWindow($hwnd, ${Number(command)}) | Out-Null`,
@@ -78,7 +87,7 @@ function buildShowWindowScript(hwnd, command) {
 
 function buildMoveResizeScript(hwnd, rect) {
   return [
-    "$ErrorActionPreference = 'Stop'",
+    ...powerShellPreamble(),
     win32TypeDefinition(),
     `$hwnd = [IntPtr]${Number(hwnd)}`,
     `[JarvisWin32]::SetWindowPos($hwnd, [IntPtr]${HWND_TOP}, ${Math.round(rect.x)}, ${Math.round(rect.y)}, ${Math.round(rect.width)}, ${Math.round(rect.height)}, ${SWP_SHOWWINDOW}) | Out-Null`,
@@ -88,7 +97,7 @@ function buildMoveResizeScript(hwnd, rect) {
 
 function buildCloseWindowScript(hwnd) {
   return [
-    "$ErrorActionPreference = 'Stop'",
+    ...powerShellPreamble(),
     win32TypeDefinition(),
     `$hwnd = [IntPtr]${Number(hwnd)}`,
     '[JarvisWin32]::PostMessage($hwnd, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null',

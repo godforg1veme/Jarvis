@@ -17,6 +17,7 @@ const ACTION_POLICIES = Object.freeze({
   'window.list': POLICY.OBSERVE,
 
   'file.open': POLICY.LOW_RISK,
+  'file.open_folder': POLICY.LOW_RISK,
   'file.reveal': POLICY.LOW_RISK,
   'window.focus': POLICY.LOW_RISK,
   'window.restore': POLICY.LOW_RISK,

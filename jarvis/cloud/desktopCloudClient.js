@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const { createRemoteMessage } = require('../agents/remoteProtocol');
+const { createRemoteMessage, validateRemoteMessage } = require('../agents/remoteProtocol');
 
 const PUBLIC_STATE_FILE = 'cloud-device.json';
 const SECRET_FILE = 'cloud-device.token';
@@ -9,6 +9,8 @@ const HEARTBEAT_MS = 30000;
 const MAX_RECONNECT_MS = 30000;
 const AUTHENTICATION_TIMEOUT_MS = 10000;
 const DEFAULT_CLOUD_SERVER_URL = 'https://jarvis.rilora.ru';
+const COMMAND_JOURNAL_FILE = 'cloud-command-journal.json';
+const MAX_COMMAND_JOURNAL_ENTRIES = 100;
 
 function normalizeServerUrl(value, options = {}) {
   const url = new URL(String(value || '').trim());
@@ -49,9 +51,13 @@ class DesktopCloudClient {
       allowHttp: this.allowHttp,
     });
     this.onState = typeof options.onState === 'function' ? options.onState : () => {};
+    this.onWorkflowUpdate = typeof options.onWorkflowUpdate === 'function' ? options.onWorkflowUpdate : () => {};
     this.capabilities = options.capabilities || { wakeWord: true, localTts: true, protocolVersion: 1 };
+    this.executeRemoteCommand = typeof options.executeRemoteCommand === 'function' ? options.executeRemoteCommand : null;
     this.publicPath = path.join(this.userDataPath, PUBLIC_STATE_FILE);
     this.secretPath = path.join(this.userDataPath, SECRET_FILE);
+    this.commandJournalPath = path.join(this.userDataPath, COMMAND_JOURNAL_FILE);
+    this.commandJournal = this._readCommandJournal();
     this.publicState = this._readPublicState();
     this.socket = null;
     this.heartbeat = null;
@@ -85,6 +91,33 @@ class DesktopCloudClient {
     } catch (_) {
       return '';
     }
+  }
+
+  _readCommandJournal() {
+    try {
+      const value = safeJsonParse(fs.readFileSync(this.commandJournalPath, 'utf8'), {});
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+      return Object.fromEntries(Object.entries(value)
+        .filter(([key, item]) => (/^[a-f0-9-]{36}$/i.test(key) || /^cmd-[a-zA-Z0-9_.:-]{1,128}$/.test(key)) && item && typeof item === 'object')
+        .slice(-MAX_COMMAND_JOURNAL_ENTRIES));
+    } catch (_) {
+      return {};
+    }
+  }
+
+  _writeCommandJournal() {
+    fs.mkdirSync(this.userDataPath, { recursive: true });
+    const entries = Object.entries(this.commandJournal).slice(-MAX_COMMAND_JOURNAL_ENTRIES);
+    const temporary = `${this.commandJournalPath}.${process.pid}.tmp`;
+    fs.writeFileSync(temporary, `${JSON.stringify(Object.fromEntries(entries))}\n`, 'utf8');
+    fs.renameSync(temporary, this.commandJournalPath);
+  }
+
+  _rememberCommand(commandId, entry) {
+    this.commandJournal[commandId] = entry;
+    const entries = Object.entries(this.commandJournal).slice(-MAX_COMMAND_JOURNAL_ENTRIES);
+    this.commandJournal = Object.fromEntries(entries);
+    this._writeCommandJournal();
   }
 
   _writeCredentials({ serverUrl, device, token }) {
@@ -198,6 +231,26 @@ class DesktopCloudClient {
     });
   }
 
+  async createRemoteCommand({ deviceId, action, args = {} }) {
+    return this._request('/v1/desktop/commands', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deviceId, action, args }),
+    });
+  }
+
+  async getRemoteCommand(commandId) {
+    return this._request(`/v1/desktop/commands/${encodeURIComponent(String(commandId || ''))}`);
+  }
+
+  async approveRemoteCommand(commandId) {
+    return this._request(`/v1/desktop/commands/${encodeURIComponent(String(commandId || ''))}/approve`, { method: 'POST' });
+  }
+
+  async rejectRemoteCommand(commandId) {
+    return this._request(`/v1/desktop/commands/${encodeURIComponent(String(commandId || ''))}/reject`, { method: 'POST' });
+  }
+
   _clearSessionTimers() {
     if (this.heartbeat) clearInterval(this.heartbeat);
     if (this.authenticationTimer) clearTimeout(this.authenticationTimer);
@@ -246,8 +299,14 @@ class DesktopCloudClient {
       }, AUTHENTICATION_TIMEOUT_MS);
     });
     this.socket.addEventListener('message', (event) => {
-      const message = safeJsonParse(String(event.data || ''), null);
-      if (message && message.type === 'device.welcome' && message.payload && message.payload.deviceId === this.publicState.deviceId) {
+      let message;
+      try {
+        message = validateRemoteMessage(safeJsonParse(String(event.data || ''), null));
+      } catch (_) {
+        this._emitState({ lastError: 'INVALID_REMOTE_MESSAGE' });
+        return;
+      }
+      if (message.type === 'device.welcome' && message.payload && message.payload.deviceId === this.publicState.deviceId) {
         if (this.authenticationTimer) clearTimeout(this.authenticationTimer);
         this.authenticationTimer = null;
         this.connection = 'online';
@@ -256,7 +315,17 @@ class DesktopCloudClient {
         this._sendSessionMessage('device.capabilities', { actions: this.capabilities.localActions || [] });
         this._sendSessionMessage('device.heartbeat', {});
         this.heartbeat = setInterval(() => this._sendSessionMessage('device.heartbeat', {}), HEARTBEAT_MS);
-      } else if (message && message.type === 'server.error') {
+      } else if (message.type === 'command.execute') {
+        void this._handleRemoteCommand(message);
+      } else if (message.type === 'command.cancel') {
+        this._emitState({ lastError: 'REMOTE_COMMAND_CANCEL_REQUESTED' });
+      } else if (message.type === 'workflow.update') {
+        this.onWorkflowUpdate({
+          workflowId: message.payload.workflowId,
+          status: message.payload.status,
+          answer: message.payload.answer,
+        });
+      } else if (message.type === 'server.error') {
         this._emitState({ lastError: message.payload && message.payload.code });
       }
     });
@@ -269,6 +338,70 @@ class DesktopCloudClient {
       if (!this.manuallyStopped) this._scheduleReconnect();
     });
     this.socket.addEventListener('error', () => {});
+  }
+
+  async _handleRemoteCommand(message) {
+    const payload = message.payload || {};
+    const commandId = payload.commandId;
+    const cached = this.commandJournal[commandId];
+    if (cached) {
+      const result = cached.status === 'completed'
+        ? cached.result
+        : { ok: false, executionUnknown: true, error: 'Previous command execution state is unknown.' };
+      this._sendSessionMessage('command.result', { commandId, result });
+      return;
+    }
+
+    const actions = Array.isArray(this.capabilities.localActions) ? this.capabilities.localActions : [];
+    if (!actions.includes(payload.action)) {
+      const result = { ok: false, action: payload.action, error: 'Action is not available on this Desktop.' };
+      this._rememberCommand(commandId, { status: 'completed', result });
+      this._sendSessionMessage('command.result', { commandId, result });
+      return;
+    }
+
+    try {
+      this._rememberCommand(commandId, { status: 'running', action: payload.action });
+    } catch (_) {
+      const result = {
+        ok: false,
+        action: payload.action,
+        error: 'Desktop command journal is unavailable; command was not executed.',
+      };
+      this._sendSessionMessage('command.result', { commandId, result });
+      return;
+    }
+    let result;
+    try {
+      if (!this.executeRemoteCommand) throw new Error('Desktop command executor is unavailable.');
+      result = await this.executeRemoteCommand({
+        requestId: commandId,
+        action: payload.action,
+        args: payload.args || {},
+      }, {
+        confirmed: payload.confirmed === true,
+        strongConfirmed: payload.strongConfirmed === true,
+      });
+      if (!result || typeof result !== 'object' || Array.isArray(result)) {
+        result = { ok: false, action: payload.action, error: 'Desktop returned an invalid command result.' };
+      }
+      if (result.requiresConfirmation || result.requiresStrongConfirmation) {
+        result = { ok: false, action: payload.action, error: 'Server confirmation did not satisfy local policy.' };
+      }
+    } catch (error) {
+      result = { ok: false, action: payload.action, error: String(error && error.message || 'Desktop command failed').slice(0, 500) };
+    }
+    try {
+      this._rememberCommand(commandId, { status: 'completed', action: payload.action, result });
+    } catch (_) {
+      result = {
+        ok: false,
+        action: payload.action,
+        executionUnknown: true,
+        error: 'Command completed but its local journal could not be updated.',
+      };
+    }
+    this._sendSessionMessage('command.result', { commandId, result });
   }
 
   _scheduleReconnect() {
@@ -301,6 +434,7 @@ module.exports = {
   HEARTBEAT_MS,
   MAX_RECONNECT_MS,
   AUTHENTICATION_TIMEOUT_MS,
+  COMMAND_JOURNAL_FILE,
   createClientMessageId,
   normalizeServerUrl,
   toWebSocketUrl,

@@ -50,6 +50,13 @@ const baseSchema = z.object({
   documentWorkerIntervalMs: z.number().int().min(250).max(60000),
   pdfToTextBin: z.string().min(1).max(2048),
   ffprobeBin: z.string().min(1).max(2048),
+  embeddingProvider: z.enum(['disabled', 'openai-compatible']),
+  embeddingBaseUrl: z.string().max(2048),
+  embeddingApiKey: z.string().max(2048),
+  embeddingModel: z.string().max(255),
+  embeddingDimensions: z.number().int().min(0).max(4096),
+  embeddingTimeoutMs: z.number().int().min(1000).max(120000),
+  embeddingBatchSize: z.number().int().min(1).max(64),
   asrProvider: z.enum(['disabled', 'openai-compatible']),
   asrBaseUrl: z.string().max(2048),
   asrApiKey: z.string().max(2048),
@@ -103,6 +110,20 @@ function validateAsr(config) {
   }
 }
 
+function validateEmbeddings(config) {
+  if (config.embeddingProvider !== 'openai-compatible') return;
+  if (!config.embeddingBaseUrl || !config.embeddingModel) {
+    throw new Error('JARVIS_EMBEDDING_BASE_URL and JARVIS_EMBEDDING_MODEL are required for embeddings');
+  }
+  const url = new URL(config.embeddingBaseUrl);
+  if (config.nodeEnv === 'production' && url.protocol !== 'https:') {
+    throw new Error('JARVIS_EMBEDDING_BASE_URL must use HTTPS in production');
+  }
+  if (config.embeddingDimensions === 0) {
+    throw new Error('JARVIS_EMBEDDING_DIMENSIONS is required for embeddings');
+  }
+}
+
 function loadConfig(env = process.env) {
   const raw = {
     nodeEnv: String(env.NODE_ENV || 'development').trim().toLowerCase(),
@@ -134,6 +155,13 @@ function loadConfig(env = process.env) {
     documentWorkerIntervalMs: Number(env.JARVIS_DOCUMENT_WORKER_INTERVAL_MS || 2000),
     pdfToTextBin: String(env.JARVIS_PDFTOTEXT_BIN || 'pdftotext').trim(),
     ffprobeBin: String(env.JARVIS_FFPROBE_BIN || 'ffprobe').trim(),
+    embeddingProvider: String(env.JARVIS_EMBEDDING_PROVIDER || 'disabled').trim().toLowerCase(),
+    embeddingBaseUrl: String(env.JARVIS_EMBEDDING_BASE_URL || '').trim(),
+    embeddingApiKey: String(env.JARVIS_EMBEDDING_API_KEY || '').trim(),
+    embeddingModel: String(env.JARVIS_EMBEDDING_MODEL || '').trim(),
+    embeddingDimensions: Number(env.JARVIS_EMBEDDING_DIMENSIONS || 0),
+    embeddingTimeoutMs: Number(env.JARVIS_EMBEDDING_TIMEOUT_MS || 60000),
+    embeddingBatchSize: Number(env.JARVIS_EMBEDDING_BATCH_SIZE || 32),
     asrProvider: String(env.JARVIS_ASR_PROVIDER || 'disabled').trim().toLowerCase(),
     asrBaseUrl: String(env.ASR_BASE_URL || '').trim(),
     asrApiKey: String(env.ASR_API_KEY || '').trim(),
@@ -151,6 +179,7 @@ function loadConfig(env = process.env) {
   validateProvider(config, config.modelFallbackProvider);
   validateConfiguredFallbacks(config);
   validateAsr(config);
+  validateEmbeddings(config);
   if (config.modelProvider !== 'echo' && config.modelProvider === config.modelFallbackProvider) {
     throw new Error('model fallback provider must differ from the primary provider');
   }
@@ -163,4 +192,5 @@ module.exports = {
   parseBoolean,
   validateConfiguredFallbacks,
   validateAsr,
+  validateEmbeddings,
 };

@@ -155,12 +155,22 @@ async function searchFilesForGateway(args, options = {}) {
 
 async function openOrReveal(action, args, options = {}) {
   const shell = options.shell;
-  const targetPath = normalizePath(args.path, options);
+  let resolvedCandidate = null;
+  if (args.candidateId) {
+    if (typeof options.resolveFileCandidate !== 'function') throw new Error('trusted file candidate resolver is unavailable');
+    resolvedCandidate = options.resolveFileCandidate(args.candidateId, {
+      expectedType: action === 'file.open_folder' ? 'directory' : undefined,
+    });
+  }
+  const targetPath = normalizePath(resolvedCandidate?.path || args.path, options);
   if (!fs.existsSync(targetPath)) {
     return { ok: false, action, policy: POLICY.LOW_RISK, error: 'path does not exist', path: targetPath };
   }
 
   const stats = fs.statSync(targetPath);
+  if (action === 'file.open_folder' && !stats.isDirectory()) {
+    return { ok: false, action, policy: POLICY.LOW_RISK, error: 'path is not a directory', path: targetPath };
+  }
   const candidate = stats.isFile()
     ? toFileCandidate(targetPath, stats, 'gateway', 100)
     : {
@@ -446,7 +456,7 @@ async function executeToolRequest(request, options = {}) {
   try {
     if (action === 'file.search') return await searchFilesForGateway(args, options);
     if (action === 'file.list_directory') return listDirectory(args, options);
-    if (action === 'file.open' || action === 'file.reveal') return await openOrReveal(action, args, options);
+    if (action === 'file.open' || action === 'file.open_folder' || action === 'file.reveal') return await openOrReveal(action, args, options);
     if (action === 'file.create_folder') return createFolder(args, options);
     if (action === 'file.create_text_file') return createTextFile(args, options);
     if (action === 'file.rename') return renamePath(args, options);

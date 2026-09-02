@@ -2,6 +2,7 @@ const MAX_TEXT_LENGTH = 10000;
 const { attachmentReply, isDeviceAttachmentQuestion } = require('../devices/deviceReplies');
 const { attachmentFromTelegramMessage } = require('../knowledge/fileTypes');
 const { publicDocumentStatus, renderDocumentCitations } = require('../knowledge/knowledgeService');
+const { parseRemoteCommand, remoteCommandReply } = require('../commands/commandText');
 
 function normalizeTelegramMessage(update) {
   const message = update && update.message;
@@ -48,7 +49,7 @@ function normalizeTelegramMessage(update) {
 function commandReply(text) {
   const command = String(text || '').split(/\s+/, 1)[0].split('@', 1)[0].toLowerCase();
   if (command === '/start') return 'Jarvis подключён. Напишите вопрос обычным сообщением.';
-  if (command === '/help') return 'Доступно: текстовые вопросы, загрузка файлов, /documents, /document_delete ID confirm, /devices, /pair Имя ПК, /revoke ID устройства, /memory, а также «запомни», «забудь» и «исправь старое → новое».';
+  if (command === '/help') return 'Доступно: текстовые вопросы, загрузка файлов, /documents, /document_delete ID confirm, /devices, /pair Имя ПК, /revoke ID устройства, /desktop DEVICE_ID ACTION JSON, /confirm COMMAND_ID, /reject COMMAND_ID, /command COMMAND_ID, /memory, а также «запомни», «забудь» и «исправь старое → новое».';
   if (command === '/memory') return null;
   return null;
 }
@@ -71,6 +72,19 @@ class TelegramMessageService {
     this.deviceService = options.deviceService || null;
     this.memoryService = options.memoryService || null;
     this.knowledgeService = options.knowledgeService || null;
+    this.commandService = options.commandService || null;
+    this.orchestrator = options.orchestrator || null;
+  }
+
+  async remoteCommandReply({ text, user, conversationId }) {
+    return remoteCommandReply({
+      text,
+      userId: user.id,
+      conversationId,
+      originChannel: 'telegram',
+      commandService: this.commandService,
+      orchestrator: this.orchestrator,
+    });
   }
 
   async documentCommandReply({ text, user }) {
@@ -169,15 +183,46 @@ class TelegramMessageService {
       externalMessageId: input.messageId,
     });
 
-    const memoryResult = this.memoryService
-      ? await this.memoryService.handleUserText({ userId: user.id, text: input.text, sourceConversationId: conversation.id })
-      : { handled: false };
+    const remoteAnswer = await this.remoteCommandReply({ text: input.text, user, conversationId: conversation.id });
+    if (remoteAnswer) {
+      await this.conversationRepository.appendMessage({
+        userId: user.id,
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: remoteAnswer,
+      });
+      return { status: 'answered', answer: remoteAnswer };
+    }
 
     const history = await this.conversationRepository.recentMessages({
       userId: user.id,
       conversationId: conversation.id,
       limit: 30,
     });
+    const orchestration = this.orchestrator ? await this.orchestrator.handle({
+      userId: user.id,
+      conversationId: conversation.id,
+      originChannel: 'telegram',
+      originChatId: input.chatId,
+      text: input.text,
+      history,
+    }) : { handled: false };
+    if (orchestration.handled) {
+      const answer = String(orchestration.answer || '').trim().slice(0, MAX_TEXT_LENGTH);
+      if (!answer) throw new Error('orchestrator returned an empty answer');
+      await this.conversationRepository.appendMessage({
+        userId: user.id,
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: answer,
+      });
+      return { status: 'answered', answer };
+    }
+
+    const memoryResult = this.memoryService
+      ? await this.memoryService.handleUserText({ userId: user.id, text: input.text, sourceConversationId: conversation.id })
+      : { handled: false };
+
     const deviceAnswer = await this.deviceCommandReply({ text: input.text, user });
     const documentAnswer = await this.documentCommandReply({ text: input.text, user });
     const memories = this.memoryService ? await this.memoryService.memoriesForPrompt({ userId: user.id }) : [];
@@ -216,5 +261,6 @@ module.exports = {
   TelegramMessageService,
   commandReply,
   commandParts,
+  parseRemoteCommand,
   normalizeTelegramMessage,
 };

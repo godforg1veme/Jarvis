@@ -24,6 +24,9 @@ async function run() {
   const listScript = buildListWindowsScript();
   assert(listScript.includes('EnumWindows'));
   assert(listScript.includes('ConvertTo-Json'));
+  assert(listScript.includes('[Console]::OutputEncoding = $utf8'));
+  assert(listScript.includes('[uint32]$processId = 0'));
+  assert(!listScript.includes('$pid = 0'));
 
   const showScript = buildShowWindowScript(123, SW_RESTORE);
   assert(showScript.includes('[IntPtr]123'));

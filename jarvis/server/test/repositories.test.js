@@ -92,5 +92,5 @@ test('document search always scopes the chunk and joined document to its owner',
   await repository.search({ userId: 'owner-a', query: 'секрет', limit: 100 });
   assert.match(calls[0].sql, /c\.user_id = \$1/);
   assert.match(calls[0].sql, /d\.id = c\.document_id AND d\.user_id = c\.user_id/);
-  assert.deepEqual(calls[0].values, ['owner-a', 'секрет', 20]);
+  assert.deepEqual(calls[0].values, ['owner-a', 'секрет', 40]);
 });

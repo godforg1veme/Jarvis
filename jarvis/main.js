@@ -32,7 +32,8 @@ const {
   sendAgentTaskEvent,
   getAgentTaskWindow,
 } = require('./agents/agentTaskWindow');
-const { executeToolRequest } = require('./agents/toolGateway');
+const { executeToolRequest, ACTION_POLICIES } = require('./agents/toolGateway');
+const { FileCandidateVault } = require('./agents/fileCandidateVault');
 const { DesktopCloudClient } = require('./cloud/desktopCloudClient');
 const { createSecureCloudTransport } = require('./cloud/secureCloudTransport');
 const { CloudVoiceService } = require('./voice/cloudVoiceService');
@@ -60,6 +61,7 @@ let desktopCloudClient = null;
 let cloudVoiceService = null;
 let cloudTransport = null;
 const appSelectionTickets = new Map();
+const remoteFileCandidates = new FileCandidateVault();
 const HISTORY_PATH = path.join(__dirname, 'data', 'history.json');
 const APPS_PATH = path.join(__dirname, 'data', 'apps.default.json');
 const UI_STATE_PATH = path.join(__dirname, 'data', 'ui-state.local.json');
@@ -124,6 +126,43 @@ function registerAppSelection(result) {
     };
   });
   return { ...result, candidates };
+}
+
+function registerRemoteAppTicket(candidate) {
+  const now = Date.now();
+  for (const [candidateId, ticket] of appSelectionTickets) {
+    if (now > ticket.expiresAt) appSelectionTickets.delete(candidateId);
+  }
+  const candidateId = `candidate-${crypto.randomUUID()}`;
+  appSelectionTickets.set(candidateId, { candidate, expiresAt: now + 10 * 60 * 1000 });
+  return { ...candidate, candidateId };
+}
+
+function registerRemoteAppResolution(result) {
+  if (!result || typeof result !== 'object') return result;
+  const copy = { ...result };
+  if (copy.app) copy.app = registerRemoteAppTicket(copy.app);
+  if (Array.isArray(copy.candidates)) {
+    copy.candidates = copy.candidates.map(registerRemoteAppTicket);
+  }
+  return copy;
+}
+
+function resolveRemoteAppCandidate(candidateId) {
+  const id = requireOpaqueId(candidateId, 'candidate');
+  const ticket = appSelectionTickets.get(id);
+  appSelectionTickets.delete(id);
+  if (!ticket || Date.now() > ticket.expiresAt) throw new Error('app candidate is unavailable or expired');
+  return ticket.candidate;
+}
+
+function registerRemoteFileSearch(result) {
+  if (!result || typeof result !== 'object' || !Array.isArray(result.results)) return result;
+  return { ...result, results: remoteFileCandidates.registerMany(result.results) };
+}
+
+function resolveRemoteFileCandidate(candidateId, options = {}) {
+  return remoteFileCandidates.resolve(requireOpaqueId(candidateId, 'candidate-file'), options);
 }
 
 async function launchRegisteredSelection(candidateId) {
@@ -819,10 +858,31 @@ app.whenReady().then(() => {
     fetch: cloudTransport.fetch,
     WebSocket: cloudTransport.WebSocket,
     allowHttp: !app.isPackaged,
+    capabilities: {
+      wakeWord: true,
+      localTts: true,
+      protocolVersion: 1,
+      localActions: Object.keys(ACTION_POLICIES),
+    },
+    executeRemoteCommand: async (request, executionOptions = {}) => {
+      const result = await executeToolRequest(request, {
+        shell,
+        workArea: screen.getPrimaryDisplay().workArea,
+        resolveAppCandidate: resolveRemoteAppCandidate,
+        resolveFileCandidate: resolveRemoteFileCandidate,
+        ...executionOptions,
+      });
+      if (request?.action === 'file.search') return registerRemoteFileSearch(result);
+      if (request?.action === 'app.resolve' && result?.result) {
+        return { ...result, result: registerRemoteAppResolution(result.result) };
+      }
+      return result;
+    },
     onState: (state) => {
       sendCloudEvent('cloud:state', state);
       updateTrayMenu();
     },
+    onWorkflowUpdate: (update) => sendCloudEvent('cloud:message', update),
   });
   cloudVoiceService = new CloudVoiceService({
     cloudClient: desktopCloudClient,
@@ -883,6 +943,30 @@ app.whenReady().then(() => {
     } catch (error) {
       return { ok: false, error: 'Сервер недоступен. Попробуйте ещё раз.' };
     }
+  });
+  ipcMain.handle('cloud:create-command', async (event, input = {}) => {
+    if (!isTrustedMainRenderer(event) || !desktopCloudClient) return { ok: false, error: 'Access denied.' };
+    try {
+      return await desktopCloudClient.createRemoteCommand({
+        deviceId: input.deviceId,
+        action: input.action,
+        args: input.args || {},
+      });
+    } catch (error) {
+      return { ok: false, error: 'Не удалось создать удалённую команду.' };
+    }
+  });
+  ipcMain.handle('cloud:get-command', async (event, input = {}) => {
+    if (!isTrustedMainRenderer(event) || !desktopCloudClient) return { ok: false, error: 'Access denied.' };
+    try { return await desktopCloudClient.getRemoteCommand(input.commandId); } catch (_) { return { ok: false, error: 'Команда не найдена.' }; }
+  });
+  ipcMain.handle('cloud:approve-command', async (event, input = {}) => {
+    if (!isTrustedMainRenderer(event) || !desktopCloudClient) return { ok: false, error: 'Access denied.' };
+    try { return await desktopCloudClient.approveRemoteCommand(input.commandId); } catch (_) { return { ok: false, error: 'Не удалось подтвердить команду.' }; }
+  });
+  ipcMain.handle('cloud:reject-command', async (event, input = {}) => {
+    if (!isTrustedMainRenderer(event) || !desktopCloudClient) return { ok: false, error: 'Access denied.' };
+    try { return await desktopCloudClient.rejectRemoteCommand(input.commandId); } catch (_) { return { ok: false, error: 'Не удалось отменить команду.' }; }
   });
   ipcMain.handle('voice-lab:open', (event) => {
     if (!isTrustedMainRenderer(event) || !voiceLabController) return { ok: false, error: 'Voice Lab unavailable in cloud mode.' };

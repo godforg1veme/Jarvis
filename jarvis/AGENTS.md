@@ -14,9 +14,10 @@ Jarvis is a hybrid personal and family AI-assistant platform:
 - the Electron application is the Windows client and execution edge for local
   voice, apps, files, windows, and approved remote actions;
 - Telegram is the first cloud client, not the whole product;
-- PWA, server ASR, camera/vision, semantic/embedding knowledge retrieval, and
-  full remote device execution are planned or in progress and must not be
-  documented as complete.
+- PWA, server ASR, and camera/vision are planned or in progress. Semantic
+  retrieval and the confirmed remote-command path are implemented. Production
+  embeddings and single-device Desktop/Telegram-origin confirmation were
+  verified live on 2026-09-02; live multi-device acceptance remains unfinished.
 
 The short product model is: **cloud brain and memory, local hands on devices**.
 See `docs/README.md` for current implementation status and historical records.
@@ -34,6 +35,10 @@ See `docs/README.md` for current implementation status and historical records.
   policy separate from user-controlled content.
 - `server/src/assistant/` invokes a provider and validates policy-sensitive
   output with at most one corrective retry.
+- `server/src/orchestrator/` owns versioned action manifests, executor routing,
+  owner-scoped workflows, strict tool planning, bounded continuation, and
+  asynchronous result delivery. Desktop is the first executor; future server
+  workers and account connectors must implement the same registry contract.
 - `server/src/providers/` contains OpenAI-compatible and fallback adapters.
   Provider/model selection is configuration, not Jarvis identity.
 - `server/src/knowledge/` owns owner-scoped attachment storage, bounded ingest
@@ -58,8 +63,10 @@ See `docs/README.md` for current implementation status and historical records.
   mutations. `agents/toolPolicy.js` and `agents/toolSchemas.js` are shared
   policy/validation contracts.
 - `agents/remoteProtocol.js` validates the Desktop WSS wire contract. Pairing,
-  owner-scoped device sessions, and presence are complete; remote command
-  dispatch/execution remains unfinished.
+  owner-scoped device sessions, presence, confirmed command dispatch, and
+  Tool-Gateway execution are implemented. File search results use local,
+  short-lived opaque candidates before subsequent actions. Production
+  multi-device acceptance and broader client UX remain unfinished.
 - `agent_runtime/` is the existing Python/LangGraph planner for complex local
   Desktop Agent tasks. It is no longer the only stateful AI-related component
   in the overall product because the cloud server persists conversations.
@@ -70,7 +77,8 @@ See `docs/README.md` for current implementation status and historical records.
 - Docker Compose runs `server` and private `postgres`; `cloudflared` is the
   intended public ingress because host port 443 is occupied by Xray.
 - The current public Tunnel hostname is `jarvis.rilora.ru`; `/health/ready` was
-  verified through Cloudflare on 2026-09-01. `cloudflared` runs as root only
+  verified through Cloudflare on 2026-09-02 after the Action Orchestrator
+  migration. `cloudflared` runs as root only
   inside its isolated container to read its read-only file-backed secret; the
   VPS token file must remain mode `0600`.
 - `deploy/docker-compose.yml` also retains an optional Caddy profile for hosts

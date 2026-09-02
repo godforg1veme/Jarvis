@@ -70,3 +70,23 @@ test('does not accept an identical secondary OpenRouter profile', () => {
     OPENROUTER_FALLBACK_MODEL: 'same-model',
   }), /different key or model/);
 });
+
+test('requires an explicit HTTPS embedding profile when semantic search is enabled', () => {
+  assert.throws(() => loadConfig({
+    JARVIS_EMBEDDING_PROVIDER: 'openai-compatible',
+    JARVIS_EMBEDDING_BASE_URL: 'http://embeddings.example.test/v1',
+    JARVIS_EMBEDDING_MODEL: 'test-embedding',
+    JARVIS_EMBEDDING_DIMENSIONS: '3',
+    NODE_ENV: 'production',
+    DATABASE_URL: 'postgres://unused',
+    TELEGRAM_BOT_TOKEN: 'unused',
+    TELEGRAM_ALLOWED_IDS: '1',
+  }), /must use HTTPS/);
+  const config = loadConfig({
+    JARVIS_EMBEDDING_PROVIDER: 'openai-compatible',
+    JARVIS_EMBEDDING_BASE_URL: 'https://embeddings.example.test/v1',
+    JARVIS_EMBEDDING_MODEL: 'test-embedding',
+    JARVIS_EMBEDDING_DIMENSIONS: '3',
+  });
+  assert.equal(config.embeddingDimensions, 3);
+});
