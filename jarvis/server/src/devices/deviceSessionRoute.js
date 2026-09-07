@@ -48,6 +48,10 @@ function createDeviceSessionHandler(options) {
           return;
         }
 
+        if (sessionRegistry && !sessionRegistry.isCurrent(device.id, socket)) {
+          socket.close(1008, 'session revoked');
+          return;
+        }
         if (message.type === 'device.hello' && message.payload.deviceId !== device.id) {
           throw new Error('device id mismatch');
         }
@@ -59,7 +63,8 @@ function createDeviceSessionHandler(options) {
           });
         }
         if (message.type === 'device.heartbeat' || message.type === 'device.hello') {
-          await repository.markOnline({ userId: device.user_id, deviceId: device.id });
+          const online = await repository.markOnline({ userId: device.user_id, deviceId: device.id });
+          if (!online) { socket.close(1008, 'device revoked'); return; }
         }
         if (message.type === 'command.result') {
           if (!commandService) throw new Error('command service is unavailable');

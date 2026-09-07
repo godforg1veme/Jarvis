@@ -8,7 +8,7 @@ different architecture.
 
 Jarvis is a hybrid personal and family AI-assistant platform:
 
-- the always-on cloud control plane owns identity, conversations, future
+- the always-on cloud control plane owns identity, conversations,
   memory/knowledge retrieval, model routing, Telegram access, and device
   orchestration;
 - the Electron application is the Windows client and execution edge for local
@@ -73,6 +73,22 @@ See `docs/README.md` for current implementation status and historical records.
 
 ### Deployment
 
+- `server/src/operations/` owns the owner-only Operations panel, Telegram
+  browser approval, metadata-only family/device administration, telemetry,
+  incidents, and durable fixed service operations. `ops-ui/` is its React/Vite
+  client; `host-agent/` is the Python standard-library Unix-socket execution
+  boundary. The application container has neither a Docker socket nor sudo.
+- Operations checks track actual Telegram poll completion, database migrations,
+  stuck jobs, and a configured primary-model probe. The model probe uses only
+  a synthetic health message and a PostgreSQL-backed six-hour schedule.
+- Host Agent mutation claims are persisted before execution. An interrupted
+  command has an unknown outcome and is reconciled; never retry it under a new
+  identifier merely because its connection was lost. Discovery is read-only.
+- Operations log archives contain bounded severity/lifecycle summaries only;
+  raw parser findings, family content, SQL values and credentials are excluded.
+- Backup scheduling and real backup/restore acceptance are deferred by the
+  owner as of 2026-09-06. Do not enable the timer as part of panel maintenance.
+
 - The current VPS runs Ubuntu 24.04 LTS, not the original planned 22.04.
 - Docker Compose runs `server` and private `postgres`; `cloudflared` is the
   intended public ingress because host port 443 is occupied by Xray.
@@ -90,7 +106,7 @@ See `docs/README.md` for current implementation status and historical records.
 
 ## Safety and Trust Boundaries
 
-- Never add API keys, Telegram tokens, VPN keys, Cloudflare tokens, device
+- Never add API keys, Telegram tokens, Cloudflare tokens, device
   tokens, or database passwords to Git, tests, logs, prompts, or chat output.
 - Use environment variables and ignored files under `deploy/secrets/`.
 - Never expose PostgreSQL, worker internals, Docker control endpoints, or a
@@ -173,6 +189,16 @@ Run the smallest relevant checks first, then adjacent regression suites. For
 configured model changes, test missing-key behavior, fake transport, and a
 manual live contract without printing secrets. For deployment changes, use
 `deploy/scripts/preflight.sh`, Compose health, and `deploy/scripts/smoke.sh`.
+
+Operations verification: `npm test` and `npm run build` in `ops-ui/`;
+`PYTHONPATH=host-agent python3 -m unittest discover -s host-agent/tests` on
+Linux. `scripts/testOperationsBrowser.cjs` runs local Playwright fixture checks
+at 1440/390/320 px; supply `PLAYWRIGHT_MODULE` for a bundled runtime and
+`PLAYWRIGHT_CHANNEL=msedge` when using installed Edge. The explicit integration
+script `server/test/operationsPostgresAcceptance.cjs` requires PostgreSQL and a
+running Host Agent; it creates only a unique fixture schema and rolls back its
+public-table fixtures. Telegram delivery is opt-in via
+`JARVIS_ACCEPTANCE_NOTIFY=1`, not part of ordinary test runs.
 
 ## Documentation Policy
 

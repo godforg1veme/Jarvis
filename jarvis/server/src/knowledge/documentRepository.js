@@ -10,6 +10,16 @@ class DocumentRepository {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
+      const maintenance = await client.query(`
+        SELECT enabled FROM ops_maintenance_flags
+        WHERE flag='knowledge_writes_paused'
+        FOR SHARE
+      `);
+      if (maintenance.rows[0] && maintenance.rows[0].enabled) {
+        const error = new Error('knowledge writes are temporarily paused');
+        error.code = 'KNOWLEDGE_WRITES_PAUSED';
+        throw error;
+      }
       const owner = await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [input.userId]);
       if (owner.rowCount !== 1) throw new Error('document owner is unavailable');
       const total = await client.query(`
@@ -122,12 +132,16 @@ class DocumentRepository {
 
   async claimNextIngest(workerId) {
     const result = await this.pool.query(`
-      WITH next_job AS (
+      WITH maintenance AS MATERIALIZED (
+        SELECT enabled FROM ops_maintenance_flags
+        WHERE flag='knowledge_writes_paused' FOR SHARE
+      ), next_job AS (
         SELECT id
         FROM jobs
         WHERE kind IN ('document_ingest', 'document_embedding')
           AND status = 'queued'
           AND available_at <= now()
+          AND EXISTS (SELECT 1 FROM maintenance WHERE NOT enabled)
         ORDER BY created_at ASC
         FOR UPDATE SKIP LOCKED
         LIMIT 1

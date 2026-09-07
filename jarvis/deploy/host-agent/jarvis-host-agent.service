@@ -1,0 +1,24 @@
+[Unit]
+Description=Jarvis Host Agent
+After=network.target docker.service
+Wants=docker.service
+
+[Service]
+Type=simple
+User=root
+# The Node image runs as uid/gid 1000.  On the VPS gid 1000 is `deploy`, so
+# this is the deliberately narrow group which may connect to the agent socket.
+Group=deploy
+UMask=0007
+Environment=PYTHONPATH=/opt/jarvis-host-agent
+ExecStart=/usr/bin/python3 -m jarvis_host_agent.server --config /etc/jarvis-host-agent/config.json --socket /run/jarvis-host-agent/agent.sock
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/run/jarvis-host-agent /var/lib/jarvis-host-agent
+
+[Install]
+WantedBy=multi-user.target

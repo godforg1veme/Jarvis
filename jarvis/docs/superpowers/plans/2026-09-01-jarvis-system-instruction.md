@@ -39,6 +39,6 @@ Docker health on DE-4
 live provider contract probe without exposing credentials
 ```
 
-The deployment does not modify PostgreSQL data, Xray, VPN configuration, or
+The deployment does not modify PostgreSQL data, Xray, or
 port 443. The existing false historical assistant messages remain audit history
 but are untrusted model output and cannot override the persona.

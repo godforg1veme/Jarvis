@@ -19,16 +19,24 @@ JARVIS_BACKUP_COMPOSE_FILE=deploy/docker-compose.yml
 JARVIS_BACKUP_ENV_FILE=deploy/.env
 JARVIS_BACKUP_PROJECT=jarvis-family
 JARVIS_DOCUMENT_VOLUME=jarvis-family_document-data
-JARVIS_BACKUP_PAUSE_SERVER=1
+JARVIS_BACKUP_STATE_DIR=/var/lib/jarvis-backup
+JARVIS_BACKUP_DRAIN_TIMEOUT_SECONDS=300
 ```
 
 Create `/etc/jarvis/restic-password` directly on the host, mode `0600`; never
 put its contents in an environment variable, shell history, git, or a log.
 
-`JARVIS_BACKUP_PAUSE_SERVER=1` is the safe default: it briefly stops the
-control plane while PostgreSQL and the document volume are captured. Set it to
-`0` only after an application-level ingestion lock has been implemented and
-tested.
+The backup never stops the Jarvis server. It transactionally enables the
+`knowledge_writes_paused` maintenance flag, waits for running document ingest
+and embedding jobs to finish, captures PostgreSQL and the private document
+volume, then clears the flag in an exit trap. Chat, Telegram polling, memory,
+Desktop sessions, and Operations remain online. New document uploads receive a
+temporary-unavailable response while the flag is active.
+
+Every attempt writes a bounded result to
+`/var/lib/jarvis-backup/last-result.json`. If a failed run cannot clear the
+maintenance flag, clear it through authenticated host PostgreSQL access before
+accepting new uploads; there is no public HTTP endpoint for this flag.
 
 Install the systemd units with absolute paths adjusted if the deployment root
 is different:

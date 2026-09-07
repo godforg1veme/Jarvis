@@ -5,7 +5,7 @@ Status: active architecture, partially implemented as of 2026-09-01.
 Implementation update: the Fastify control plane, PostgreSQL/pgvector schema,
 Telegram text client, OpenAI-compatible provider gateway, and canonical Jarvis
 prompt pipeline are implemented and deployed. Long-term retrieval, document
-ingestion, server ASR, device pairing/execution, PWA/vision, VPN operations,
+ingestion, server ASR, device pairing/execution, PWA/vision,
 and tested backups remain roadmap work.
 
 Deployment update: the provisioned host is Ubuntu 24.04 LTS. Xray already owns
@@ -66,7 +66,6 @@ The first production slice includes:
 - remote operation of an online Windows Jarvis Device Agent;
 - two action categories: safe and changing;
 - confirmation of every changing action in the channel that originated it;
-- a separate personal WireGuard VPN for 10-20 personal phones/devices;
 - encrypted off-server database and document backups;
 - audit records for agent actions without raw audio or secrets.
 
@@ -100,9 +99,6 @@ Telegram
        -> PostgreSQL + pgvector
        -> object/document storage
 
-Personal phones
-  -> separate WireGuard full/split tunnel on DE-4
-  -> internet
 ```
 
 The server is a modular monolith. Modules have explicit interfaces but are
@@ -166,9 +162,8 @@ ambiguous, the assistant asks instead of guessing.
 
 ## Device Enrollment and Connectivity
 
-Jarvis device control does not require a service VPN. A Windows Device Agent
-opens an outbound WSS connection to DE-4, which works through NAT without
-opening an inbound PC port.
+Jarvis device control uses an outbound WSS connection from the Windows Device
+Agent to DE-4, which works through NAT without opening an inbound PC port.
 
 Enrollment is intentionally simple:
 
@@ -181,8 +176,8 @@ Enrollment is intentionally simple:
 
 Baseline protection consists of HTTPS/WSS, Telegram allowlisting, pairing,
 per-device tokens, user/device ownership checks, action policy, and changing-
-action confirmation. There is no service WireGuard, mTLS, or per-command
-public-key signature in the MVP.
+action confirmation. There is no mTLS or per-command public-key signature in
+the MVP.
 
 ## Agent and Tool Execution
 
@@ -308,28 +303,12 @@ confirmed decisions, repeated preferences, and verified tool outcomes may be
 promoted. Passwords, API keys, banking data, and authentication secrets are
 never automatically stored as long-term memories.
 
-## Personal WireGuard VPN
-
-The DE-4 also hosts a separate personal WireGuard VPN for approximately 10-20
-phones or personal devices. It is operationally independent of Jarvis device
-control.
-
-Each VPN device receives an individual key so it can be revoked independently.
-Firewall rules prevent the VPN from directly reaching PostgreSQL and internal
-container management ports. Split tunnel is preferred when only selected
-traffic needs the VPS. Full tunnel is allowed subject to the provider's traffic
-policy.
-
-Heavy VPN traffic must not starve voice processing. The deployment plan must
-include network rate limits or service prioritization and measure ASR latency
-while VPN traffic is active.
-
 ## Failure Handling
 
 - If Salad is unavailable, `auto` mode may use OpenRouter; fixed `salad` mode
   reports the outage without losing the request or history.
-- If all LLMs are unavailable, Telegram, memory storage, VPN, deterministic
-  commands, and device presence continue to work.
+- If all LLMs are unavailable, Telegram, memory storage, deterministic commands,
+  and device presence continue to work.
 - If ASR is unavailable, text remains available and voice returns a clear
   retry/text instruction.
 - If a target PC is offline, the assistant reports it. Safe queued work may be
@@ -359,7 +338,7 @@ while VPN traffic is active.
 ## Delivery Sequence
 
 1. Provision Ubuntu 22.04, patch it, configure SSH, Docker Compose, Caddy,
-   firewall, PostgreSQL/pgvector, backups, and the independent WireGuard VPN.
+   firewall, PostgreSQL/pgvector, and backups.
 2. Build the Telegram adapter, allowlist, internal users, conversations, and a
    minimal OpenRouter-backed Model Gateway.
 3. Add layered memory, document ingestion, embeddings, hybrid retrieval, and
@@ -372,8 +351,8 @@ while VPN traffic is active.
    Tool Gateway for initial safe tools.
 7. Add the bounded Agent Orchestrator and introduce changing tools one at a
    time with originating-channel confirmation.
-8. Verify isolation, recovery, provider switching, VPN coexistence, backups,
-   and family acceptance scenarios.
+8. Verify isolation, recovery, provider switching, backups, and family
+   acceptance scenarios.
 9. After the MVP is stable, design the PWA and camera phases against the same
    APIs.
 
@@ -395,7 +374,7 @@ Automated verification must cover:
 - agent step limit, schema rejection, tool failure, and no automatic mutation
   replay;
 - database backup and clean restore;
-- VPN firewall isolation and ASR latency under VPN traffic.
+- resource isolation and ASR latency under expected system load.
 
 The existing Jarvis test suites remain required for touched local voice,
 intent, agent, and Tool Gateway behavior.
@@ -419,6 +398,4 @@ The MVP is ready when all of the following are demonstrated:
    history or personal memory.
 8. A DE-4 restart preserves identities, memory, documents, device ownership,
    and valid recoverable work without replaying mutations.
-9. The independent WireGuard VPN serves personal devices without exposing
-   PostgreSQL or making ASR unusable.
-10. Encrypted off-server backups restore successfully into a clean deployment.
+9. Encrypted off-server backups restore successfully into a clean deployment.

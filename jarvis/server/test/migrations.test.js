@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
-const { listMigrationFiles, runMigrations } = require('../src/db/migrate');
+const { DEFAULT_MIGRATIONS_DIR, listMigrationFiles, runMigrations } = require('../src/db/migrate');
 
 test('migration files are ordered and narrowly named', () => {
   const files = listMigrationFiles();
@@ -14,7 +14,23 @@ test('migration files are ordered and narrowly named', () => {
     '004_private_knowledge_base.sql',
     '005_embeddings_and_command_lifecycle.sql',
     '006_action_orchestrator.sql',
+    '007_operations_control_plane.sql',
+    '008_operations_telemetry.sql',
+    '009_operations_connections.sql',
+    '010_operations_notification_delivery.sql',
+    '011_operations_health_checks.sql',
   ]);
+});
+
+test('operations migrations retain bounded, owner-safe storage contracts', () => {
+  const migrations = ['007_operations_control_plane.sql', '008_operations_telemetry.sql', '009_operations_connections.sql']
+    .map((name) => fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, name), 'utf8'))
+    .join('\n');
+  assert.match(migrations, /browser_verifier_hash bytea NOT NULL CHECK \(octet_length\(browser_verifier_hash\) = 32\)/);
+  assert.match(migrations, /credential_hash bytea NOT NULL UNIQUE CHECK \(octet_length\(credential_hash\) = 32\)/);
+  assert.match(migrations, /knowledge_writes_paused/);
+  assert.match(migrations, /device_kind text NOT NULL DEFAULT 'computer'/);
+  assert.doesNotMatch(migrations, /messages\s+JOIN|document_chunks\s+JOIN/i);
 });
 
 test('migration runner locks, parameterizes names, and commits', async () => {

@@ -1,15 +1,9 @@
 # CLAUDE.md
 
-The authoritative agent instructions are in [`AGENTS.md`](AGENTS.md). Read that
-file completely before inspecting or changing code; do not rely on an older
-desktop-only description of Jarvis.
+[`AGENTS.md`](AGENTS.md) is the sole authoritative instruction set for coding
+agents in this repository. Read it completely before inspecting or changing
+code. It defines the current architecture, safety boundaries, generated files,
+and verification commands; do not duplicate or override it here.
 
-Jarvis is a hybrid personal/family AI-assistant platform: an always-on cloud
-control plane provides Telegram access, persistent user-scoped conversations,
-model routing, and future memory/device orchestration, while the Electron
-application remains the Windows execution edge for voice, applications, files,
-windows, and approved remote actions.
-
-Current status and historical design records are indexed in
-[`docs/README.md`](docs/README.md). Secrets, user data, generated state, and
-deployment archives must not be committed.
+For implemented-versus-roadmap status and historical design records, use
+[`docs/README.md`](docs/README.md).

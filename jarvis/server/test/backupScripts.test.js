@@ -38,6 +38,8 @@ test('backup and restore scripts produce an isolated restic restore set', (t) =>
   const resticDir = path.join(fixture, 'restic');
   const documents = path.join(fixture, 'documents');
   const restoreTarget = path.join(fixture, 'restore');
+  const dockerLog = path.join(fixture, 'docker.log');
+  const stateDir = path.join(fixture, 'state');
   fs.mkdirSync(fakeBin);
   fs.mkdirSync(resticDir);
   fs.mkdirSync(documents);
@@ -50,13 +52,17 @@ test('backup and restore scripts produce an isolated restic restore set', (t) =>
   const unix = (value) => value.replace(/\\/g, '/');
   writeExecutable(path.join(fakeBin, 'docker'), `#!/usr/bin/env bash
 set -euo pipefail
+printf '%s\n' "$*" >>"$FAKE_DOCKER_LOG"
 if [[ "$1" == "volume" ]]; then
   echo "$FAKE_DOCUMENT_MOUNT"
   exit 0
 fi
 case " $* " in
+  *"enabled=false"*) [[ "\${FAKE_FAIL_CLEAR:-0}" != "1" ]] ;;
   *" ps --status running --services "*) echo server ;;
-  *" exec -T postgres "*) printf 'fake-postgres-dump' ;;
+  *" psql "*"SELECT count"*) echo 0 ;;
+  *" psql "*) exit 0 ;;
+  *" pg_dump "*) printf 'fake-postgres-dump' ;;
   *) exit 0 ;;
 esac
 `);
@@ -98,6 +104,7 @@ exit 1
     PATH: `${unix(fakeBin)}:/usr/bin:/bin`,
     FAKE_DOCUMENT_MOUNT: unix(documents),
     FAKE_RESTIC_DIR: unix(resticDir),
+    FAKE_DOCKER_LOG: unix(dockerLog),
     RESTIC_REPOSITORY: 'test-repository',
     RESTIC_PASSWORD_FILE: unix(path.join(fixture, 'password')),
     JARVIS_BACKUP_COMPOSE_FILE: unix(path.join(fixture, 'compose.yml')),
@@ -105,6 +112,7 @@ exit 1
     JARVIS_BACKUP_PROJECT: 'test-project',
     JARVIS_DOCUMENT_VOLUME: 'test-volume',
     JARVIS_BACKUP_LOCK_FILE: unix(path.join(fixture, 'backup.lock')),
+    JARVIS_BACKUP_STATE_DIR: unix(stateDir),
     JARVIS_BACKUP_KEEP_DAILY: '1',
     JARVIS_BACKUP_KEEP_WEEKLY: '1',
     JARVIS_BACKUP_KEEP_MONTHLY: '1',
@@ -114,6 +122,10 @@ exit 1
     const backup = runBash(bash, 'deploy/backup/backup.sh', environment);
     assert.equal(backup.status, 0, `${backup.stdout}\n${backup.stderr}`);
     assert.equal(fs.readFileSync(path.join(resticDir, 'postgres.dump'), 'utf8'), 'fake-postgres-dump');
+    const dockerCalls = fs.readFileSync(dockerLog, 'utf8');
+    assert.doesNotMatch(dockerCalls, /\bstop\b/);
+    assert.match(dockerCalls, /knowledge_writes_paused/);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(stateDir, 'last-result.json'), 'utf8')).status, 'succeeded');
     const manifest = JSON.parse(fs.readFileSync(path.join(resticDir, 'manifest.json'), 'utf8'));
     assert.match(manifest.runId, /^\d{8}T\d{6}Z$/);
 
@@ -126,6 +138,9 @@ exit 1
     assert.equal(fs.readFileSync(path.join(restoreTarget, 'postgres.dump'), 'utf8'), 'fake-postgres-dump');
     assert.equal(fs.readFileSync(path.join(restoreTarget, 'documents', 'private.txt'), 'utf8'), 'семейный секрет');
     assert.ok(fs.existsSync(path.join(restoreTarget, 'documents.sha256')));
+    const failedCleanup = runBash(bash, 'deploy/backup/backup.sh', { ...environment, FAKE_FAIL_CLEAR: '1' });
+    assert.notEqual(failedCleanup.status, 0, 'a stuck maintenance gate must fail the backup');
+    assert.equal(JSON.parse(fs.readFileSync(path.join(stateDir, 'last-result.json'), 'utf8')).status, 'failed');
   } finally {
     fs.rmSync(fixture, { recursive: true, force: true });
   }

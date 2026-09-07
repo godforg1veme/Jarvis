@@ -1,0 +1,12 @@
+export type Service = { id?: string; key: string; name: string; type?: string; sourceState?: string; state: string; observedAt: string | null; capabilities?: ('start' | 'stop' | 'restart')[] };
+export type OperationResult = { id: string; operation: string; targetKey: string; status: string; errorCode: string | null; createdAt: string; completedAt: string | null };
+export type Overview = { host_key: string; label: string; status: string; last_contact_at: string | null; services: Service[] };
+export type Device = { id: string; name: string; status: 'online' | 'offline' | 'revoked'; kind: 'computer' | 'mobile' | 'web'; lastSeenAt: string | null; createdAt: string; updatedAt: string };
+export type TelegramIdentity = { id: string; externalId: string; connectedAt: string };
+export type ConnectionProfile = { id: string; displayName: string; role: 'owner' | 'member'; createdAt: string; telegram: TelegramIdentity[]; devices: Device[] };
+export type PanelSession = { id: string; label: string; client_metadata: { userAgent?: string }; created_at: string; last_used_at: string; current: boolean };
+export type Metric = { name: string; value: number; sampledAt: string };
+export type Incident = { id: string; kind: string; state: 'open' | 'resolved'; severity: string; summary: string; serviceKey: string | null; serviceName: string | null; firstObservedAt: string; lastObservedAt: string; resolvedAt: string | null };
+export type OpsEvent = { id: string; type: string; payload: Record<string, unknown>; serviceKey: string | null; createdAt: string };
+export type Backup = { id: string; source: string; status: string; startedAt: string; completedAt: string | null; byteSize: number | null; errorCode: string | null; detail: string };
+export type ParserData = { service: Service | null; results: { id: string; observedAt: string; kind: string; summary: string }[] };

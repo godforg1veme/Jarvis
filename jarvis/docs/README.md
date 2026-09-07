@@ -6,6 +6,12 @@ future-tense wording does not override the current architecture in `AGENTS.md`.
 
 Status snapshot: 2026-09-02.
 
+Operations update, 2026-09-06: see
+`updates/2026-09-06-operations-verification.md` for the corrective rollout,
+verified checks, and the owner's decision to defer backups. The earlier
+2026-09-04 rollout overestimated readiness and is superseded for Operations
+acceptance by this record.
+
 ## Product position
 
 Jarvis is a hybrid personal/family AI-assistant platform: an always-on cloud
@@ -35,7 +41,7 @@ deliberately disabled until the DE-4 benchmark selects one.
 
 | Document | Status |
 | --- | --- |
-| `specs/2026-09-01-jarvis-family-cloud-assistant-design.md` | Partially implemented: control plane, DB, Telegram/Desktop text, provider gateway, safe text fallback, prompt pipeline, user-scoped memory, Telegram-first attachment ingestion, production hybrid knowledge retrieval, and the confirmed remote-command path are implemented and tested. Server ASR, PWA/vision, VPN and live multi-device acceptance remain operational work. |
+| `specs/2026-09-01-jarvis-family-cloud-assistant-design.md` | Partially implemented: control plane, DB, Telegram/Desktop text, provider gateway, safe text fallback, prompt pipeline, user-scoped memory, Telegram-first attachment ingestion, production hybrid knowledge retrieval, and the confirmed remote-command path are implemented and tested. Server ASR, PWA/vision and live multi-device acceptance remain operational work. |
 | `plans/2026-09-01-jarvis-family-cloud-assistant.md` | Active roadmap; Milestones 0–3 are partial, later milestones are not complete |
 | `specs/2026-09-01-jarvis-desktop-cloud-client-design.md` | Implemented and packaged: paired Windows chat, DPAPI device credentials, device-scoped HTTPS/WSS sessions, local wake word, server ASR contract, and NSIS installer. Live VPS configuration and clean-machine acceptance remain operational steps. |
 | `specs/2026-09-01-jarvis-system-instruction-design.md` | Implemented and verified for the current Telegram/OpenRouter path |

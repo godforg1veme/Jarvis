@@ -1,21 +1,8 @@
 const { Bot } = require('grammy');
-
-function splitTelegramText(text, maxLength = 4000) {
-  const chunks = [];
-  let remaining = String(text || '');
-  while (remaining.length > maxLength) {
-    let boundary = remaining.lastIndexOf('\n', maxLength);
-    if (boundary < Math.floor(maxLength / 2)) boundary = remaining.lastIndexOf(' ', maxLength);
-    if (boundary < Math.floor(maxLength / 2)) boundary = maxLength;
-    chunks.push(remaining.slice(0, boundary).trimEnd());
-    remaining = remaining.slice(boundary).trimStart();
-  }
-  if (remaining) chunks.push(remaining);
-  return chunks;
-}
+const { sendTelegramText, splitTelegramText } = require('./telegramFormatting');
 
 async function replyWithChunks(ctx, text) {
-  for (const chunk of splitTelegramText(text)) await ctx.reply(chunk);
+  await sendTelegramText((chunk, options) => ctx.reply(chunk, options), text);
 }
 
 async function downloadTelegramAttachment(ctx, token, maxBytes = 20 * 1024 * 1024, fetchImpl = globalThis.fetch) {
@@ -38,6 +25,20 @@ async function downloadTelegramAttachment(ctx, token, maxBytes = 20 * 1024 * 102
 function createTelegramBot(options) {
   const bot = new Bot(options.token);
   const messageService = options.messageService;
+  if (options.onPollingHealth) bot.api.config.use(async (previous, method, payload, signal) => {
+    try {
+      const result = await previous(method, payload, signal);
+      if (method === 'getUpdates') options.onPollingHealth({ at: Date.now(), ok: result.ok === true });
+      return result;
+    } catch (error) {
+      if (method === 'getUpdates') options.onPollingHealth({ at: Date.now(), ok: false });
+      throw error;
+    }
+  });
+
+  if (typeof options.approvalHandler === 'function') {
+    bot.on('callback_query:data', options.approvalHandler);
+  }
 
   bot.on('message', async (ctx) => {
     const result = await messageService.handle(ctx.update, {

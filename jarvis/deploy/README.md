@@ -90,7 +90,7 @@ bash deploy/scripts/smoke.sh "$JARVIS_PUBLIC_URL"
 
 After upgrading to DE-4, run preflight without `JARVIS_ALLOW_LOW_MEMORY=1`.
 Server-side ASR or a local LLM must still be enabled only after measuring their
-peak RAM, latency, and interaction with PostgreSQL/VPN load.
+peak RAM, latency, and interaction with PostgreSQL load.
 
 ## Direct HTTPS profile on another host
 
@@ -114,7 +114,26 @@ bash deploy/scripts/smoke.sh "$JARVIS_PUBLIC_URL"
 
 Run migrations through the server startup path and inspect health before
 replacing a running container. Never delete volumes as part of an ordinary
-update. Backups and a tested restore procedure remain required roadmap work.
+update. The backup path no longer stops Jarvis, but a real encrypted backup
+and isolated restore drill are still required production acceptance steps.
+
+## Operations Panel
+
+The owner-only panel is served under `/ops/` on the configured exact
+operations origin. A new browser must be approved once through the main Jarvis
+Telegram bot. Active sessions remain valid until they are explicitly forgotten.
+
+The root-owned Host Agent is installed with:
+
+```bash
+sudo bash /home/deploy/apps/jarvis/deploy/host-agent/install.sh
+systemctl status jarvis-host-agent --no-pager
+```
+
+Do not mount the Docker socket into the application container. Service actions
+remain unavailable unless both the Host Agent allowlist and the matching
+`ops_service_capabilities` row are enabled. The Telegram parser is observation
+only and must never receive an action capability.
 
 ## Model configuration
 

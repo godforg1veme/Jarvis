@@ -36,7 +36,7 @@ Not included:
 
 - committing an ASR model choice before the DE-4 benchmark;
 - an offline local ASR fallback;
-- document ingestion, durable-memory implementation, PWA, VPN, camera, or
+- document ingestion, durable-memory implementation, PWA, camera, or
   arbitrary remote shell execution;
 - remote changing actions. Existing local execution remains local until a
   separate confirmation-bound remote-action design is implemented.

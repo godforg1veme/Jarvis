@@ -5,7 +5,7 @@ Status: active roadmap, partially implemented as of 2026-09-01.
 Current execution: the shared policy/protocol foundation, Compose/PostgreSQL
 control plane, Telegram text slice, OpenRouter-compatible provider gateway, and
 canonical prompt pipeline exist. Remote device networking, memory retrieval,
-document ingestion, server ASR, Salad runtime, VPN/backups, PWA/vision, and full
+document ingestion, server ASR, Salad runtime, backups, PWA/vision, and full
 acceptance remain incomplete. Production runs Ubuntu 24.04 with Cloudflare
 Tunnel because Xray owns port 443; older Ubuntu 22.04/Caddy steps below are
 historical plan text, not current operations.
@@ -32,7 +32,7 @@ backup, and provider fallback are verified.
   layer.
 - Keep the Node Tool Gateway as the only authority that executes Windows tools.
 - Do not allow LLM-generated shell or PowerShell.
-- Do not put API keys, Telegram tokens, VPN keys, or device tokens in git.
+- Do not put API keys, Telegram tokens, or device tokens in git.
 - Do not commit generated state, downloaded models, document contents, or
   backups.
 - Preserve current local voice and desktop-agent behavior while adding remote
@@ -54,7 +54,6 @@ control:
 5. OpenRouter API key and selected fallback model.
 6. Salad account, endpoint credentials, and container registry choice.
 7. An off-server restic-compatible backup destination.
-8. WireGuard client device names for the personal VPN.
 
 ## Dependency Approval Checkpoint
 
@@ -85,7 +84,6 @@ Host tools installed outside npm/pip:
 - Docker Engine and Compose plugin;
 - Caddy;
 - PostgreSQL client utilities;
-- WireGuard tools;
 - restic;
 - ffmpeg.
 
@@ -132,7 +130,6 @@ deploy/
   env.example
   postgres/
   systemd/
-  wireguard/
   backup/
   scripts/
 ```
@@ -221,8 +218,8 @@ Add idempotent or check-before-change scripts under `deploy/scripts/` for:
 - non-root deploy user and SSH-key-only access;
 - Docker repository and Compose plugin;
 - Caddy;
-- ffmpeg, PostgreSQL client, WireGuard, and restic;
-- UFW rules for SSH, HTTP/HTTPS, and the personal WireGuard UDP port;
+- ffmpeg, PostgreSQL client, and restic;
+- UFW rules for SSH and HTTP/HTTPS;
 - unattended security updates;
 - swap as an emergency buffer, not normal model memory.
 
@@ -440,7 +437,7 @@ word error, names/application aliases, noise, and two queued requests.
 Acceptance target for the selected MVP ASR:
 
 - median post-utterance latency no more than 3 seconds for 3-7 second commands;
-- p95 no more than 6 seconds with no competing VPN load;
+- p95 no more than 6 seconds with no competing system load;
 - server total memory stays below 85%;
 - no cross-job audio/result mix-up;
 - accuracy is acceptable on the user's command corpus.
@@ -587,20 +584,9 @@ device-offline test, and real Windows smoke test before enabling it remotely.
 Exit criterion: the acceptance safe and changing commands execute only on the
 requesting user's selected PC, with actual results returned to Telegram.
 
-## Milestone 9: Personal WireGuard, Backups, and Operations
+## Milestone 9: Backups and Operations
 
-### Task 9.1: Configure the independent personal VPN
-
-Add templates/documentation under `deploy/wireguard/` for a host-native
-WireGuard interface and individual client keys. Generate real private keys only
-on the server. Firewall VPN clients away from PostgreSQL, Docker control ports,
-and server-internal worker endpoints.
-
-Test both split-tunnel and optional full-tunnel clients. Measure ASR latency
-with idle VPN, normal browsing, and a bounded download. Add rate limiting/QoS
-only if the measured degradation requires it.
-
-### Task 9.2: Implement encrypted off-server backup
+### Task 9.1: Implement encrypted off-server backup
 
 Add `deploy/backup/` scripts and systemd timer definitions for:
 
@@ -613,21 +599,21 @@ Add `deploy/backup/` scripts and systemd timer definitions for:
 Add a restore script that targets an explicitly named empty test database and
 directory. Never make the production restore path the default.
 
-### Task 9.3: Add operational visibility
+### Task 9.2: Add operational visibility
 
 Expose owner-only health summaries: database, Telegram, ASR queue/worker,
 provider health, Device Agent sessions, disk, backup age, and memory pressure.
 Set bounded log rotation. Do not add a separate monitoring stack in MVP.
 
-### Task 9.4: Schedule Ubuntu migration
+### Task 9.3: Schedule Ubuntu migration
 
 Document an Ubuntu 22.04-to-newer-LTS rehearsal and deadline before standard
 support ends in 2027. Validate the full compose stack and restore procedure on
 a replacement host rather than relying on an untested in-place production
 upgrade.
 
-Exit criterion: personal VPN works independently, backups restore to a clean
-environment, and model/voice services remain usable under expected VPN traffic.
+Exit criterion: backups restore to a clean environment, and model/voice services
+remain usable under expected system load.
 
 ## Milestone 10: End-to-End Acceptance and Release
 
@@ -642,8 +628,7 @@ demonstrate all ten design acceptance criteria:
 6. offline/ambiguous devices never receive guessed execution;
 7. Salad/OpenRouter switching preserves context;
 8. server restart preserves state without replaying mutations;
-9. WireGuard does not expose internals or make ASR unusable;
-10. encrypted backup restores successfully.
+9. encrypted backup restores successfully.
 
 Run the full relevant local Jarvis regression suite, server Node tests, Python
 tests, migration tests, container smoke tests, and manual Windows pairing/tool
@@ -666,7 +651,7 @@ Use small commits that correspond to verified vertical work:
 8. device enrollment and WSS presence;
 9. safe remote tools;
 10. changing actions and confirmations;
-11. personal WireGuard and backup operations;
+11. backup operations;
 12. acceptance/runbook.
 
 Never mix generated model files, local identities, user documents, secrets, or

@@ -65,6 +65,14 @@ services:
       JARVIS_EMBEDDING_DIMENSIONS: ${JARVIS_EMBEDDING_DIMENSIONS:-0}
       JARVIS_EMBEDDING_TIMEOUT_MS: ${JARVIS_EMBEDDING_TIMEOUT_MS:-60000}
       JARVIS_EMBEDDING_BATCH_SIZE: ${JARVIS_EMBEDDING_BATCH_SIZE:-32}
+      JARVIS_OPERATIONS_ENABLED: ${JARVIS_OPERATIONS_ENABLED:-false}
+      JARVIS_OPERATIONS_HOST_KEY: ${JARVIS_OPERATIONS_HOST_KEY:-vps}
+      JARVIS_OPERATIONS_HOST_LABEL: ${JARVIS_OPERATIONS_HOST_LABEL:-Jarvis VPS}
+      JARVIS_OPERATIONS_SOCKET_PATH: ${JARVIS_OPERATIONS_SOCKET_PATH:-/run/jarvis-host-agent/agent.sock}
+      JARVIS_OPERATIONS_AUTHENTICATOR_PATH: ${JARVIS_OPERATIONS_AUTHENTICATOR_PATH:-/run/secrets/operations_host_agent_authenticator}
+      JARVIS_OPERATIONS_POLL_INTERVAL_MS: ${JARVIS_OPERATIONS_POLL_INTERVAL_MS:-30000}
+      JARVIS_OPERATIONS_OWNER_TELEGRAM_ID: ${JARVIS_OPERATIONS_OWNER_TELEGRAM_ID:-0}
+      JARVIS_OPERATIONS_PUBLIC_ORIGIN: ${JARVIS_OPERATIONS_PUBLIC_ORIGIN:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -75,6 +83,9 @@ services:
       retries: 5
     volumes:
       - document-data:/srv/jarvis/documents
+      - /run/jarvis-host-agent:/run/jarvis-host-agent:ro
+    secrets:
+      - operations_host_agent_authenticator
     networks: [backend]
     deploy:
       resources:
@@ -139,3 +150,5 @@ volumes:
 secrets:
   cloudflare_tunnel_token:
     file: ./secrets/cloudflare-tunnel-token
+  operations_host_agent_authenticator:
+    file: ./secrets/operations-host-agent-authenticator

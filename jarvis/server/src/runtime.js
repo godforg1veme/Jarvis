@@ -6,6 +6,7 @@ const { createAnswerProvider } = require('./providers/providerFactory');
 const { providerProfileForConfig } = require('./providers/providerProfile');
 const { createTelegramAccessPolicy } = require('./telegram/accessPolicy');
 const { createTelegramBot } = require('./telegram/bot');
+const { sendTelegramText } = require('./telegram/telegramFormatting');
 const { TelegramMessageService } = require('./telegram/messageService');
 const { TelegramUpdateRepository } = require('./telegram/telegramUpdateRepository');
 const { UserRepository } = require('./users/userRepository');
@@ -38,6 +39,7 @@ const { DesktopCommandExecutor, ExecutorRegistry } = require('./orchestrator/exe
 const { ToolIntentPlanner } = require('./orchestrator/toolIntentPlanner');
 const { WorkflowRepository } = require('./orchestrator/workflowRepository');
 const { createRemoteMessage } = require('./devices/remoteProtocol');
+const { createOperationsRuntime } = require('./operations/operationsRuntime');
 
 async function createRuntime(config, overrides = {}) {
   let pool = overrides.pool || null;
@@ -46,6 +48,7 @@ async function createRuntime(config, overrides = {}) {
   const readinessChecks = pool ? [databaseReadinessCheck(pool)] : [];
   const app = overrides.app || buildApp({ config, readinessChecks });
   let bot = overrides.bot || null;
+  let pollingHealth = { at: 0, ok: false };
 
   if (pool) {
     await (overrides.runMigrations || runMigrations)(pool);
@@ -59,6 +62,7 @@ async function createRuntime(config, overrides = {}) {
   let commandService = null;
   let commandWorker = null;
   let orchestrator = null;
+  let operationsRuntime = null;
   if (pool) {
     const answerProvider = overrides.provider || createAnswerProvider(config, {
       onFallback(name, error) {
@@ -109,7 +113,10 @@ async function createRuntime(config, overrides = {}) {
         }
         const chatId = workflow.state && workflow.state.originChatId;
         if (workflow.origin_channel === 'telegram' && chatId && bot && bot.api) {
-          await bot.api.sendMessage(chatId, answer);
+          await sendTelegramText(
+            (chunk, options) => bot.api.sendMessage(chatId, chunk, options),
+            answer,
+          );
         }
       },
     });
@@ -200,7 +207,27 @@ async function createRuntime(config, overrides = {}) {
       messageService,
       logger: app.log,
       documentMaxBytes: config.documentMaxBytes,
+      onPollingHealth: (value) => { pollingHealth = value; },
     });
+    }
+    operationsRuntime = await (overrides.createOperationsRuntime || createOperationsRuntime)({
+      config,
+      pool,
+      app,
+      getBot: () => bot,
+      getPollingHealth: () => pollingHealth,
+      onDeviceRevoked: (id) => {
+        const session = sessionRegistry.get(id);
+        if (session) {
+          sessionRegistry.unregister(id, session.socket);
+          try { session.socket.close(1008, 'device reassigned'); } catch (_) {}
+        }
+      },
+      logger: app.log,
+      overrides: overrides.operations || {},
+    });
+    if (operationsRuntime.enabled && bot && typeof bot.on === 'function') {
+      bot.on('callback_query:data', operationsRuntime.approvalHandler);
     }
   }
 
@@ -213,8 +240,10 @@ async function createRuntime(config, overrides = {}) {
     memoryService,
     knowledgeService,
     orchestrator,
+    operationsRuntime,
     async start() {
       await app.listen({ host: config.host, port: config.port });
+      if (operationsRuntime) await operationsRuntime.start();
       if (knowledgeWorker) knowledgeWorker.start();
       if (commandWorker) commandWorker.start();
       if (bot) void bot.start().catch((error) => app.log.error({ err: error }, 'Telegram polling stopped'));
@@ -222,6 +251,7 @@ async function createRuntime(config, overrides = {}) {
     async close() {
       if (knowledgeWorker) knowledgeWorker.stop();
       if (commandWorker) commandWorker.stop();
+      if (operationsRuntime) await operationsRuntime.close();
       if (bot && (typeof bot.isRunning !== 'function' || bot.isRunning())) await bot.stop();
       await app.close();
       if (pool) await pool.end();

@@ -56,6 +56,7 @@ test('document creation locks the owner before enforcing a byte quota', async ()
       const normalized = String(sql).trim();
       calls.push({ sql: normalized, values });
       if (normalized === 'BEGIN' || normalized === 'COMMIT' || normalized === 'ROLLBACK') return { rowCount: 0, rows: [] };
+      if (normalized.includes('ops_maintenance_flags')) return { rowCount: 1, rows: [{ enabled: false }] };
       if (normalized.includes('SELECT id FROM users')) return { rowCount: 1, rows: [{ id: 'owner-a' }] };
       if (normalized.includes('COALESCE(SUM(byte_size)')) return { rowCount: 1, rows: [{ byte_size: '100' }] };
       return { rowCount: 1, rows: [{ id: 'document-a' }] };
@@ -75,10 +76,19 @@ test('document creation locks the owner before enforcing a byte quota', async ()
     userQuotaBytes: 200,
     metadata: {},
   });
-  assert.match(calls[1].sql, /FROM users WHERE id = \$1 FOR UPDATE/);
-  assert.match(calls[2].sql, /WHERE user_id = \$1/);
-  assert.deepEqual(calls[1].values, ['owner-a']);
+  assert.match(calls[1].sql, /ops_maintenance_flags/);
+  assert.match(calls[2].sql, /FROM users WHERE id = \$1 FOR UPDATE/);
+  assert.match(calls[3].sql, /WHERE user_id = \$1/);
+  assert.deepEqual(calls[2].values, ['owner-a']);
   assert.equal(calls.at(-1).sql, 'RELEASE');
+});
+
+test('knowledge worker claim is atomically gated by the maintenance flag', async () => {
+  const calls = [];
+  const repository = new DocumentRepository({ async query(sql, values) { calls.push({ sql, values }); return { rows: [] }; } });
+  assert.equal(await repository.claimNextIngest('worker-1'), null);
+  assert.match(calls[0].sql, /ops_maintenance_flags/);
+  assert.match(calls[0].sql, /knowledge_writes_paused/);
 });
 
 test('document search always scopes the chunk and joined document to its owner', async () => {

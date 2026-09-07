@@ -1,6 +1,39 @@
 # Jarvis Operations Control Panel Implementation Plan
 
-Status: ready for implementation as of 2026-09-04.
+2026-09-06 status correction: the original rollout below overstated acceptance.
+See `docs/updates/2026-09-06-operations-verification.md`. Subsequent work fixes
+mutation claims and timeout recovery, live device refresh and connection
+revocation, stale/error display, archive privacy/quotas, backup races, and
+notification retries; adds provider/polling/queue/migration checks, CPU/swap/
+network metrics, and read-only component discovery. Migrations now include
+010 and 011. The owner explicitly deferred all actual backup/restore work;
+the backup timer remains disabled. Historical milestones below are preserved
+as decision history rather than silently rewritten.
+
+Status: advanced implementation in progress as of 2026-09-04; production is
+healthy, but final root-owned activation and restore acceptance remain open.
+
+Implemented and verified live: migrations 007-009, authenticated Unix-socket
+Host Agent, four-service inventory, Telegram browser approval, persistent
+sessions and immediate SSE revocation, exact operations-host enforcement,
+host metrics, five-minute rollups, bounded age retention, read APIs, live SSE,
+parser state history, deterministic incidents, safe Telegram error delivery,
+metadata-only family device mapping, reassignment workflows, and the complete
+read UI for Overview, Infrastructure, Services/logs, Devices, Parser,
+Incidents, Events, Backups, and Sessions. Fixed service-operation code and UI
+are deployed. Restart capabilities for Jarvis Server and Cloudflare Tunnel are
+enabled and verified live, including Host Agent journal reconciliation after
+Jarvis restarts itself. PostgreSQL and Telegram Parser remain read-only. The
+non-stopping knowledge maintenance gate and backup script are deployed and
+locally verified.
+
+Still required for final acceptance: provision an external restic repository
+and its root-only credentials, install/enable the daily backup timer, run a
+real encrypted backup and isolated restore drill, verify a safely simulated
+incident notification, and complete phone/desktop visual acceptance. The
+updated Host Agent, disk/inode collection, sudo boundary, and selected action
+allowlists are verified live. The already running Telegram parser remains
+unmodified.
 
 Design:
 `docs/superpowers/specs/2026-09-04-jarvis-operations-control-panel-design.md`
@@ -35,8 +68,9 @@ or begin VPN, proxy, and automatic deployment work.
 - Do not expose family conversation, memory, document, message, or request
   content through operations repositories or routes.
 - Preserve old ownership when Telegram identities or devices are reassigned.
-- Do not move, copy, or reinstall the production parser during initial
-  integration.
+- Treat the already deployed production parser as an external, read-only
+  integration: do not move, copy, reinstall, modify its source, alter its
+  systemd unit, or add parser control/source/discovery actions in this plan.
 - Preserve unrelated dirty-worktree changes and generated/local state listed
   in `AGENTS.md`.
 
@@ -143,7 +177,8 @@ Capture read-only VPS fixtures for tests without copying secrets:
 - Docker Compose project/container JSON output;
 - representative `/proc/meminfo`, `/proc/loadavg`, disk, and inode values;
 - bounded redacted journal lines;
-- parser discovery checkpoint and report shapes without session/config data.
+- parser systemd-state and bounded redacted journal shapes without
+  session/config data.
 
 Store synthetic equivalents under `host-agent/tests/fixtures/`; do not commit
 raw production output.
@@ -161,6 +196,16 @@ Define a versioned JSON request and response envelope containing request ID,
 protocol version, operation name, validated arguments, result state, timestamps,
 and bounded error code. Separate read operations from changing operations.
 
+For each operation define an exact closed argument schema, including maximum
+array items, string lengths, and per-field formats. The response must echo the
+request ID and operation name exactly. Changing requests use a durable Host
+Agent idempotency journal keyed by the request ID: the Agent persists the
+terminal result before returning it, returns that result for a duplicate ID,
+rejects an ID reused with different operation/arguments, and exposes a bounded
+read operation for reconciling a previously accepted ID after a disconnect or
+restart. A timeout is still `unknown` to the server until that reconciliation
+returns a verified terminal result.
+
 Initial operation names:
 
 ```text
@@ -173,13 +218,11 @@ service.restart
 backup.status
 backup.run
 parser.snapshot
-parser.sources.replace
-parser.discovery.start
 ```
 
 Do not include a generic command field. Reject unknown fields, overlong
-identifiers, unsupported versions, and responses above the configured byte
-limit.
+identifiers, unsupported versions, argument-schema violations, request-ID
+reuse with a changed payload, and responses above the configured byte limit.
 
 Exit criterion: Node and Python validate the same fixtures, and no protocol
 field can carry arbitrary command text.
@@ -266,8 +309,13 @@ profile.
 Create the Python standard-library package under `host-agent/`. The agent:
 
 - listens only on `/run/jarvis-host-agent/agent.sock`;
-- sets restrictive socket ownership and mode;
-- validates a shared request authenticator from an ignored root-readable file;
+- runs as a dedicated privileged Host Agent account only where systemd/Docker
+  management requires it; its fixed manifest is the authority boundary;
+- sets the socket directory to traversable only by root and a dedicated
+  `jarvis-server` group, and the socket to `0660 root:jarvis-server`;
+- validates an authenticator from an ignored file readable by the Host Agent
+  and the Fastify process only (not a root-only file that the `node` container
+  cannot read);
 - enforces request and response byte limits;
 - has no public TCP listener;
 - executes subprocesses only from fixed argument builders with `shell=False`;
@@ -283,6 +331,9 @@ Create:
 
 The real config and authenticator stay outside Git. The config registers exact
 systemd units, Compose project paths, parser paths, and backup unit names.
+The deployment runbook creates the matching host group and container group
+mapping before the server starts; an inaccessible socket or secret is a hard
+startup failure, not a fallback to TCP.
 
 ### Task 2.2: Implement host collectors
 
@@ -333,8 +384,10 @@ all undeclared actions, and has no general shell path.
 ### Task 3.1: Connect Fastify to the agent
 
 Create `server/src/operations/hostAgentClient.js` using Node's Unix-socket
-support. Mount `/run/jarvis-host-agent/` into the server container and mount the
-server-side authenticator as a read-only Compose secret.
+support. Mount `/run/jarvis-host-agent/` into the server container read-only
+and mount the server-side authenticator with the explicit container UID/GID
+required by the `node` process. The container receives neither the Docker
+socket nor host privilege.
 
 Extend:
 
@@ -393,7 +446,9 @@ GET /ops/api/stream
 Every list endpoint has fixed maximum page size, validated cursors, and bounded
 time ranges. SSE sends event IDs, heartbeats, and only summary payloads. A
 client that reconnects beyond retained event history receives a signal to
-refresh through REST.
+refresh through REST. Every subscription is associated with its validated panel
+session ID; session revocation removes and closes all of that session's active
+subscriptions immediately, rather than waiting for EventSource to reconnect.
 
 ### Task 3.4: Wire a focused operations runtime
 
@@ -438,18 +493,26 @@ GET    /ops/api/sessions
 DELETE /ops/api/sessions/:id
 ```
 
-An approval request expires after five minutes and is single-use. An approved
-session receives a random credential in a host-only Secure, HttpOnly,
-SameSite=Strict cookie. Store only its hash. The session itself has no expiry;
+An approval request expires after five minutes and is single-use. At request
+creation, issue a distinct random browser-request verifier in a host-only
+Secure, HttpOnly, SameSite=Strict cookie and store only its hash with the
+approval request. The poll route must require that verifier before it reports
+state or issues the approved session credential, so the opaque request ID alone
+cannot claim a session. Store only hashes. The session itself has no expiry;
 touch `last_used_at` at a bounded frequency rather than on every request.
 
-Restrict all `/ops/api/*` routes except request/poll to the configured
-operations hostname and approved owner sessions. A logged-in session can
-forget itself or another listed session without Telegram confirmation.
+Restrict every `/ops/*` route, including request/poll and static assets, to the
+configured exact operations hostname. Require an approved owner session for
+every `/ops/api/*` route except the verifier-bound request/poll routes. Require
+same-origin `Origin` (and reject cross-site Fetch Metadata) for all state
+changing operations; SameSite cookies are defense in depth, not the sole CSRF
+control. A logged-in session can forget itself or another listed session
+without Telegram confirmation.
 
 ### Task 4.2: Add Telegram approval callbacks
 
-Extend `server/src/telegram/bot.js` with a narrow callback-query handler and add
+Extend `server/src/telegram/bot.js` with a narrow `callback_query:data` handler
+and add
 `server/src/operations/sessions/telegramApproval.js`. Callback data contains
 only a compact opaque approval ID and decision. Validate:
 
@@ -463,9 +526,11 @@ conversation messages.
 
 ### Task 4.3: Add session tests
 
-Test unknown browsers, allow, deny, expiry, duplicate callback, wrong Telegram
-user, cookie properties, server restart persistence, no automatic expiry,
-forgetting, REST/SSE rejection after forgetting, and Telegram unavailability.
+Test unknown browsers, verifier mismatch, allow, deny, expiry, duplicate
+callback, wrong Telegram user, callback routing, cookie properties, server
+restart persistence, no automatic expiry, forgetting, REST/SSE rejection after
+forgetting (including closing an already-open SSE connection), cross-origin
+state changes, and Telegram unavailability.
 
 Exit criterion: a new browser requires Telegram once; after approval it remains
 fully usable until forgotten.
@@ -577,9 +642,6 @@ Add action handlers only for registered targets:
 
 - start, stop, and restart service;
 - run configured backup service;
-- pause/resume parser by stopping/starting `tg-parser.service`;
-- replace parser sources through its validated adapter;
-- start the predefined parser discovery unit.
 
 Each handler builds exact argument arrays. The API cannot supply unit names,
 Compose paths, executable paths, environment variables, or command fragments.
@@ -598,16 +660,15 @@ POST /ops/api/services/:id/actions/start
 POST /ops/api/services/:id/actions/stop
 POST /ops/api/services/:id/actions/restart
 POST /ops/api/backups/actions/run
-POST /ops/api/parser/actions/pause
-POST /ops/api/parser/actions/resume
-PUT  /ops/api/parser/sources
-POST /ops/api/parser/discovery
 ```
 
 The service creates an operation record before contacting the Host Agent,
 passes the same operation ID, and stores the verified result. It does not retry
 changing operations after timeout, disconnect, or restart. A duplicate browser
-submission with the same idempotency key returns the existing operation.
+submission with the same idempotency key and identical normalized request
+returns the existing operation; reuse of a key with a different action, target,
+or arguments is rejected. The service may reconcile a previously accepted
+Host-Agent operation ID, but never creates a second changing request.
 
 The panel session is the authorization; do not add Telegram confirmation.
 
@@ -622,63 +683,35 @@ Exit criterion: only explicitly registered services expose buttons, every
 action has a durable audit record, and unknown results are never displayed as
 success.
 
-## Milestone 8: Existing Parser Integration
+## Milestone 8: Existing Parser Observation
 
-This milestone changes the parser source in its own repository but does not
-move it into Jarvis. Keep parser commits separate from Jarvis commits.
+The production parser already runs on the VPS outside this repository. This
+milestone changes neither its source, virtual environment, session, systemd
+unit, configuration, notification destination, sources, nor discovery flow.
 
-### Task 8.1: Add the parser operations export
-
-In the current parser source, add a focused module such as
-`operations_export.py` and corresponding tests. It writes atomic bounded state
-under a configured directory outside Git, for example
-`/var/lib/tg-parser/operations/`:
-
-- `status.json` with heartbeat, source count, queue state, and latest bounded
-  error;
-- `events.jsonl` with found-job/classification summaries;
-- discovery status and report references without Telegram session data.
-
-Instrument `main.py`, `alert_delivery.py`, and the discovery pipeline at their
-existing domain boundaries. Do not parse human log strings when a structured
-event can be emitted directly. Never export bot tokens, Telethon session data,
-API credentials, proxy credentials, or private configuration.
-
-### Task 8.2: Add validated source administration
-
-Extend the parser CLI with a machine-oriented source operation that uses the
-existing `source_registry.py` parser and atomic writer. Accept a bounded JSON
-file path created by the Host Agent, validate every source, and replace
-`chats.txt` atomically. Return structured JSON without echoing secrets.
-
-The Host Agent writes input only to its private temporary directory and invokes
-the exact parser virtual-environment executable and fixed CLI action.
-
-### Task 8.3: Add discovery service
-
-Add a separate `tg-parser-discovery.service` that runs the existing command in
-resume mode with a fixed output directory. The initial panel action runs
-discovery without `--apply`; candidates appear in the panel and source changes
-remain an explicit separate action.
-
-Prevent concurrent discovery runs with systemd state and the parser's existing
-checkpoint behavior. Do not interrupt `tg-parser.service` unless the parser's
-own tests prove shared Telethon session access is safe; otherwise serialize the
-two through a parser-local lock and show the waiting state.
-
-### Task 8.4: Ingest parser state
+### Task 8.1: Read-only parser adapter
 
 Implement `host-agent/jarvis_host_agent/adapters/tg_parser.py` and server parser
-normalization. Store found-job/classification summaries for 15 days, deduped by
-parser fingerprint. Keep current parser alert delivery untouched.
+normalization using only selected `systemctl show tg-parser.service` properties,
+the process freshness visible to systemd, and bounded redacted journal records.
+If the existing deployment already exposes a non-secret status/checkpoint file,
+it may be listed in root-owned Host Agent config and read as a bounded optional
+source; absence is `unavailable`, not an error or a reason to modify parser.
 
-Run the parser's full test suite, deploy the small change to its existing
-working directory and virtual environment, restart only `tg-parser.service`,
-and verify notification behavior before enabling parser actions in the panel.
+Store only service-state and bounded operational summaries for 15 days. Do not
+store Telegram session data, tokens, proxies, source lists, messages, found-job
+content, classification content, or parser configuration. Keep current parser
+alert delivery untouched.
 
-Exit criterion: the panel displays live parser activity and recent found jobs,
-source edits and discovery work through fixed operations, and the parser still
-sends jobs to its original destination.
+### Task 8.2: Verify observation only
+
+Run the parser's existing test suite in its production virtual environment as a
+read-only acceptance check, then compare panel state with `systemctl` and
+journald. Do not restart the service during this milestone.
+
+Exit criterion: the panel accurately displays the parser service's current
+health and bounded operational errors while the parser behavior and files are
+unchanged.
 
 ## Milestone 9: Jarvis Connection Administration
 
@@ -745,13 +778,22 @@ clear temporary-unavailable response and queued ingestion does not start.
 Ordinary chat, Telegram polling, memory, Desktop sessions, and the operations
 panel continue.
 
+The upload gate and the worker's `claimNextIngest` query must read and enforce
+the flag inside their respective database transactions; a check before a later
+claim is insufficient. The backup path writes and clears the flag through a
+fixed, authenticated `psql` invocation inside the existing PostgreSQL Compose
+service, never through an unauthenticated HTTP route. It waits for every
+running document-ingest and embedding job to reach a terminal state before the
+database dump and document-volume snapshot, with a bounded timeout that clears
+the flag and fails safely.
+
 ### Task 10.2: Update backup scripts and reporting
 
 Modify `deploy/backup/backup.sh` to:
 
 - acquire the existing backup lock;
 - set the knowledge-write flag;
-- wait boundedly for an active document-ingestion job to finish;
+- wait boundedly for active document-ingestion and embedding jobs to finish;
 - run `pg_dump` and snapshot the document volume;
 - clear the flag in an exit trap;
 - write a bounded machine-readable result under a configured host state
@@ -802,13 +844,10 @@ status, one owner alert, panel resolution, and correct retention behavior.
 
 Enable actions in this order:
 
-1. parser pause/resume in a planned window;
-2. parser source replacement with a no-op equivalent list;
-3. parser discovery;
-4. Jarvis server restart;
-5. Cloudflare Tunnel restart;
-6. manual backup;
-7. PostgreSQL restart only if explicitly accepted after observation.
+1. Jarvis server restart;
+2. Cloudflare Tunnel restart;
+3. manual backup;
+4. PostgreSQL restart only if explicitly accepted after observation.
 
 For each action, compare the durable operation result with actual systemd or
 Docker state. Do not enable automatic recovery.
@@ -859,8 +898,7 @@ Keep implementation commits small and independently verifiable:
 5. incident rules and owner error notifications;
 6. responsive read-only operations UI;
 7. fixed manual operations;
-8. parser operations export in the parser repository;
-9. Jarvis parser adapter and panel integration;
+8. read-only Jarvis parser adapter and panel integration;
 10. connection administration;
 11. non-stopping backup and restore verification;
 12. production acceptance and documentation.

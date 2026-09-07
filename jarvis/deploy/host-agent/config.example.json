@@ -1,0 +1,10 @@
+{
+  "authenticatorPath": "/etc/jarvis-host-agent/authenticator",
+  "stateDir": "/var/lib/jarvis-host-agent",
+  "managedServices": [
+    { "id": "jarvis-server", "type": "docker", "target": "jarvis-family-server-1", "actions": [] },
+    { "id": "postgres", "type": "docker", "target": "jarvis-family-postgres-1", "actions": [] },
+    { "id": "cloudflared", "type": "docker", "target": "jarvis-family-cloudflared-1", "actions": [] },
+    { "id": "telegram-parser", "type": "systemd", "target": "tg-parser.service", "actions": [] }
+  ]
+}

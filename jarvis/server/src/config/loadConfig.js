@@ -62,6 +62,14 @@ const baseSchema = z.object({
   asrApiKey: z.string().max(2048),
   asrModel: z.string().max(255),
   asrTimeoutMs: z.number().int().min(1000).max(120000),
+  operationsEnabled: z.boolean(),
+  operationsHostKey: z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/),
+  operationsHostLabel: z.string().min(1).max(100),
+  operationsSocketPath: z.string().min(1).max(2048),
+  operationsAuthenticatorPath: z.string().min(1).max(2048),
+  operationsPollIntervalMs: z.number().int().min(5000).max(300000),
+  operationsOwnerTelegramId: z.string().regex(/^\d{1,20}$/),
+  operationsPublicOrigin: z.string().max(2048),
 });
 
 function validateProvider(config, provider) {
@@ -167,6 +175,14 @@ function loadConfig(env = process.env) {
     asrApiKey: String(env.ASR_API_KEY || '').trim(),
     asrModel: String(env.ASR_MODEL || '').trim(),
     asrTimeoutMs: Number(env.JARVIS_ASR_TIMEOUT_MS || 60000),
+    operationsEnabled: parseBoolean(env.JARVIS_OPERATIONS_ENABLED),
+    operationsHostKey: String(env.JARVIS_OPERATIONS_HOST_KEY || 'vps').trim(),
+    operationsHostLabel: String(env.JARVIS_OPERATIONS_HOST_LABEL || 'Jarvis VPS').trim(),
+    operationsSocketPath: String(env.JARVIS_OPERATIONS_SOCKET_PATH || '/run/jarvis-host-agent/agent.sock').trim(),
+    operationsAuthenticatorPath: String(env.JARVIS_OPERATIONS_AUTHENTICATOR_PATH || '/run/secrets/operations_host_agent_authenticator').trim(),
+    operationsPollIntervalMs: Number(env.JARVIS_OPERATIONS_POLL_INTERVAL_MS || 30000),
+    operationsOwnerTelegramId: String(env.JARVIS_OPERATIONS_OWNER_TELEGRAM_ID || '0').trim(),
+    operationsPublicOrigin: String(env.JARVIS_OPERATIONS_PUBLIC_ORIGIN || '').trim(),
   };
 
   const config = baseSchema.parse(raw);
@@ -180,6 +196,13 @@ function loadConfig(env = process.env) {
   validateConfiguredFallbacks(config);
   validateAsr(config);
   validateEmbeddings(config);
+  if (config.operationsEnabled) {
+    if (!config.operationsPublicOrigin) throw new Error('JARVIS_OPERATIONS_PUBLIC_ORIGIN is required when operations are enabled');
+    const operationsUrl = new URL(config.operationsPublicOrigin);
+    if (config.nodeEnv === 'production' && operationsUrl.protocol !== 'https:') throw new Error('JARVIS_OPERATIONS_PUBLIC_ORIGIN must use HTTPS in production');
+    if (operationsUrl.pathname !== '/' || operationsUrl.search || operationsUrl.hash) throw new Error('JARVIS_OPERATIONS_PUBLIC_ORIGIN must be an origin without a path');
+    if (config.operationsOwnerTelegramId === '0') throw new Error('JARVIS_OPERATIONS_OWNER_TELEGRAM_ID is required when operations are enabled');
+  }
   if (config.modelProvider !== 'echo' && config.modelProvider === config.modelFallbackProvider) {
     throw new Error('model fallback provider must differ from the primary provider');
   }

@@ -27,12 +27,17 @@ class DeviceRepository {
         WHERE code_hash = $1
           AND consumed_at IS NULL
           AND expires_at > now()
-        RETURNING user_id, device_name
+        RETURNING id, user_id, device_name, source_device_id
       ), created_device AS (
         INSERT INTO devices (user_id, name, token_hash, capabilities, status, last_seen_at)
         SELECT user_id, device_name, $2, $3, 'offline', now()
         FROM consumed_code
         RETURNING id, user_id, name, status, capabilities, created_at, updated_at
+      ), claimed_reassignment AS (
+        UPDATE device_reassignments r SET status='claimed',claimed_at=now()
+        FROM consumed_code c
+        WHERE r.pairing_code_id=c.id AND r.status='pending_claim'
+        RETURNING r.id
       )
       SELECT * FROM created_device
     `, [pairingCodeHash(code), deviceTokenHash(token), capabilities]);

@@ -156,7 +156,15 @@ class TelegramMessageService {
         throw new Error('document ingestion is unavailable');
       }
       const data = await options.downloadAttachment(input.attachment);
-      const document = await this.knowledgeService.ingest({ userId: user.id, attachment: input.attachment, data });
+      let document;
+      try {
+        document = await this.knowledgeService.ingest({ userId: user.id, attachment: input.attachment, data });
+      } catch (error) {
+        if (error && error.code === 'KNOWLEDGE_WRITES_PAUSED') {
+          return { status: 'answered', answer: 'Загрузка документов временно приостановлена на время резервного копирования. Попробуй ещё раз через несколько минут.' };
+        }
+        throw error;
+      }
       const answer = `Принял «${document.originalName || document.name}». Индексирую; статус появится в /documents.`;
       await this.conversationRepository.appendMessage({
         userId: user.id,

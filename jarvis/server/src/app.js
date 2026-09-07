@@ -47,7 +47,10 @@ function buildApp(options = {}) {
     reply.header('X-Content-Type-Options', 'nosniff');
     reply.header('X-Frame-Options', 'DENY');
     reply.header('Referrer-Policy', 'no-referrer');
-    reply.header('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'; base-uri 'none'");
+    const opsAsset = request.raw.url && request.raw.url.startsWith('/ops/');
+    reply.header('Content-Security-Policy', opsAsset
+      ? "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'"
+      : "default-src 'none'; frame-ancestors 'none'; base-uri 'none'");
     if (config.nodeEnv === 'production') {
       reply.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     }
