@@ -59,6 +59,10 @@ See `docs/README.md` for current implementation status and historical records.
   `stt_runtime/`/Faster Whisper remains a development-only local subsystem.
 - `tts/` keeps Silero/Piper behind `tts/ttsService.js`.
 - `tools/` and `actions/` implement bounded local operations.
+- `renderer/quantumCore.js` provides procedural 3D WebGL (Three.js r160) avatar
+  («Quantum Holographic Core 2.0»), integrated into Cloud Chat sidebar, floating
+  Voice Overlay, and a dedicated desktop companion widget (`renderer/quantum-widget.*`)
+  with full state/emotion IPC sync.
 - `agents/toolGateway.js` is the execution authority for agent-requested OS
   mutations. `agents/toolPolicy.js` and `agents/toolSchemas.js` are shared
   policy/validation contracts.
@@ -172,6 +176,8 @@ node scripts/testVoiceQualityMonitor.js
 node scripts/testVoiceLabController.js
 node scripts/testGeminiVoiceAdvisor.js
 node scripts/testVoiceLabRenderer.js
+node scripts/testTrayMenu.js
+node scripts/testQuantumCore.js
 node --test cloud/*.test.js voice/cloudVoiceService.test.js tts/windowsSapiService.test.js
 npm run dist:win
 python scripts/testFasterWhisperQuality.py

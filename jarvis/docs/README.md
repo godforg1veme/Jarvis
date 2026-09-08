@@ -16,8 +16,9 @@ acceptance by this record.
 
 Jarvis is a hybrid personal/family AI-assistant platform: an always-on cloud
 control plane provides identity, Telegram access, persistent user-scoped data,
-and model routing; Windows clients provide local voice and bounded device
-execution. Telegram is the first client. PWA, camera/vision, and production
+and model routing; Windows clients provide local voice, a procedural 3D
+holographic avatar («Quantum Core 2.0»), a floating desktop companion widget,
+and bounded device execution. Telegram is the first client. PWA, camera/vision, and production
 acceptance of multi-device control remain roadmap work unless explicitly marked
 implemented below. The Telegram-first private knowledge base accepts bounded
 attachments, indexes supported text formats with PostgreSQL full-text search,
