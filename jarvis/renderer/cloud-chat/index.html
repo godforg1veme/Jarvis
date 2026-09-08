@@ -28,6 +28,9 @@
 
       <section class="voice-card">
         <p class="eyebrow">VOICE CHANNEL</p>
+        <div class="voice-core-stage" id="voice-core-stage">
+          <canvas id="voice-core-canvas"></canvas>
+        </div>
         <h2 id="voice-title">Голос выключен</h2>
         <p id="voice-description">После подключения Jarvis будет ждать wake word локально.</p>
         <button id="voice-toggle" class="voice-button" type="button" disabled>
@@ -90,6 +93,8 @@
       </section>
     </section>
   </main>
+  <script src="../vendor/three.min.js"></script>
+  <script src="../quantumCore.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>

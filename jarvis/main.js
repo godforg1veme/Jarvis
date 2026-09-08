@@ -48,7 +48,9 @@ let mainWindow = null;
 let voiceOverlayWindow = null;
 let transcriptionBarWindow = null;
 let voiceLabWindow = null;
+let hologramWidgetWindow = null;
 let showTranscriptionBar = true;
+let showHologramWidget = true;
 let tray = null;
 let voiceService = null;
 let voiceLabController = null;
@@ -96,6 +98,17 @@ function isTrustedMainRenderer(event) {
 function sendCloudEvent(channel, payload) {
   if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
     mainWindow.webContents.send(channel, payload);
+  }
+}
+
+function broadcastCoreMode(mode, extra = {}) {
+  const payload = { mode, ...extra };
+  for (const win of BrowserWindow.getAllWindows()) {
+    try {
+      if (win.webContents && !win.webContents.isDestroyed()) {
+        win.webContents.send('jarvis:core-mode', payload);
+      }
+    } catch (e) {}
   }
 }
 
@@ -194,6 +207,7 @@ function saveJSON(filePath, data) {
 
 const initialUiState = loadJSON(UI_STATE_PATH, {});
 showTranscriptionBar = initialUiState.showTranscriptionBar !== false;
+showHologramWidget = initialUiState.showHologramWidget !== false;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -544,6 +558,7 @@ function updateTrayMenu() {
 
   const contextMenu = Menu.buildFromTemplate(buildTrayMenuTemplate({
     isMicOn,
+    showHologramWidget,
     showTranscriptionBar,
     onToggleMic: () => {
         if (cloudVoiceService) {
@@ -552,12 +567,35 @@ function updateTrayMenu() {
           updateTrayMenu();
         }
       },
+    onToggleHologramWidget: (checked) => {
+      toggleHologramWidget(checked);
+    },
     onToggleTranscriptionBar: (checked) => {
       toggleTranscriptionBar(checked);
     },
     onQuit: () => shutdownApp(),
   }));
   tray.setContextMenu(contextMenu);
+}
+
+function toggleHologramWidget(visible) {
+  showHologramWidget = visible;
+  const uiState = loadJSON(UI_STATE_PATH, {});
+  uiState.showHologramWidget = visible;
+  saveJSON(UI_STATE_PATH, uiState);
+
+  if (visible) {
+    if (!hologramWidgetWindow || hologramWidgetWindow.isDestroyed()) {
+      createHologramWidgetWindow();
+    } else {
+      hologramWidgetWindow.show();
+    }
+  } else {
+    if (hologramWidgetWindow && !hologramWidgetWindow.isDestroyed()) {
+      hologramWidgetWindow.hide();
+    }
+  }
+  updateTrayMenu();
 }
 
 function toggleTranscriptionBar(visible) {
@@ -623,9 +661,9 @@ function createWindow() {
 function createVoiceOverlayWindow() {
   voiceOverlayWindow = new BrowserWindow({
     width: 800,
-    height: 150,
+    height: 300,
     x: Math.round(screen.getPrimaryDisplay().workAreaSize.width / 2 - 400),
-    y: Math.round(screen.getPrimaryDisplay().workAreaSize.height - 180), // At the bottom
+    y: Math.round(screen.getPrimaryDisplay().workAreaSize.height - 330), // At the bottom
     frame: false,
     transparent: true,
     resizable: false,
@@ -695,6 +733,58 @@ function createTranscriptionBarWindow() {
 
   transcriptionBarWindow.on('closed', () => {
     transcriptionBarWindow = null;
+  });
+}
+
+function createHologramWidgetWindow() {
+  if (hologramWidgetWindow && !hologramWidgetWindow.isDestroyed()) return;
+
+  const uiState = loadJSON(UI_STATE_PATH, {});
+  const savedPos = uiState.hologramWidgetPosition;
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+
+  const defaultX = Math.round(screenWidth - 280);
+  const defaultY = Math.round(screenHeight - 280);
+
+  hologramWidgetWindow = new BrowserWindow({
+    width: 260,
+    height: 260,
+    x: (savedPos && typeof savedPos[0] === 'number') ? savedPos[0] : defaultX,
+    y: (savedPos && typeof savedPos[1] === 'number') ? savedPos[1] : defaultY,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: uiState.hologramWidgetPinned !== false,
+    skipTaskbar: true,
+    resizable: false,
+    hasShadow: false,
+    focusable: true,
+    show: showHologramWidget,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  });
+
+  hologramWidgetWindow.loadFile(path.join(__dirname, 'renderer', 'quantum-widget.html'));
+
+  let moveTimeout;
+  hologramWidgetWindow.on('move', () => {
+    if (moveTimeout) clearTimeout(moveTimeout);
+    moveTimeout = setTimeout(() => {
+      if (hologramWidgetWindow && !hologramWidgetWindow.isDestroyed()) {
+        const pos = hologramWidgetWindow.getPosition();
+        const latestUiState = loadJSON(UI_STATE_PATH, {});
+        latestUiState.hologramWidgetPosition = pos;
+        saveJSON(UI_STATE_PATH, latestUiState);
+      }
+    }, 500);
+  });
+
+  hologramWidgetWindow.on('closed', () => {
+    hologramWidgetWindow = null;
   });
 }
 
@@ -808,6 +898,9 @@ function shutdownApp() {
   if (voiceLabWindow && !voiceLabWindow.isDestroyed()) {
     voiceLabWindow.close();
   }
+  if (hologramWidgetWindow && !hologramWidgetWindow.isDestroyed()) {
+    hologramWidgetWindow.close();
+  }
   app.quit();
 }
 
@@ -865,18 +958,27 @@ app.whenReady().then(() => {
       localActions: Object.keys(ACTION_POLICIES),
     },
     executeRemoteCommand: async (request, executionOptions = {}) => {
-      const result = await executeToolRequest(request, {
-        shell,
-        workArea: screen.getPrimaryDisplay().workArea,
-        resolveAppCandidate: resolveRemoteAppCandidate,
-        resolveFileCandidate: resolveRemoteFileCandidate,
-        ...executionOptions,
-      });
-      if (request?.action === 'file.search') return registerRemoteFileSearch(result);
-      if (request?.action === 'app.resolve' && result?.result) {
-        return { ...result, result: registerRemoteAppResolution(result.result) };
+      const isSearch = request?.action === 'file.search';
+      broadcastCoreMode(isSearch ? 'scanner' : 'vortex', { action: request?.action });
+      try {
+        const result = await executeToolRequest(request, {
+          shell,
+          workArea: screen.getPrimaryDisplay().workArea,
+          resolveAppCandidate: resolveRemoteAppCandidate,
+          resolveFileCandidate: resolveRemoteFileCandidate,
+          ...executionOptions,
+        });
+        if (request?.action === 'file.search') return registerRemoteFileSearch(result);
+        if (request?.action === 'app.resolve' && result?.result) {
+          return { ...result, result: registerRemoteAppResolution(result.result) };
+        }
+        return result;
+      } catch (err) {
+        broadcastCoreMode('alert', { error: err.message });
+        throw err;
+      } finally {
+        setTimeout(() => broadcastCoreMode('idle'), 1200);
       }
-      return result;
     },
     onState: (state) => {
       sendCloudEvent('cloud:state', state);
@@ -906,6 +1008,10 @@ app.whenReady().then(() => {
 
   // --- Tray (always created) ---
   createTray();
+
+  if (showHologramWidget) {
+    createHologramWidgetWindow();
+  }
 
   // Register global shortcut to show/hide window
   globalShortcut.register('Ctrl+Alt+J', () => {
@@ -1056,14 +1162,17 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('confirm-command', async (event, { tool, args }) => {
-    if (!ALLOWED_TOOLS.includes(tool)) {
-      return { ok: false, type: 'error', title: 'Ошибка', content: `Неизвестный инструмент: ${tool}` };
-    }
+    broadcastCoreMode('alert', { tool, args });
     try {
+      if (!ALLOWED_TOOLS.includes(tool)) {
+        return { ok: false, type: 'error', title: 'Ошибка', content: `Неизвестный инструмент: ${tool}` };
+      }
       const toolModule = require(`./tools/${tool}`);
       return await toolModule.execute(args, true);
     } catch (err) {
       return { ok: false, type: 'error', title: 'Ошибка', content: err.message, error: err.message };
+    } finally {
+      setTimeout(() => broadcastCoreMode('idle'), 1500);
     }
   });
 
@@ -1141,6 +1250,33 @@ app.whenReady().then(() => {
 
   ipcMain.handle('hide-transcription-bar', () => {
     toggleTranscriptionBar(false);
+    return { ok: true };
+  });
+
+  ipcMain.handle('hologram-widget:toggle', (_event, { visible } = {}) => {
+    toggleHologramWidget(!!visible);
+    return { ok: true, visible: showHologramWidget };
+  });
+
+  ipcMain.handle('hologram-widget:set-pin', (_event, { pinned } = {}) => {
+    if (hologramWidgetWindow && !hologramWidgetWindow.isDestroyed()) {
+      hologramWidgetWindow.setAlwaysOnTop(!!pinned);
+      const uiState = loadJSON(UI_STATE_PATH, {});
+      uiState.hologramWidgetPinned = !!pinned;
+      saveJSON(UI_STATE_PATH, uiState);
+    }
+    return { ok: true, pinned: !!pinned };
+  });
+
+  ipcMain.on('hologram-widget:move', (_event, { dx, dy } = {}) => {
+    if (hologramWidgetWindow && !hologramWidgetWindow.isDestroyed()) {
+      const [x, y] = hologramWidgetWindow.getPosition();
+      hologramWidgetWindow.setPosition(Math.round(x + (dx || 0)), Math.round(y + (dy || 0)));
+    }
+  });
+
+  ipcMain.handle('show-main-window', async () => {
+    await showMainWindow();
     return { ok: true };
   });
 

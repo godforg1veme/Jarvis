@@ -14,4 +14,5 @@ contextBridge.exposeInMainWorld('jarvisCloud', {
   onState: (callback) => ipcRenderer.on('cloud:state', (_event, state) => callback(state)),
   onVoiceStatus: (callback) => ipcRenderer.on('cloud:voice-status', (_event, state) => callback(state)),
   onMessage: (callback) => ipcRenderer.on('cloud:message', (_event, message) => callback(message)),
+  onCoreMode: (callback) => ipcRenderer.on('jarvis:core-mode', (_event, payload) => callback(payload)),
 });

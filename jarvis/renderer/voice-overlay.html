@@ -8,9 +8,16 @@
   <link rel="stylesheet" href="voice-overlay.css">
 </head>
 <body>
-  <div id="overlay-container" class="hidden">
-    <div id="voice-text"></div>
+  <div id="overlay-wrapper" class="hidden">
+    <div id="core-stage">
+      <canvas id="quantum-core-canvas"></canvas>
+    </div>
+    <div id="overlay-container" class="is-empty">
+      <div id="voice-text"></div>
+    </div>
   </div>
+  <script src="vendor/three.min.js"></script>
+  <script src="quantumCore.js"></script>
   <script src="voice-overlay.js"></script>
 </body>
 </html>

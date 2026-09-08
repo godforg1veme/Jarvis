@@ -73,6 +73,29 @@ function renderState(nextState) {
   if (!paired && !elements.serverUrl.value && state.defaultServerUrl) elements.serverUrl.value = state.defaultServerUrl;
 }
 
+let quantumCore = null;
+
+function initQuantumCore() {
+  const canvas = document.getElementById('voice-core-canvas');
+  const stage = document.getElementById('voice-core-stage');
+  if (!canvas || !window.createQuantumCore) return;
+
+  try {
+    quantumCore = window.createQuantumCore({
+      canvas: canvas,
+      container: stage,
+      width: stage.clientWidth || 240,
+      height: 160,
+      mouseTracking: true,
+      autoStart: true,
+      scaleFactor: 0.85,
+    });
+    window.__quantumCore = quantumCore;
+  } catch (err) {
+    console.error('[cloudChat] Failed to init QuantumCore:', err);
+  }
+}
+
 function renderVoice(status) {
   const enabled = Boolean(status.enabled);
   state.voiceEnabled = enabled;
@@ -85,9 +108,29 @@ function renderVoice(status) {
     : 'После подключения Jarvis будет ждать wake word локально.';
   elements.voiceState.textContent = status.message || (enabled ? 'Голос готов' : 'Микрофон не активен');
   if (status.type === 'error') appendMessage('system', status.message || 'Ошибка голосового канала.');
+
+  if (quantumCore) {
+    if (!enabled) {
+      quantumCore.setMode('idle');
+      quantumCore.setAudioLevel(0);
+    } else if (phase === 'wake' || phase === 'ready') {
+      quantumCore.setMode('idle');
+      quantumCore.setAudioLevel(0);
+    } else if (phase === 'listening') {
+      quantumCore.setMode('speech');
+      quantumCore.setAudioLevel(0.8);
+    } else if (phase === 'transcribing' || phase === 'responding') {
+      quantumCore.setMode('vortex');
+    }
+    if (status.type === 'error') {
+      quantumCore.setMode('alert');
+    }
+  }
 }
 
 async function initialize() {
+  initQuantumCore();
+
   if (!cloud) {
     appendMessage('system', 'Безопасный cloud bridge недоступен.');
     return;
@@ -96,12 +139,52 @@ async function initialize() {
   cloud.onVoiceStatus(renderVoice);
   cloud.onMessage((message) => {
     if (message.transcript) appendMessage('user', message.transcript, 'ВЫ · ГОЛОС');
-    if (message.answer) appendMessage('assistant', message.answer);
+    if (message.answer) {
+      appendMessage('assistant', message.answer);
+      if (quantumCore) {
+        quantumCore.setMode('speech');
+        quantumCore.setAudioLevel(0.9);
+        setTimeout(() => {
+          if (quantumCore && state.voiceEnabled) {
+            quantumCore.setMode('idle');
+            quantumCore.setAudioLevel(0);
+          }
+        }, 3500);
+      }
+    }
   });
   const result = await cloud.getState();
   if (result && result.ok) renderState(result);
   const voice = await cloud.getVoiceState();
   if (voice && voice.ok) renderVoice(voice);
+
+  if (typeof cloud.onCoreMode === 'function') {
+    cloud.onCoreMode((payload) => {
+      if (quantumCore && payload && payload.mode) {
+        quantumCore.setMode(payload.mode);
+      }
+    });
+  }
+
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('visibilitychange', () => {
+      if (quantumCore) {
+        if (document.hidden) quantumCore.pause();
+        else quantumCore.resume();
+      }
+    });
+  }
+
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('resize', () => {
+      if (quantumCore) {
+        const stage = document.getElementById('voice-core-stage');
+        if (stage && stage.clientWidth > 0 && stage.clientHeight > 0) {
+          quantumCore.resize(stage.clientWidth, stage.clientHeight);
+        }
+      }
+    });
+  }
 }
 
 elements.pairingForm.addEventListener('submit', async (event) => {

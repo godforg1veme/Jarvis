@@ -41,6 +41,15 @@ contextBridge.exposeInMainWorld('jarvis', {
 
   // Index status listener
   onIndexStatus: (callback) => ipcRenderer.on('index-status', (_event, data) => callback(data)),
+
+  // 3D Quantum Core mode listener
+  onCoreMode: (callback) => ipcRenderer.on('jarvis:core-mode', (_event, payload) => callback(payload)),
+
+  // 3D Holographic Desktop Companion Widget APIs
+  toggleHologramWidget: (visible) => ipcRenderer.invoke('hologram-widget:toggle', { visible }),
+  setHologramPin: (pinned) => ipcRenderer.invoke('hologram-widget:set-pin', { pinned }),
+  moveHologramWindow: (dx, dy) => ipcRenderer.send('hologram-widget:move', { dx, dy }),
+  showMainWindow: () => ipcRenderer.invoke('show-main-window'),
 });
 
 // Voice API

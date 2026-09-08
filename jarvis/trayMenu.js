@@ -1,8 +1,22 @@
-function buildTrayMenuTemplate({ isMicOn, showTranscriptionBar, onToggleMic, onToggleTranscriptionBar, onQuit }) {
+function buildTrayMenuTemplate({
+  isMicOn,
+  showHologramWidget,
+  showTranscriptionBar,
+  onToggleMic,
+  onToggleHologramWidget,
+  onToggleTranscriptionBar,
+  onQuit
+}) {
   return [
     {
       label: isMicOn ? "Выключить микрофон" : "Включить микрофон",
       click: onToggleMic,
+    },
+    {
+      label: "3D-Компаньон (Голограмма)",
+      type: "checkbox",
+      checked: showHologramWidget !== false,
+      click: (item) => onToggleHologramWidget && onToggleHologramWidget(item.checked),
     },
     {
       label: "Панель транскрипции",

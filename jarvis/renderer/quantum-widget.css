@@ -1,0 +1,153 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+}
+
+.widget-container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+}
+
+.widget-container:active {
+  cursor: grabbing;
+}
+
+.canvas-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.canvas-container canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+  pointer-events: none;
+}
+
+/* Subtle Stark Tech circular guide ring on hover */
+.widget-container::after {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  border-radius: 50%;
+  border: 1px dashed rgba(0, 229, 255, 0.15);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 2;
+}
+
+.widget-container:hover::after {
+  opacity: 1;
+}
+
+/* HUD Overlay Controls */
+.hud-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 12px;
+  z-index: 10;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.widget-container:hover .hud-overlay {
+  opacity: 1;
+}
+
+.hud-status {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(10, 16, 26, 0.75);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  padding: 3px 8px;
+  border-radius: 12px;
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.2);
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #00e5ff;
+  box-shadow: 0 0 6px #00e5ff;
+  animation: pulseDot 2s infinite ease-in-out;
+}
+
+.status-text {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #a0ecff;
+  text-transform: uppercase;
+}
+
+.hud-controls {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(10, 16, 26, 0.75);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(0, 229, 255, 0.25);
+  padding: 4px 8px;
+  border-radius: 20px;
+  pointer-events: auto;
+}
+
+.hud-btn {
+  background: transparent;
+  border: none;
+  color: #72a4bc;
+  padding: 5px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.hud-btn:hover {
+  color: #00e5ff;
+  background: rgba(0, 229, 255, 0.15);
+  box-shadow: 0 0 8px rgba(0, 229, 255, 0.3);
+}
+
+.hud-btn.active {
+  color: #00e5ff;
+}
+
+@keyframes pulseDot {
+  0%, 100% { opacity: 0.6; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.1); box-shadow: 0 0 8px #00e5ff; }
+}

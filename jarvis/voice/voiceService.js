@@ -753,7 +753,9 @@ class VoiceService {
         : {};
       if (settings.speakVoiceResults === false) return;
 
+      this.broadcastStatus('speaking', message);
       await this.ttsService.speak(message);
+      this.broadcastStatus('ready', 'Скажите: «Джарвис»');
     } catch (e) {
       console.error('[voiceService] TTS failed:', e);
       this.broadcastStatus('error', `TTS failed: ${e.message}`);

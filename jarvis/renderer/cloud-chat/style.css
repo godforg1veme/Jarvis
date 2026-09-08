@@ -87,6 +87,22 @@ button { cursor: pointer; }
 .signal-card p { margin: 12px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
 
 .voice-card { padding: 18px 16px; background: linear-gradient(145deg, rgba(121,228,208,.08), rgba(255,255,255,.02)); }
+.voice-core-stage {
+  width: 100%;
+  height: 160px;
+  position: relative;
+  margin: 12px 0 10px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: radial-gradient(circle at center, rgba(56, 189, 248, 0.09) 0%, rgba(4, 7, 17, 0.4) 75%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
+}
+#voice-core-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
 .voice-card h2 { margin: 8px 0 6px; font-family: var(--serif); font-size: 22px; font-weight: 400; }
 .voice-card > p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
 .voice-button {

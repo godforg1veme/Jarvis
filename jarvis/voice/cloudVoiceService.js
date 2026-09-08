@@ -134,6 +134,7 @@ class CloudVoiceService {
       this._emit('responding', 'Отвечаю…', { transcript: response.transcript || '' });
       this.onResponse({ source: 'voice', transcript: response.transcript || '', answer: response.answer || '' });
       if (response.answer && this.ttsService && typeof this.ttsService.speak === 'function') {
+        this._emit('speaking', 'Говорю…', { answer: response.answer });
         await this.ttsService.speak(response.answer);
       }
       this._emit('ready', 'Скажите: «Джарвис»');
