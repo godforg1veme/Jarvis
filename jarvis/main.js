@@ -758,7 +758,6 @@ function createHologramWidgetWindow() {
     skipTaskbar: true,
     resizable: false,
     hasShadow: false,
-    focusable: false,
     show: showHologramWidget,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -767,6 +766,8 @@ function createHologramWidgetWindow() {
       sandbox: false,
     },
   });
+
+  hologramWidgetWindow.setAlwaysOnTop(Boolean(uiState.hologramWidgetPinned), 'normal');
 
   hologramWidgetWindow.loadFile(path.join(__dirname, 'renderer', 'quantum-widget.html'));
 
@@ -1301,7 +1302,7 @@ app.whenReady().then(() => {
 
   ipcMain.handle('hologram-widget:set-pin', (_event, { pinned } = {}) => {
     if (hologramWidgetWindow && !hologramWidgetWindow.isDestroyed()) {
-      hologramWidgetWindow.setAlwaysOnTop(!!pinned);
+      hologramWidgetWindow.setAlwaysOnTop(!!pinned, 'normal');
       const uiState = loadJSON(UI_STATE_PATH, {});
       uiState.hologramWidgetPinned = !!pinned;
       saveJSON(UI_STATE_PATH, uiState);
