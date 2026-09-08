@@ -213,15 +213,37 @@ elements.messageForm.addEventListener('submit', async (event) => {
   appendMessage('user', text);
   elements.messageInput.value = '';
   elements.sendButton.disabled = true;
+  if (quantumCore) {
+    quantumCore.setMode('vortex');
+  }
   try {
     const result = await cloud.sendMessage(text);
     if (!result || !result.ok) {
       appendMessage('system', result && result.error ? result.error : 'Сервер не ответил.');
+      if (quantumCore) {
+        quantumCore.setMode('alert');
+        setTimeout(() => { if (quantumCore) quantumCore.setMode('idle'); }, 2500);
+      }
       return;
     }
     appendMessage('assistant', result.answer);
+    if (quantumCore) {
+      quantumCore.setMode('speech');
+      quantumCore.setAudioLevel(0.85);
+      const duration = Math.min(8000, Math.max(3000, (result.answer || '').length * 40));
+      setTimeout(() => {
+        if (quantumCore) {
+          quantumCore.setMode('idle');
+          quantumCore.setAudioLevel(0);
+        }
+      }, duration);
+    }
   } catch (_) {
     appendMessage('system', 'Сервер недоступен. Попробуйте ещё раз.');
+    if (quantumCore) {
+      quantumCore.setMode('alert');
+      setTimeout(() => { if (quantumCore) quantumCore.setMode('idle'); }, 2500);
+    }
   } finally {
     elements.sendButton.disabled = !state.paired;
     elements.messageInput.focus();

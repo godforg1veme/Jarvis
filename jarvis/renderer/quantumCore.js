@@ -154,9 +154,10 @@ class QuantumCore {
     }
 
     // Scene & Camera
+    const camDist = typeof options.cameraDistance === 'number' ? options.cameraDistance : 7.2;
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 100);
-    this.camera.position.set(0, 0, 5.2);
+    this.camera.position.set(0, 0, camDist);
 
     this.clock = new THREE.Clock();
 

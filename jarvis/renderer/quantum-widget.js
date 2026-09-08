@@ -15,17 +15,18 @@
     fov: 45
   }) : null;
 
-  let isPinned = true;
+  let isPinned = false;
   let currentMode = 'idle';
   let speechInterval = null;
+  let modeRevertTimeout = null;
 
   // Mode status mapping
   const MODE_CONFIG = {
-    idle: { label: 'JARVIS // ONLINE', dot: '#00e5ff' },
-    speech: { label: 'JARVIS // SPEAKING', dot: '#00e5ff' },
-    vortex: { label: 'JARVIS // PROCESSING', dot: '#00e5ff' },
-    scanner: { label: 'JARVIS // SCANNING', dot: '#00ff88' },
-    alert: { label: 'JARVIS // ATTENTION', dot: '#ff1744' }
+    idle: { label: 'JARVIS // ОНЛАЙН', dot: '#00e5ff' },
+    speech: { label: 'JARVIS // ОТВЕЧАЕТ', dot: '#00e5ff' },
+    vortex: { label: 'JARVIS // ВЫЧИСЛЕНИЕ...', dot: '#00e5ff' },
+    scanner: { label: 'JARVIS // СКАНИРОВАНИЕ', dot: '#00ff88' },
+    alert: { label: 'JARVIS // ВНИМАНИЕ', dot: '#ff1744' }
   };
 
   function updateStatusBadge(mode) {
@@ -153,22 +154,38 @@
     }
   }
 
+  // --- Core Mode Controller ---
+  function setCoreMode(mode, duration) {
+    if (modeRevertTimeout) {
+      clearTimeout(modeRevertTimeout);
+      modeRevertTimeout = null;
+    }
+
+    updateStatusBadge(mode);
+
+    if (core) {
+      core.setMode(mode);
+    }
+
+    if (mode === 'speech') {
+      startSpeechAnimation();
+    } else {
+      stopSpeechAnimation();
+    }
+
+    // Auto-revert to idle if duration is specified
+    if (duration && typeof duration === 'number' && duration > 0) {
+      modeRevertTimeout = setTimeout(() => {
+        setCoreMode('idle');
+      }, duration);
+    }
+  }
+
   // --- Core Mode IPC Listener ---
   if (window.jarvis && typeof window.jarvis.onCoreMode === 'function') {
     window.jarvis.onCoreMode((payload) => {
       if (!payload || !payload.mode) return;
-      const mode = payload.mode;
-      updateStatusBadge(mode);
-
-      if (core) {
-        core.setMode(mode);
-      }
-
-      if (mode === 'speech') {
-        startSpeechAnimation();
-      } else {
-        stopSpeechAnimation();
-      }
+      setCoreMode(payload.mode, payload.duration);
     });
   }
 

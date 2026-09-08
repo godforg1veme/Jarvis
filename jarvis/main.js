@@ -744,21 +744,21 @@ function createHologramWidgetWindow() {
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
 
-  const defaultX = Math.round(screenWidth - 280);
-  const defaultY = Math.round(screenHeight - 280);
+  const defaultX = Math.round(screenWidth - 320);
+  const defaultY = Math.round(screenHeight - 320);
 
   hologramWidgetWindow = new BrowserWindow({
-    width: 260,
-    height: 260,
+    width: 300,
+    height: 300,
     x: (savedPos && typeof savedPos[0] === 'number') ? savedPos[0] : defaultX,
     y: (savedPos && typeof savedPos[1] === 'number') ? savedPos[1] : defaultY,
     frame: false,
     transparent: true,
-    alwaysOnTop: uiState.hologramWidgetPinned !== false,
+    alwaysOnTop: Boolean(uiState.hologramWidgetPinned),
     skipTaskbar: true,
     resizable: false,
     hasShadow: false,
-    focusable: true,
+    focusable: false,
     show: showHologramWidget,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -984,7 +984,26 @@ app.whenReady().then(() => {
       sendCloudEvent('cloud:state', state);
       updateTrayMenu();
     },
-    onWorkflowUpdate: (update) => sendCloudEvent('cloud:message', update),
+    onWorkflowUpdate: (update) => {
+      sendCloudEvent('cloud:message', update);
+      if (update) {
+        if (update.status === 'running') {
+          broadcastCoreMode('vortex');
+        } else if (update.status === 'failed') {
+          broadcastCoreMode('alert', { duration: 3000 });
+        } else if (update.answer) {
+          const lower = update.answer.toLowerCase();
+          let mode = 'speech';
+          if (lower.includes('ошибк') || lower.includes('не удалось') || lower.includes('error')) {
+            mode = 'alert';
+          } else if (lower.includes('найден') || lower.includes('поиск') || lower.includes('сканир')) {
+            mode = 'scanner';
+          }
+          const duration = Math.min(8000, Math.max(3000, update.answer.length * 40));
+          broadcastCoreMode(mode, { text: update.answer, duration });
+        }
+      }
+    },
   });
   cloudVoiceService = new CloudVoiceService({
     cloudClient: desktopCloudClient,
@@ -992,7 +1011,13 @@ app.whenReady().then(() => {
       sendCloudEvent('cloud:voice-status', status);
       updateTrayMenu();
     },
-    onResponse: (response) => sendCloudEvent('cloud:message', response),
+    onResponse: (response) => {
+      sendCloudEvent('cloud:message', response);
+      if (response && response.answer) {
+        const duration = Math.min(8000, Math.max(3000, response.answer.length * 40));
+        broadcastCoreMode('speech', { text: response.answer, duration });
+      }
+    },
   });
 
   // --- Create cloud chat window (always, but hidden if --hidden) ---
@@ -1044,9 +1069,25 @@ app.whenReady().then(() => {
     if (!isTrustedMainRenderer(event) || !desktopCloudClient) return { ok: false, error: 'Access denied.' };
     const text = String(input.text || '').trim();
     if (!text || text.length > 10000) return { ok: false, error: 'Сообщение должно содержать от 1 до 10000 символов.' };
+    broadcastCoreMode('vortex', { text, reason: 'text_query' });
     try {
-      return await desktopCloudClient.sendText(text);
+      const result = await desktopCloudClient.sendText(text);
+      if (result && result.ok && result.answer) {
+        const lower = result.answer.toLowerCase();
+        let mode = 'speech';
+        if (lower.includes('ошибк') || lower.includes('не удалось') || lower.includes('error') || lower.includes('отказ')) {
+          mode = 'alert';
+        } else if (lower.includes('найден') || lower.includes('поиск') || lower.includes('сканир')) {
+          mode = 'scanner';
+        }
+        const duration = Math.min(8000, Math.max(3000, result.answer.length * 40));
+        broadcastCoreMode(mode, { text: result.answer, duration });
+      } else if (result && !result.ok) {
+        broadcastCoreMode('alert', { error: result.error, duration: 3000 });
+      }
+      return result;
     } catch (error) {
+      broadcastCoreMode('alert', { error: error.message, duration: 3000 });
       return { ok: false, error: 'Сервер недоступен. Попробуйте ещё раз.' };
     }
   });
