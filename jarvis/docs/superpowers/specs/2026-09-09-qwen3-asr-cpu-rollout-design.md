@@ -81,3 +81,23 @@ than real time (about 0.54 real-time factor in the fast profile), but it misses
 the absolute 3/6-second target for this 15-second utterance. Do not enable it
 yet: measure 1-to-3-second Russian commands, Russian names, and latency while
 the control plane is under normal load before selecting the provider.
+
+## Russian CPU comparison follow-up
+
+The owner approved three further isolated benchmarks. Each is limited to four
+CPU cores, has no listener or Jarvis configuration change, and uses the same
+public Russian GigaAM example audio (not family audio):
+
+1. GigaAM v3 CTC, exported to the official FP32 ONNX path and run through the
+   CPU execution provider. The GigaAM source is pinned to commit
+   `7447938d791c4f3e643386ee22c33777004293a5`.
+2. OpenAI Whisper large-v3-turbo with `faster-whisper==1.2.1`, CPU INT8, four
+   threads, and beam size 1 and 5.
+3. Whisper Medium using `whisper.cpp` at commit
+   `c44b60b8053bbf2a5c1e014f11323fb3f2485177`, compiled with OpenBLAS and
+   converted from its official GGML FP16 weights to Q8_0.
+
+The benchmark records warm transcription latency, resident memory when
+available, and the public test transcription. It is not an accuracy acceptance
+test: only a later corpus of owner-approved Russian command recordings can
+choose the production provider.
