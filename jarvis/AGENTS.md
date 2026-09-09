@@ -74,6 +74,13 @@ See `docs/README.md` for current implementation status and historical records.
 - `agent_runtime/` is the existing Python/LangGraph planner for complex local
   Desktop Agent tasks. It is no longer the only stateful AI-related component
   in the overall product because the cloud server persists conversations.
+- Writable local state, settings, and generated indexes (`ui-state.local.json`,
+  `history.json`, `settings.json`, `app-index.json`, `apps.user.json`,
+  `file-index.json`, `agent-history.json`) route through `getWritableDataPath`:
+  when packaged (`app.isPackaged`), they are safely redirected from read-only
+  install folders (`C:\Program Files\...`) to `%APPDATA%\jarvis\data\`
+  (`app.getPath('userData')/data/`). Development continues using repository `data/`.
+  Write operations catch filesystem errors to prevent unhandled `EPERM` crashes.
 
 ### Deployment
 
@@ -140,7 +147,8 @@ Do not edit or commit unless the task explicitly requires it:
 - `data/history.json`, `data/ai-cache.json`, `data/agent-history.json`;
 - `data/file-index.json`, `data/ui-state.local.json`, `data/tts-cache/`;
 - `data/stt-profiles.json`, preview settings, device identity, logs, temporary
-  audio, user documents, database dumps, and downloaded models.
+  audio, user documents, database dumps, and downloaded models (in packaged
+  execution, stored under `%APPDATA%\jarvis\data\`).
 
 `data/stt-settings.json` is a checked-in default and may be changed deliberately
 with its validation tests.

@@ -8,12 +8,25 @@ const { isAbsoluteLocalPath } = require('./launchDescriptor');
 const fs = require('fs');
 const path = require('path');
 
+function getWritablePath(filePath) {
+  try {
+    const { app } = require('electron');
+    if (app && app.isPackaged && typeof app.getPath === 'function') {
+      const dataDir = path.resolve(__dirname, '..', 'data');
+      const resolved = path.resolve(filePath);
+      if (resolved.startsWith(dataDir)) {
+        const rel = path.relative(dataDir, resolved);
+        return path.join(app.getPath('userData'), 'data', rel);
+      }
+    }
+  } catch {}
+  return filePath;
+}
+
 const USER_APPS_PATH = path.join(__dirname, '..', 'data', 'apps.user.json');
 const AI_SETTINGS_PATH = path.join(__dirname, '..', 'data', 'ai-settings.json');
 const AI_THINKING_STATUS = 'AI: пытаюсь понять запрос...';
 const RUN_PROGRAM_AI_CAPABILITIES = ['launch_app', 'search_app'];
-
-/**
  * Execute app launch: resolve query → launch app
  */
 function formatCandidates(result) {
@@ -483,8 +496,15 @@ function addApp(args) {
 
   // Load existing user apps
   let userData;
+  const userAppsTarget = getWritablePath(USER_APPS_PATH);
   try {
-    userData = JSON.parse(fs.readFileSync(USER_APPS_PATH, 'utf-8'));
+    if (fs.existsSync(userAppsTarget)) {
+      userData = JSON.parse(fs.readFileSync(userAppsTarget, 'utf-8'));
+    } else if (fs.existsSync(USER_APPS_PATH)) {
+      userData = JSON.parse(fs.readFileSync(USER_APPS_PATH, 'utf-8'));
+    } else {
+      userData = { apps: [] };
+    }
   } catch {
     userData = { apps: [] };
   }
@@ -503,7 +523,13 @@ function addApp(args) {
     userData.apps.push(newApp);
   }
 
-  fs.writeFileSync(USER_APPS_PATH, JSON.stringify(userData, null, 2), 'utf-8');
+  try {
+    const dir = path.dirname(userAppsTarget);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(userAppsTarget, JSON.stringify(userData, null, 2), 'utf-8');
+  } catch (err) {
+    console.error(`[runProgram] Failed to write ${userAppsTarget}:`, err);
+  }
 
   return {
     ok: true,

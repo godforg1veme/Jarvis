@@ -30,17 +30,42 @@ const ALLOWED_MODEL_FIELDS = new Set([
   'confidence', 'reason',
 ]);
 
+function getWritablePath(filePath) {
+  try {
+    const { app } = require('electron');
+    if (app && app.isPackaged && typeof app.getPath === 'function') {
+      const dataDir = path.resolve(__dirname, '..', 'data');
+      const resolved = path.resolve(filePath);
+      if (resolved.startsWith(dataDir)) {
+        const rel = path.relative(dataDir, resolved);
+        return path.join(app.getPath('userData'), 'data', rel);
+      }
+    }
+  } catch {}
+  return filePath;
+}
+
 function ensureDir(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
 
 function loadJSON(filePath, fallback) {
-  try { return JSON.parse(fs.readFileSync(filePath, 'utf-8')); } catch { return fallback; }
+  try {
+    const target = getWritablePath(filePath);
+    if (fs.existsSync(target)) return JSON.parse(fs.readFileSync(target, 'utf-8'));
+    if (fs.existsSync(filePath)) return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    return fallback;
+  } catch { return fallback; }
 }
 
 function saveJSON(filePath, data) {
-  ensureDir(path.dirname(filePath));
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+  try {
+    const target = getWritablePath(filePath);
+    ensureDir(path.dirname(target));
+    fs.writeFileSync(target, JSON.stringify(data, null, 2), 'utf-8');
+  } catch (err) {
+    console.error(`[aiIntentResolver] Failed to write ${filePath}:`, err);
+  }
 }
 
 function loadSettings() {

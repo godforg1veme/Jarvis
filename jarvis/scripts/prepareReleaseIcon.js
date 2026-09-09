@@ -24,7 +24,7 @@ const resizeScript = [
 ].join('; ');
 execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', resizeScript], {
   env: { ...process.env, JARVIS_RELEASE_ICON_SOURCE: source, JARVIS_RELEASE_ICON_TARGET: resizedPng },
-  stdio: 'inherit',
+  stdio: ['ignore', 'inherit', 'inherit'],
 });
 
 const png = fs.readFileSync(resizedPng);

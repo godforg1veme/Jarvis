@@ -15,6 +15,21 @@ const EXCLUDED_DIR_NAMES = new Set([
   'tmp',
 ]);
 
+function getWritablePath(filePath) {
+  try {
+    const { app } = require('electron');
+    if (app && app.isPackaged && typeof app.getPath === 'function') {
+      const dataDir = path.resolve(__dirname, '..', 'data');
+      const resolved = path.resolve(filePath);
+      if (resolved.startsWith(dataDir)) {
+        const rel = path.relative(dataDir, resolved);
+        return path.join(app.getPath('userData'), 'data', rel);
+      }
+    }
+  } catch {}
+  return filePath;
+}
+
 function ensureDir(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
@@ -79,14 +94,22 @@ function writeIndex(indexPath = DEFAULT_INDEX_PATH, roots = [], options = {}) {
     files,
   };
 
-  ensureDir(path.dirname(indexPath));
-  fs.writeFileSync(indexPath, JSON.stringify(data, null, 2), 'utf8');
+  const target = getWritablePath(indexPath);
+  try {
+    ensureDir(path.dirname(target));
+    fs.writeFileSync(target, JSON.stringify(data, null, 2), 'utf8');
+  } catch (err) {
+    console.error(`[fileIndex] Failed to write ${target}:`, err);
+  }
   return data;
 }
 
 function readIndex(indexPath = DEFAULT_INDEX_PATH) {
   try {
-    return JSON.parse(fs.readFileSync(indexPath, 'utf8'));
+    const target = getWritablePath(indexPath);
+    if (fs.existsSync(target)) return JSON.parse(fs.readFileSync(target, 'utf8'));
+    if (fs.existsSync(indexPath)) return JSON.parse(fs.readFileSync(indexPath, 'utf8'));
+    return null;
   } catch {
     return null;
   }

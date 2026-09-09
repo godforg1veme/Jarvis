@@ -188,21 +188,45 @@ async function launchRegisteredSelection(candidateId) {
 }
 
 // --- Helpers ---
+function getWritableDataPath(filePath) {
+  if (app && app.isPackaged && typeof app.getPath === 'function') {
+    const bundledDataDir = path.resolve(__dirname, 'data');
+    const resolved = path.resolve(filePath);
+    if (resolved.startsWith(bundledDataDir)) {
+      const rel = path.relative(bundledDataDir, resolved);
+      return path.join(app.getPath('userData'), 'data', rel);
+    }
+  }
+  return filePath;
+}
+
 function ensureDir(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
 
 function loadJSON(filePath, fallback) {
   try {
-    return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    const writable = getWritableDataPath(filePath);
+    if (fs.existsSync(writable)) {
+      return JSON.parse(fs.readFileSync(writable, 'utf-8'));
+    }
+    if (fs.existsSync(filePath)) {
+      return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    }
+    return fallback;
   } catch {
     return fallback;
   }
 }
 
 function saveJSON(filePath, data) {
-  ensureDir(path.dirname(filePath));
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+  try {
+    const target = getWritableDataPath(filePath);
+    ensureDir(path.dirname(target));
+    fs.writeFileSync(target, JSON.stringify(data, null, 2), 'utf-8');
+  } catch (err) {
+    console.error(`[saveJSON] Failed to write ${filePath}:`, err);
+  }
 }
 
 const initialUiState = loadJSON(UI_STATE_PATH, {});

@@ -8,14 +8,39 @@ const SETTINGS_PATH = path.join(__dirname, '..', 'data', 'settings.json');
 const INDEX_PATH = path.join(__dirname, '..', 'data', 'app-index.json');
 
 // --- Helpers ---
+function getWritablePath(filePath) {
+  try {
+    const { app } = require('electron');
+    if (app && app.isPackaged && typeof app.getPath === 'function') {
+      const dataDir = path.resolve(__dirname, '..', 'data');
+      const resolved = path.resolve(filePath);
+      if (resolved.startsWith(dataDir)) {
+        const rel = path.relative(dataDir, resolved);
+        return path.join(app.getPath('userData'), 'data', rel);
+      }
+    }
+  } catch {}
+  return filePath;
+}
+
 function loadJSON(filePath, fallback) {
-  try { return JSON.parse(fs.readFileSync(filePath, 'utf-8')); } catch { return fallback; }
+  try {
+    const target = getWritablePath(filePath);
+    if (fs.existsSync(target)) return JSON.parse(fs.readFileSync(target, 'utf-8'));
+    if (fs.existsSync(filePath)) return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    return fallback;
+  } catch { return fallback; }
 }
 
 function saveJSON(filePath, data) {
-  const dir = path.dirname(filePath);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+  try {
+    const target = getWritablePath(filePath);
+    const dir = path.dirname(target);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(target, JSON.stringify(data, null, 2), 'utf-8');
+  } catch (err) {
+    console.error(`[appIndexer] Failed to write ${filePath}:`, err);
+  }
 }
 
 function expandEnv(str) {
