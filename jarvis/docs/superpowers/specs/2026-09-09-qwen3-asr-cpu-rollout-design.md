@@ -66,3 +66,18 @@ load time and warm transcription latency with the same short public audio
 probe used for Qwen. This is a CPU-latency comparison only: Russian command
 accuracy requires a separate, owner-approved corpus of real recordings before
 any provider can be enabled.
+
+### Result
+
+On 2026-09-10 the target DE-4 ran `faster-whisper==1.2.1` Medium INT8 with four
+CPU threads against the same 15.051-second public English probe. Initial load,
+including the first model download, took 27.410 seconds. With the model warm,
+beam size 1 took 8.468 and 8.115 seconds; beam size 5 took 9.393 seconds. Peak
+resident memory was 1,960 MiB. The worker removed itself after the benchmark;
+only the private 1.53-GB model cache remains for repeatability.
+
+This is approximately four times faster than the Qwen 0.6B result and faster
+than real time (about 0.54 real-time factor in the fast profile), but it misses
+the absolute 3/6-second target for this 15-second utterance. Do not enable it
+yet: measure 1-to-3-second Russian commands, Russian names, and latency while
+the control plane is under normal load before selecting the provider.
