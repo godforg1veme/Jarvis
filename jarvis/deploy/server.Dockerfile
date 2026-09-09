@@ -18,6 +18,7 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 COPY server/src ./src
+COPY shared /app/shared
 COPY --from=ui-build /app/ops-ui/dist ./public/ops
 
 # Docker copies this ownership into a newly created named volume, letting the
