@@ -91,6 +91,29 @@ test('requires an explicit HTTPS embedding profile when semantic search is enabl
   assert.equal(config.embeddingDimensions, 3);
 });
 
+test('permits only the private Qwen ASR worker over HTTP in production', () => {
+  const production = {
+    NODE_ENV: 'production',
+    DATABASE_URL: 'postgres://unused',
+    TELEGRAM_BOT_TOKEN: 'unused',
+    TELEGRAM_ALLOWED_IDS: '1',
+    JARVIS_ASR_PROVIDER: 'openai-compatible',
+    ASR_MODEL: 'Qwen/Qwen3-ASR-1.7B',
+  };
+  assert.equal(loadConfig({
+    ...production,
+    ASR_BASE_URL: 'http://qwen-asr:8000/v1',
+  }).asrBaseUrl, 'http://qwen-asr:8000/v1');
+  assert.throws(() => loadConfig({
+    ...production,
+    ASR_BASE_URL: 'http://qwen-asr:8001/v1',
+  }), /must use HTTPS/);
+  assert.throws(() => loadConfig({
+    ...production,
+    ASR_BASE_URL: 'http://qwen-asr:8000/not-v1',
+  }), /must use HTTPS/);
+});
+
 test('vision is disabled by default and validates an explicit OpenRouter profile', () => {
   assert.equal(loadConfig({ NODE_ENV: 'test' }).visionProvider, 'disabled');
   assert.throws(() => loadConfig({

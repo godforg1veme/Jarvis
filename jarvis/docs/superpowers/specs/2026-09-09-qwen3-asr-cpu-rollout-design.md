@@ -1,6 +1,7 @@
 # Qwen3-ASR CPU rollout design
 
-Status: approved for implementation on 2026-09-09.
+Status: implemented as a disabled benchmark profile on 2026-09-10; not
+accepted as the production ASR provider.
 
 ## Decision
 
@@ -41,3 +42,16 @@ below 85 percent, and names/application aliases are accurate enough for the
 existing command corpus. On failure, disable the worker and compare
 Qwen3-ASR-0.6B and Faster Whisper Medium INT8 rather than leaving an unstable
 provider enabled.
+
+## Benchmark result
+
+The private worker was built and run on the target DE-4 (six CPU cores, 15 GiB
+RAM). Qwen3-ASR-1.7B exceeded 30 seconds on a short official speech probe.
+Qwen3-ASR-0.6B produced a correct transcript but took 34.535 seconds on the
+same probe. Both violate the 3/6-second latency target by a wide margin.
+
+The profile is stopped and `JARVIS_ASR_PROVIDER` remains `disabled`. The model
+cache is retained in its private named volume to permit a reproducible later
+comparison. Do not enable either Qwen checkpoint for normal Desktop voice
+traffic on this CPU-only VPS; measure Faster Whisper Medium INT8 next if a
+server-side ASR provider is still required.
