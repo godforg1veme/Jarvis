@@ -36,9 +36,8 @@ and `docs/superpowers/plans/2026-09-09-jarvis-vision.md`.
 
 - Full server test suite, focused Desktop Vision/IPC/policy/voice tests, and a
   headless Edge interaction test for the Perception Dock and Timeline.
-- Real Electron hardware probe detected and captured both physical monitors as
-  one 1448×435 JPEG (85,908 bytes in the final probe) without writing frame
-  content to the project.
+- Repeated real Electron hardware probes detected and captured both physical
+  monitors as one 1448×435 JPEG without writing frame content to the project.
 - Permission tests confirm the voice renderer receives audio only and the hidden
   Vision renderer receives video only.
 
@@ -48,8 +47,12 @@ and `docs/superpowers/plans/2026-09-09-jarvis-vision.md`.
   a 1280x720 JPEG frame while the same run composed both real displays into a
   1448x435 workspace. The acceptance uncovered and fixed an Electron 42 permission
   contract mismatch (`mediaType` for checks versus `mediaTypes` for requests).
-  To repeat the acceptance, start Camo Studio, connect
-  the phone, and run `npx electron scripts/probeVisionHardware.js` again.
+  DirectShow independently confirmed the Camo stream at 1280x720 and 30 FPS.
+- The focused media-permission, Vision IPC/runtime/transport, capture-renderer,
+  tray, Tool Gateway, remote-protocol, and policy-mapping regressions passed after
+  the fix. The Windows NSIS installer was rebuilt successfully.
+- To repeat the hardware acceptance, start Camo Studio, connect the phone, and
+  run `npx electron scripts/probeVisionHardware.js` again.
 
 ## Acceptance still required
 
