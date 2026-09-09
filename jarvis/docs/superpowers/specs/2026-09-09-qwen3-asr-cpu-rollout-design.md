@@ -111,8 +111,8 @@ target DE-4. The reported fast value is the second warm run where applicable.
 | Candidate | Fast / greedy | Beam 5 | Observation |
 | --- | ---: | ---: | --- |
 | GigaAM v3 CTC, official ONNX CPU path | 1.277 s | n/a | Correct-looking Russian transcript; 0.11 real-time factor |
-| Faster Whisper Medium INT8 | 9.569 s | 11.797 s | 1.60 GiB peak process RSS |
-| Faster Whisper large-v3-turbo INT8 | 10.908 s | 11.089 s | 1.66 GiB peak process RSS |
+| Faster Whisper Medium INT8 | 9.569 s | 11.797 s | 1,597 MiB peak process RSS |
+| Faster Whisper large-v3-turbo INT8 | 10.908 s | 11.089 s | 1,665 MiB peak process RSS |
 | Whisper.cpp Medium Q8_0 with OpenBLAS | 11.290 s | 16.842 s | CLI process restart/load is included in wall time |
 
 GigaAM's 4.12-GiB peak during this job is not a production-memory estimate: the
