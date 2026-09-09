@@ -95,9 +95,30 @@ public Russian GigaAM example audio (not family audio):
    threads, and beam size 1 and 5.
 3. Whisper Medium using `whisper.cpp` at commit
    `c44b60b8053bbf2a5c1e014f11323fb3f2485177`, compiled with OpenBLAS and
-   converted from its official GGML FP16 weights to Q8_0.
+   its official GGML Q8_0 checkpoint.
 
 The benchmark records warm transcription latency, resident memory when
 available, and the public test transcription. It is not an accuracy acceptance
 test: only a later corpus of owner-approved Russian command recordings can
 choose the production provider.
+
+### Results
+
+On 2026-09-10, all candidates ran serially on the same public 11.290-second
+Russian GigaAM demonstration recording, with four CPU cores pinned on the
+target DE-4. The reported fast value is the second warm run where applicable.
+
+| Candidate | Fast / greedy | Beam 5 | Observation |
+| --- | ---: | ---: | --- |
+| GigaAM v3 CTC, official ONNX CPU path | 1.277 s | n/a | Correct-looking Russian transcript; 0.11 real-time factor |
+| Faster Whisper Medium INT8 | 9.569 s | 11.797 s | 1.60 GiB peak process RSS |
+| Faster Whisper large-v3-turbo INT8 | 10.908 s | 11.089 s | 1.66 GiB peak process RSS |
+| Whisper.cpp Medium Q8_0 with OpenBLAS | 11.290 s | 16.842 s | CLI process restart/load is included in wall time |
+
+GigaAM's 4.12-GiB peak during this job is not a production-memory estimate: the
+one-off process held both the PyTorch checkpoint needed to export ONNX and the
+ONNX session. An ONNX-only worker must be measured separately. Its dramatic
+latency win makes it the leading candidate, but the public vendor demonstration
+audio is not an independent quality corpus. Keep every provider disabled until
+the same runs are repeated with short owner-approved Russian commands, names,
+noise, and normal control-plane load.
