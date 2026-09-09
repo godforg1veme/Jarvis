@@ -41,6 +41,18 @@ function normalizeDocuments(documents, limit = 8) {
     .filter((document) => document.content);
 }
 
+function normalizeVisualMemories(memories, limit = 5) {
+  if (!Array.isArray(memories)) return [];
+  return memories.slice(0, limit).map((item) => ({
+    memoryId: String(item.memoryId || '').slice(0, 128),
+    sourceId: String(item.sourceId || '').slice(0, 128),
+    capturedAt: String(item.capturedAt || '').slice(0, 40),
+    summary: String(item.summary || '').trim().slice(0, 4000),
+    objects: Array.isArray(item.objects) ? item.objects.slice(0, 20) : [],
+    texts: Array.isArray(item.texts) ? item.texts.slice(0, 20) : [],
+  })).filter((item) => item.memoryId && item.summary);
+}
+
 function buildRuntimePolicy(runtimeContext = {}) {
   const channel = String(runtimeContext.channel || 'unknown').slice(0, 50);
   const tools = Array.isArray(runtimeContext.toolsAvailable)
@@ -71,6 +83,7 @@ function buildCanonicalPrompt(input) {
     history: Object.freeze(normalizeHistory(input.history)),
     memories: Object.freeze(normalizeMemories(input.memories)),
     documents: Object.freeze(normalizeDocuments(input.documents)),
+    visualMemories: Object.freeze(normalizeVisualMemories(input.visualMemories)),
     devices: Object.freeze(devices),
     currentRequest,
   });
@@ -83,5 +96,6 @@ module.exports = {
   normalizeDevicePromptContext,
   normalizeDocuments,
   normalizeMemories,
+  normalizeVisualMemories,
   normalizeHistory,
 };

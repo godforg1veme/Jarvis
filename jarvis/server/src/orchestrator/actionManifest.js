@@ -29,6 +29,7 @@ const ACTION_DETAILS = Object.freeze({
   'window.move': { description: 'Move and size a visible window.', idempotency: 'repeatable', timeoutMs: 10000 },
   'window.resize': { description: 'Resize a visible window.', idempotency: 'repeatable', timeoutMs: 10000 },
   'window.layout': { description: 'Apply a layout to visible windows.', idempotency: 'repeatable', timeoutMs: 15000 },
+  'vision.capture': { description: 'Observe camera and/or screens only through an already active local Vision Lease. Never starts a camera remotely.', idempotency: 'read', timeoutMs: 120000 },
 });
 
 function createActionManifest() {

@@ -35,6 +35,8 @@ class ScreenCaptureController {
     this.screen = options.screen;
     this.nativeImage = options.nativeImage;
     this.sourceRegistry = options.sourceRegistry;
+    this.privacyGuard = options.privacyGuard || null;
+    this.composeWorkspace = options.composeWorkspace || null;
   }
 
   listDisplays() {
@@ -64,6 +66,17 @@ class ScreenCaptureController {
     });
   }
 
+  async _assertPrivacy() {
+    if (!this.privacyGuard) return;
+    const windows = await this.desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 0, height: 0 }, fetchWindowIcons: false });
+    const result = this.privacyGuard.evaluate({ windows: windows.map((window) => ({ processName: window.name, title: window.name, visible: true })) });
+    if (!result.allowed) {
+      const error = new Error('screen capture paused by privacy denylist');
+      error.code = 'VISION_PRIVACY_PAUSED';
+      throw error;
+    }
+  }
+
   _frameFromCandidate(source, candidate, options = {}) {
     if (!candidate || !candidate.thumbnail || candidate.thumbnail.isEmpty()) throw new Error('display capture is unavailable');
     const fullSize = candidate.thumbnail.getSize();
@@ -89,6 +102,7 @@ class ScreenCaptureController {
   }
 
   async captureDisplay(sourceId, options = {}) {
+    await this._assertPrivacy();
     const source = this.sourceRegistry.requireLocal(sourceId);
     if (source.type !== 'display' || !source.available || source.protected) throw new Error('display source is unavailable');
     const candidates = await this._screenSources(options);
@@ -97,6 +111,7 @@ class ScreenCaptureController {
   }
 
   async captureWorkspace(sourceIds, options = {}) {
+    await this._assertPrivacy();
     if (!Array.isArray(sourceIds) || sourceIds.length < 1 || sourceIds.length > 8) {
       throw new Error('workspace display sources are invalid');
     }
@@ -111,12 +126,12 @@ class ScreenCaptureController {
       candidates.find((item) => String(item.display_id) === String(source.nativeId)),
       options,
     ));
-    const composed = composeScreenWorkspace(frames, {
-      nativeImage: this.nativeImage,
-      tileWidth: options.tileWidth,
-      jpegQuality: options.jpegQuality,
-    });
-    const signature = grayscaleSignatureFromBgra(composed.image.toBitmap(), composed.width, composed.height);
+    const composed = this.composeWorkspace
+      ? await this.composeWorkspace(frames, options)
+      : composeScreenWorkspace(frames, { nativeImage: this.nativeImage, tileWidth: options.tileWidth, jpegQuality: options.jpegQuality });
+    const signature = composed.image
+      ? grayscaleSignatureFromBgra(composed.image.toBitmap(), composed.width, composed.height)
+      : Uint8Array.from(frames.flatMap((frame) => [...frame.signature]).slice(0, 16384));
     return {
       bytes: composed.bytes,
       contentType: composed.contentType,

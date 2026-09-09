@@ -198,7 +198,8 @@ class CommandService {
       commandId,
       result: normalized,
       ok,
-      errorCode: ok ? null : normalized.executionUnknown ? 'EXECUTION_UNKNOWN' : 'TOOL_EXECUTION_FAILED',
+      errorCode: ok ? null : normalized.executionUnknown ? 'EXECUTION_UNKNOWN'
+        : /^[A-Z0-9_]{1,80}$/.test(String(normalized.errorCode || '')) ? normalized.errorCode : 'TOOL_EXECUTION_FAILED',
     });
     await this.repository.audit({
       userId: device.user_id,

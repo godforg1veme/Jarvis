@@ -74,6 +74,7 @@ class TelegramMessageService {
     this.knowledgeService = options.knowledgeService || null;
     this.commandService = options.commandService || null;
     this.orchestrator = options.orchestrator || null;
+    this.visualMemoryService = options.visualMemoryService || null;
   }
 
   async remoteCommandReply({ text, user, conversationId }) {
@@ -236,6 +237,7 @@ class TelegramMessageService {
     const memories = this.memoryService ? await this.memoryService.memoriesForPrompt({ userId: user.id }) : [];
     const devices = this.deviceService ? await this.deviceService.list({ userId: user.id }) : [];
     const documentSources = this.knowledgeService ? await this.knowledgeService.searchForPrompt({ userId: user.id, query: input.text }) : [];
+    const visualMemories = this.visualMemoryService ? await this.visualMemoryService.searchForPrompt({ userId: user.id, query: input.text }) : [];
     const answer = commandReply(input.text) || deviceAnswer || documentAnswer || memoryResult.answer || await this.assistant.answer({
       userId: user.id,
       conversationId: conversation.id,
@@ -243,6 +245,7 @@ class TelegramMessageService {
       history,
       memories,
       documents: documentSources,
+      visualMemories,
       devices,
       runtimeContext: {
         channel: 'telegram',

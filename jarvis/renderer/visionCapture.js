@@ -9,8 +9,13 @@ function stopTracks() {
   video.srcObject = null;
 }
 
-async function enumerateCameras() {
-  const devices = await navigator.mediaDevices.enumerateDevices();
+async function enumerateCameras(args = {}) {
+  let devices = await navigator.mediaDevices.enumerateDevices();
+  if (args.requestPermission === true && !devices.some((device) => device.kind === 'videoinput' && device.deviceId)) {
+    const permissionStream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
+    permissionStream.getTracks().forEach((track) => track.stop());
+    devices = await navigator.mediaDevices.enumerateDevices();
+  }
   return devices
     .filter((device) => device.kind === 'videoinput')
     .slice(0, 32)
@@ -77,14 +82,48 @@ async function captureFrame(args = {}) {
   };
 }
 
+async function composeWorkspace(args = {}) {
+  const frames = Array.isArray(args.frames) ? args.frames.slice(0, 8) : [];
+  if (!frames.length) throw new Error('workspace_frames_required');
+  const tileWidth = Math.max(320, Math.min(Number(args.tileWidth || 960), 1920));
+  const gap = 8;
+  const labelHeight = 30;
+  const decoded = [];
+  for (const frame of frames) {
+    const bytes = frame.bytes instanceof Uint8Array ? frame.bytes : new Uint8Array(frame.bytes || []);
+    const bitmap = await createImageBitmap(new Blob([bytes], { type: frame.contentType || 'image/jpeg' }));
+    const width = Math.min(tileWidth, bitmap.width);
+    decoded.push({ ...frame, bitmap, width, height: Math.max(1, Math.round(bitmap.height * width / bitmap.width)) });
+  }
+  const width = decoded.reduce((sum, frame) => sum + frame.width, 0) + gap * (decoded.length - 1);
+  const height = Math.max(...decoded.map((frame) => frame.height)) + labelHeight;
+  canvas.width = width; canvas.height = height;
+  const context = canvas.getContext('2d', { alpha: false });
+  context.fillStyle = '#080908'; context.fillRect(0, 0, width, height);
+  context.font = '13px Arial'; context.textBaseline = 'middle';
+  let x = 0;
+  const tiles = [];
+  for (const frame of decoded) {
+    context.fillStyle = '#171a18'; context.fillRect(x, 0, frame.width, labelHeight);
+    context.fillStyle = '#d8ff65'; context.fillText(`DISPLAY ${Number(frame.displayIndex) + 1}`, x + 12, labelHeight / 2);
+    context.drawImage(frame.bitmap, x, labelHeight, frame.width, frame.height);
+    tiles.push({ sourceId: frame.sourceId, displayIndex: frame.displayIndex, x, y: labelHeight, width: frame.width, height: frame.height });
+    frame.bitmap.close();
+    x += frame.width + gap;
+  }
+  const blob = await canvasBlob('image/jpeg', Math.max(.4, Math.min(Number(args.quality || .82), .95)));
+  return { bytes: new Uint8Array(await blob.arrayBuffer()), contentType: 'image/jpeg', width, height, tiles };
+}
+
 async function handleCommand(payload) {
   const requestId = String(payload && payload.requestId || '');
   const command = String(payload && payload.command || '');
   try {
     let result;
-    if (command === 'list') result = { cameras: await enumerateCameras() };
+    if (command === 'list') result = { cameras: await enumerateCameras(payload.args || {}) };
     else if (command === 'start') result = await startCamera(payload.args || {});
     else if (command === 'capture') result = await captureFrame(payload.args || {});
+    else if (command === 'compose') result = await composeWorkspace(payload.args || {});
     else if (command === 'stop') { stopTracks(); result = { stopped: true }; }
     else throw new Error('camera_command_invalid');
     window.jarvisVisionCapture.sendResult({ requestId, ok: true, result });

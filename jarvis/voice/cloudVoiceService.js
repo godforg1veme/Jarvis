@@ -48,6 +48,7 @@ class CloudVoiceService {
     this.settings = options.settings || getSttSettings();
     this.onStatus = typeof options.onStatus === 'function' ? options.onStatus : () => {};
     this.onResponse = typeof options.onResponse === 'function' ? options.onResponse : () => {};
+    this.onTranscript = typeof options.onTranscript === 'function' ? options.onTranscript : null;
     this.wakeWordHost = options.wakeWordHost || new NodeWakeWordHost({
       onResult: (result) => this._onWakeResult(result),
       onError: () => this._onWakeError(),
@@ -130,7 +131,15 @@ class CloudVoiceService {
     this._clearBuffers();
     this._emit('transcribing', 'Распознаю…');
     try {
-      const response = await this.cloudClient.sendVoice(pcm16ToWav(pcm), { mimeType: 'audio/wav' });
+      const wav = pcm16ToWav(pcm);
+      let response;
+      if (this.onTranscript && typeof this.cloudClient.transcribeVoice === 'function') {
+        const transcription = await this.cloudClient.transcribeVoice(wav, { mimeType: 'audio/wav' });
+        const handled = await this.onTranscript(transcription.transcript || '');
+        response = { ...transcription, answer: handled?.answer || '' };
+      } else {
+        response = await this.cloudClient.sendVoice(wav, { mimeType: 'audio/wav' });
+      }
       this._emit('responding', 'Отвечаю…', { transcript: response.transcript || '' });
       this.onResponse({ source: 'voice', transcript: response.transcript || '', answer: response.answer || '' });
       if (response.answer && this.ttsService && typeof this.ttsService.speak === 'function') {

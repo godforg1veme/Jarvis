@@ -87,3 +87,16 @@ test('Desktop voice accepts only bounded audio types and passes a completed utte
   assert.equal(calls.at(-1).input.kind, 'voice');
   await app.close();
 });
+
+test('Desktop can request ASR-only routing before selecting ordinary or visual handling', async () => {
+  const { app } = createApp();
+  const response = await app.inject({
+    method: 'POST', url: '/v1/desktop/voice/transcribe',
+    headers: { authorization: 'Bearer valid', 'content-type': 'audio/wav', 'x-jarvis-client-message-id': 'voice-route-a' },
+    payload: Buffer.from([1, 2, 3, 4]),
+  });
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json().transcript, 'голосовой текст');
+  assert.equal(response.json().answer, undefined);
+  await app.close();
+});

@@ -100,13 +100,13 @@ class CameraCaptureController {
     });
   }
 
-  async listCameras() {
-    const result = await this._command('list');
+  async listCameras(options = {}) {
+    const result = await this._command('list', { requestPermission: options.requestPermission === true });
     const cameras = Array.isArray(result.cameras) ? result.cameras.slice(0, 32) : [];
     const nativeIds = [];
     const sources = cameras.map((camera) => {
       const nativeId = String(camera.deviceId || '').slice(0, 512);
-      if (!nativeId) throw new Error('camera returned an invalid device id');
+      if (!nativeId) return null;
       nativeIds.push(nativeId);
       return this.sourceRegistry.upsert({
         type: 'camera',
@@ -114,7 +114,7 @@ class CameraCaptureController {
         label: String(camera.label || '').slice(0, 160),
         available: true,
       });
-    });
+    }).filter(Boolean);
     this.sourceRegistry.markUnavailableMissing('camera', nativeIds);
     return sources;
   }
@@ -152,6 +152,24 @@ class CameraCaptureController {
     };
   }
 
+  async composeWorkspace(frames, options = {}) {
+    if (!Array.isArray(frames) || frames.length < 1 || frames.length > 8) throw new Error('workspace frames are invalid');
+    const result = await this._command('compose', {
+      frames: frames.map((frame) => ({
+        sourceId: frame.sourceId, displayIndex: frame.displayIndex,
+        bytes: frame.bytes, contentType: frame.contentType,
+      })),
+      tileWidth: options.tileWidth,
+      quality: Math.max(.4, Math.min(Number(options.jpegQuality || 82) / 100, .95)),
+    });
+    const bytes = Buffer.isBuffer(result.bytes) ? result.bytes : Buffer.from(result.bytes || []);
+    const width = Number(result.width); const height = Number(result.height);
+    if (!bytes.length || bytes.length > MAX_FRAME_BYTES || !Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) {
+      throw new Error('workspace composition result is invalid');
+    }
+    return { bytes, contentType: 'image/jpeg', width, height, tiles: Array.isArray(result.tiles) ? result.tiles : [] };
+  }
+
   async stop() {
     if (!this.window || this.window.isDestroyed()) {
       this.activeSourceId = '';
@@ -165,7 +183,10 @@ class CameraCaptureController {
   }
 
   async close() {
-    try { await this.stop(); } catch (_) {}
+    if (this.window && !this.window.isDestroyed()) {
+      try { this.window.webContents.send(COMMAND_CHANNEL, { requestId: this.createRequestId(), command: 'stop', args: {} }); } catch (_) {}
+    }
+    this.activeSourceId = '';
     this._rejectPending(new Error('camera capture controller closed'));
     if (this.window && !this.window.isDestroyed()) this.window.close();
     this.window = null;

@@ -90,3 +90,19 @@ test('requires an explicit HTTPS embedding profile when semantic search is enabl
   });
   assert.equal(config.embeddingDimensions, 3);
 });
+
+test('vision is disabled by default and validates an explicit OpenRouter profile', () => {
+  assert.equal(loadConfig({ NODE_ENV: 'test' }).visionProvider, 'disabled');
+  assert.throws(() => loadConfig({
+    JARVIS_VISION_PROVIDER: 'openrouter',
+    JARVIS_VISION_MODEL: 'vision-model',
+    JARVIS_VISION_MEMORY_KEY: '0000000000000000000000000000000000000000000000000000000000000000',
+  }), /API key/);
+  const config = loadConfig({
+    JARVIS_VISION_PROVIDER: 'openrouter',
+    JARVIS_VISION_MODEL: 'vision-model',
+    JARVIS_VISION_API_KEY: 'vision-key',
+    JARVIS_VISION_MEMORY_KEY: '0000000000000000000000000000000000000000000000000000000000000000',
+  });
+  assert.equal(config.visionModel, 'vision-model');
+});

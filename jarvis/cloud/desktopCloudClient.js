@@ -231,6 +231,17 @@ class DesktopCloudClient {
     });
   }
 
+  async transcribeVoice(audio, options = {}) {
+    const clientMessageId = options.clientMessageId || createClientMessageId();
+    const mimeType = options.mimeType || 'audio/wav';
+    const payload = Buffer.isBuffer(audio) ? audio : Buffer.from(audio || []);
+    return this._request('/v1/desktop/voice/transcribe', {
+      method: 'POST',
+      headers: { 'Content-Type': mimeType, 'X-Jarvis-Audio-Mime': mimeType, 'X-Jarvis-Client-Message-Id': clientMessageId },
+      body: payload,
+    });
+  }
+
   async createRemoteCommand({ deviceId, action, args = {} }) {
     return this._request('/v1/desktop/commands', {
       method: 'POST',
@@ -250,6 +261,50 @@ class DesktopCloudClient {
   async rejectRemoteCommand(commandId) {
     return this._request(`/v1/desktop/commands/${encodeURIComponent(String(commandId || ''))}/reject`, { method: 'POST' });
   }
+
+  async createVisionLease({ sources, durationMs }) {
+    return this._request('/v1/vision/leases', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sources, ...(durationMs ? { durationMs } : {}) }),
+    });
+  }
+
+  async createVisionCaptureRequest(leaseId, input) {
+    return this._request(`/v1/vision/leases/${encodeURIComponent(String(leaseId || ''))}/requests`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    });
+  }
+
+  async sendVisionFrame(leaseId, metadata, image) {
+    const payload = Buffer.isBuffer(image) ? image : Buffer.from(image || []);
+    return this._request(`/v1/vision/leases/${encodeURIComponent(String(leaseId || ''))}/frames`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': metadata.contentType,
+        'X-Jarvis-Vision-Metadata': Buffer.from(JSON.stringify(metadata), 'utf8').toString('base64url'),
+      },
+      body: payload,
+    });
+  }
+
+  async stopVisionLease(leaseId) {
+    return this._request(`/v1/vision/leases/${encodeURIComponent(String(leaseId || ''))}`, { method: 'DELETE' });
+  }
+
+  async setVisionSensitiveConsent(leaseId, sourceId, allow) {
+    return this._request(`/v1/vision/leases/${encodeURIComponent(String(leaseId || ''))}/sensitive-consent`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceId, allow: allow === true }),
+    });
+  }
+
+  async listVisionMemories(limit = 50) { return this._request(`/v1/vision/memories?limit=${Math.min(Math.max(Number(limit) || 50, 1), 100)}`); }
+  async getVisionMemory(memoryId) { return this._request(`/v1/vision/memories/${encodeURIComponent(String(memoryId || ''))}`); }
+  async updateVisionMemory(memoryId, patch) {
+    return this._request(`/v1/vision/memories/${encodeURIComponent(String(memoryId || ''))}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
+    });
+  }
+  async deleteVisionMemory(memoryId) { return this._request(`/v1/vision/memories/${encodeURIComponent(String(memoryId || ''))}`, { method: 'DELETE' }); }
 
   _clearSessionTimers() {
     if (this.heartbeat) clearInterval(this.heartbeat);

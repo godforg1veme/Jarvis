@@ -1,6 +1,8 @@
 # Jarvis Vision Design
 
-Status: approved for implementation on 2026-09-09.
+Status: first vertical slice implemented and locally verified on 2026-09-09.
+Live Camo, VPS provider/migration, and Telegram acceptance remain pending; see
+`../../updates/2026-09-09-vision-implementation.md`.
 
 This specification supersedes the uncommitted draft titled "Jarvis Vision —
 подробный план реализации" where it differs. Historical specifications remain
@@ -443,4 +445,3 @@ Completion requires evidence, not merely a provider receiving an image:
   build, deployment preflight/health/smoke, and manual privacy acceptance pass;
 - `README.md`, `docs/README.md`, and `AGENTS.md` report only the functionality
   actually verified at that point.
-

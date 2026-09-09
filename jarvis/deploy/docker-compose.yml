@@ -50,6 +50,14 @@ services:
       OPENROUTER_FALLBACK_MODEL: ${OPENROUTER_FALLBACK_MODEL:-}
       OPENROUTER_REASONING_EFFORT: ${OPENROUTER_REASONING_EFFORT:-}
       OPENROUTER_REASONING_EXCLUDE: ${OPENROUTER_REASONING_EXCLUDE:-true}
+      JARVIS_VISION_PROVIDER: ${JARVIS_VISION_PROVIDER:-disabled}
+      JARVIS_VISION_BASE_URL: ${JARVIS_VISION_BASE_URL:-https://openrouter.ai/api/v1}
+      JARVIS_VISION_API_KEY: ${JARVIS_VISION_API_KEY:-}
+      JARVIS_VISION_MODEL: ${JARVIS_VISION_MODEL:-}
+      JARVIS_VISION_TIMEOUT_MS: ${JARVIS_VISION_TIMEOUT_MS:-60000}
+      JARVIS_VISION_MEMORY_PATH: ${JARVIS_VISION_MEMORY_PATH:-/srv/jarvis/vision}
+      JARVIS_VISION_MEMORY_KEY: ${JARVIS_VISION_MEMORY_KEY:-}
+      JARVIS_VISION_USER_QUOTA_BYTES: ${JARVIS_VISION_USER_QUOTA_BYTES:-1073741824}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-}
       JARVIS_DOCUMENT_STORAGE_PATH: ${JARVIS_DOCUMENT_STORAGE_PATH:-/srv/jarvis/documents}
@@ -83,6 +91,7 @@ services:
       retries: 5
     volumes:
       - document-data:/srv/jarvis/documents
+      - vision-data:/srv/jarvis/vision
       - /run/jarvis-host-agent:/run/jarvis-host-agent:ro
     secrets:
       - operations_host_agent_authenticator
@@ -144,6 +153,7 @@ networks:
 volumes:
   postgres-data:
   document-data:
+  vision-data:
   caddy-data:
   caddy-config:
 

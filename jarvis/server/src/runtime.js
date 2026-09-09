@@ -40,6 +40,12 @@ const { ToolIntentPlanner } = require('./orchestrator/toolIntentPlanner');
 const { WorkflowRepository } = require('./orchestrator/workflowRepository');
 const { createRemoteMessage } = require('./devices/remoteProtocol');
 const { createOperationsRuntime } = require('./operations/operationsRuntime');
+const { VisionLeaseStore } = require('./vision/visionLeaseStore');
+const { createVisionProvider } = require('./vision/visionProviderFactory');
+const { registerVisionRoutes } = require('./vision/visionRoutes');
+const { VisualMemoryStorage } = require('./vision/visualMemoryStorage');
+const { VisualMemoryRepository } = require('./vision/visualMemoryRepository');
+const { VisualMemoryService, VisualMemoryWorker } = require('./vision/visualMemoryService');
 
 async function createRuntime(config, overrides = {}) {
   let pool = overrides.pool || null;
@@ -63,6 +69,8 @@ async function createRuntime(config, overrides = {}) {
   let commandWorker = null;
   let orchestrator = null;
   let operationsRuntime = null;
+  let visualMemoryService = null;
+  let visualMemoryWorker = null;
   if (pool) {
     const answerProvider = overrides.provider || createAnswerProvider(config, {
       onFallback(name, error) {
@@ -154,6 +162,13 @@ async function createRuntime(config, overrides = {}) {
         logger: app.log,
       });
     }
+    visualMemoryService = overrides.visualMemoryService || (!config.visionProvider || config.visionProvider === 'disabled' ? null : new VisualMemoryService({
+      repository: new VisualMemoryRepository(pool),
+      storage: new VisualMemoryStorage({ root: config.visionMemoryPath, key: config.visionMemoryKey }),
+      quotaBytes: config.visionUserQuotaBytes,
+      logger: app.log,
+    }));
+    if (visualMemoryService) visualMemoryWorker = overrides.visualMemoryWorker || new VisualMemoryWorker({ service: visualMemoryService, logger: app.log });
     const desktopMessageService = overrides.desktopMessageService || new DesktopMessageService({
       requestRepository: overrides.desktopRequestRepository || new DesktopRequestRepository(pool),
       conversationRepository,
@@ -163,6 +178,7 @@ async function createRuntime(config, overrides = {}) {
       deviceService,
       commandService,
       orchestrator,
+      visualMemoryService,
     });
     if (typeof app.post === 'function' && typeof app.addContentTypeParser === 'function') {
       const desktopRateLimiter = overrides.desktopRateLimiter || new FixedWindowRateLimiter();
@@ -177,6 +193,16 @@ async function createRuntime(config, overrides = {}) {
         authenticate: authenticateDevice,
         commandService,
         limiter: desktopRateLimiter,
+      });
+      registerVisionRoutes(app, {
+        authenticate: authenticateDevice,
+        leaseStore: overrides.visionLeaseStore || new VisionLeaseStore(),
+        provider: overrides.visionProvider || createVisionProvider(config, {
+          fetchImpl: overrides.visionFetch,
+          fake: overrides.fakeVisionProvider,
+        }),
+        limiter: overrides.visionRateLimiter || desktopRateLimiter,
+        memoryService: visualMemoryService,
       });
     }
     if (typeof app.register === 'function' && typeof app.get === 'function') {
@@ -201,6 +227,7 @@ async function createRuntime(config, overrides = {}) {
       knowledgeService,
       commandService,
       orchestrator,
+      visualMemoryService,
     });
     bot = createTelegramBot({
       token: config.telegramBotToken,
@@ -245,11 +272,13 @@ async function createRuntime(config, overrides = {}) {
       await app.listen({ host: config.host, port: config.port });
       if (operationsRuntime) await operationsRuntime.start();
       if (knowledgeWorker) knowledgeWorker.start();
+      if (visualMemoryWorker) visualMemoryWorker.start();
       if (commandWorker) commandWorker.start();
       if (bot) void bot.start().catch((error) => app.log.error({ err: error }, 'Telegram polling stopped'));
     },
     async close() {
       if (knowledgeWorker) knowledgeWorker.stop();
+      if (visualMemoryWorker) visualMemoryWorker.stop();
       if (commandWorker) commandWorker.stop();
       if (operationsRuntime) await operationsRuntime.close();
       if (bot && (typeof bot.isRunning !== 'function' || bot.isRunning())) await bot.stop();

@@ -2,7 +2,9 @@
 
 Date: 2026-09-09
 
-Status: approved for implementation. This plan implements Release 1 of
+Status: Release 1 first vertical slice implemented and locally verified on
+2026-09-09. Live Camo and deployed end-to-end acceptance remain pending; see
+`../../updates/2026-09-09-vision-implementation.md`. This plan implements Release 1 of
 `../specs/2026-09-09-jarvis-vision-design.md`. Vision Watches and later realtime
 features remain separate projects.
 
@@ -313,4 +315,3 @@ Only after the corresponding acceptance evidence exists:
   verification commands;
 - record unfinished live/hardware/deployment acceptance explicitly rather than
   describing roadmap work as production-ready.
-

@@ -40,6 +40,24 @@
         <p id="voice-state" class="voice-state">Микрофон не активен</p>
       </section>
 
+      <section class="vision-card" aria-labelledby="vision-title">
+        <div class="vision-heading">
+          <div><p class="eyebrow">PERCEPTION DOCK</p><h2 id="vision-title">Зрение выключено</h2></div>
+          <span id="vision-indicator" class="vision-indicator off" aria-hidden="true"></span>
+        </div>
+        <div id="vision-preview" class="vision-preview" aria-label="Последний кадр, отправленный на анализ"><span>NO VISUAL SIGNAL</span></div>
+        <label class="vision-source-label" for="vision-camera">Камера</label>
+        <select id="vision-camera" class="vision-select" disabled><option value="auto">Автовыбор · Camo при наличии</option><option value="">Без камеры</option></select>
+        <label class="vision-check"><input id="vision-screens" type="checkbox" checked disabled><span>Оба монитора одним пространством</span></label>
+        <div class="vision-actions">
+          <button id="vision-toggle" class="vision-button" type="button" disabled>Включить</button>
+          <button id="vision-stop" class="vision-stop" type="button" disabled>STOP</button>
+        </div>
+        <button id="vision-timeline-open" class="vision-timeline-open" type="button" disabled>Открыть визуальную память</button>
+        <p id="vision-state" class="vision-state" aria-live="polite">Камера и экраны физически закрыты</p>
+        <p id="vision-timer" class="vision-timer">00:00 · OFF</p>
+      </section>
+
       <div class="privacy-note">
         <span aria-hidden="true">◈</span>
         До wake word звук остаётся на этом ПК. На сервер уходит только завершённая фраза.
@@ -93,6 +111,13 @@
       </section>
     </section>
   </main>
+  <dialog id="vision-timeline" class="vision-timeline" aria-labelledby="vision-timeline-title">
+    <header><div><p class="eyebrow">VISUAL MEMORY</p><h2 id="vision-timeline-title">Лента восприятия</h2></div><button id="vision-timeline-close" type="button" aria-label="Закрыть">×</button></header>
+    <div class="timeline-layout">
+      <div id="vision-memory-list" class="vision-memory-list" aria-live="polite"></div>
+      <article id="vision-memory-detail" class="vision-memory-detail"><p>Выберите снимок, чтобы открыть источник и описание.</p></article>
+    </div>
+  </dialog>
   <script src="../vendor/three.min.js"></script>
   <script src="../quantumCore.js"></script>
   <script src="renderer.js"></script>

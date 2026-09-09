@@ -21,9 +21,25 @@ const elements = {
   voiceTitle: document.getElementById('voice-title'),
   voiceDescription: document.getElementById('voice-description'),
   voiceState: document.getElementById('voice-state'),
+  visionTitle: document.getElementById('vision-title'),
+  visionIndicator: document.getElementById('vision-indicator'),
+  visionPreview: document.getElementById('vision-preview'),
+  visionCamera: document.getElementById('vision-camera'),
+  visionScreens: document.getElementById('vision-screens'),
+  visionToggle: document.getElementById('vision-toggle'),
+  visionStop: document.getElementById('vision-stop'),
+  visionState: document.getElementById('vision-state'),
+  visionTimer: document.getElementById('vision-timer'),
+  visionTimelineOpen: document.getElementById('vision-timeline-open'),
+  visionTimeline: document.getElementById('vision-timeline'),
+  visionTimelineClose: document.getElementById('vision-timeline-close'),
+  visionMemoryList: document.getElementById('vision-memory-list'),
+  visionMemoryDetail: document.getElementById('vision-memory-detail'),
 };
 
 let state = { paired: false, connection: 'unpaired', voiceEnabled: false };
+let visionState = { state: 'off', startedAt: null, preview: null };
+let visionBusy = false;
 
 function clearEmptyChat() {
   const empty = elements.messages.querySelector('.empty-chat');
@@ -69,8 +85,145 @@ function renderState(nextState) {
   elements.messageInput.disabled = !paired;
   elements.sendButton.disabled = !paired;
   elements.voiceButton.disabled = !paired;
+  elements.visionToggle.disabled = !paired || visionBusy;
+  elements.visionCamera.disabled = !paired || visionState.state === 'active';
+  elements.visionScreens.disabled = !paired || visionState.state === 'active';
+  elements.visionTimelineOpen.disabled = !paired;
   if (paired && state.serverUrl) elements.serverUrl.value = state.serverUrl;
   if (!paired && !elements.serverUrl.value && state.defaultServerUrl) elements.serverUrl.value = state.defaultServerUrl;
+}
+
+function elapsedText(startedAt) {
+  if (!startedAt) return '00:00';
+  const seconds = Math.max(0, Math.floor((Date.now() - Date.parse(startedAt)) / 1000));
+  return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
+function renderVision(next = {}) {
+  visionState = { ...visionState, ...next };
+  const active = visionState.state === 'active';
+  elements.visionTitle.textContent = visionBusy ? 'Анализирую сцену' : active ? 'Зрение активно' : 'Зрение выключено';
+  elements.visionIndicator.className = `vision-indicator ${visionBusy ? 'busy' : active ? 'active' : 'off'}`;
+  elements.visionToggle.textContent = active ? 'Анализировать' : 'Включить';
+  elements.visionToggle.disabled = !state.paired || visionBusy;
+  elements.visionStop.disabled = !active && !visionBusy;
+  elements.visionCamera.disabled = !state.paired || active || visionBusy;
+  elements.visionScreens.disabled = !state.paired || active || visionBusy;
+  elements.visionState.textContent = visionBusy ? 'Отправляю выбранные кадры в облачный контур зрения…'
+    : active ? 'Источник активен. STOP немедленно закрывает камеру.' : 'Камера и экраны физически закрыты';
+  elements.visionTimer.textContent = `${elapsedText(visionState.startedAt)} · ${active ? 'LIVE' : 'OFF'}`;
+  if (visionState.preview?.dataUrl) {
+    const image = document.createElement('img');
+    image.src = visionState.preview.dataUrl;
+    image.alt = 'Последний кадр, отправленный на визуальный анализ';
+    elements.visionPreview.replaceChildren(image);
+  } else if (!active) {
+    const label = document.createElement('span');
+    label.textContent = 'NO VISUAL SIGNAL';
+    elements.visionPreview.replaceChildren(label);
+  }
+}
+
+async function refreshVisionSources() {
+  if (!cloud || !state.paired || typeof cloud.listVisionSources !== 'function') return;
+  const result = await cloud.listVisionSources();
+  if (!result?.ok) { elements.visionState.textContent = result?.error || 'Источники зрения недоступны'; return; }
+  const prior = elements.visionCamera.value;
+  elements.visionCamera.replaceChildren();
+  const automatic = document.createElement('option');
+  automatic.value = 'auto'; automatic.textContent = 'Автовыбор · Camo при наличии'; elements.visionCamera.appendChild(automatic);
+  const none = document.createElement('option');
+  none.value = ''; none.textContent = 'Без камеры'; elements.visionCamera.appendChild(none);
+  for (const camera of result.cameras || []) {
+    const option = document.createElement('option');
+    option.value = camera.sourceId; option.textContent = camera.label || 'Камера'; elements.visionCamera.appendChild(option);
+  }
+  elements.visionCamera.value = prior && [...elements.visionCamera.options].some((item) => item.value === prior)
+    ? prior : 'auto';
+}
+
+async function openMemoryDetail(memoryId) {
+  elements.visionMemoryDetail.replaceChildren(document.createTextNode('Загружаю зашифрованный снимок…'));
+  const result = await cloud.getVisionMemory(memoryId);
+  if (!result?.ok) {
+    elements.visionMemoryDetail.replaceChildren(document.createTextNode(result?.error || 'Снимок недоступен.'));
+    return;
+  }
+  const record = result.memory;
+  const observation = result.observation;
+  const image = document.createElement('img');
+  image.src = `data:${result.image.contentType};base64,${result.image.data}`;
+  image.alt = `Визуальный снимок от ${new Date(record.captured_at).toLocaleString('ru-RU')}`;
+  const title = document.createElement('h3'); title.textContent = observation.sceneSummary;
+  const meta = document.createElement('p');
+  meta.textContent = `${new Date(record.captured_at).toLocaleString('ru-RU')} · ${record.source_id} · уверенность ${observation.confidence === null ? '—' : Math.round(observation.confidence * 100) + '%'}`;
+  const actions = document.createElement('div'); actions.className = 'memory-detail-actions';
+  const pin = document.createElement('button'); pin.type = 'button'; pin.textContent = record.pinned ? 'Открепить' : 'Закрепить навсегда';
+  pin.addEventListener('click', async () => { await cloud.updateVisionMemory(memoryId, { pinned: !record.pinned }); await loadMemoryTimeline(); await openMemoryDetail(memoryId); });
+  const correct = document.createElement('button'); correct.type = 'button'; correct.textContent = 'Исправить описание';
+  correct.addEventListener('click', async () => {
+    const summary = window.prompt('Как правильно описать этот снимок?', observation.sceneSummary);
+    if (summary === null) return;
+    await cloud.updateVisionMemory(memoryId, { correctedSummary: summary.slice(0, 4000) });
+    await openMemoryDetail(memoryId);
+  });
+  const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'danger'; remove.textContent = 'Удалить полностью';
+  remove.addEventListener('click', async () => {
+    if (!window.confirm('Полностью удалить этот снимок и его зашифрованные данные?')) return;
+    await cloud.deleteVisionMemory(memoryId);
+    elements.visionMemoryDetail.replaceChildren(document.createTextNode('Снимок удалён.'));
+    await loadMemoryTimeline();
+  });
+  actions.append(pin, correct, remove);
+  elements.visionMemoryDetail.replaceChildren(image, title, meta, actions);
+}
+
+async function loadMemoryTimeline() {
+  elements.visionMemoryList.replaceChildren(document.createTextNode('Загружаю ленту…'));
+  const result = await cloud.listVisionMemories();
+  if (!result?.ok || !result.memories?.length) {
+    elements.visionMemoryList.replaceChildren(document.createTextNode(result?.error || 'Визуальная память пока пуста.'));
+    return;
+  }
+  const fragment = document.createDocumentFragment();
+  for (const memory of result.memories) {
+    const row = document.createElement('button'); row.type = 'button'; row.className = 'memory-row';
+    const label = document.createElement('strong'); label.textContent = `${memory.pinned ? 'PIN · ' : ''}${memory.sensitivity === 'sensitive' ? 'PRIVATE · ' : ''}${memory.source_id}`;
+    const date = document.createElement('span'); date.textContent = new Date(memory.captured_at).toLocaleString('ru-RU');
+    const status = document.createElement('span'); status.textContent = memory.state === 'pending_sensitive_consent' ? 'Ожидает решения о хранении' : 'Сохранён';
+    row.append(label, date, status);
+    row.addEventListener('click', () => openMemoryDetail(memory.id));
+    fragment.appendChild(row);
+  }
+  elements.visionMemoryList.replaceChildren(fragment);
+}
+
+async function runVisualQuery(text, intent) {
+  visionBusy = true;
+  renderVision();
+  try {
+    if (visionState.state !== 'active') {
+      const start = await cloud.startVision({
+        cameraSourceId: intent.target === 'screen' || elements.visionCamera.value === 'auto' ? '' : elements.visionCamera.value,
+        includeCamera: intent.target !== 'screen' && elements.visionCamera.value !== '',
+        includeScreens: intent.target !== 'camera',
+        kind: intent.kind,
+      });
+      if (!start?.ok) { appendMessage('system', start?.error || 'Не удалось включить зрение.'); return; }
+      renderVision(start.state);
+    }
+    appendMessage('system', 'Смотрю…');
+    const result = await cloud.analyzeVision({ prompt: text, target: intent.target });
+    if (!result?.ok) { appendMessage('system', result?.error || 'Визуальный анализ не удался.'); return; }
+    appendMessage('assistant', result.answer, 'JARVIS · VISION');
+    for (const sourceId of result.retentionConsentSources || []) {
+      const allow = window.confirm('На кадре могут быть чувствительные данные. Сохранить этот и следующие чувствительные кадры этого источника в зашифрованной памяти до конца текущей сессии?');
+      await cloud.setVisionSensitiveConsent(sourceId, allow);
+    }
+  } finally {
+    visionBusy = false;
+    renderVision();
+  }
 }
 
 let quantumCore = null;
@@ -153,10 +306,23 @@ async function initialize() {
       }
     }
   });
+  if (typeof cloud.onVisionState === 'function') cloud.onVisionState(renderVision);
+  if (typeof cloud.onVisionSensitiveConsentRequired === 'function') {
+    cloud.onVisionSensitiveConsentRequired(async (payload) => {
+      for (const sourceId of payload?.sourceIds || []) {
+        const allow = window.confirm('На кадре могут быть чувствительные данные. Сохранить этот и следующие чувствительные кадры этого источника в зашифрованной памяти до конца текущей сессии?');
+        await cloud.setVisionSensitiveConsent(sourceId, allow);
+      }
+    });
+  }
   const result = await cloud.getState();
   if (result && result.ok) renderState(result);
   const voice = await cloud.getVoiceState();
   if (voice && voice.ok) renderVoice(voice);
+  if (typeof cloud.getVisionState === 'function') {
+    const vision = await cloud.getVisionState();
+    if (vision?.ok) renderVision(vision.state);
+  }
 
   if (typeof cloud.onCoreMode === 'function') {
     cloud.onCoreMode((payload) => {
@@ -217,6 +383,11 @@ elements.messageForm.addEventListener('submit', async (event) => {
     quantumCore.setMode('vortex');
   }
   try {
+    const intent = typeof cloud.classifyVisualIntent === 'function' ? await cloud.classifyVisualIntent(text) : { visual: false };
+    if (intent?.visual) {
+      await runVisualQuery(text, intent);
+      return;
+    }
     const result = await cloud.sendMessage(text);
     if (!result || !result.ok) {
       appendMessage('system', result && result.error ? result.error : 'Сервер не ответил.');
@@ -268,5 +439,54 @@ elements.voiceButton.addEventListener('click', async () => {
   if (result && result.ok) renderVoice(result);
   else renderVoice({ type: 'error', message: result && result.error ? result.error : 'Голосовой режим недоступен.', enabled: false, phase: 'off' });
 });
+
+elements.visionToggle.addEventListener('click', async () => {
+  if (!cloud || !state.paired || visionBusy) return;
+  visionBusy = true;
+  renderVision();
+  try {
+    if (visionState.state !== 'active') {
+      const result = await cloud.startVision({
+        cameraSourceId: elements.visionCamera.value === 'auto' ? '' : elements.visionCamera.value,
+        includeCamera: elements.visionCamera.value !== '',
+        includeScreens: elements.visionScreens.checked,
+        kind: 'active',
+      });
+      if (!result?.ok) appendMessage('system', result?.error || 'Не удалось включить зрение.');
+      else renderVision(result.state);
+      return;
+    }
+    const prompt = elements.messageInput.value.trim() || 'Опиши, что сейчас видно, и обрати внимание на важные изменения.';
+    visionBusy = false;
+    await runVisualQuery(prompt, { target: 'all', kind: 'active' });
+  } finally {
+    visionBusy = false;
+    renderVision();
+  }
+});
+
+elements.visionStop.addEventListener('click', async () => {
+  if (!cloud) return;
+  visionBusy = true;
+  renderVision();
+  try {
+    const result = await cloud.stopVision();
+    if (result?.state) renderVision(result.state);
+  } finally {
+    visionBusy = false;
+    renderVision({ state: 'off', startedAt: null, preview: null });
+  }
+});
+
+elements.visionTimelineOpen.addEventListener('click', async () => {
+  if (!cloud || !state.paired) return;
+  elements.visionTimeline.showModal();
+  await loadMemoryTimeline();
+});
+elements.visionTimelineClose.addEventListener('click', () => elements.visionTimeline.close());
+
+setInterval(() => {
+  if (visionState.state === 'active') renderVision();
+}, 1000);
 
 void initialize();

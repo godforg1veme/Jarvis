@@ -4,7 +4,7 @@ This file is the status authority for project documentation. Specifications and
 plans under `docs/superpowers/` are preserved as decision history; their old
 future-tense wording does not override the current architecture in `AGENTS.md`.
 
-Status snapshot: 2026-09-02.
+Status snapshot: 2026-09-09.
 
 Operations update, 2026-09-06: see
 `updates/2026-09-06-operations-verification.md` for the corrective rollout,
@@ -18,9 +18,12 @@ Jarvis is a hybrid personal/family AI-assistant platform: an always-on cloud
 control plane provides identity, Telegram access, persistent user-scoped data,
 and model routing; Windows clients provide local voice, a procedural 3D
 holographic avatar («Quantum Core 2.0»), a floating desktop companion widget,
-and bounded device execution. Telegram is the first client. PWA, camera/vision, and production
-acceptance of multi-device control remain roadmap work unless explicitly marked
-implemented below. The Telegram-first private knowledge base accepts bounded
+and bounded device execution. Telegram is the first client. PWA and production
+acceptance of multi-device control remain roadmap work. The first Vision vertical
+slice is implemented but not yet deployed: local explicit camera/screen leases,
+two-display composition, provider-neutral analysis, encrypted owner-scoped visual
+memory, and remote observation through an already active lease. Live Camo and
+deployed-provider acceptance are still pending. The Telegram-first private knowledge base accepts bounded
 attachments, indexes supported text formats with PostgreSQL full-text search,
 extracts PDF text with page metadata, keeps unsupported files searchable by
 metadata, and uses production hybrid embeddings retrieval with FTS fallback.
@@ -42,7 +45,9 @@ deliberately disabled until the DE-4 benchmark selects one.
 
 | Document | Status |
 | --- | --- |
-| `specs/2026-09-01-jarvis-family-cloud-assistant-design.md` | Partially implemented: control plane, DB, Telegram/Desktop text, provider gateway, safe text fallback, prompt pipeline, user-scoped memory, Telegram-first attachment ingestion, production hybrid knowledge retrieval, and the confirmed remote-command path are implemented and tested. Server ASR, PWA/vision and live multi-device acceptance remain operational work. |
+| `specs/2026-09-01-jarvis-family-cloud-assistant-design.md` | Partially implemented: control plane, DB, Telegram/Desktop text, provider gateway, safe text fallback, prompt pipeline, user-scoped memory, Telegram-first attachment ingestion, production hybrid knowledge retrieval, the confirmed remote-command path, and the first Vision vertical slice are implemented and tested. Server ASR, PWA, deployment of Vision, live Camo, and live multi-device acceptance remain operational work. |
+| `superpowers/specs/2026-09-09-jarvis-vision-design.md` | Implemented first vertical slice; see `updates/2026-09-09-vision-implementation.md` for verified boundaries and remaining live acceptance |
+| `superpowers/plans/2026-09-09-jarvis-vision.md` | Execution plan adapted to the current cloud-brain/local-hands architecture; first camera + two-display + memory slice implemented |
 | `plans/2026-09-01-jarvis-family-cloud-assistant.md` | Active roadmap; Milestones 0–3 are partial, later milestones are not complete |
 | `specs/2026-09-01-jarvis-desktop-cloud-client-design.md` | Implemented and packaged: paired Windows chat, DPAPI device credentials, device-scoped HTTPS/WSS sessions, local wake word, server ASR contract, and NSIS installer. Live VPS configuration and clean-machine acceptance remain operational steps. |
 | `specs/2026-09-01-jarvis-system-instruction-design.md` | Implemented and verified for the current Telegram/OpenRouter path |

@@ -112,6 +112,15 @@ function registerDesktopRoutes(app, options) {
     });
     return { ok: true, ...response };
   });
+
+  app.post('/v1/desktop/voice/transcribe', { preHandler: requireDevice, bodyLimit: MAX_AUDIO_BYTES }, async (request) => {
+    const input = readAudioMetadata(request);
+    limiter.check(`voice-transcribe:${request.device.id}`, { limit: 10, windowMs: 60000 });
+    const transcription = await asr.transcribe({
+      audio: input.audio, mimeType: input.mimeType, languageHint: 'ru', requestId: request.id,
+    });
+    return { ok: true, transcript: transcription.text, transcription };
+  });
 }
 
 module.exports = {

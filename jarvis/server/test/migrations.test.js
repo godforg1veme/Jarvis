@@ -19,7 +19,16 @@ test('migration files are ordered and narrowly named', () => {
     '009_operations_connections.sql',
     '010_operations_notification_delivery.sql',
     '011_operations_health_checks.sql',
+    '012_visual_memory.sql',
   ]);
+});
+
+test('visual memory migration is owner-scoped and stores no plaintext scene or OCR payload', () => {
+  const migration = fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, '012_visual_memory.sql'), 'utf8');
+  assert.match(migration, /user_id uuid NOT NULL REFERENCES users\(id\) ON DELETE CASCADE/);
+  assert.match(migration, /content_hash bytea NOT NULL CHECK \(octet_length\(content_hash\) = 32\)/);
+  assert.match(migration, /visual_memory_tokens/);
+  assert.doesNotMatch(migration, /scene_summary|ocr_text|image_data/);
 });
 
 test('operations migrations retain bounded, owner-safe storage contracts', () => {

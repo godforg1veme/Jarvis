@@ -10,7 +10,7 @@ const NEGATIVE_CONFIRMATION = /^(?:нет|не надо|отмена|отмен�
 const TERMINAL_AFTER_SUCCESS = new Set(['file.open', 'file.open_folder', 'file.reveal', 'app.launch']);
 const OPEN_INTENT = /(?:^|\s)(?:открой|открыть|запусти|запустить|open|launch)(?:\s|$)/iu;
 const REVEAL_INTENT = /(?:покажи|показать|проводник|где\s+(?:лежит|находится)|расположен|reveal|show\s+in\s+(?:explorer|folder))/iu;
-const DEVICE_ACTION_INTENT = /(?:(?:^|\s)(?:найди|найти|поищи|поиск|открой|открыть|покажи|показать|запусти|запустить|закрой|закрыть|удали|удалить|удаляй|перемести|перенеси|переместить|переименуй|переименовать|создай|создать|скопируй|копировать|сфокусируй|разверни|восстанови|расположи|выполни|сделай|команда|find|search|open|reveal|show|launch|close|delete|remove|move|rename|create|copy|focus|restore|resize|layout|execute)(?:\s|$)|(?:какие|перечисли|покажи)\s+окна(?:\s|[?.!,]|$)|что\s+(?:сейчас\s+)?открыто\s+(?:на|в)\s+(?:пк|компьютере)(?:\s|[?.!,]|$)|что\s+(?:лежит|находится)\s+в\s+папке(?:\s|[?.!,]|$)|[a-z]:[\\/])/iu;
+const DEVICE_ACTION_INTENT = /(?:(?:^|\s)(?:найди|найти|поищи|поиск|открой|открыть|покажи|показать|посмотри|взгляни|запусти|запустить|закрой|закрыть|удали|удалить|удаляй|перемести|перенеси|переместить|переименуй|переименовать|создай|создать|скопируй|копировать|сфокусируй|разверни|восстанови|расположи|выполни|сделай|команда|find|search|open|reveal|show|look|launch|close|delete|remove|move|rename|create|copy|focus|restore|resize|layout|execute)(?:\s|$)|что\s+(?:ты\s+)?видишь|что\s+(?:сейчас\s+)?на\s+(?:камере|экране|мониторе)|(?:какие|перечисли|покажи)\s+окна(?:\s|[?.!,]|$)|что\s+(?:сейчас\s+)?открыто\s+(?:на|в)\s+(?:пк|компьютере)(?:\s|[?.!,]|$)|что\s+(?:лежит|находится)\s+в\s+папке(?:\s|[?.!,]|$)|[a-z]:[\\/])/iu;
 
 function hasPotentialDeviceAction(text) {
   return DEVICE_ACTION_INTENT.test(String(text || '').trim());
@@ -22,6 +22,7 @@ function publicErrorText(error) {
   if (code === 'DEVICE_NOT_FOUND') return 'Выбранный компьютер не найден.';
   if (code === 'DEVICE_REVOKED') return 'Выбранный компьютер отозван.';
   if (code === 'CONFIRMATION_UNAVAILABLE') return 'Подтверждение не найдено, уже использовано или истекло.';
+  if (code === 'VISION_LOCAL_LEASE_REQUIRED') return 'Сначала включите зрение на самом компьютере; удалённо запускать камеру нельзя.';
   return 'Не удалось выполнить действие на компьютере.';
 }
 
@@ -433,6 +434,11 @@ class ActionOrchestrator {
         answer: continuation.kind === 'ask_user' ? continuation.question : continuation.text,
         workflowId: completed.id,
       };
+    }
+    if (command.action === 'vision.capture') {
+      const answer = String(safeResult.answer || '').trim().slice(0, 10000);
+      const completed = await this._update(active, 'succeeded', active.state, false, true);
+      return { handled: true, answer: answer || 'Визуальный анализ завершён.', workflowId: completed.id };
     }
     const devices = await this.deviceRepository.listForUser(input.userId);
     const plan = await this.planner.plan({

@@ -37,6 +37,7 @@ class DesktopMessageService {
     this.knowledgeService = options.knowledgeService || null;
     this.commandService = options.commandService || null;
     this.orchestrator = options.orchestrator || null;
+    this.visualMemoryService = options.visualMemoryService || null;
   }
 
   async handle({ device, clientMessageId, kind = 'text', resolveContent }) {
@@ -152,6 +153,8 @@ class DesktopMessageService {
       const documentSources = this.knowledgeService
         ? await this.knowledgeService.searchForPrompt({ userId: device.user_id, query: content })
         : [];
+      const visualMemories = this.visualMemoryService
+        ? await this.visualMemoryService.searchForPrompt({ userId: device.user_id, query: content }) : [];
       const deviceAnswer = isDeviceAttachmentQuestion(content) ? attachmentReply(devices) : null;
       const answer = memoryResult.answer || deviceAnswer || await this.assistant.answer({
         userId: device.user_id,
@@ -160,6 +163,7 @@ class DesktopMessageService {
         history,
         memories,
         documents: documentSources,
+        visualMemories,
         devices,
         runtimeContext: {
           channel: 'desktop',

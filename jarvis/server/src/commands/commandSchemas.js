@@ -13,6 +13,7 @@ const ACTION_POLICIES = Object.freeze({
   'file.list_directory': POLICY.OBSERVE,
   'app.resolve': POLICY.OBSERVE,
   'window.list': POLICY.OBSERVE,
+  'vision.capture': POLICY.OBSERVE,
   // The cloud cannot inspect the target extension before reaching Desktop.
   // Require source-client confirmation so the local dangerous-file guard is never bypassed.
   'file.open': POLICY.CONFIRM,
@@ -78,6 +79,7 @@ const ACTION_ARG_KEYS = Object.freeze({
   'window.move': ['hwnd', 'x', 'y', 'width', 'height'],
   'window.resize': ['hwnd', 'x', 'y', 'width', 'height'],
   'window.layout': ['items', 'hwnds', 'layout'],
+  'vision.capture': ['prompt', 'target'],
 });
 
 const commandInputSchema = z.object({
@@ -153,6 +155,11 @@ function validateActionArgs(action, input = {}) {
     if (!/^candidate-[a-zA-Z0-9-]+$/.test(String(args.candidateId || ''))) throw new Error('opaque candidateId is required');
   }
   if (action === 'app.close') requireText(args, ['appId'], 'appId', 128);
+  if (action === 'vision.capture') {
+    requireText(args, ['prompt'], 'vision prompt', 4000);
+    if (!['camera', 'screen', 'all'].includes(String(args.target || 'all'))) throw new Error('vision target is invalid');
+    args.target = String(args.target || 'all');
+  }
   return args;
 }
 

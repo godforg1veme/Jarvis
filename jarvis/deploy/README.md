@@ -182,3 +182,20 @@ HTTPS in production and implement the OpenAI-compatible
 `POST /audio/transcriptions` contract. Rebuild the server, verify `/health/ready`,
 then send one non-sensitive voice probe from a paired test Desktop. Do not log
 or retain raw audio outside the request path.
+
+## Jarvis Vision
+
+Vision is fail-closed while `JARVIS_VISION_PROVIDER=disabled`. To stage the
+OpenRouter-compatible provider, set `JARVIS_VISION_PROVIDER=openrouter`, its
+dedicated API key/model, and one randomly generated 32-byte
+`JARVIS_VISION_MEMORY_KEY` only in `deploy/.env`. Keep the `vision-data` volume
+private; it contains AES-256-GCM blobs and must never be served as static files.
+Server startup applies migration `012_visual_memory.sql` before accepting frames.
+
+After rebuilding, verify the fake-provider and route suites first. Production
+acceptance then requires one paired Desktop, an explicitly started local Vision
+Lease, a non-sensitive camera frame, the combined two-display frame, Timeline
+read/delete, immediate STOP, and a Telegram observation through that already
+active lease. Telegram cannot start or extend capture. Do not enable Vision
+until the memory key has been backed up securely: losing it makes retained frames
+unrecoverable, while changing it without re-encryption breaks existing memory.

@@ -24,6 +24,7 @@ const CLEAR_PHRASES = [
   'очисти visual context',
   'сбрось визуальный контекст',
 ];
+const { classifyVisualIntent } = require('../vision/visualIntent');
 
 function normalizeVisualCommandText(text) {
   return String(text || '')
@@ -40,7 +41,7 @@ function includesPhrase(text, phrases) {
 }
 
 function isVisualAnalyzeCommand(text) {
-  return includesPhrase(text, ANALYZE_PHRASES);
+  return classifyVisualIntent(text).visual || includesPhrase(text, ANALYZE_PHRASES);
 }
 
 function isVisualContinuationCommand(text) {

@@ -27,6 +27,7 @@ const ACTION_ARG_KEYS = Object.freeze({
   'window.move': ['hwnd', 'x', 'y', 'width', 'height'],
   'window.resize': ['hwnd', 'x', 'y', 'width', 'height'],
   'window.layout': ['items', 'hwnds', 'layout'],
+  'vision.capture': ['prompt', 'target'],
 });
 
 function isRecord(value) {
@@ -100,6 +101,12 @@ function validateActionArgs(action, input) {
     if (!/^candidate-[a-zA-Z0-9-]+$/.test(candidateId)) throw new Error('opaque candidateId is required for app.launch');
   }
   if (normalizedAction === 'app.close') requireText(args, ['appId'], 'appId');
+  if (normalizedAction === 'vision.capture') {
+    requireText(args, ['prompt'], 'vision prompt');
+    if (String(args.prompt).length > 4000) throw new Error('vision prompt is too long');
+    if (!['camera', 'screen', 'all'].includes(String(args.target || 'all'))) throw new Error('vision target is invalid');
+    args.target = String(args.target || 'all');
+  }
 
   return args;
 }

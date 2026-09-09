@@ -14,7 +14,12 @@ Jarvis is a hybrid personal and family AI-assistant platform:
 - the Electron application is the Windows client and execution edge for local
   voice, apps, files, windows, and approved remote actions;
 - Telegram is the first cloud client, not the whole product;
-- PWA, server ASR, and camera/vision are planned or in progress. Semantic
+- PWA and server ASR remain planned or in progress. The first camera/screen
+  Vision vertical slice is implemented locally and in the control plane: explicit
+  local leases, Camo-compatible camera discovery, a two-display workspace,
+  provider-neutral analysis, encrypted owner-scoped visual memory, and remote
+  observation through an already active lease. Real two-display capture is
+  verified; live Camo and deployed-provider acceptance remain unfinished. Semantic
   retrieval and the confirmed remote-command path are implemented. Production
   embeddings and single-device Desktop/Telegram-origin confirmation were
   verified live on 2026-09-02; live multi-device acceptance remains unfinished.
@@ -63,6 +68,11 @@ See `docs/README.md` for current implementation status and historical records.
   («Quantum Holographic Core 2.0»), integrated into Cloud Chat sidebar, floating
   Voice Overlay, and a dedicated desktop companion widget (`renderer/quantum-widget.*`)
   with full state/emotion IPC sync.
+- `vision/` owns explicit local Vision Leases, hidden camera capture, protected
+  screen checks, two-display composition, intent routing, and cloud transport.
+  Camera media permission is restricted to the hidden capture renderer. Telegram
+  and future PWA clients may observe only through an already active owner lease;
+  they cannot start, add, or extend local capture sources.
 - `agents/toolGateway.js` is the execution authority for agent-requested OS
   mutations. `agents/toolPolicy.js` and `agents/toolSchemas.js` are shared
   policy/validation contracts.
@@ -186,6 +196,12 @@ node scripts/testGeminiVoiceAdvisor.js
 node scripts/testVoiceLabRenderer.js
 node scripts/testTrayMenu.js
 node scripts/testQuantumCore.js
+node scripts/testVisionTransport.js
+node scripts/testVisionRuntime.js
+node scripts/testVisionIpc.js
+node scripts/testVisionMediaPermission.js
+npx electron scripts/probeVisionHardware.js
+node scripts/testVisionRendererBrowser.cjs
 node --test cloud/*.test.js voice/cloudVoiceService.test.js tts/windowsSapiService.test.js
 npm run dist:win
 python scripts/testFasterWhisperQuality.py

@@ -22,6 +22,19 @@ const command = createRemoteMessage('command.execute', {
 assert.strictEqual(command.payload.action, 'file.search');
 assert.strictEqual(command.payload.confirmed, false);
 
+const visionCommand = createRemoteMessage('command.execute', {
+  commandId: 'command-vision',
+  action: 'vision.capture',
+  args: { prompt: 'Что сейчас видно?', target: 'all' },
+  confirmed: false,
+});
+assert.strictEqual(visionCommand.payload.args.target, 'all');
+assert.throws(() => createRemoteMessage('command.execute', {
+  commandId: 'command-vision-start',
+  action: 'vision.capture',
+  args: { prompt: 'Включи камеру', target: 'camera', startLease: true },
+}), /unknown argument/);
+
 const workflowUpdate = createRemoteMessage('workflow.update', {
   workflowId: 'workflow-1',
   status: 'completed',

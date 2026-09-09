@@ -42,6 +42,14 @@ const baseSchema = z.object({
   openrouterFallbackModel: z.string().max(255),
   openrouterReasoningEffort: z.enum(['', 'max', 'xhigh', 'high', 'medium', 'low', 'minimal', 'none']),
   openrouterReasoningExclude: z.boolean(),
+  visionProvider: z.enum(['disabled', 'fake', 'openrouter']),
+  visionBaseUrl: z.string().max(2048),
+  visionApiKey: z.string().max(2048),
+  visionModel: z.string().max(255),
+  visionTimeoutMs: z.number().int().min(1000).max(120000),
+  visionMemoryPath: z.string().min(1).max(2048),
+  visionMemoryKey: z.string().max(256),
+  visionUserQuotaBytes: z.number().int().min(8 * 1024 * 1024).max(100 * 1024 * 1024 * 1024),
   geminiApiKey: z.string().max(2048),
   geminiModel: z.string().max(255),
   documentStoragePath: z.string().min(1).max(2048),
@@ -132,6 +140,25 @@ function validateEmbeddings(config) {
   }
 }
 
+function validateVision(config) {
+  if (config.visionProvider === 'disabled') return;
+  if (!config.visionMemoryKey) throw new Error('JARVIS_VISION_MEMORY_KEY is required when vision is enabled');
+  try {
+    const key = /^[a-f0-9]{64}$/iu.test(config.visionMemoryKey)
+      ? Buffer.from(config.visionMemoryKey, 'hex') : Buffer.from(config.visionMemoryKey, 'base64url');
+    if (key.length !== 32) throw new Error();
+  } catch { throw new Error('JARVIS_VISION_MEMORY_KEY must encode exactly 32 bytes'); }
+  if (config.visionProvider === 'openrouter') {
+    if (!(config.visionApiKey || config.openrouterApiKey) || !config.visionModel) {
+      throw new Error('JARVIS_VISION_MODEL and a Vision/OpenRouter API key are required for OpenRouter vision');
+    }
+  }
+  const url = new URL(config.visionBaseUrl);
+  if (config.nodeEnv === 'production' && url.protocol !== 'https:') {
+    throw new Error('JARVIS_VISION_BASE_URL must use HTTPS in production');
+  }
+}
+
 function loadConfig(env = process.env) {
   const raw = {
     nodeEnv: String(env.NODE_ENV || 'development').trim().toLowerCase(),
@@ -155,6 +182,14 @@ function loadConfig(env = process.env) {
     openrouterFallbackModel: String(env.OPENROUTER_FALLBACK_MODEL || '').trim(),
     openrouterReasoningEffort: String(env.OPENROUTER_REASONING_EFFORT || '').trim().toLowerCase(),
     openrouterReasoningExclude: parseBoolean(env.OPENROUTER_REASONING_EXCLUDE),
+    visionProvider: String(env.JARVIS_VISION_PROVIDER || 'disabled').trim().toLowerCase(),
+    visionBaseUrl: String(env.JARVIS_VISION_BASE_URL || 'https://openrouter.ai/api/v1').trim(),
+    visionApiKey: String(env.JARVIS_VISION_API_KEY || '').trim(),
+    visionModel: String(env.JARVIS_VISION_MODEL || '').trim(),
+    visionTimeoutMs: Number(env.JARVIS_VISION_TIMEOUT_MS || 60000),
+    visionMemoryPath: String(env.JARVIS_VISION_MEMORY_PATH || '/srv/jarvis/vision').trim(),
+    visionMemoryKey: String(env.JARVIS_VISION_MEMORY_KEY || '').trim(),
+    visionUserQuotaBytes: Number(env.JARVIS_VISION_USER_QUOTA_BYTES || (1024 * 1024 * 1024)),
     geminiApiKey: String(env.GEMINI_API_KEY || '').trim(),
     geminiModel: String(env.GEMINI_MODEL || '').trim(),
     documentStoragePath: String(env.JARVIS_DOCUMENT_STORAGE_PATH || '/srv/jarvis/documents').trim(),
@@ -196,6 +231,7 @@ function loadConfig(env = process.env) {
   validateConfiguredFallbacks(config);
   validateAsr(config);
   validateEmbeddings(config);
+  validateVision(config);
   if (config.operationsEnabled) {
     if (!config.operationsPublicOrigin) throw new Error('JARVIS_OPERATIONS_PUBLIC_ORIGIN is required when operations are enabled');
     const operationsUrl = new URL(config.operationsPublicOrigin);
@@ -216,4 +252,5 @@ module.exports = {
   validateConfiguredFallbacks,
   validateAsr,
   validateEmbeddings,
+  validateVision,
 };

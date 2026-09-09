@@ -28,7 +28,7 @@ class ScreenPrivacyGuard {
   isProtectedWindow(window = {}) {
     const processName = normalize(window.processName);
     const title = normalize(window.title);
-    return this.protectedApps.some((app) => processName === app || processName.includes(app))
+    return this.protectedApps.some((app) => processName === app || processName.includes(app) || title.includes(app))
       || this.protectedTitleFragments.some((fragment) => title.includes(fragment));
   }
 
@@ -77,4 +77,3 @@ module.exports = {
   ScreenPrivacyGuard,
   redactAccessibilityNodes,
 };
-

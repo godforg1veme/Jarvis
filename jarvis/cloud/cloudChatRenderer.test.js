@@ -29,6 +29,9 @@ function createRendererHarness(sendMessage) {
     'connection-dot', 'connection-label', 'device-label', 'mode-badge', 'chat-shell', 'messages',
     'message-form', 'message-input', 'send-button', 'voice-toggle', 'voice-button-label',
     'voice-title', 'voice-description', 'voice-state',
+    'vision-title', 'vision-indicator', 'vision-preview', 'vision-camera', 'vision-screens',
+    'vision-toggle', 'vision-stop', 'vision-state', 'vision-timer', 'vision-timeline-open',
+    'vision-timeline', 'vision-timeline-close', 'vision-memory-list', 'vision-memory-detail',
   ];
   const elements = Object.fromEntries(ids.map((id) => [id, new FakeElement(id)]));
   const cloud = {
@@ -46,6 +49,7 @@ function createRendererHarness(sendMessage) {
       getElementById: (id) => elements[id],
     },
     window: { jarvisCloud: cloud },
+    setInterval() { return 1; },
   });
   const source = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'cloud-chat', 'renderer.js'), 'utf8');
   vm.runInContext(source, context);

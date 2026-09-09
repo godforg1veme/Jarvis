@@ -20,11 +20,6 @@ const { buildTrayMenuTemplate } = require('./trayMenu');
 const { createTrayIcon } = require('./trayIcon');
 const { translateSelectedText } = require('./tools/selectedTextTranslator');
 const { getForegroundWindowHandle, sendCtrlCToSelection } = require('./tools/windowsSelectionCopy');
-const {
-  analyzeVisualArea,
-  continueVisualDialog,
-  clearVisualContext,
-} = require('./tools/screenVisionAnalyzer');
 const { DesktopAgentClient } = require('./agents/desktopAgentClient');
 const { appendTask, updateTask } = require('./agents/agentHistory');
 const {
@@ -37,6 +32,15 @@ const { FileCandidateVault } = require('./agents/fileCandidateVault');
 const { DesktopCloudClient } = require('./cloud/desktopCloudClient');
 const { createSecureCloudTransport } = require('./cloud/secureCloudTransport');
 const { CloudVoiceService } = require('./voice/cloudVoiceService');
+const { VisualSourceRegistry } = require('./vision/visualSourceRegistry');
+const { CameraCaptureController } = require('./vision/cameraCaptureController');
+const { ScreenCaptureController } = require('./vision/screenCaptureController');
+const { VisionTransport } = require('./vision/visionTransport');
+const { VisionRuntime } = require('./vision/visionRuntime');
+const { classifyVisualIntent } = require('./vision/visualIntent');
+const { ScreenPrivacyGuard } = require('./vision/screenPrivacyGuard');
+const { allowCaptureMedia } = require('./vision/mediaPermissionPolicy');
+const { registerVisionIpc } = require('./vision/visionIpc');
 
 if (process.platform === 'win32') {
   // Keep hidden renderer processes alive so microphone capture continues in the tray/background.
@@ -62,6 +66,8 @@ let appRecoveryService = null;
 let desktopCloudClient = null;
 let cloudVoiceService = null;
 let cloudTransport = null;
+let cameraCaptureController = null;
+let visionRuntime = null;
 const appSelectionTickets = new Map();
 const remoteFileCandidates = new FileCandidateVault();
 const HISTORY_PATH = path.join(__dirname, 'data', 'history.json');
@@ -300,23 +306,29 @@ async function handleTranslateSelected() {
 }
 
 async function handleVisualAnalyze(command) {
-  return await analyzeVisualArea(command, {
-    screen,
-    desktopCapturer,
-    nativeImage,
-    app,
-    logger: console,
-  });
+  if (!visionRuntime) return { ok: false, content: 'Контур зрения недоступен.' };
+  const intent = classifyVisualIntent(command);
+  if (visionRuntime.privacy.getState().state !== 'active') {
+    const sources = await visionRuntime.discover();
+    const start = await visionRuntime.start({
+      cameraSourceId: intent.target === 'screen' ? '' : (sources.cameras?.[0]?.sourceId || ''),
+      includeCamera: intent.target !== 'screen',
+      includeScreens: intent.target !== 'camera', kind: intent.kind || 'short',
+    });
+    if (!start.ok) return { ok: false, content: start.error };
+  }
+  const result = await visionRuntime.analyze({ prompt: command, target: intent.target || 'all' });
+  return { ...result, content: result.answer || result.error };
 }
 
 async function handleVisualContinue(command) {
-  return await continueVisualDialog(command, {
-    logger: console,
-  });
+  if (!visionRuntime) return { ok: false, content: 'Контур зрения недоступен.' };
+  const result = await visionRuntime.analyze({ prompt: command, target: classifyVisualIntent(command).target || 'all' });
+  return { ...result, content: result.answer || result.error };
 }
 
 function handleClearVisualContext() {
-  return clearVisualContext(console);
+  return visionRuntime ? visionRuntime.stop('context_cleared') : { ok: true };
 }
 
 async function handleFileCommand(args, confirmed = false) {
@@ -894,6 +906,10 @@ function shutdownApp() {
     cloudVoiceService.shutdown();
     cloudVoiceService = null;
   }
+  if (visionRuntime) {
+    void visionRuntime.close().catch(() => {});
+    visionRuntime = null;
+  }
   if (desktopCloudClient) {
     desktopCloudClient.stopSession();
     desktopCloudClient = null;
@@ -950,18 +966,28 @@ app.whenReady().then(() => {
   const startHidden = process.argv.includes('--hidden');
 
   // --- Permission handler for microphone ---
-  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details = {}) => {
     if (permission === 'media') {
       const captureWindow = cloudVoiceService && cloudVoiceService.audioCaptureWindow;
-      return callback(Boolean(captureWindow && !captureWindow.isDestroyed() && webContents.id === captureWindow.webContents.id));
+      const visionWindow = cameraCaptureController && cameraCaptureController.window;
+      return callback(allowCaptureMedia({
+        requestingWebContentsId: webContents.id, permission, mediaTypes: details.mediaTypes,
+        voiceWebContentsId: captureWindow && !captureWindow.isDestroyed() ? captureWindow.webContents.id : null,
+        visionWebContentsId: visionWindow && !visionWindow.isDestroyed() ? visionWindow.webContents.id : null,
+      }));
     }
     return callback(false);
   });
 
-  session.defaultSession.setPermissionCheckHandler((webContents, permission) => {
+  session.defaultSession.setPermissionCheckHandler((webContents, permission, _origin, details = {}) => {
     if (permission === 'media') {
       const captureWindow = cloudVoiceService && cloudVoiceService.audioCaptureWindow;
-      return Boolean(captureWindow && !captureWindow.isDestroyed() && webContents.id === captureWindow.webContents.id);
+      const visionWindow = cameraCaptureController && cameraCaptureController.window;
+      return allowCaptureMedia({
+        requestingWebContentsId: webContents.id, permission, mediaTypes: details.mediaTypes,
+        voiceWebContentsId: captureWindow && !captureWindow.isDestroyed() ? captureWindow.webContents.id : null,
+        visionWebContentsId: visionWindow && !visionWindow.isDestroyed() ? visionWindow.webContents.id : null,
+      });
     }
     return false;
   });
@@ -986,6 +1012,14 @@ app.whenReady().then(() => {
       const isSearch = request?.action === 'file.search';
       broadcastCoreMode(isSearch ? 'scanner' : 'vortex', { action: request?.action });
       try {
+        if (request?.action === 'vision.capture') {
+          if (!visionRuntime || visionRuntime.privacy.getState().state !== 'active') {
+            return { ok: false, action: 'vision.capture', errorCode: 'VISION_LOCAL_LEASE_REQUIRED', error: 'A local Vision Lease is required.' };
+          }
+          const visual = await visionRuntime.analyze({ prompt: request.args.prompt, target: request.args.target, origin: 'remote' });
+          if (!visual.ok) return { ok: false, action: 'vision.capture', errorCode: visual.code || 'VISION_CAPTURE_FAILED', error: visual.error };
+          return { ok: true, action: 'vision.capture', answer: visual.answer };
+        }
         const result = await executeToolRequest(request, {
           shell,
           workArea: screen.getPrimaryDisplay().workArea,
@@ -1007,6 +1041,9 @@ app.whenReady().then(() => {
     },
     onState: (state) => {
       sendCloudEvent('cloud:state', state);
+      if (visionRuntime && visionRuntime.privacy.getState().state === 'active' && state.connection !== 'online') {
+        void visionRuntime.stop('connection_lost');
+      }
       updateTrayMenu();
     },
     onWorkflowUpdate: (update) => {
@@ -1032,6 +1069,24 @@ app.whenReady().then(() => {
   });
   cloudVoiceService = new CloudVoiceService({
     cloudClient: desktopCloudClient,
+    onTranscript: async (transcript) => {
+      const intent = classifyVisualIntent(transcript);
+      if (!intent.visual) return desktopCloudClient.sendText(transcript);
+      if (visionRuntime && visionRuntime.privacy.getState().state !== 'active') {
+        const sources = await visionRuntime.discover();
+        const started = await visionRuntime.start({
+          cameraSourceId: intent.target === 'screen' ? '' : (sources.cameras?.[0]?.sourceId || ''),
+          includeCamera: intent.target !== 'screen',
+          includeScreens: intent.target !== 'camera', kind: intent.kind,
+        });
+        if (!started.ok) return { answer: started.error };
+      }
+      const result = await visionRuntime.analyze({ prompt: transcript, target: intent.target });
+      if (result.retentionConsentSources?.length) {
+        sendCloudEvent('vision:sensitive-consent-required', { sourceIds: result.retentionConsentSources });
+      }
+      return { answer: result.answer || result.error || 'Не удалось проанализировать изображение.' };
+    },
     onStatus: (status) => {
       sendCloudEvent('cloud:voice-status', status);
       updateTrayMenu();
@@ -1043,6 +1098,16 @@ app.whenReady().then(() => {
         broadcastCoreMode('speech', { text: response.answer, duration });
       }
     },
+  });
+  const visualSourceRegistry = new VisualSourceRegistry();
+  cameraCaptureController = new CameraCaptureController({ BrowserWindow, ipcMain, sourceRegistry: visualSourceRegistry });
+  visionRuntime = new VisionRuntime({
+    sourceRegistry: visualSourceRegistry,
+    camera: cameraCaptureController,
+    screenCapture: new ScreenCaptureController({ desktopCapturer, screen, nativeImage, sourceRegistry: visualSourceRegistry, privacyGuard: new ScreenPrivacyGuard(), composeWorkspace: (frames, options) => cameraCaptureController.composeWorkspace(frames, options) }),
+    transport: new VisionTransport({ cloudClient: desktopCloudClient }),
+    getDeviceState: () => desktopCloudClient ? desktopCloudClient.getState() : { paired: false },
+    emitState: (state) => sendCloudEvent('vision:state', state),
   });
 
   // --- Create cloud chat window (always, but hidden if --hidden) ---
@@ -1140,6 +1205,7 @@ app.whenReady().then(() => {
     if (!isTrustedMainRenderer(event) || !desktopCloudClient) return { ok: false, error: 'Access denied.' };
     try { return await desktopCloudClient.rejectRemoteCommand(input.commandId); } catch (_) { return { ok: false, error: 'Не удалось отменить команду.' }; }
   });
+  registerVisionIpc({ ipcMain, isTrustedRenderer: isTrustedMainRenderer, getRuntime: () => visionRuntime });
   ipcMain.handle('voice-lab:open', (event) => {
     if (!isTrustedMainRenderer(event) || !voiceLabController) return { ok: false, error: 'Voice Lab unavailable in cloud mode.' };
     openVoiceLab();
@@ -1490,6 +1556,10 @@ app.on('before-quit', () => {
   if (cloudVoiceService) {
     cloudVoiceService.shutdown();
     cloudVoiceService = null;
+  }
+  if (visionRuntime) {
+    void visionRuntime.close().catch(() => {});
+    visionRuntime = null;
   }
   if (desktopCloudClient) {
     desktopCloudClient.stopSession();
