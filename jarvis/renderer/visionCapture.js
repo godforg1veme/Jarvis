@@ -1,5 +1,6 @@
 const video = document.getElementById('camera');
 const canvas = document.getElementById('frame');
+const signatureCanvas = document.getElementById('signature');
 let stream = null;
 
 function stopTracks() {
@@ -57,6 +58,13 @@ async function captureFrame(args = {}) {
   canvas.height = height;
   const context = canvas.getContext('2d', { alpha: false });
   context.drawImage(video, 0, 0, width, height);
+  const signatureContext = signatureCanvas.getContext('2d', { alpha: false, willReadFrequently: true });
+  signatureContext.drawImage(video, 0, 0, signatureCanvas.width, signatureCanvas.height);
+  const rgba = signatureContext.getImageData(0, 0, signatureCanvas.width, signatureCanvas.height).data;
+  const signature = new Uint8Array(signatureCanvas.width * signatureCanvas.height);
+  for (let source = 0, target = 0; source < rgba.length; source += 4, target += 1) {
+    signature[target] = Math.round(rgba[source] * 0.299 + rgba[source + 1] * 0.587 + rgba[source + 2] * 0.114);
+  }
   const blob = await canvasBlob('image/jpeg', Number(args.quality));
   const bytes = new Uint8Array(await blob.arrayBuffer());
   return {
@@ -65,6 +73,7 @@ async function captureFrame(args = {}) {
     width,
     height,
     capturedAt: new Date().toISOString(),
+    signature,
   };
 }
 
@@ -91,4 +100,3 @@ async function handleCommand(payload) {
 
 window.jarvisVisionCapture.onCommand(handleCommand);
 window.addEventListener('beforeunload', stopTracks);
-

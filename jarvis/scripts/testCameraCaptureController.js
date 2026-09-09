@@ -79,10 +79,12 @@ function reply(result, ok = true) {
     width: 1280,
     height: 720,
     capturedAt: '2026-09-09T12:00:00.000Z',
+    signature: new Uint8Array(64).fill(100),
   });
   const frame = await capturePromise;
   assert.strictEqual(frame.bytes.length, 4);
   assert.strictEqual(frame.sourceId, 'source-camo');
+  assert.strictEqual(frame.signature.length, 64);
 
   const stopPromise = controller.stop();
   reply({ stopped: true });
@@ -101,4 +103,3 @@ function reply(result, ok = true) {
   console.error(error);
   process.exitCode = 1;
 });
-

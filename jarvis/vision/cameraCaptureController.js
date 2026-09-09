@@ -137,6 +137,10 @@ class CameraCaptureController {
     const bytes = Buffer.isBuffer(result.bytes) ? result.bytes : Buffer.from(result.bytes || []);
     if (!bytes.length || bytes.length > MAX_FRAME_BYTES) throw new Error('camera frame bytes are invalid');
     if (String(result.contentType || '') !== 'image/jpeg') throw new Error('camera frame content type is invalid');
+    const signature = result.signature instanceof Uint8Array
+      ? result.signature
+      : Uint8Array.from(result.signature || []);
+    if (signature.length < 64 || signature.length > 16384) throw new Error('camera frame signature is invalid');
     return {
       sourceId: this.activeSourceId,
       bytes,
@@ -144,6 +148,7 @@ class CameraCaptureController {
       width: Number(result.width || 0),
       height: Number(result.height || 0),
       capturedAt: String(result.capturedAt || ''),
+      signature,
     };
   }
 
@@ -175,4 +180,3 @@ module.exports = {
   CameraCaptureController,
   boundedCaptureOptions,
 };
-
