@@ -55,3 +55,14 @@ cache is retained in its private named volume to permit a reproducible later
 comparison. Do not enable either Qwen checkpoint for normal Desktop voice
 traffic on this CPU-only VPS; measure Faster Whisper Medium INT8 next if a
 server-side ASR provider is still required.
+
+## Faster Whisper comparison protocol
+
+The next isolated check uses `faster-whisper==1.2.1` with
+`Systran/faster-whisper-medium`, `device=cpu`, `compute_type=int8`, and four
+OpenMP threads. The process is separate from Docker Compose, has no network
+listener, and does not change the Jarvis ASR configuration. It measures model
+load time and warm transcription latency with the same short public audio
+probe used for Qwen. This is a CPU-latency comparison only: Russian command
+accuracy requires a separate, owner-approved corpus of real recordings before
+any provider can be enabled.
