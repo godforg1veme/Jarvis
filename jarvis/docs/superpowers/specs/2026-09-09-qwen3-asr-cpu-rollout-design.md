@@ -126,8 +126,27 @@ noise, and normal control-plane load.
 ## GigaAM v3 Russian-variant comparison
 
 The owner requested every current Russian v3 ASR variant, excluding the
-multilingual line and legacy v1/v2 lines. `v3_ctc` is already measured above.
-The remaining `v3_rnnt`, `v3_e2e_ctc`, and `v3_e2e_rnnt` will each use the same
-isolated, four-core, official ONNX CPU procedure and public 11.290-second
-Russian audio. Each report records initial checkpoint/ONNX preparation and two
-warm runs. No variant is attached to Jarvis during this comparison.
+multilingual line and legacy v1/v2 lines. On 2026-09-10, all four were run with
+the same isolated, four-core, official ONNX Runtime CPU procedure and public
+11.290-second Russian audio. No variant was attached to Jarvis.
+
+| Variant | Two warm runs | First-load / ONNX export | Output on this public sample |
+| --- | ---: | ---: | --- |
+| `v3_ctc` | 1.380 / 1.277 s | 9.289 / 17.106 s | Raw lower-case transcript without punctuation |
+| `v3_rnnt` | 1.856 / 1.770 s | 8.703 / 11.135 s | Raw lower-case transcript without punctuation |
+| `v3_e2e_ctc` | 1.297 / 1.406 s | 14.706 / 10.988 s | Casing, punctuation, normalization and `ё` present |
+| `v3_e2e_rnnt` | 1.519 / 1.995 s | 9.834 / 9.622 s | Casing, punctuation, normalization and `ё` present |
+
+`v3_e2e_ctc` is effectively as fast as raw `v3_ctc` on this host while
+producing a user-ready transcript, so it is the leading Russian-only candidate
+for the next acceptance test. `v3_rnnt` is roughly 38 percent slower than
+`v3_ctc` on its faster run; the end-to-end RNNT result is also slower and more
+variable than end-to-end CTC here.
+
+Every reported peak RSS (4.12--4.16 GiB) is for the temporary export process,
+which simultaneously holds the PyTorch checkpoint and ONNX Runtime session. It
+is not the memory requirement of an ONNX-only service. The shared public vendor
+sample demonstrates speed and formatting only, not comparative recognition
+quality. Before enabling a provider, measure an ONNX-only `v3_e2e_ctc` worker
+on owner-approved short commands, names, noise, two queued requests, and normal
+control-plane load.
