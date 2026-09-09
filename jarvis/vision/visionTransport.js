@@ -18,13 +18,13 @@ class VisionTransport {
     return result.request;
   }
 
-  async uploadFrame(leaseId, metadata, bytes) {
+  async uploadFrame(leaseId, metadata, bytes, options = {}) {
     const image = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes || []);
     const validated = validateVisionFrameMetadata(metadata);
     if (validated.leaseId !== leaseId || validated.byteLength !== image.length || image.length > MAX_FRAME_BYTES) {
       throw new Error('vision frame upload is invalid');
     }
-    const result = await this.cloudClient.sendVisionFrame(leaseId, validated, image);
+    const result = await this.cloudClient.sendVisionFrame(leaseId, validated, image, options);
     return { observation: validateVisionObservation(result.observation), memory: result.memory || null };
   }
 

@@ -47,7 +47,7 @@ function publicMemoryRecord(record) {
   };
 }
 
-function registerVisionRoutes(app, { authenticate, leaseStore, provider, limiter, memoryService = null }) {
+function registerVisionRoutes(app, { authenticate, leaseStore, provider, limiter, memoryService = null, sceneStore = null }) {
   app.addContentTypeParser([...IMAGE_TYPES], { parseAs: 'buffer' }, (request, body, done) => done(null, body));
   const requireDevice = async (request) => { request.device = await authenticate(request.headers); };
 
@@ -76,13 +76,19 @@ function registerVisionRoutes(app, { authenticate, leaseStore, provider, limiter
     limiter.check(`vision-frame-device:${request.device.id}`, { limit: 30, windowMs: 60_000 });
     limiter.check(`vision-frame-lease:${metadata.leaseId}`, { limit: 120, windowMs: 60_000 });
     const accepted = leaseStore.acceptFrame({ leaseId: request.params.leaseId, device: request.device, metadata });
-    const observation = await provider.observe({ image: request.body, metadata, prompt: accepted.request.prompt });
+    const priorScene = sceneStore ? sceneStore.contextFor({
+      ownerId: request.device.user_id, deviceId: request.device.id, sourceId: metadata.sourceId,
+    }) : null;
+    const observation = await provider.observe({ image: request.body, metadata, prompt: accepted.request.prompt, priorScene });
+    const sceneState = sceneStore ? sceneStore.update({
+      ownerId: request.device.user_id, deviceId: request.device.id, observation,
+    }) : null;
     const memory = memoryService ? await memoryService.store({
       userId: request.device.user_id, deviceId: request.device.id, leaseId: metadata.leaseId,
       image: request.body, metadata, observation,
       sensitiveConsent: leaseStore.getSensitiveConsent(accepted.lease, metadata.sourceId),
     }) : null;
-    return { ok: true, observation, ...(memory ? { memory } : {}) };
+    return { ok: true, observation, ...(sceneState ? { sceneState } : {}), ...(memory ? { memory } : {}) };
   });
 
   app.delete('/v1/vision/leases/:leaseId', { preHandler: requireDevice }, async (request) => ({

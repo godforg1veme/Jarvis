@@ -594,6 +594,7 @@ function updateTrayMenu() {
 
   const contextMenu = Menu.buildFromTemplate(buildTrayMenuTemplate({
     isMicOn,
+    visionActive: Boolean(visionRuntime && visionRuntime.privacy.getState().state === 'active'),
     showHologramWidget,
     showTranscriptionBar,
     onToggleMic: () => {
@@ -608,6 +609,9 @@ function updateTrayMenu() {
     },
     onToggleTranscriptionBar: (checked) => {
       toggleTranscriptionBar(checked);
+    },
+    onStopVision: () => {
+      if (visionRuntime) void visionRuntime.stop('tray_stop').finally(updateTrayMenu);
     },
     onQuit: () => shutdownApp(),
   }));
@@ -1107,7 +1111,8 @@ app.whenReady().then(() => {
     screenCapture: new ScreenCaptureController({ desktopCapturer, screen, nativeImage, sourceRegistry: visualSourceRegistry, privacyGuard: new ScreenPrivacyGuard(), composeWorkspace: (frames, options) => cameraCaptureController.composeWorkspace(frames, options) }),
     transport: new VisionTransport({ cloudClient: desktopCloudClient }),
     getDeviceState: () => desktopCloudClient ? desktopCloudClient.getState() : { paired: false },
-    emitState: (state) => sendCloudEvent('vision:state', state),
+    emitState: (state) => { sendCloudEvent('vision:state', state); updateTrayMenu(); },
+    emitSensitiveConsentRequired: (payload) => sendCloudEvent('vision:sensitive-consent-required', payload),
   });
 
   // --- Create cloud chat window (always, but hidden if --hidden) ---

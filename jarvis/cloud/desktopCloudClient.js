@@ -275,7 +275,7 @@ class DesktopCloudClient {
     });
   }
 
-  async sendVisionFrame(leaseId, metadata, image) {
+  async sendVisionFrame(leaseId, metadata, image, options = {}) {
     const payload = Buffer.isBuffer(image) ? image : Buffer.from(image || []);
     return this._request(`/v1/vision/leases/${encodeURIComponent(String(leaseId || ''))}/frames`, {
       method: 'POST',
@@ -284,6 +284,7 @@ class DesktopCloudClient {
         'X-Jarvis-Vision-Metadata': Buffer.from(JSON.stringify(metadata), 'utf8').toString('base64url'),
       },
       body: payload,
+      ...(options.signal ? { signal: options.signal } : {}),
     });
   }
 

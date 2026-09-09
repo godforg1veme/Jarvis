@@ -93,10 +93,19 @@ function renderState(nextState) {
   if (!paired && !elements.serverUrl.value && state.defaultServerUrl) elements.serverUrl.value = state.defaultServerUrl;
 }
 
-function elapsedText(startedAt) {
-  if (!startedAt) return '00:00';
-  const seconds = Math.max(0, Math.floor((Date.now() - Date.parse(startedAt)) / 1000));
+function remainingText(snapshot) {
+  const expiries = [snapshot.idleExpiresAt, snapshot.hardExpiresAt]
+    .map((value) => Date.parse(value)).filter(Number.isFinite);
+  if (!expiries.length) return '00:00';
+  const seconds = Math.max(0, Math.ceil((Math.min(...expiries) - Date.now()) / 1000));
   return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
+function activeVisionSources(snapshot) {
+  const active = (snapshot.sources || []).filter((source) => source.active);
+  const hasCamera = active.some((source) => source.type === 'camera');
+  const hasWorkspace = active.some((source) => source.type === 'screen_workspace');
+  return [hasCamera ? 'камера' : '', hasWorkspace ? 'оба монитора' : ''].filter(Boolean).join(' + ') || 'источник';
 }
 
 function renderVision(next = {}) {
@@ -109,9 +118,13 @@ function renderVision(next = {}) {
   elements.visionStop.disabled = !active && !visionBusy;
   elements.visionCamera.disabled = !state.paired || active || visionBusy;
   elements.visionScreens.disabled = !state.paired || active || visionBusy;
+  const recentRemote = visionState.lastRemoteUseAt && Date.now() - Date.parse(visionState.lastRemoteUseAt) < 10_000;
   elements.visionState.textContent = visionBusy ? 'Отправляю выбранные кадры в облачный контур зрения…'
-    : active ? 'Источник активен. STOP немедленно закрывает камеру.' : 'Камера и экраны физически закрыты';
-  elements.visionTimer.textContent = `${elapsedText(visionState.startedAt)} · ${active ? 'LIVE' : 'OFF'}`;
+    : visionState.lastTemporalError === 'VISION_PRIVACY_PAUSED' ? 'Vision приостановлен: на экране защищённое приложение.'
+    : recentRemote ? `Удалённый запрос использует активное зрение: ${activeVisionSources(visionState)}.`
+    : active ? `Активно: ${activeVisionSources(visionState)}. STOP немедленно закрывает камеру.`
+    : 'Камера и экраны физически закрыты';
+  elements.visionTimer.textContent = `${active ? remainingText(visionState) : '00:00'} · ${active ? 'ОСТАЛОСЬ' : 'OFF'}`;
   if (visionState.preview?.dataUrl) {
     const image = document.createElement('img');
     image.src = visionState.preview.dataUrl;

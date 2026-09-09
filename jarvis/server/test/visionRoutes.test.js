@@ -5,6 +5,7 @@ const { loadConfig } = require('../src/config/loadConfig');
 const { FixedWindowRateLimiter } = require('../src/http/rateLimiter');
 const { VisionLeaseStore } = require('../src/vision/visionLeaseStore');
 const { FakeVisionProvider } = require('../src/vision/visionProvider');
+const { SceneStateStore } = require('../src/vision/sceneState');
 const { publicMemoryRecord, registerVisionRoutes } = require('../src/vision/visionRoutes');
 
 function appFixture() {
@@ -14,7 +15,7 @@ function appFixture() {
       if (headers.authorization !== 'Bearer valid') { const e = new Error(); e.statusCode = 401; e.publicCode = 'DEVICE_AUTH_REQUIRED'; throw e; }
       return { id: 'device-a', user_id: 'owner-a' };
     },
-    leaseStore: new VisionLeaseStore(), provider: new FakeVisionProvider(), limiter: new FixedWindowRateLimiter(),
+    leaseStore: new VisionLeaseStore(), provider: new FakeVisionProvider(), limiter: new FixedWindowRateLimiter(), sceneStore: new SceneStateStore(),
   });
   return app;
 }
@@ -37,6 +38,7 @@ test('vision route requires auth and accepts one correlated valid JPEG', async (
   const accepted = await app.inject({ method: 'POST', url: `/v1/vision/leases/${lease.leaseId}/frames`, headers, payload: image });
   assert.equal(accepted.statusCode, 200);
   assert.equal(accepted.json().observation.frameId, 'frame-a');
+  assert.equal(accepted.json().sceneState.historyCount, 1);
   const replay = await app.inject({ method: 'POST', url: `/v1/vision/leases/${lease.leaseId}/frames`, headers, payload: image });
   assert.equal(replay.statusCode, 409);
   assert.equal(replay.json().code, 'VISION_CAPTURE_REPLAY');

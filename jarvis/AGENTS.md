@@ -17,7 +17,8 @@ Jarvis is a hybrid personal and family AI-assistant platform:
 - PWA and server ASR remain planned or in progress. The first camera/screen
   Vision vertical slice is implemented locally and in the control plane: explicit
   local leases, Camo-compatible camera discovery, a two-display workspace,
-  provider-neutral analysis, encrypted owner-scoped visual memory, and remote
+  change-filtered temporal sampling, bounded Scene State, provider-neutral
+  analysis, encrypted owner-scoped visual memory, and remote
   observation through an already active lease. Real two-display capture is
   verified; live Camo and deployed-provider acceptance remain unfinished. Semantic
   retrieval and the confirmed remote-command path are implemented. Production
@@ -200,8 +201,11 @@ node scripts/testVisionTransport.js
 node scripts/testVisionRuntime.js
 node scripts/testVisionIpc.js
 node scripts/testVisionMediaPermission.js
+node scripts/testObjectReconciler.js
+node scripts/testSceneState.js
 npx electron scripts/probeVisionHardware.js
 node scripts/testVisionRendererBrowser.cjs
+node scripts/testVisionCaptureRendererBrowser.cjs
 node --test cloud/*.test.js voice/cloudVoiceService.test.js tts/windowsSapiService.test.js
 npm run dist:win
 python scripts/testFasterWhisperQuality.py

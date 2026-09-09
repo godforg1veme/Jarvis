@@ -2,9 +2,11 @@ function buildTrayMenuTemplate({
   isMicOn,
   showHologramWidget,
   showTranscriptionBar,
+  visionActive,
   onToggleMic,
   onToggleHologramWidget,
   onToggleTranscriptionBar,
+  onStopVision,
   onQuit
 }) {
   return [
@@ -23,6 +25,11 @@ function buildTrayMenuTemplate({
       type: "checkbox",
       checked: showTranscriptionBar,
       click: (item) => onToggleTranscriptionBar(item.checked),
+    },
+    {
+      label: visionActive ? "Зрение активно — STOP" : "Зрение выключено",
+      enabled: visionActive === true,
+      click: onStopVision,
     },
     { type: "separator" },
     {

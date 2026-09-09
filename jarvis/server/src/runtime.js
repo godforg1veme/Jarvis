@@ -46,6 +46,7 @@ const { registerVisionRoutes } = require('./vision/visionRoutes');
 const { VisualMemoryStorage } = require('./vision/visualMemoryStorage');
 const { VisualMemoryRepository } = require('./vision/visualMemoryRepository');
 const { VisualMemoryService, VisualMemoryWorker } = require('./vision/visualMemoryService');
+const { SceneStateStore } = require('./vision/sceneState');
 
 async function createRuntime(config, overrides = {}) {
   let pool = overrides.pool || null;
@@ -203,6 +204,7 @@ async function createRuntime(config, overrides = {}) {
         }),
         limiter: overrides.visionRateLimiter || desktopRateLimiter,
         memoryService: visualMemoryService,
+        sceneStore: overrides.visionSceneStore || new SceneStateStore(),
       });
     }
     if (typeof app.register === 'function' && typeof app.get === 'function') {

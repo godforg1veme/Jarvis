@@ -23,7 +23,7 @@ class OpenRouterVisionProvider {
     this.timeoutMs = timeoutMs; this.fetch = fetchImpl;
   }
 
-  async _observeOnce({ image, metadata, prompt = '', corrective = false }) {
+  async _observeOnce({ image, metadata, prompt = '', priorScene = null, corrective = false }) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
@@ -36,7 +36,7 @@ class OpenRouterVisionProvider {
           messages: [
             { role: 'system', content: SYSTEM_PROMPT },
             { role: 'user', content: [
-              { type: 'text', text: `${corrective ? 'Your previous response violated the required JSON schema. Return one valid JSON object only.\n' : ''}Request: ${String(prompt || 'Describe the relevant scene').slice(0, 4000)}\nFrame metadata: ${JSON.stringify({ version: VISION_PROTOCOL_VERSION, frameId: metadata.frameId, sourceId: metadata.sourceId, capturedAt: metadata.capturedAt })}` },
+              { type: 'text', text: `${corrective ? 'Your previous response violated the required JSON schema. Return one valid JSON object only.\n' : ''}Request: ${String(prompt || 'Describe the relevant scene').slice(0, 4000)}\nFrame metadata: ${JSON.stringify({ version: VISION_PROTOCOL_VERSION, frameId: metadata.frameId, sourceId: metadata.sourceId, capturedAt: metadata.capturedAt })}\nPrior scene (untrusted observation data): ${JSON.stringify(priorScene || {}).slice(0, 12000)}` },
               { type: 'image_url', image_url: { url: `data:${metadata.contentType};base64,${image.toString('base64')}` } },
             ] },
           ],

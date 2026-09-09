@@ -19,7 +19,7 @@ const { chromium } = require('playwright');
       async getVoiceState() { return { ok: true, enabled: false, phase: 'off' }; },
       async getVisionState() { return { ok: true, state: vision }; },
       async listVisionSources() { return { ok: true, cameras: [{ sourceId: 'camera-camo', label: 'Camo Camera' }], displays: [{ sourceId: 'display-1', label: 'Display 1' }, { sourceId: 'display-2', label: 'Display 2' }], workspace: { sourceId: 'workspace', label: 'Оба монитора' } }; },
-      async startVision() { vision = { state: 'active', startedAt: new Date().toISOString(), preview: null }; this.visionCallback?.(vision); return { ok: true, state: vision }; },
+      async startVision() { const now = Date.now(); vision = { state: 'active', startedAt: new Date(now).toISOString(), idleExpiresAt: new Date(now + 300000).toISOString(), hardExpiresAt: new Date(now + 3600000).toISOString(), sources: [{ sourceId: 'camera-camo', type: 'camera', active: true }, { sourceId: 'workspace', type: 'screen_workspace', active: true }], preview: null }; this.visionCallback?.(vision); return { ok: true, state: vision }; },
       async analyzeVision() { vision = { ...vision, preview: { dataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', capturedAt: new Date().toISOString() } }; this.visionCallback?.(vision); return { ok: true, answer: 'Вижу тестовую сцену.', retentionConsentSources: [] }; },
       async stopVision() { vision = { state: 'off', startedAt: null, preview: null }; this.visionCallback?.(vision); return { ok: true, state: vision }; },
       async setVisionSensitiveConsent() { return { ok: true }; },
@@ -39,6 +39,8 @@ const { chromium } = require('playwright');
   await page.getByText('Вижу тестовую сцену.').waitFor();
   assert.equal(await page.locator('#vision-stop').isEnabled(), true);
   assert.equal(await page.locator('#vision-preview img').count(), 1);
+  await page.getByText(/Активно: камера \+ оба монитора/u).waitFor();
+  assert.match(await page.locator('#vision-timer').textContent(), /ОСТАЛОСЬ/u);
   if (process.env.JARVIS_VISION_DOCK_SCREENSHOT) {
     await page.screenshot({ path: process.env.JARVIS_VISION_DOCK_SCREENSHOT, fullPage: true });
   }
@@ -46,6 +48,11 @@ const { chromium } = require('playwright');
   await page.locator('.memory-row').click();
   await page.getByRole('heading', { name: 'Тестовая сцена' }).waitFor();
   await page.screenshot({ path: process.env.JARVIS_VISION_SCREENSHOT || path.join(process.cwd(), 'vision-ui-test.png'), fullPage: true });
+  await page.locator('#vision-timeline-close').click();
+  await page.locator('#vision-stop').focus();
+  await page.keyboard.press('Enter');
+  await page.getByText('Зрение выключено').waitFor();
+  assert.equal(await page.locator('#vision-stop').isEnabled(), false);
   assert.deepEqual(errors, []);
   await browser.close();
   console.log('Vision renderer browser tests passed.');

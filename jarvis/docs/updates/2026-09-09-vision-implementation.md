@@ -12,16 +12,23 @@ and `docs/superpowers/plans/2026-09-09-jarvis-vision.md`.
 - Standard Electron `videoinput` capture with user-triggered permission and Camo
   preference, limited to one active camera.
 - Both Windows displays captured and composed into one bounded JPEG workspace.
+- Active leases sample locally, reserve upload capacity for focused questions,
+  discard unchanged/mid-motion candidates, submit stable changes and a bounded
+  heartbeat, and cancel an in-flight upload across the STOP boundary.
 - Authenticated owner/device-bound lease and capture-request routes, one-use
   correlations, sequence replay protection, MIME/magic/size checks, rate limits,
   and a provider-neutral observation schema.
 - OpenRouter-compatible vision adapter with a fake provider for deterministic
   tests, response bounds, timeout, schema validation, and one corrective retry.
+- Ephemeral owner/device/source-scoped Scene State keeps a bounded observation
+  ring, freshness, and conservative session-stable object identities; only a
+  compact prior scene is returned to the perception provider as untrusted data.
 - AES-256-GCM visual memory with opaque blob keys, owner-scoped metadata,
   blind exact-match tokens, 90-day retention, 30-minute sensitive-consent
   staging, pin/correct/delete controls, quotas, and retryable physical cleanup.
 - Perception Dock and visual Timeline beside the Quantum Core; text and voice
-  visual requests share one router, and voice speaks only the final answer.
+  visual requests share one router, voice speaks only the final answer, and the
+  tray exposes authoritative active state plus hard STOP.
 - Safe `vision.capture` remote action. A remote client can use an already active
   local owner lease, but cannot start, add, or extend camera/screen access.
 
@@ -37,6 +44,9 @@ and `docs/superpowers/plans/2026-09-09-jarvis-vision.md`.
 
 ## Acceptance still required
 
+- Accessibility-grounded Windows UI actions from Phase 7 are not part of this
+  camera/perception slice yet. Existing declared file/app/window actions remain
+  available, but Vision does not convert pixels into arbitrary clicks.
 - Camo Studio was not publishing a `videoinput` device during the hardware probe,
   so a real phone/Camo frame has not yet been accepted. Start Camo Studio, connect
   the phone, and run `npx electron scripts/probeVisionHardware.js` again.
