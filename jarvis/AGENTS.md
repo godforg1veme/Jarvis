@@ -20,7 +20,8 @@ Jarvis is a hybrid personal and family AI-assistant platform:
   change-filtered temporal sampling, bounded Scene State, provider-neutral
   analysis, encrypted owner-scoped visual memory, and remote
   observation through an already active lease. Real two-display capture is
-  verified; live Camo and deployed-provider acceptance remain unfinished. Semantic
+  verified, including a live Camo 1280x720 frame on 2026-09-09; deployed-provider
+  acceptance remains unfinished. Semantic
   retrieval and the confirmed remote-command path are implemented. Production
   embeddings and single-device Desktop/Telegram-origin confirmation were
   verified live on 2026-09-02; live multi-device acceptance remains unfinished.

@@ -4,8 +4,8 @@ Date: 2026-09-09
 
 Status: Release 1 perception/memory vertical slice through Scene State and
 temporal sampling implemented and locally verified on 2026-09-09. Accessibility-
-grounded visual actions, companion/overlay polish, live Camo, and deployed
-end-to-end acceptance remain pending; see
+grounded visual actions, companion/overlay polish, and deployed end-to-end
+acceptance remain pending. Live Camo acceptance passed on 2026-09-09; see
 `../../updates/2026-09-09-vision-implementation.md`. This plan implements Release 1 of
 `../specs/2026-09-09-jarvis-vision-design.md`. Vision Watches and later realtime
 features remain separate projects.

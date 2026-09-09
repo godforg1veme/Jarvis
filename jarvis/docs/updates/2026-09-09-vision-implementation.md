@@ -42,14 +42,20 @@ and `docs/superpowers/plans/2026-09-09-jarvis-vision.md`.
 - Permission tests confirm the voice renderer receives audio only and the hidden
   Vision renderer receives video only.
 
+## Live hardware acceptance
+
+- Live Camo acceptance passed on 2026-09-09: Electron enumerated Camo and captured
+  a 1280x720 JPEG frame while the same run composed both real displays into a
+  1448x435 workspace. The acceptance uncovered and fixed an Electron 42 permission
+  contract mismatch (`mediaType` for checks versus `mediaTypes` for requests).
+  To repeat the acceptance, start Camo Studio, connect
+  the phone, and run `npx electron scripts/probeVisionHardware.js` again.
+
 ## Acceptance still required
 
 - Accessibility-grounded Windows UI actions from Phase 7 are not part of this
   camera/perception slice yet. Existing declared file/app/window actions remain
   available, but Vision does not convert pixels into arbitrary clicks.
-- Camo Studio was not publishing a `videoinput` device during the hardware probe,
-  so a real phone/Camo frame has not yet been accepted. Start Camo Studio, connect
-  the phone, and run `npx electron scripts/probeVisionHardware.js` again.
 - The local environment has no configured Vision model or visual-memory key.
   Migration, provider configuration, and a live non-sensitive OpenRouter request
   must be verified during VPS rollout without printing secrets.

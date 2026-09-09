@@ -17,12 +17,14 @@ const report = {};
   const camera = new CameraCaptureController({ BrowserWindow, ipcMain, sourceRegistry: registry });
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details = {}) => {
     callback(allowCaptureMedia({
-      requestingWebContentsId: webContents.id, permission, mediaTypes: details.mediaTypes,
+      requestingWebContentsId: webContents?.id, permission, mediaTypes: details.mediaTypes,
+      mediaType: details.mediaType,
       visionWebContentsId: camera.window && !camera.window.isDestroyed() ? camera.window.webContents.id : null,
     }));
   });
   session.defaultSession.setPermissionCheckHandler((webContents, permission, _origin, details = {}) => allowCaptureMedia({
-    requestingWebContentsId: webContents.id, permission, mediaTypes: details.mediaTypes,
+    requestingWebContentsId: webContents?.id, permission, mediaTypes: details.mediaTypes,
+    mediaType: details.mediaType,
     visionWebContentsId: camera.window && !camera.window.isDestroyed() ? camera.window.webContents.id : null,
   }));
   const screens = new ScreenCaptureController({ desktopCapturer, screen, nativeImage, sourceRegistry: registry, composeWorkspace: (frames, options) => camera.composeWorkspace(frames, options) });

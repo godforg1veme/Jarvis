@@ -975,7 +975,8 @@ app.whenReady().then(() => {
       const captureWindow = cloudVoiceService && cloudVoiceService.audioCaptureWindow;
       const visionWindow = cameraCaptureController && cameraCaptureController.window;
       return callback(allowCaptureMedia({
-        requestingWebContentsId: webContents.id, permission, mediaTypes: details.mediaTypes,
+        requestingWebContentsId: webContents?.id, permission, mediaTypes: details.mediaTypes,
+        mediaType: details.mediaType,
         voiceWebContentsId: captureWindow && !captureWindow.isDestroyed() ? captureWindow.webContents.id : null,
         visionWebContentsId: visionWindow && !visionWindow.isDestroyed() ? visionWindow.webContents.id : null,
       }));
@@ -988,7 +989,8 @@ app.whenReady().then(() => {
       const captureWindow = cloudVoiceService && cloudVoiceService.audioCaptureWindow;
       const visionWindow = cameraCaptureController && cameraCaptureController.window;
       return allowCaptureMedia({
-        requestingWebContentsId: webContents.id, permission, mediaTypes: details.mediaTypes,
+        requestingWebContentsId: webContents?.id, permission, mediaTypes: details.mediaTypes,
+        mediaType: details.mediaType,
         voiceWebContentsId: captureWindow && !captureWindow.isDestroyed() ? captureWindow.webContents.id : null,
         visionWebContentsId: visionWindow && !visionWindow.isDestroyed() ? visionWindow.webContents.id : null,
       });
