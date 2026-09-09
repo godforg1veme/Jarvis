@@ -122,3 +122,12 @@ latency win makes it the leading candidate, but the public vendor demonstration
 audio is not an independent quality corpus. Keep every provider disabled until
 the same runs are repeated with short owner-approved Russian commands, names,
 noise, and normal control-plane load.
+
+## GigaAM v3 Russian-variant comparison
+
+The owner requested every current Russian v3 ASR variant, excluding the
+multilingual line and legacy v1/v2 lines. `v3_ctc` is already measured above.
+The remaining `v3_rnnt`, `v3_e2e_ctc`, and `v3_e2e_rnnt` will each use the same
+isolated, four-core, official ONNX CPU procedure and public 11.290-second
+Russian audio. Each report records initial checkpoint/ONNX preparation and two
+warm runs. No variant is attached to Jarvis during this comparison.
