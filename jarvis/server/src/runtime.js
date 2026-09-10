@@ -7,7 +7,7 @@ const { providerProfileForConfig } = require('./providers/providerProfile');
 const { createTelegramAccessPolicy } = require('./telegram/accessPolicy');
 const { createTelegramBot } = require('./telegram/bot');
 const { sendTelegramText } = require('./telegram/telegramFormatting');
-const { TelegramMessageService } = require('./telegram/messageService');
+const { MAX_TELEGRAM_VOICE_BYTES, TelegramMessageService } = require('./telegram/messageService');
 const { TelegramUpdateRepository } = require('./telegram/telegramUpdateRepository');
 const { UserRepository } = require('./users/userRepository');
 const { ConversationRepository } = require('./conversations/conversationRepository');
@@ -72,6 +72,7 @@ async function createRuntime(config, overrides = {}) {
   let operationsRuntime = null;
   let visualMemoryService = null;
   let visualMemoryWorker = null;
+  let asr = null;
   if (pool) {
     const answerProvider = overrides.provider || createAnswerProvider(config, {
       onFallback(name, error) {
@@ -181,13 +182,14 @@ async function createRuntime(config, overrides = {}) {
       orchestrator,
       visualMemoryService,
     });
+    asr = overrides.asr || createAsrProvider(config);
     if (typeof app.post === 'function' && typeof app.addContentTypeParser === 'function') {
       const desktopRateLimiter = overrides.desktopRateLimiter || new FixedWindowRateLimiter();
       registerDesktopRoutes(app, {
         authenticate: authenticateDevice,
         deviceService,
         messageService: desktopMessageService,
-        asr: overrides.asr || createAsrProvider(config),
+        asr,
         limiter: desktopRateLimiter,
       });
       registerCommandRoutes(app, {
@@ -230,12 +232,15 @@ async function createRuntime(config, overrides = {}) {
       commandService,
       orchestrator,
       visualMemoryService,
+      asr: config.telegramVoiceEnabled ? asr : null,
+      voiceLimiter: overrides.telegramVoiceLimiter || new FixedWindowRateLimiter(),
     });
     bot = createTelegramBot({
       token: config.telegramBotToken,
       messageService,
       logger: app.log,
       documentMaxBytes: config.documentMaxBytes,
+      voiceMaxBytes: MAX_TELEGRAM_VOICE_BYTES,
       onPollingHealth: (value) => { pollingHealth = value; },
     });
     }

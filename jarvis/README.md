@@ -69,6 +69,11 @@ Jarvis — гибридная платформа персонального и �
   Два физических монитора и полный тестовый контур проверены 2026-09-09;
   live-захват Camo 1280×720 также прошёл проверку. Production-развёртывание
   vision-провайдера ещё требует acceptance.
+- Telegram voice notes на allowlisted-аккаунтах проходят через приватный GigaAM
+  `v3_e2e_rnnt` на DE-4: OGG/Opus временно декодируется внутри worker tmpfs,
+  в диалог попадает только `voice_transcript`. Лимиты — 5 MiB, 120 секунд и
+  три заметки в минуту на владельца; `audio` и остальные медиа остаются
+  приватными вложениями.
 
 Развивается:
 
@@ -78,9 +83,11 @@ Jarvis — гибридная платформа персонального и �
 - live multi-device acceptance удалённых команд и расширенная UI-обвязка для
   управления историей; общий WSS/Telegram/Desktop workflow и асинхронное
   завершение уже покрыты тестами и развёрнуты на VPS;
-- серверная ASR-модель: приватный GigaAM `v3_e2e_rnnt` развёрнут на DE-4 и
-  проверен через live server-to-worker контракт; остаётся ручная проверка UX
-  на привязанном Desktop-клиенте;
+- server-side ASR: приватный GigaAM `v3_e2e_rnnt` развёрнут на DE-4; сквозной
+  synthetic OGG-контракт `TelegramMessageService → worker` проверен live.
+  Реальная входящая voice-заметка владельца и тест на привязанном Desktop ещё
+  остаются ручным client acceptance; Telegram `audio` по-прежнему ingestion
+  вложений, а не ASR;
 - переключение между OpenRouter, Salad и другими совместимыми провайдерами;
 - PWA и расширение Vision после первого вертикального среза: production rollout
   и acceptance vision-провайдера, временные события и более широкая multi-device UX.

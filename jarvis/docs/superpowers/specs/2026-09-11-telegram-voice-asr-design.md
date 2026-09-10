@@ -1,7 +1,7 @@
 # Telegram voice through private GigaAM ASR — design
 
 **Date:** 2026-09-11
-**Status:** approved for implementation by the owner in the same task
+**Status:** implemented and enabled on DE-4
 
 ## Goal
 
@@ -62,3 +62,20 @@ argument is introduced.
    Telegram-message service through the private worker. A real inbound user
    Telegram voice is a separate client acceptance check and is reported
    explicitly rather than implied.
+
+## Deployment record
+
+The full local server suite passed (173 tests). The focused Linux run of the
+changed Telegram, ASR, and configuration tests passed in the VPS server image;
+the worker Python source compiled and the rendered Compose configuration and
+DE-4 preflight passed. The worker and server were rebuilt, both became healthy,
+and the public deployment smoke check passed.
+
+With `JARVIS_TELEGRAM_VOICE_ENABLED=true`, a non-sensitive public speech sample
+was converted to OGG and passed through the deployed
+`TelegramMessageService → OpenAI-compatible provider → private GigaAM` chain.
+The probe returned non-empty text (not emitted to logs), persisted only
+`voice_transcript`, and left no files in the worker temporary directory. The
+worker remains unexposed on the private Compose network. No real incoming
+Telegram update from an owner account was sent, so that client-level acceptance
+is deliberately still unclaimed.

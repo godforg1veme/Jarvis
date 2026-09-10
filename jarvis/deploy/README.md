@@ -162,9 +162,11 @@ MiB. Jarvis stores them only in the private `document-data` volume using opaque
 keys. TXT, Markdown, CSV, JSON, XML, HTML, and DOCX are indexed by text. PDF
 text is extracted with `pdftotext` and includes page citations. Images,
 archives, and generic files are indexed by private metadata; audio/video also
-have their container metadata probed with `ffprobe`. Their speech is not yet
-transcribed: that waits for the separately benchmarked server-ASR rollout. Do
-not expose the volume through a public static-file route. The server image
+have their container metadata probed with `ffprobe`. Telegram `voice` notes are
+an explicit exception when server ASR and `JARVIS_TELEGRAM_VOICE_ENABLED=true`
+are configured: they are transcribed request-temporarily and never enter the
+document volume. Telegram `audio`, video, and other media remain attachments.
+Do not expose the volume through a public static-file route. The server image
 creates the mountpoint with the unprivileged `node` owner before Docker creates
 a fresh named volume; do not replace it with a root-only bind mount.
 
@@ -172,19 +174,25 @@ Encrypted off-VPS backup setup and the restore drill live in
 [`backup/README.md`](backup/README.md). A backup is not accepted until the
 restore drill has populated an explicitly empty test directory and database.
 
-## Desktop voice ASR
+## Private ASR for Desktop and Telegram voice notes
 
 The Desktop HTTP endpoint returns `ASR_UNAVAILABLE` while
 `JARVIS_ASR_PROVIDER=disabled`. The selected DE-4 worker is the private
 GigaAM `v3_e2e_rnnt` Compose service. Enable it only with
 `JARVIS_ASR_PROVIDER=openai-compatible`,
 `ASR_BASE_URL=http://gigaam-asr:8000/v1`, and
-`ASR_MODEL=GigaAM/v3_e2e_rnnt` in the VPS-only `deploy/.env`, then run
+`ASR_MODEL=GigaAM/v3_e2e_rnnt` in the VPS-only `deploy/.env`. Set
+`JARVIS_TELEGRAM_VOICE_ENABLED=true` only to route allowlisted Telegram
+`message.voice` updates; it does not transcribe Telegram `audio` files. Voice
+notes are limited to 5 MiB, 120 seconds, and three per owner per minute before
+download. Then run
 `docker compose --profile asr --env-file deploy/.env -f deploy/docker-compose.yml up -d --build gigaam-asr server`.
 No ASR API key is needed for this private hop. Any other production endpoint
 must use HTTPS and implement the OpenAI-compatible
-`POST /audio/transcriptions` contract. Verify worker and server readiness, then
-send one non-sensitive voice probe from a paired test Desktop. Do not log or
+`POST /audio/transcriptions` contract. The worker accepts fixed WAV/OGG/Opus
+media types and uses a fixed ffmpeg conversion in tmpfs; it has no public port.
+Verify worker and server readiness, then send a non-sensitive voice probe from
+a paired test Desktop and a real allowlisted Telegram account. Do not log or
 retain raw audio outside the request path.
 
 ## Jarvis Vision

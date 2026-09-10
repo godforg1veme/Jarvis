@@ -15,8 +15,12 @@ Jarvis is a hybrid personal and family AI-assistant platform:
   voice, apps, files, windows, and approved remote actions;
 - Telegram is the first cloud client, not the whole product;
 - PWA remains planned. Server ASR is deployed as a private GigaAM
-  `v3_e2e_rnnt` ONNX worker on DE-4; paired-Desktop voice UX acceptance remains
-  a manual check. The first camera/screen
+  `v3_e2e_rnnt` ONNX worker on DE-4. Allowlisted Telegram `voice` notes route
+  through it, persist only a `voice_transcript`, and retain no raw audio.
+  The deployed synthetic OGG service-to-worker contract is verified; a real
+  inbound owner Telegram voice and a paired-Desktop voice remain manual client
+  acceptance checks. Telegram `audio` and other media retain attachment
+  ingestion. The first camera/screen
   Vision vertical slice is implemented locally and in the control plane: explicit
   local leases, Camo-compatible camera discovery, a two-display workspace,
   change-filtered temporal sampling, bounded Scene State, provider-neutral
@@ -127,8 +131,11 @@ See `docs/README.md` for current implementation status and historical records.
 - PostgreSQL must never be published publicly.
 - The DE-4 runs the private `gigaam-asr` service for Russian server ASR with a
   four-CPU/8-GiB cap and no host port. Its observed steady-state RSS is about
-  1.2 GiB; Qwen remains a stopped benchmark profile. Local LLM deployment still
-  requires its own measured capacity decision.
+  1.2 GiB. `JARVIS_TELEGRAM_VOICE_ENABLED=true` enables only allowlisted
+  Telegram `voice` notes, bounded to 5 MiB, 120 seconds, and three per owner
+  per minute before download; OGG/Opus is decoded only in the worker's tmpfs.
+  Qwen remains a stopped benchmark profile. Local LLM deployment still requires
+  its own measured capacity decision.
 
 ## Safety and Trust Boundaries
 
@@ -150,6 +157,8 @@ See `docs/README.md` for current implementation status and historical records.
 - Treat uploaded files as hostile: bound bytes before buffering, use opaque
   storage keys, never unpack archives automatically, and do not log Telegram
   file URLs because they contain the bot token.
+- Telegram `voice` raw bytes are request-temporary only: never place them in
+  document storage, memory, conversation content, telemetry, or logs.
 
 ## Generated and Local State
 

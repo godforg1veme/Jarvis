@@ -1,21 +1,52 @@
 const MAX_TEXT_LENGTH = 10000;
+const MAX_TELEGRAM_VOICE_BYTES = 5 * 1024 * 1024;
+const MAX_TELEGRAM_VOICE_SECONDS = 120;
+const TELEGRAM_VOICE_TYPES = new Set(['audio/ogg', 'audio/opus', 'application/ogg']);
 const { attachmentReply, isDeviceAttachmentQuestion } = require('../devices/deviceReplies');
 const { attachmentFromTelegramMessage } = require('../knowledge/fileTypes');
 const { publicDocumentStatus, renderDocumentCitations } = require('../knowledge/knowledgeService');
 const { parseRemoteCommand, remoteCommandReply } = require('../commands/commandText');
+
+function voiceFromTelegramMessage(message = {}) {
+  const candidate = message.voice;
+  if (!candidate || !candidate.file_id) return null;
+  const mimeType = String(candidate.mime_type || 'audio/ogg').split(';', 1)[0].trim().toLowerCase();
+  const durationSeconds = Number(candidate.duration);
+  const byteSize = Number(candidate.file_size || 0);
+  return Object.freeze({
+    fileId: String(candidate.file_id).slice(0, 256),
+    fileUniqueId: String(candidate.file_unique_id || '').slice(0, 256),
+    mediaType: mimeType,
+    byteSize: Number.isSafeInteger(byteSize) && byteSize >= 0 ? byteSize : null,
+    durationSeconds: Number.isSafeInteger(durationSeconds) && durationSeconds >= 0 ? durationSeconds : null,
+  });
+}
+
+function validateTelegramVoice(voice) {
+  if (!voice || !voice.fileId || !TELEGRAM_VOICE_TYPES.has(voice.mediaType)) {
+    throw new Error('invalid Telegram voice');
+  }
+  if (voice.byteSize === null || voice.byteSize > MAX_TELEGRAM_VOICE_BYTES) {
+    throw new Error('Telegram voice is too large');
+  }
+  if (voice.durationSeconds === null || voice.durationSeconds < 1 || voice.durationSeconds > MAX_TELEGRAM_VOICE_SECONDS) {
+    throw new Error('Telegram voice duration is invalid');
+  }
+}
 
 function normalizeTelegramMessage(update) {
   const message = update && update.message;
   const telegramUserId = message && message.from && String(message.from.id || '');
   const chatId = message && message.chat && String(message.chat.id || '');
   const text = message && typeof message.text === 'string' ? message.text.trim() : '';
+  const voice = voiceFromTelegramMessage(message || {});
   const attachment = attachmentFromTelegramMessage(message || {});
   const updateId = Number(update && update.update_id);
 
   if (!/^\d{1,20}$/.test(telegramUserId)) throw new Error('invalid Telegram user ID');
   if (!/^-?\d{1,20}$/.test(chatId)) throw new Error('invalid Telegram chat ID');
   if (!Number.isSafeInteger(updateId) || updateId < 0) throw new Error('invalid Telegram update ID');
-  if (!text && !attachment) {
+  if (!text && !attachment && !voice) {
     return {
       updateId,
       telegramUserId,
@@ -23,6 +54,7 @@ function normalizeTelegramMessage(update) {
       messageId: String(message.message_id),
       displayName: [message.from.first_name, message.from.last_name].filter(Boolean).join(' ').trim().slice(0, 100) || `Telegram ${telegramUserId}`,
       text: '',
+      voice: null,
       attachment: null,
       ignored: true,
     };
@@ -42,6 +74,7 @@ function normalizeTelegramMessage(update) {
     messageId: String(message.message_id),
     displayName,
     text,
+    voice,
     attachment,
   };
 }
@@ -75,6 +108,8 @@ class TelegramMessageService {
     this.commandService = options.commandService || null;
     this.orchestrator = options.orchestrator || null;
     this.visualMemoryService = options.visualMemoryService || null;
+    this.asr = options.asr || null;
+    this.voiceLimiter = options.voiceLimiter || null;
   }
 
   async remoteCommandReply({ text, user, conversationId }) {
@@ -152,7 +187,32 @@ class TelegramMessageService {
       externalChatId: input.chatId,
     });
 
-    if (input.attachment) {
+    let voiceTranscript = false;
+    if (input.voice && this.asr) {
+      if (typeof options.downloadVoice !== 'function') throw new Error('voice transcription is unavailable');
+      validateTelegramVoice(input.voice);
+      if (this.voiceLimiter) {
+        this.voiceLimiter.check(`telegram-voice:${user.id}`, { limit: 3, windowMs: 60000 });
+      }
+      const audio = await options.downloadVoice(input.voice);
+      const transcription = await this.asr.transcribe({
+        audio,
+        mimeType: input.voice.mediaType,
+        languageHint: 'ru',
+      });
+      const transcript = String(transcription && transcription.text || '').trim();
+      if (!transcript || transcript.length > MAX_TEXT_LENGTH) throw new Error('invalid Telegram voice transcription');
+      input.text = transcript;
+      voiceTranscript = true;
+      await this.conversationRepository.appendMessage({
+        userId: user.id,
+        conversationId: conversation.id,
+        role: 'user',
+        contentType: 'voice_transcript',
+        content: input.text,
+        externalMessageId: input.messageId,
+      });
+    } else if (input.attachment) {
       if (!this.knowledgeService || typeof options.downloadAttachment !== 'function') {
         throw new Error('document ingestion is unavailable');
       }
@@ -184,13 +244,15 @@ class TelegramMessageService {
       return { status: 'answered', answer };
     }
 
-    await this.conversationRepository.appendMessage({
-      userId: user.id,
-      conversationId: conversation.id,
-      role: 'user',
-      content: input.text,
-      externalMessageId: input.messageId,
-    });
+    if (!voiceTranscript) {
+      await this.conversationRepository.appendMessage({
+        userId: user.id,
+        conversationId: conversation.id,
+        role: 'user',
+        content: input.text,
+        externalMessageId: input.messageId,
+      });
+    }
 
     const remoteAnswer = await this.remoteCommandReply({ text: input.text, user, conversationId: conversation.id });
     if (remoteAnswer) {
@@ -269,9 +331,13 @@ class TelegramMessageService {
 
 module.exports = {
   MAX_TEXT_LENGTH,
+  MAX_TELEGRAM_VOICE_BYTES,
+  MAX_TELEGRAM_VOICE_SECONDS,
   TelegramMessageService,
   commandReply,
   commandParts,
   parseRemoteCommand,
   normalizeTelegramMessage,
+  validateTelegramVoice,
+  voiceFromTelegramMessage,
 };

@@ -43,6 +43,7 @@ function createTelegramBot(options) {
   bot.on('message', async (ctx) => {
     const result = await messageService.handle(ctx.update, {
       downloadAttachment: () => downloadTelegramAttachment(ctx, options.token, options.documentMaxBytes, options.fetchImpl),
+      downloadVoice: () => downloadTelegramAttachment(ctx, options.token, options.voiceMaxBytes, options.fetchImpl),
     });
     if (result.status === 'forbidden') {
       await ctx.reply('Доступ к этому Jarvis не разрешён.');

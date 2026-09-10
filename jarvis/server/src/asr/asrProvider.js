@@ -13,6 +13,14 @@ class DisabledAsrProvider {
   }
 }
 
+function fileNameForMimeType(mimeType) {
+  const normalized = String(mimeType || '').split(';', 1)[0].trim().toLowerCase();
+  if (normalized === 'audio/ogg' || normalized === 'audio/opus' || normalized === 'application/ogg') {
+    return 'utterance.ogg';
+  }
+  return 'utterance.wav';
+}
+
 class OpenAiCompatibleAsrProvider {
   constructor(options) {
     this.baseUrl = String(options.baseUrl || '').replace(/\/+$/, '');
@@ -31,7 +39,7 @@ class OpenAiCompatibleAsrProvider {
       form.set('model', this.model);
       if (languageHint) form.set('language', String(languageHint).slice(0, 12));
       form.set('response_format', 'verbose_json');
-      form.set('file', new Blob([audio], { type: mimeType }), 'utterance.wav');
+      form.set('file', new Blob([audio], { type: mimeType }), fileNameForMimeType(mimeType));
       const headers = this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : {};
       const response = await this.fetch(`${this.baseUrl}/audio/transcriptions`, {
         method: 'POST',
@@ -74,6 +82,7 @@ function createAsrProvider(config, options = {}) {
 module.exports = {
   AsrUnavailableError,
   DisabledAsrProvider,
+  fileNameForMimeType,
   OpenAiCompatibleAsrProvider,
   createAsrProvider,
 };

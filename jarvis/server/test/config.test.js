@@ -7,6 +7,20 @@ test('loads safe development defaults', () => {
   assert.equal(config.host, '127.0.0.1');
   assert.equal(config.port, 3210);
   assert.deepEqual(config.telegramAllowedIds, []);
+  assert.equal(config.telegramVoiceEnabled, false);
+});
+
+test('keeps Telegram voice ASR opt-in', () => {
+  assert.throws(
+    () => loadConfig({ JARVIS_TELEGRAM_VOICE_ENABLED: 'true' }),
+    /requires OpenAI-compatible ASR/,
+  );
+  assert.equal(loadConfig({
+    JARVIS_TELEGRAM_VOICE_ENABLED: 'true',
+    JARVIS_ASR_PROVIDER: 'openai-compatible',
+    ASR_BASE_URL: 'http://gigaam-asr:8000/v1',
+    ASR_MODEL: 'GigaAM/v3_e2e_rnnt',
+  }).telegramVoiceEnabled, true);
 });
 
 test('parses and deduplicates Telegram IDs', () => {

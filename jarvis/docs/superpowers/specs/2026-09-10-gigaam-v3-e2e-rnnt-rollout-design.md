@@ -108,6 +108,17 @@ about 12 seconds after restart. Its observed steady-state RSS was 1.207 GiB
 within the 8-GiB cap; the Jarvis server was healthy throughout.
 
 No paired Desktop voice request was sent during this rollout because that would
-require an owner device credential and a real client session. The authenticated
-Desktop route is covered by the server suite; its final UX acceptance remains a
-manual owner test.
+require an owner device credential and a real client session. No Telegram voice
+message was sent either: the current Telegram handler treats voice/audio as a
+knowledge attachment and does not call the ASR provider. The authenticated
+Desktop route is covered by the server suite; Desktop and Telegram voice UX
+acceptance remains unperformed manual work.
+
+### Supersession note — 2026-09-11
+
+The preceding paragraph accurately records the 2026-09-10 deployment state.
+The subsequent Telegram voice rollout is documented in
+`2026-09-11-telegram-voice-asr-design.md`: it enables only `message.voice`,
+adds OGG/Opus decoding in the private worker, and verifies a synthetic live
+service-to-worker path. A real inbound owner Telegram voice and a paired
+Desktop voice remain separate manual acceptance checks.

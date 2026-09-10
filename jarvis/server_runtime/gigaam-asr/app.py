@@ -1,5 +1,6 @@
 import asyncio
 import gc
+import subprocess
 import tempfile
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -15,7 +16,16 @@ MODEL_CACHE = '/models/checkpoints'
 ONNX_DIR = Path('/models/onnx')
 TEMP_DIR = Path('/tmp/gigaam-asr')
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+MAX_AUDIO_SECONDS = 120
 THREADS = 4
+SUPPORTED_MEDIA_TYPES = {
+    'audio/wav': '.wav',
+    'audio/x-wav': '.wav',
+    'application/octet-stream': '.wav',
+    'audio/ogg': '.ogg',
+    'audio/opus': '.ogg',
+    'application/ogg': '.ogg',
+}
 REQUIRED_ONNX_FILES = (
     f'{MODEL_VERSION}.yaml',
     f'{MODEL_VERSION}_encoder.onnx',
@@ -75,6 +85,28 @@ def transcribe(path):
     return text
 
 
+def convert_to_wav(source_path):
+    with tempfile.NamedTemporaryFile(suffix='.wav', dir=TEMP_DIR, delete=False) as temporary:
+        wav_path = Path(temporary.name)
+    try:
+        subprocess.run(
+            [
+                'ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'error', '-y',
+                '-i', str(source_path), '-map', '0:a:0', '-t', str(MAX_AUDIO_SECONDS),
+                '-ac', '1', '-ar', '16000', '-c:a', 'pcm_s16le', str(wav_path),
+            ],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=True,
+            timeout=30,
+        )
+        return wav_path
+    except Exception:
+        wav_path.unlink(missing_ok=True)
+        raise
+
+
 @asynccontextmanager
 async def lifespan(_app):
     global runtime
@@ -105,20 +137,29 @@ async def create_transcription(
     if runtime is None:
         raise HTTPException(status_code=503, detail='model unavailable')
 
+    content_type = str(file.content_type or '').split(';', 1)[0].strip().lower()
+    suffix = SUPPORTED_MEDIA_TYPES.get(content_type)
+    if not suffix:
+        raise HTTPException(status_code=400, detail='invalid audio')
+
     audio = await file.read(MAX_UPLOAD_BYTES + 1)
     if not audio or len(audio) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=400, detail='invalid audio')
 
-    path = None
+    source_path = None
+    wav_path = None
     try:
-        with tempfile.NamedTemporaryFile(mode='wb', suffix='.wav', dir=TEMP_DIR, delete=False) as temporary:
+        with tempfile.NamedTemporaryFile(mode='wb', suffix=suffix, dir=TEMP_DIR, delete=False) as temporary:
             temporary.write(audio)
-            path = Path(temporary.name)
+            source_path = Path(temporary.name)
         async with model_lock:
-            text = await asyncio.to_thread(transcribe, path)
+            wav_path = await asyncio.to_thread(convert_to_wav, source_path)
+            text = await asyncio.to_thread(transcribe, wav_path)
         return {'text': text, 'language': 'ru'}
     except Exception:
         raise HTTPException(status_code=503, detail='transcription unavailable') from None
     finally:
-        if path:
-            path.unlink(missing_ok=True)
+        if wav_path:
+            wav_path.unlink(missing_ok=True)
+        if source_path:
+            source_path.unlink(missing_ok=True)

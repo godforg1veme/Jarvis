@@ -70,6 +70,7 @@ const baseSchema = z.object({
   asrApiKey: z.string().max(2048),
   asrModel: z.string().max(255),
   asrTimeoutMs: z.number().int().min(1000).max(120000),
+  telegramVoiceEnabled: z.boolean(),
   operationsEnabled: z.boolean(),
   operationsHostKey: z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/),
   operationsHostLabel: z.string().min(1).max(100),
@@ -116,6 +117,9 @@ function validateConfiguredFallbacks(config) {
 }
 
 function validateAsr(config) {
+  if (config.telegramVoiceEnabled && config.asrProvider !== 'openai-compatible') {
+    throw new Error('JARVIS_TELEGRAM_VOICE_ENABLED requires OpenAI-compatible ASR');
+  }
   if (config.asrProvider !== 'openai-compatible') return;
   if (!config.asrBaseUrl || !config.asrModel) {
     throw new Error('ASR_BASE_URL and ASR_MODEL are required for OpenAI-compatible ASR');
@@ -218,6 +222,7 @@ function loadConfig(env = process.env) {
     asrApiKey: String(env.ASR_API_KEY || '').trim(),
     asrModel: String(env.ASR_MODEL || '').trim(),
     asrTimeoutMs: Number(env.JARVIS_ASR_TIMEOUT_MS || 60000),
+    telegramVoiceEnabled: parseBoolean(env.JARVIS_TELEGRAM_VOICE_ENABLED),
     operationsEnabled: parseBoolean(env.JARVIS_OPERATIONS_ENABLED),
     operationsHostKey: String(env.JARVIS_OPERATIONS_HOST_KEY || 'vps').trim(),
     operationsHostLabel: String(env.JARVIS_OPERATIONS_HOST_LABEL || 'Jarvis VPS').trim(),

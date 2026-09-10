@@ -1,7 +1,13 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const { createTelegramAccessPolicy } = require('../src/telegram/accessPolicy');
-const { TelegramMessageService, normalizeTelegramMessage, parseRemoteCommand } = require('../src/telegram/messageService');
+const { FixedWindowRateLimiter, RateLimitError } = require('../src/http/rateLimiter');
+const {
+  MAX_TELEGRAM_VOICE_BYTES,
+  TelegramMessageService,
+  normalizeTelegramMessage,
+  parseRemoteCommand,
+} = require('../src/telegram/messageService');
 
 function update(id, userId, chatId, text) {
   return {
@@ -11,6 +17,25 @@ function update(id, userId, chatId, text) {
       from: { id: userId, first_name: `User ${userId}` },
       chat: { id: chatId },
       text,
+    },
+  };
+}
+
+function voiceUpdate(id, userId, chatId, overrides = {}) {
+  return {
+    update_id: id,
+    message: {
+      message_id: id + 100,
+      from: { id: userId, first_name: `User ${userId}` },
+      chat: { id: chatId },
+      voice: {
+        file_id: 'voice-id',
+        file_unique_id: 'voice-unique',
+        file_size: 24,
+        mime_type: 'audio/ogg',
+        duration: 3,
+        ...overrides,
+      },
     },
   };
 }
@@ -27,9 +52,17 @@ test('normalizes media-only Telegram messages without treating them as plain tex
   });
   assert.equal(input.text, '');
   assert.equal(input.attachment.category, 'audio');
+  assert.equal(input.voice, null);
 });
 
-function harness(allowedIds = ['101', '202'], devices = null, commandService = null) {
+test('normalizes a Telegram voice note separately from ordinary attachments', () => {
+  const input = normalizeTelegramMessage(voiceUpdate(2, 101, 101));
+  assert.equal(input.voice.mediaType, 'audio/ogg');
+  assert.equal(input.voice.durationSeconds, 3);
+  assert.equal(input.attachment.category, 'audio');
+});
+
+function harness(allowedIds = ['101', '202'], devices = null, commandService = null, options = {}) {
   const state = { updates: new Set(), users: new Map(), conversations: new Map(), messages: [] };
   const assistantCalls = [];
   const service = new TelegramMessageService({
@@ -77,6 +110,9 @@ function harness(allowedIds = ['101', '202'], devices = null, commandService = n
       },
     } : {}),
     ...(commandService ? { commandService } : {}),
+    ...(options.knowledgeService ? { knowledgeService: options.knowledgeService } : {}),
+    ...(options.asr ? { asr: options.asr } : {}),
+    ...(options.voiceLimiter ? { voiceLimiter: options.voiceLimiter } : {}),
   });
   return { service, state, assistantCalls };
 }
@@ -95,6 +131,107 @@ test('deduplicates Telegram updates', async () => {
   assert.equal((await service.handle(update(2, 101, 101, 'hello'))).status, 'answered');
   assert.equal((await service.handle(update(2, 101, 101, 'hello'))).status, 'duplicate');
   assert.equal(state.messages.length, 2);
+});
+
+test('transcribes an allowed Telegram voice without storing raw audio', async () => {
+  const rawAudio = Buffer.from('private-voice-bytes');
+  const asrCalls = [];
+  const ingestionCalls = [];
+  const { service, state, assistantCalls } = harness(['101'], null, null, {
+    asr: {
+      async transcribe(input) {
+        asrCalls.push(input);
+        return { text: 'открой список задач', language: 'ru' };
+      },
+    },
+    knowledgeService: {
+      async ingest(input) { ingestionCalls.push(input); },
+      async searchForPrompt() { return []; },
+    },
+  });
+
+  const result = await service.handle(voiceUpdate(31, 101, 101), {
+    async downloadVoice(voice) {
+      assert.equal(voice.fileId, 'voice-id');
+      return rawAudio;
+    },
+    async downloadAttachment() { throw new Error('voice must not enter attachment storage'); },
+  });
+
+  assert.equal(result.answer, 'answer:открой список задач');
+  assert.equal(asrCalls.length, 1);
+  assert.equal(asrCalls[0].audio, rawAudio);
+  assert.equal(asrCalls[0].mimeType, 'audio/ogg');
+  assert.equal(asrCalls[0].languageHint, 'ru');
+  assert.equal(ingestionCalls.length, 0);
+  assert.deepEqual(state.messages.map((message) => ({ role: message.role, contentType: message.contentType, content: message.content })), [
+    { role: 'user', contentType: 'voice_transcript', content: 'открой список задач' },
+    { role: 'assistant', contentType: undefined, content: 'answer:открой список задач' },
+  ]);
+  assert.equal(state.messages.some((message) => String(message.content).includes(rawAudio.toString())), false);
+  assert.equal(assistantCalls[0].currentRequest, 'открой список задач');
+});
+
+test('keeps a Telegram voice in attachment ingestion while voice ASR is disabled', async () => {
+  const ingested = [];
+  const { service, state } = harness(['101'], null, null, {
+    knowledgeService: {
+      async ingest(input) {
+        ingested.push(input);
+        return { originalName: 'voice-unique', name: 'voice-unique' };
+      },
+    },
+  });
+  const result = await service.handle(voiceUpdate(32, 101, 101), {
+    async downloadAttachment() { return Buffer.from('voice-as-document'); },
+    async downloadVoice() { throw new Error('disabled ASR must not download voice for transcription'); },
+  });
+
+  assert.match(result.answer, /Индексирую/);
+  assert.equal(ingested.length, 1);
+  assert.equal(ingested[0].attachment.category, 'audio');
+  assert.equal(state.messages[0].contentType, 'document');
+});
+
+test('rejects oversized or over-duration Telegram voice before downloading it', async () => {
+  let downloads = 0;
+  const { service } = harness(['101'], null, null, {
+    asr: { async transcribe() { return { text: 'unused' }; } },
+  });
+  await assert.rejects(
+    service.handle(voiceUpdate(33, 101, 101, { duration: 121 }), {
+      async downloadVoice() { downloads += 1; return Buffer.from('unused'); },
+    }),
+    /duration is invalid/,
+  );
+  await assert.rejects(
+    service.handle(voiceUpdate(34, 101, 101, { file_size: MAX_TELEGRAM_VOICE_BYTES + 1 }), {
+      async downloadVoice() { downloads += 1; return Buffer.from('unused'); },
+    }),
+    /too large/,
+  );
+  assert.equal(downloads, 0);
+});
+
+test('throttles Telegram voice per owner before additional downloads', async () => {
+  const limiter = new FixedWindowRateLimiter({ now: () => 1000 });
+  const { service } = harness(['101'], null, null, {
+    asr: { async transcribe() { return { text: 'коротко' }; } },
+    voiceLimiter: limiter,
+  });
+  let downloads = 0;
+  for (const id of [35, 36, 37]) {
+    await service.handle(voiceUpdate(id, 101, 101), {
+      async downloadVoice() { downloads += 1; return Buffer.from('voice'); },
+    });
+  }
+  await assert.rejects(
+    service.handle(voiceUpdate(38, 101, 101), {
+      async downloadVoice() { downloads += 1; return Buffer.from('voice'); },
+    }),
+    (error) => error instanceof RateLimitError,
+  );
+  assert.equal(downloads, 3);
 });
 
 test('isolates conversations for two Telegram users', async () => {
