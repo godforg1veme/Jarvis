@@ -28,8 +28,9 @@ pending. The Telegram-first private knowledge base accepts bounded
 attachments, indexes supported text formats with PostgreSQL full-text search,
 extracts PDF text with page metadata, keeps unsupported files searchable by
 metadata, and uses production hybrid embeddings retrieval with FTS fallback.
-The server ASR interface is implemented, but a concrete ASR provider remains
-deliberately disabled until the DE-4 benchmark selects one.
+The server ASR interface is deployed with a private Russian-only GigaAM
+`v3_e2e_rnnt` ONNX worker on DE-4. Its server-to-worker contract and capacity
+checks are accepted; final paired-Desktop voice UX acceptance remains manual.
 
 ## Authoritative current documents
 
@@ -48,6 +49,7 @@ deliberately disabled until the DE-4 benchmark selects one.
 | --- | --- |
 | `specs/2026-09-01-jarvis-family-cloud-assistant-design.md` | Partially implemented: control plane, DB, Telegram/Desktop text, provider gateway, safe text fallback, prompt pipeline, user-scoped memory, Telegram-first attachment ingestion, production hybrid knowledge retrieval, the confirmed remote-command path, and the first Vision vertical slice are implemented and tested. Live Camo was accepted on 2026-09-09. Server ASR, PWA, deployment of Vision, and live multi-device acceptance remain operational work. |
 | `superpowers/specs/2026-09-09-jarvis-vision-design.md` | Implemented first vertical slice with accepted live Camo and dual-display capture; see `updates/2026-09-09-vision-implementation.md` for verified boundaries and remaining provider/Telegram acceptance |
+| `superpowers/specs/2026-09-10-gigaam-v3-e2e-rnnt-rollout-design.md` | Deployed private DE-4 server ASR worker; ONNX cache, live server contract, queue, restart, health, and capacity checks verified. Paired-Desktop voice UX remains a manual acceptance. |
 | `superpowers/plans/2026-09-09-jarvis-vision.md` | Execution plan adapted to the current cloud-brain/local-hands architecture; first camera + two-display + memory slice implemented and locally accepted |
 | `plans/2026-09-01-jarvis-family-cloud-assistant.md` | Active roadmap; Milestones 0–3 are partial, later milestones are not complete |
 | `specs/2026-09-01-jarvis-desktop-cloud-client-design.md` | Implemented and packaged: paired Windows chat, DPAPI device credentials, device-scoped HTTPS/WSS sessions, local wake word, server ASR contract, and NSIS installer. Live VPS configuration and clean-machine acceptance remain operational steps. |

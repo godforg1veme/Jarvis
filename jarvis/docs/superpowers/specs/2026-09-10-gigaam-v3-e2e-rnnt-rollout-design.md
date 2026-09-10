@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved by the owner on 2026-09-10. This supersedes the disabled Qwen3-ASR
+Deployed and verified on 2026-09-10. This supersedes the disabled Qwen3-ASR
 benchmark profile only for the configured Desktop voice provider; the Qwen
 profile and model cache remain available for comparison and are not deleted.
 
@@ -91,3 +91,23 @@ handles the live contract, preserves server health, and stays within the
 existing 60-second request timeout. Record steady-state memory and response
 latency; if they violate capacity or reliability expectations, immediately
 apply the configuration-only rollback.
+
+### Deployment record
+
+The focused configuration test and the complete server suite passed (165 tests).
+The VPS preflight, rendered Compose configuration, worker Python syntax check,
+private-worker readiness, public health smoke, and isolation checks passed. The
+worker has a read-only root filesystem, no host port bindings, and all Linux
+capabilities dropped.
+
+The live server ASR client made a public non-sensitive Russian WAV request to
+the private worker in 1.944 seconds, then in 1.713 seconds after a worker
+restart. Two simultaneous requests completed in 1.960 and 3.984 seconds,
+confirming serialized handling. The cached ONNX worker returned to healthy in
+about 12 seconds after restart. Its observed steady-state RSS was 1.207 GiB
+within the 8-GiB cap; the Jarvis server was healthy throughout.
+
+No paired Desktop voice request was sent during this rollout because that would
+require an owner device credential and a real client session. The authenticated
+Desktop route is covered by the server suite; its final UX acceptance remains a
+manual owner test.

@@ -14,7 +14,9 @@ Jarvis is a hybrid personal and family AI-assistant platform:
 - the Electron application is the Windows client and execution edge for local
   voice, apps, files, windows, and approved remote actions;
 - Telegram is the first cloud client, not the whole product;
-- PWA and server ASR remain planned or in progress. The first camera/screen
+- PWA remains planned. Server ASR is deployed as a private GigaAM
+  `v3_e2e_rnnt` ONNX worker on DE-4; paired-Desktop voice UX acceptance remains
+  a manual check. The first camera/screen
   Vision vertical slice is implemented locally and in the control plane: explicit
   local leases, Camo-compatible camera discovery, a two-display workspace,
   change-filtered temporal sampling, bounded Scene State, provider-neutral
@@ -123,9 +125,10 @@ See `docs/README.md` for current implementation status and historical records.
 - `deploy/docker-compose.yml` also retains an optional Caddy profile for hosts
   where 80/443 are available. Do not start both ingress modes accidentally.
 - PostgreSQL must never be published publicly.
-- The current small host may run the control plane and cloud-model client, but
-  local LLM/ASR workers require a measured capacity decision after the DE-4
-  upgrade.
+- The DE-4 runs the private `gigaam-asr` service for Russian server ASR with a
+  four-CPU/8-GiB cap and no host port. Its observed steady-state RSS is about
+  1.2 GiB; Qwen remains a stopped benchmark profile. Local LLM deployment still
+  requires its own measured capacity decision.
 
 ## Safety and Trust Boundaries
 
