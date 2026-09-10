@@ -139,7 +139,6 @@ services:
     read_only: true
     cap_drop: ["ALL"]
     security_opt: ["no-new-privileges:true"]
-    pids_limit: 512
     volumes:
       - gigaam-asr-models:/models
     tmpfs:
@@ -150,6 +149,7 @@ services:
         limits:
           cpus: "4.0"
           memory: 8G
+          pids: 512
 
   caddy:
     image: caddy:2.10-alpine
