@@ -174,14 +174,18 @@ restore drill has populated an explicitly empty test directory and database.
 
 ## Desktop voice ASR
 
-The Desktop HTTP endpoint is present but returns `ASR_UNAVAILABLE` while
-`JARVIS_ASR_PROVIDER=disabled`. After the DE-4 benchmark selects a provider,
-configure `JARVIS_ASR_PROVIDER=openai-compatible`, `ASR_BASE_URL`, `ASR_MODEL`,
-and, when required, `ASR_API_KEY` only in `deploy/.env`. The endpoint must be
-HTTPS in production and implement the OpenAI-compatible
-`POST /audio/transcriptions` contract. Rebuild the server, verify `/health/ready`,
-then send one non-sensitive voice probe from a paired test Desktop. Do not log
-or retain raw audio outside the request path.
+The Desktop HTTP endpoint returns `ASR_UNAVAILABLE` while
+`JARVIS_ASR_PROVIDER=disabled`. The selected DE-4 worker is the private
+GigaAM `v3_e2e_rnnt` Compose service. Enable it only with
+`JARVIS_ASR_PROVIDER=openai-compatible`,
+`ASR_BASE_URL=http://gigaam-asr:8000/v1`, and
+`ASR_MODEL=GigaAM/v3_e2e_rnnt` in the VPS-only `deploy/.env`, then run
+`docker compose --profile asr --env-file deploy/.env -f deploy/docker-compose.yml up -d --build gigaam-asr server`.
+No ASR API key is needed for this private hop. Any other production endpoint
+must use HTTPS and implement the OpenAI-compatible
+`POST /audio/transcriptions` contract. Verify worker and server readiness, then
+send one non-sensitive voice probe from a paired test Desktop. Do not log or
+retain raw audio outside the request path.
 
 ## Jarvis Vision
 

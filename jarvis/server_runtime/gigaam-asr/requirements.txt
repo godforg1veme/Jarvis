@@ -1,0 +1,4 @@
+https://github.com/salute-developers/GigaAM/archive/7447938d791c4f3e643386ee22c33777004293a5.zip
+fastapi==0.115.12
+uvicorn==0.34.0
+python-multipart==0.0.20

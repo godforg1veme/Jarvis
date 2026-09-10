@@ -121,15 +121,15 @@ function validateAsr(config) {
     throw new Error('ASR_BASE_URL and ASR_MODEL are required for OpenAI-compatible ASR');
   }
   const url = new URL(config.asrBaseUrl);
-  const privateQwenWorker = url.protocol === 'http:'
-    && url.hostname === 'qwen-asr'
+  const privateAsrWorker = url.protocol === 'http:'
+    && ['qwen-asr', 'gigaam-asr'].includes(url.hostname)
     && url.port === '8000'
     && (url.pathname === '/v1' || url.pathname === '/v1/')
     && !url.username
     && !url.password
     && !url.search
     && !url.hash;
-  if (config.nodeEnv === 'production' && url.protocol !== 'https:' && !privateQwenWorker) {
+  if (config.nodeEnv === 'production' && url.protocol !== 'https:' && !privateAsrWorker) {
     throw new Error('ASR_BASE_URL must use HTTPS in production');
   }
 }

@@ -108,7 +108,7 @@ services:
           memory: 2G
 
   qwen-asr:
-    profiles: ["asr"]
+    profiles: ["qwen-asr-benchmark"]
     build:
       context: ..
       dockerfile: deploy/qwen-asr.Dockerfile
@@ -121,6 +121,27 @@ services:
       QWEN_ASR_MODEL_REVISION: ${QWEN_ASR_MODEL_REVISION:-7278e1e70fe206f11671096ffdd38061171dd6e5}
     volumes:
       - qwen-asr-models:/models
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    networks: [backend]
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 8G
+
+  gigaam-asr:
+    profiles: ["asr"]
+    build:
+      context: ..
+      dockerfile: deploy/gigaam-asr.Dockerfile
+    restart: unless-stopped
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 512
+    volumes:
+      - gigaam-asr-models:/models
     tmpfs:
       - /tmp:size=64m,mode=1777
     networks: [backend]
@@ -183,6 +204,7 @@ volumes:
   document-data:
   vision-data:
   qwen-asr-models:
+  gigaam-asr-models:
   caddy-data:
   caddy-config:
 

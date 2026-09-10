@@ -91,7 +91,7 @@ test('requires an explicit HTTPS embedding profile when semantic search is enabl
   assert.equal(config.embeddingDimensions, 3);
 });
 
-test('permits only the private Qwen ASR worker over HTTP in production', () => {
+test('permits only exact private ASR worker URLs over HTTP in production', () => {
   const production = {
     NODE_ENV: 'production',
     DATABASE_URL: 'postgres://unused',
@@ -104,9 +104,17 @@ test('permits only the private Qwen ASR worker over HTTP in production', () => {
     ...production,
     ASR_BASE_URL: 'http://qwen-asr:8000/v1',
   }).asrBaseUrl, 'http://qwen-asr:8000/v1');
+  assert.equal(loadConfig({
+    ...production,
+    ASR_BASE_URL: 'http://gigaam-asr:8000/v1',
+  }).asrBaseUrl, 'http://gigaam-asr:8000/v1');
   assert.throws(() => loadConfig({
     ...production,
     ASR_BASE_URL: 'http://qwen-asr:8001/v1',
+  }), /must use HTTPS/);
+  assert.throws(() => loadConfig({
+    ...production,
+    ASR_BASE_URL: 'http://gigaam-asr.evil.test:8000/v1',
   }), /must use HTTPS/);
   assert.throws(() => loadConfig({
     ...production,
