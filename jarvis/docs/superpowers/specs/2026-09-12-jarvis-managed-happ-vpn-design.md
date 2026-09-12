@@ -1,6 +1,6 @@
 # Jarvis-managed Happ VPN design
 
-Date: 2026-09-12  
+Date: 2026-09-12
 Status: approved for implementation
 
 ## Context
