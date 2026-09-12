@@ -2,12 +2,12 @@ const assert = require('assert');
 const path = require('path');
 const { getWritableDataPath, isPathContained } = require('../runtimeDataPath');
 
-const bundledDataDir = path.resolve('C:\Program Files\Jarvis Desktop\resources\app\data');
-const userDataDir = path.resolve('C:\Users\Tester\AppData\Roaming\jarvis');
+const bundledDataDir = path.resolve('C:/Program Files/Jarvis Desktop/resources/app/data');
+const userDataDir = path.resolve('C:/Users/Tester/AppData/Roaming/jarvis');
 const historyPath = path.join(bundledDataDir, 'history.json');
 const nestedCachePath = path.join(bundledDataDir, 'cache', 'result.json');
 const siblingPath = path.resolve(`${bundledDataDir}-backup`, 'history.json');
-const outsidePath = path.resolve('C:\Program Files\Jarvis Desktop\resources\app\settings.json');
+const outsidePath = path.resolve('C:/Program Files/Jarvis Desktop/resources/app/settings.json');
 const packagedApp = {
   isPackaged: true,
   getPath(name) {
