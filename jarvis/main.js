@@ -9,6 +9,7 @@ const { app, BrowserWindow, globalShortcut, ipcMain, session, screen, Tray, Menu
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const { getWritableDataPath } = require('./runtimeDataPath');
 const { buildWindowsAutoStartSettings } = require('./startup/windowsAutoStart');
 const appIndexer = require('./tools/appIndexer');
 const { AppRecoveryService } = require('./tools/appRecoveryService');
@@ -194,18 +195,6 @@ async function launchRegisteredSelection(candidateId) {
 }
 
 // --- Helpers ---
-function getWritableDataPath(filePath) {
-  if (app && app.isPackaged && typeof app.getPath === 'function') {
-    const bundledDataDir = path.resolve(__dirname, 'data');
-    const resolved = path.resolve(filePath);
-    if (resolved.startsWith(bundledDataDir)) {
-      const rel = path.relative(bundledDataDir, resolved);
-      return path.join(app.getPath('userData'), 'data', rel);
-    }
-  }
-  return filePath;
-}
-
 function ensureDir(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }

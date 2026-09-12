@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { normalizeLaunchDescriptor, canonicalizeLaunchDescriptor } = require('./launchDescriptor');
 const { normalizeAlias, uniqueAliases, stableId } = require('./appIdentity');
+const { getWritableDataPath } = require('../runtimeDataPath');
 
 const SCHEMA_VERSION = 1;
 const DEFAULT_STORE_PATH = path.join(__dirname, '..', 'data', 'apps.learned.json');
@@ -45,8 +46,8 @@ function timestampForFile(date) {
 class LearnedAppStore {
   constructor(options = {}) {
     this.fs = options.fs || fs;
-    this.storePath = options.storePath || DEFAULT_STORE_PATH;
-    this.manualPath = options.manualPath || DEFAULT_MANUAL_PATH;
+    this.storePath = options.storePath || getWritableDataPath(DEFAULT_STORE_PATH);
+    this.manualPath = options.manualPath || getWritableDataPath(DEFAULT_MANUAL_PATH);
     this.now = options.now || (() => new Date());
   }
 

@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { getWritableDataPath } = require('../runtimeDataPath');
 
 const SETTINGS_PATH = path.join(__dirname, '..', 'data', 'ai-settings.json');
 const ENDPOINT_PATH = '/chat/completions';
@@ -11,7 +12,10 @@ function isHeaderSafeApiKey(value) {
 
 function loadSettings() {
   try {
-    return JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf-8'));
+    const target = getWritableDataPath(SETTINGS_PATH);
+    if (fs.existsSync(target)) return JSON.parse(fs.readFileSync(target, 'utf-8'));
+    if (fs.existsSync(SETTINGS_PATH)) return JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf-8'));
+    return {};
   } catch {
     return {};
   }

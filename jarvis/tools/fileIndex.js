@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { toFileCandidate } = require('./fileSafety');
+const { getWritableDataPath } = require('../runtimeDataPath');
 
 const DEFAULT_INDEX_PATH = path.join(__dirname, '..', 'data', 'file-index.json');
 const EXCLUDED_DIR_NAMES = new Set([
@@ -14,21 +15,6 @@ const EXCLUDED_DIR_NAMES = new Set([
   'Temp',
   'tmp',
 ]);
-
-function getWritablePath(filePath) {
-  try {
-    const { app } = require('electron');
-    if (app && app.isPackaged && typeof app.getPath === 'function') {
-      const dataDir = path.resolve(__dirname, '..', 'data');
-      const resolved = path.resolve(filePath);
-      if (resolved.startsWith(dataDir)) {
-        const rel = path.relative(dataDir, resolved);
-        return path.join(app.getPath('userData'), 'data', rel);
-      }
-    }
-  } catch {}
-  return filePath;
-}
 
 function ensureDir(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -94,7 +80,7 @@ function writeIndex(indexPath = DEFAULT_INDEX_PATH, roots = [], options = {}) {
     files,
   };
 
-  const target = getWritablePath(indexPath);
+  const target = getWritableDataPath(indexPath);
   try {
     ensureDir(path.dirname(target));
     fs.writeFileSync(target, JSON.stringify(data, null, 2), 'utf8');
@@ -106,7 +92,7 @@ function writeIndex(indexPath = DEFAULT_INDEX_PATH, roots = [], options = {}) {
 
 function readIndex(indexPath = DEFAULT_INDEX_PATH) {
   try {
-    const target = getWritablePath(indexPath);
+    const target = getWritableDataPath(indexPath);
     if (fs.existsSync(target)) return JSON.parse(fs.readFileSync(target, 'utf8'));
     if (fs.existsSync(indexPath)) return JSON.parse(fs.readFileSync(indexPath, 'utf8'));
     return null;

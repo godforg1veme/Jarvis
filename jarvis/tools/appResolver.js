@@ -3,6 +3,7 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 const learnedAppStore = require('./learnedAppStore');
 const { normalizeAlias, compactAlias, stripLaunchTrigger } = require('./appIdentity');
+const { getWritableDataPath } = require('../runtimeDataPath');
 
 const USER_APPS_PATH = path.join(__dirname, '..', 'data', 'apps.user.json');
 const DEFAULT_APPS_PATH = path.join(__dirname, '..', 'data', 'apps.default.json');
@@ -34,7 +35,12 @@ const EXACT_OR_STARTS_WITH_MATCHES = new Set([
 
 // --- Helpers ---
 function loadJSON(filePath, fallback) {
-  try { return JSON.parse(fs.readFileSync(filePath, 'utf-8')); } catch { return fallback; }
+  try {
+    const target = getWritableDataPath(filePath);
+    if (fs.existsSync(target)) return JSON.parse(fs.readFileSync(target, 'utf-8'));
+    if (fs.existsSync(filePath)) return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    return fallback;
+  } catch { return fallback; }
 }
 
 function normalize(str) {

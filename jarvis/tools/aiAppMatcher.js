@@ -3,6 +3,7 @@ const path = require('path');
 const { chatJson: defaultChatJson, isHeaderSafeApiKey } = require('./aiClient');
 const { providerMetadata } = require('./appCandidateValidator');
 const { uniqueAliases } = require('./appIdentity');
+const { getWritableDataPath } = require('../runtimeDataPath');
 
 const SCHEMA_VERSION = 1;
 const SETTINGS_PATH = path.join(__dirname, '..', 'data', 'ai-settings.json');
@@ -26,7 +27,12 @@ function sanitizeProviderQuery(value, options = {}) {
 }
 
 function loadSettings() {
-  try { return JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf8')); } catch { return {}; }
+  try {
+    const target = getWritableDataPath(SETTINGS_PATH);
+    if (fs.existsSync(target)) return JSON.parse(fs.readFileSync(target, 'utf8'));
+    if (fs.existsSync(SETTINGS_PATH)) return JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf8'));
+    return {};
+  } catch { return {}; }
 }
 
 function buildMessages(query, candidates) {

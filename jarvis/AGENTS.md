@@ -93,8 +93,10 @@ See `docs/README.md` for current implementation status and historical records.
   Desktop Agent tasks. It is no longer the only stateful AI-related component
   in the overall product because the cloud server persists conversations.
 - Writable local state, settings, and generated indexes (`ui-state.local.json`,
-  `history.json`, `settings.json`, `app-index.json`, `apps.user.json`,
-  `file-index.json`, `agent-history.json`) route through `getWritableDataPath`:
+  `history.json`, `settings.json`, `ai-settings.json`, `ai-cache.json`,
+  `app-index.json`, `apps.user.json`, `apps.learned.json`, `file-index.json`,
+  `agent-history.json`) route through the shared
+  `runtimeDataPath.js` policy:
   when packaged (`app.isPackaged`), they are safely redirected from read-only
   install folders (`C:\Program Files\...`) to `%APPDATA%\jarvis\data\`
   (`app.getPath('userData')/data/`). Development continues using repository `data/`.
@@ -199,6 +201,7 @@ node scripts/ensureTts.js
 node scripts/ensureStt.js
 node scripts/testEverythingSearch.js
 node scripts/testFileCommands.js
+node scripts/testRuntimeDataPath.js
 node scripts/testToolGateway.js
 node scripts/testRemoteProtocol.js
 node scripts/testToolPolicyMapping.js

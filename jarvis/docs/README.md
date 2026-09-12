@@ -4,7 +4,7 @@ This file is the status authority for project documentation. Specifications and
 plans under `docs/superpowers/` are preserved as decision history; their old
 future-tense wording does not override the current architecture in `AGENTS.md`.
 
-Status snapshot: 2026-09-11.
+Status snapshot: 2026-09-12.
 
 Operations update, 2026-09-06: see
 `updates/2026-09-06-operations-verification.md` for the corrective rollout,
@@ -88,6 +88,7 @@ These records describe shipped or substantially implemented local subsystems:
 | `2026-08-25-jarvis-unknown-app-recovery*` | Implemented and verified |
 | `2026-08-31-jarvis-stt-audio-transport-optimization-design.md` | Binary transport/performance work implemented in the local runtime |
 | `2026-08-31-jarvis-windows-autostart-fix-design.md` | Historical targeted design; verify current machine state before applying operational steps |
+| `2026-09-12-desktop-writable-data-path-design.md` | Implemented and regression-tested: packaged Desktop runtime data is centrally redirected from `Program Files` to Electron `userData` |
 
 ## Newly verified local subsystems
 

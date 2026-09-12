@@ -1,24 +1,10 @@
 const fs = require('fs');
 const path = require('path');
+const { getWritableDataPath } = require('../runtimeDataPath');
 
 const HISTORY_PATH = path.join(__dirname, '..', 'data', 'agent-history.json');
 const MAX_TASKS = 100;
 const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
-
-function getWritablePath(filePath) {
-  try {
-    const { app } = require('electron');
-    if (app && app.isPackaged && typeof app.getPath === 'function') {
-      const dataDir = path.resolve(__dirname, '..', 'data');
-      const resolved = path.resolve(filePath);
-      if (resolved.startsWith(dataDir)) {
-        const rel = path.relative(dataDir, resolved);
-        return path.join(app.getPath('userData'), 'data', rel);
-      }
-    }
-  } catch {}
-  return filePath;
-}
 
 function ensureDir(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -26,7 +12,7 @@ function ensureDir(dir) {
 
 function readJson(filePath, fallback) {
   try {
-    const target = getWritablePath(filePath);
+    const target = getWritableDataPath(filePath);
     if (fs.existsSync(target)) return JSON.parse(fs.readFileSync(target, 'utf8'));
     if (fs.existsSync(filePath)) return JSON.parse(fs.readFileSync(filePath, 'utf8'));
     return fallback;
@@ -57,7 +43,7 @@ function readHistory(filePath = HISTORY_PATH) {
 
 function writeHistory(history, filePath = HISTORY_PATH) {
   try {
-    const target = getWritablePath(filePath);
+    const target = getWritableDataPath(filePath);
     ensureDir(path.dirname(target));
     fs.writeFileSync(target, JSON.stringify(normalizeHistory(history), null, 2), 'utf8');
   } catch (err) {

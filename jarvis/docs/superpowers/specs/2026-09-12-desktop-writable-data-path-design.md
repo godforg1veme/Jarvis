@@ -2,7 +2,8 @@
 
 ## Status
 
-Approved for implementation on 2026-09-12.
+Implemented and verified on 2026-09-12. The focused runtime-path test, adjacent
+application-state tests, cloud suite, and NSIS packaging completed successfully.
 
 ## Problem
 

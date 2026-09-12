@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const { discoverQuick } = require('./appDiscoverySources');
+const { getWritableDataPath } = require('../runtimeDataPath');
 const SETTINGS_PATH = path.join(__dirname, '..', 'data', 'settings.json');
 
 const EXCLUDED_DIRS = new Set([
@@ -42,7 +43,12 @@ class AppDiscoveryService {
     this.now = options.now || Date.now;
     if (options.settings) this.settings = options.settings;
     else {
-      try { this.settings = JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf8')); } catch { this.settings = {}; }
+      try {
+        const target = getWritableDataPath(SETTINGS_PATH);
+        if (fs.existsSync(target)) this.settings = JSON.parse(fs.readFileSync(target, 'utf8'));
+        else if (fs.existsSync(SETTINGS_PATH)) this.settings = JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf8'));
+        else this.settings = {};
+      } catch { this.settings = {}; }
     }
   }
 
