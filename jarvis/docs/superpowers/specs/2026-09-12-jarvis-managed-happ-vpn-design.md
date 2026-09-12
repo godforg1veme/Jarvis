@@ -95,18 +95,19 @@ Read operations:
 
 - `vpn.status`: service state, configuration validity, listener status, active
   client count, aggregate traffic counters, and last successful probe time;
-- `vpn.clients.list`: bounded metadata only, without credentials;
-- `vpn.client.export`: owner-authorized one-time export handle, never a secret
-  embedded in logs or monitoring records.
+- `vpn.clients.list`: bounded metadata only, without credentials.
 
 Changing operations:
 
 - `vpn.client.issue` with a validated display label;
 - `vpn.client.revoke` with an opaque client ID;
 - `vpn.client.rotate` with an opaque client ID;
+- `vpn.client.export` with an opaque client ID, producing an owner-authorized
+  one-time export handle rather than returning a credential in protocol logs;
 - `vpn.restart`.
 
-Issue, revoke, rotate, and restart are durable, idempotency-keyed operations.
+Issue, revoke, rotate, export, and restart are durable, idempotency-keyed
+operations.
 An interrupted changing request has an unknown outcome and is reconciled using
 the original request identifier; it is never blindly replayed with a new ID.
 
