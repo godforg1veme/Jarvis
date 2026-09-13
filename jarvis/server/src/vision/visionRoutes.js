@@ -1,6 +1,7 @@
 const { z } = require('zod');
 const { MAX_FRAME_BYTES, validateVisionFrameMetadata } = require('./visionSchemas');
 const { visionError } = require('./visionErrors');
+const { recordSimpleEvent, safeSummary } = require('../life/lifeSourceEvents');
 
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/webp']);
 const leaseSchema = z.object({
@@ -47,7 +48,7 @@ function publicMemoryRecord(record) {
   };
 }
 
-function registerVisionRoutes(app, { authenticate, leaseStore, provider, limiter, memoryService = null, sceneStore = null }) {
+function registerVisionRoutes(app, { authenticate, leaseStore, provider, limiter, memoryService = null, sceneStore = null, lifeEventGateway = null }) {
   app.addContentTypeParser([...IMAGE_TYPES], { parseAs: 'buffer' }, (request, body, done) => done(null, body));
   const requireDevice = async (request) => { request.device = await authenticate(request.headers); };
 
@@ -88,6 +89,26 @@ function registerVisionRoutes(app, { authenticate, leaseStore, provider, limiter
       image: request.body, metadata, observation,
       sensitiveConsent: leaseStore.getSensitiveConsent(accepted.lease, metadata.sourceId),
     }) : null;
+    const observationSummary = safeSummary(
+      observation && (observation.summary || observation.answer || observation.description),
+      'Vision зафиксировал изменение сцены',
+    );
+    await recordSimpleEvent(lifeEventGateway, {
+      userId: request.device.user_id,
+      eventType: 'vision.observed',
+      sourceChannel: 'vision',
+      sourceDeviceId: request.device.id,
+      sourceRef: `vision:${metadata.frameId}`,
+      deduplicationKey: `vision-observation:${request.device.user_id}:${metadata.frameId}`,
+      summary: observationSummary,
+      structuredData: {
+        leaseId: metadata.leaseId,
+        sourceId: metadata.sourceId,
+        observationId: String(observation && observation.id || metadata.frameId).slice(0, 200),
+        changed: metadata.changed !== false,
+      },
+      privacyClass: observation && observation.sensitivity === 'sensitive' ? 'sensitive' : 'personal',
+    });
     return { ok: true, observation, ...(sceneState ? { sceneState } : {}), ...(memory ? { memory } : {}) };
   });
 

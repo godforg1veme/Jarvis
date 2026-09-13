@@ -1,0 +1,113 @@
+const { recordSimpleEvent } = require('./lifeSourceEvents');
+
+class ProposalService {
+  constructor(options = {}) {
+    this.repository = options.repository;
+    this.gateway = options.gateway;
+    this.orchestrator = options.orchestrator || null;
+    this.now = options.now || (() => new Date());
+  }
+
+  async create(input) {
+    try {
+      const proposal = await this.repository.createProposal(input);
+      await recordSimpleEvent(this.gateway, {
+        userId: input.userId, eventType: 'proposal.created', sourceChannel: 'life_os',
+        sourceRef: `proposal:${proposal.id}`, deduplicationKey: `proposal-created:${proposal.id}`,
+        summary: `Предложение: ${proposal.title}`,
+        structuredData: { proposalId: proposal.id, state: proposal.status,
+          ...(proposal.project_id ? { projectId: proposal.project_id } : {}),
+          ...(proposal.commitment_id ? { commitmentId: proposal.commitment_id } : {}) },
+        trustLevel: 'inferred',
+      });
+      return proposal;
+    } catch (error) {
+      if (error && error.code === '23505') return null;
+      throw error;
+    }
+  }
+
+  async confirm({ userId, proposalId, revision = null, originChannel, originDeviceId = null, originConversationId = null }) {
+    const proposal = await this.repository.getProposal({ userId, proposalId });
+    if (!proposal || proposal.status !== 'open') return null;
+    if (revision !== null && proposal.revision !== revision) return null;
+    if (new Date(proposal.expires_at) <= this.now()) {
+      await this.repository.transitionProposal({ userId, proposalId, revision: proposal.revision, fromStatuses: ['open'], status: 'expired' });
+      return null;
+    }
+    if (proposal.origin_channel !== originChannel) return null;
+    if (originChannel === 'desktop' && proposal.origin_device_id !== originDeviceId) return null;
+    if (originChannel === 'telegram' && proposal.origin_conversation_id !== originConversationId) return null;
+
+    const confirmed = await this.repository.transitionProposal({
+      userId, proposalId, revision: proposal.revision, fromStatuses: ['open'], status: 'confirmed', confirmed: true,
+    });
+    if (!confirmed) return null;
+    await recordSimpleEvent(this.gateway, {
+      userId, eventType: 'proposal.confirmed', sourceChannel: 'life_os',
+      sourceRef: `proposal:${proposalId}`, deduplicationKey: `proposal-confirmed:${proposalId}`,
+      sourceDeviceId: originDeviceId,
+      summary: `Подтверждено предложение: ${confirmed.title}`,
+      structuredData: { proposalId, state: 'confirmed' },
+    });
+
+    if (confirmed.risk_class === 'safe' || !confirmed.action_name) {
+      return this.repository.transitionProposal({
+        userId, proposalId, revision: confirmed.revision, fromStatuses: ['confirmed'], status: 'completed',
+      });
+    }
+    if (!this.orchestrator || typeof this.orchestrator.executeDeclaredProposal !== 'function') {
+      return this.repository.transitionProposal({
+        userId, proposalId, revision: confirmed.revision, fromStatuses: ['confirmed'], status: 'failed',
+      });
+    }
+    try {
+      const result = await this.orchestrator.executeDeclaredProposal({
+        userId, proposalId, conversationId: confirmed.origin_conversation_id,
+        originChannel, originDeviceId, text: confirmed.title,
+        actionName: confirmed.action_name, actionArguments: confirmed.action_arguments || {},
+      });
+      return this.repository.transitionProposal({
+        userId, proposalId, revision: confirmed.revision, fromStatuses: ['confirmed'],
+        status: result.pending ? 'executing' : 'completed', workflowId: result.workflowId || null,
+      });
+    } catch (_) {
+      return this.repository.transitionProposal({
+        userId, proposalId, revision: confirmed.revision, fromStatuses: ['confirmed'], status: 'failed',
+      });
+    }
+  }
+
+  async dismiss({ userId, proposalId, revision = null, originChannel, originDeviceId = null, originConversationId = null }) {
+    const proposal = await this.repository.getProposal({ userId, proposalId });
+    if (!proposal || proposal.status !== 'open' || proposal.origin_channel !== originChannel) return null;
+    if (revision !== null && proposal.revision !== revision) return null;
+    if (originChannel === 'desktop' && proposal.origin_device_id !== originDeviceId) return null;
+    if (originChannel === 'telegram' && proposal.origin_conversation_id !== originConversationId) return null;
+    const dismissed = await this.repository.transitionProposal({
+      userId, proposalId, revision: proposal.revision, fromStatuses: ['open'], status: 'dismissed',
+    });
+    if (dismissed) await recordSimpleEvent(this.gateway, {
+      userId, eventType: 'proposal.dismissed', sourceChannel: 'life_os',
+      sourceRef: `proposal:${proposalId}`, deduplicationKey: `proposal-dismissed:${proposalId}`,
+      sourceDeviceId: originDeviceId, summary: `Отклонено предложение: ${dismissed.title}`,
+      structuredData: { proposalId, state: 'dismissed' },
+    });
+    return dismissed;
+  }
+
+  async onWorkflowStatus(workflow) {
+    const proposalId = workflow && workflow.state && workflow.state.proposalId;
+    if (!proposalId || !['succeeded', 'failed', 'outcome_unknown'].includes(workflow.status)) return null;
+    const proposal = await this.repository.getProposal({ userId: workflow.user_id, proposalId });
+    if (!proposal || proposal.workflow_id !== workflow.id || !['confirmed', 'executing'].includes(proposal.status)) return null;
+    return this.repository.transitionProposal({
+      userId: workflow.user_id, proposalId, revision: proposal.revision,
+      fromStatuses: ['confirmed', 'executing'],
+      status: workflow.status === 'succeeded' ? 'completed' : workflow.status === 'failed' ? 'failed' : 'outcome_unknown',
+      workflowId: workflow.id,
+    });
+  }
+}
+
+module.exports = { ProposalService };

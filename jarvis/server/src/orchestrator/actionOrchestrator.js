@@ -1,4 +1,5 @@
 const crypto = require('node:crypto');
+const { recordSimpleEvent } = require('../life/lifeSourceEvents');
 
 const WORKFLOW_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_STEPS = 4;
@@ -121,6 +122,8 @@ class ActionOrchestrator {
     this.deviceRepository = options.deviceRepository;
     this.conversationRepository = options.conversationRepository;
     this.deliverUpdate = options.deliverUpdate || null;
+    this.lifeEventGateway = options.lifeEventGateway || null;
+    this.onWorkflowStatus = typeof options.onWorkflowStatus === 'function' ? options.onWorkflowStatus : null;
     this.now = options.now || (() => new Date());
     this.fastResultWaitMs = options.fastResultWaitMs || FAST_RESULT_WAIT_MS;
     this.inFlightCommands = new Set();
@@ -194,6 +197,7 @@ class ActionOrchestrator {
           ...(input.originChatId ? { originChatId: String(input.originChatId).slice(0, 128) } : {}),
         },
       });
+      await this._recordWorkflowEvent(workflow, 'workflow.started');
     }
     if (plan.kind === 'ask_user') {
       workflow = await this._update(workflow, 'awaiting_input', {
@@ -229,6 +233,29 @@ class ActionOrchestrator {
     }
   }
 
+  async executeDeclaredProposal(input) {
+    const action = this.manifest.require(input.actionName);
+    const actionArguments = action.validateArgs(input.actionArguments || {});
+    let workflow = await this.repository.create({
+      id: crypto.randomUUID(), userId: input.userId, conversationId: input.conversationId,
+      originChannel: input.originChannel, originDeviceId: input.originDeviceId || null,
+      targetExecutorType: action.executorType, targetId: input.originDeviceId || null,
+      expiresAt: new Date(this.now().getTime() + WORKFLOW_TTL_MS),
+      state: { originalRequest: String(input.text || '').slice(0, 10000), latestUserText: String(input.text || '').slice(0, 10000),
+        proposalId: input.proposalId, toolResults: [] },
+    });
+    await this._recordWorkflowEvent(workflow, 'workflow.started');
+    const devices = await this.deviceRepository.listForUser(input.userId);
+    let result = await this._executePlan({
+      input, workflow, devices, history: [],
+      plan: { kind: 'tool_call', action: action.name, args: actionArguments, targetDeviceId: input.originDeviceId || null },
+    });
+    if (result.confirmation && result.confirmation.commandId) {
+      result = await this.confirm({ ...input, commandId: result.confirmation.commandId, history: [] });
+    }
+    return result;
+  }
+
   async reject(input) {
     const command = await this.commandService.get({ userId: input.userId, commandId: input.commandId });
     const workflow = input.workflow || (command.workflow_id
@@ -260,6 +287,7 @@ class ActionOrchestrator {
         userId: command.user_id,
         conversationId: workflow.conversation_id,
         originChannel: workflow.origin_channel,
+        conversationId: workflow.conversation_id,
         originDeviceId: workflow.origin_device_id,
         originChatId: workflow.state?.originChatId,
         text: workflow.state?.latestUserText || workflow.state?.originalRequest || '',
@@ -481,10 +509,53 @@ class ActionOrchestrator {
     });
     if (!updated) {
       const current = await this.repository.getForUser({ userId: workflow.user_id, workflowId: workflow.id });
-      if (current) return current;
+      if (current) {
+        await this._recordWorkflowStatus(current);
+        return current;
+      }
       throw new Error('workflow update conflict');
     }
+    await this._recordWorkflowStatus(updated);
     return updated;
+  }
+
+  async _recordWorkflowStatus(workflow) {
+    const eventTypes = {
+      awaiting_confirmation: 'workflow.awaiting_confirmation',
+      succeeded: 'workflow.completed',
+      cancelled: 'workflow.completed',
+      failed: 'workflow.failed',
+      outcome_unknown: 'workflow.outcome_unknown',
+    };
+    const eventType = eventTypes[workflow.status];
+    if (eventType) await this._recordWorkflowEvent(workflow, eventType);
+    if (this.onWorkflowStatus) await this.onWorkflowStatus(workflow);
+  }
+
+  async _recordWorkflowEvent(workflow, eventType) {
+    const labels = {
+      'workflow.started': 'Начат безопасный сценарий действий',
+      'workflow.awaiting_confirmation': 'Сценарий ожидает подтверждения в исходном клиенте',
+      'workflow.completed': workflow.status === 'cancelled' ? 'Сценарий отменён пользователем' : 'Сценарий успешно завершён',
+      'workflow.failed': 'Сценарий завершился ошибкой',
+      'workflow.outcome_unknown': 'Результат сценария требует проверки',
+    };
+    await recordSimpleEvent(this.lifeEventGateway, {
+      userId: workflow.user_id,
+      eventType,
+      sourceChannel: 'orchestrator',
+      sourceDeviceId: workflow.origin_device_id || null,
+      sourceRef: `workflow:${workflow.id}`,
+      deduplicationKey: `workflow:${workflow.id}:${workflow.revision}:${eventType}`,
+      summary: labels[eventType],
+      structuredData: {
+        workflowId: workflow.id,
+        state: workflow.status,
+        originChannel: workflow.origin_channel,
+        ...(workflow.target_id ? { targetDeviceId: workflow.target_id } : {}),
+      },
+      correlationId: workflow.id,
+    });
   }
 
   _supports(device, action) {

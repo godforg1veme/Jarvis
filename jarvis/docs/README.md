@@ -4,7 +4,21 @@ This file is the status authority for project documentation. Specifications and
 plans under `docs/superpowers/` are preserved as decision history; their old
 future-tense wording does not override the current architecture in `AGENTS.md`.
 
-Status snapshot: 2026-09-12.
+Status snapshot: 2026-09-13.
+
+Life OS update, 2026-09-13: Core v1 is implemented and production-enabled across
+the Event Spine, projections, explainable proposals, context recovery,
+authenticated API, Telegram commands, and responsive Desktop Mission Control.
+Migration 013, an isolated real-PostgreSQL acceptance, VPS health/smoke, the
+installed Desktop package, and paired WSS reconnect were verified. Deterministic
+proactivity is enabled; optional model enrichment remains disabled. Details are
+recorded in `updates/2026-09-13-life-os-core-v1.md`.
+
+Happ VPN update, 2026-09-13: dedicated VLESS + REALITY + XTLS Vision Xray is
+deployed on port 443, externally accepted through the production client URI,
+and monitored by Operations. Owner-only Telegram/Desktop commands use
+origin-bound confirmation and one-time credential delivery. See
+`updates/2026-09-13-happ-vpn-rollout.md`.
 
 Operations update, 2026-09-06: see
 `updates/2026-09-06-operations-verification.md` for the corrective rollout,
@@ -55,6 +69,10 @@ attachment ingestion.
 | `superpowers/specs/2026-09-09-jarvis-vision-design.md` | Implemented first vertical slice with accepted live Camo and dual-display capture; see `updates/2026-09-09-vision-implementation.md` for verified boundaries and remaining provider/Telegram acceptance |
 | `superpowers/specs/2026-09-10-gigaam-v3-e2e-rnnt-rollout-design.md` | Deployed private DE-4 server ASR worker; ONNX cache, live server contract, queue, restart, health, and capacity checks verified. Superseded for Telegram routing by the 2026-09-11 record. |
 | `superpowers/specs/2026-09-11-telegram-voice-asr-design.md` | Implemented and enabled on DE-4: allowlisted Telegram `voice` → private GigaAM → owner-scoped `voice_transcript`, with synthetic OGG live-contract acceptance and explicit bounds. Real inbound owner Telegram acceptance remains manual. |
+| `superpowers/specs/2026-09-12-jarvis-managed-happ-vpn-design.md` | Implemented and deployed: dedicated Xray, closed Host Agent operations, owner-only confirmed Telegram/Desktop control, one-time Happ export, recovery, Operations monitoring, and external exit-IP acceptance. Final import in the user's Happ app remains manual. |
+| `superpowers/plans/2026-09-12-jarvis-managed-happ-vpn.md` | Implemented and production-verified on 2026-09-13; retained as rollout history. |
+| `superpowers/specs/2026-09-12-jarvis-life-os-core-v1-design.md` | Implemented and production-enabled: owner-scoped Event Spine, projections, Timeline, context recovery, explainable proposals, Telegram commands, and Desktop Mission Control. Optional model enrichment remains disabled. |
+| `superpowers/plans/2026-09-12-jarvis-life-os-core-v1.md` | Implemented, packaged, installed, and production-verified on 2026-09-13; retained as execution history. |
 | `superpowers/plans/2026-09-09-jarvis-vision.md` | Execution plan adapted to the current cloud-brain/local-hands architecture; first camera + two-display + memory slice implemented and locally accepted |
 | `plans/2026-09-01-jarvis-family-cloud-assistant.md` | Active roadmap; Milestones 0–3 are partial, later milestones are not complete |
 | `specs/2026-09-01-jarvis-desktop-cloud-client-design.md` | Implemented and packaged: paired Windows chat, DPAPI device credentials, device-scoped HTTPS/WSS sessions, local wake word, server ASR contract, and NSIS installer. Live VPS configuration and clean-machine acceptance remain operational steps. |
@@ -120,3 +138,6 @@ design, but new material must use the hybrid cloud/local positioning above.
    when runtime ownership or deployment reality changes.
 5. Never infer that a database table, protocol schema, Compose profile, or plan
    means the full user-facing feature is already operational.
+6. After Windows-client or packaged-resource changes, follow the authoritative
+   `Desktop EXE Update Reminder` in `AGENTS.md`: check the installed build and
+   offer to build and install a current EXE when it is stale.

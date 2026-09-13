@@ -1,5 +1,9 @@
 # Jarvis Life OS Core v1 Design
 
+Status: implemented and production-enabled on 2026-09-13. This document is
+retained as the approved design record; verified rollout evidence is in
+`../../updates/2026-09-13-life-os-core-v1.md`.
+
 Status: approved design as of 2026-09-12.
 
 This specification introduces the Life OS domain without replacing the current

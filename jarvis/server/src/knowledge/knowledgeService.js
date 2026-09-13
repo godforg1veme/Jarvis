@@ -2,6 +2,7 @@ const crypto = require('node:crypto');
 const { storageKeyForId } = require('./documentStorage');
 const { chunkText, extractDocumentText } = require('./documentText');
 const { classifyAttachment, safeDisplayName } = require('./fileTypes');
+const { recordDocumentEvent } = require('../life/lifeSourceEvents');
 
 const DEFAULT_DOCUMENT_MAX_BYTES = 20 * 1024 * 1024;
 
@@ -54,6 +55,7 @@ class KnowledgeService {
     this.extract = options.extract || extractDocumentText;
     this.chunk = options.chunk || chunkText;
     this.embeddingProvider = options.embeddingProvider || null;
+    this.lifeEventGateway = options.lifeEventGateway || null;
   }
 
   async ingest({ userId, attachment, data }) {
@@ -131,6 +133,12 @@ class KnowledgeService {
         await this.repository.enqueueEmbedding({ userId: document.user_id, documentId: document.id });
       }
       await this.repository.completeJob(job.id);
+      await recordDocumentEvent(this.lifeEventGateway, {
+        userId: document.user_id,
+        documentId: document.id,
+        name: document.original_name,
+        category: document.category,
+      });
       return { status: 'ready', chunks: chunks.length };
     } catch (error) {
       if (documentReady && this.embeddingProvider) {
@@ -146,6 +154,15 @@ class KnowledgeService {
           maxAttempts: job.max_attempts,
           failureCode: 'document_ingest_failed',
         });
+        if (Number(job.attempts) >= Number(job.max_attempts)) {
+          await recordDocumentEvent(this.lifeEventGateway, {
+            userId: document.user_id,
+            documentId: document.id,
+            name: document.original_name,
+            category: document.category,
+            failed: true,
+          });
+        }
       }
       throw error;
     }

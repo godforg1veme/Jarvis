@@ -5,6 +5,9 @@ agents in this repository. Read it completely before inspecting or changing
 code. It defines the current architecture, safety boundaries, generated files,
 and verification commands; do not duplicate or override it here.
 
+The `Desktop EXE Update Reminder` in `AGENTS.md` is mandatory after changes that
+affect the Windows client or its packaged resources.
+
 Gemini is an optional provider/advisor, not Jarvis's identity or the sole AI
 architecture. For implemented-versus-roadmap status and historical design
 records, use [`docs/README.md`](docs/README.md).

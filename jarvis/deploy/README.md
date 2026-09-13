@@ -22,6 +22,13 @@ and 443 are free, but it must not be started on the current Xray host.
 Do not commit or paste real values from those files. Use `deploy/env.example`
 as the variable-name reference.
 
+## Desktop EXE update reminder
+
+When deployment work also changes the Windows client or its packaged resources,
+check whether the installed Jarvis Desktop EXE is stale. If it is, offer to run
+`npm run dist:win` and install the current EXE; do not build or install it
+automatically without a user request. `AGENTS.md` is authoritative for this rule.
+
 ### Current public endpoint
 
 `jarvis.rilora.ru` routes through Cloudflare Tunnel to `http://server:3210` and
@@ -134,6 +141,47 @@ Do not mount the Docker socket into the application container. Service actions
 remain unavailable unless both the Host Agent allowlist and the matching
 `ops_service_capabilities` row are enabled. The Telegram parser is observation
 only and must never receive an action capability.
+
+## Life OS
+
+Migration `013_life_os_core.sql` creates the owner-scoped Event Spine and Life
+OS projections. Roll it out in stages: first set `JARVIS_LIFE_OS_ENABLED=true`
+with enrichment and proactivity disabled, rebuild `server`, and verify readiness,
+the isolated PostgreSQL acceptance, and an authenticated Desktop bootstrap.
+Enable `JARVIS_LIFE_OS_PROACTIVITY_ENABLED=true` only after the current Desktop
+Mission Control build is installed, because proposals are delivered over the
+validated `life.proposal` WSS message. Model enrichment remains independently
+optional through `JARVIS_LIFE_OS_ENRICHMENT_ENABLED`.
+
+Life OS must never receive raw voice bytes, screen/camera frames, OCR text,
+document bodies, private storage paths, VPN artifacts, or credentials. Changing
+proposals remain frozen declared actions and still require confirmation in the
+originating Telegram/Desktop client.
+
+## Happ VPN
+
+The current host runs a dedicated hardened `xray.service` with VLESS + REALITY
++ XTLS Vision on TCP 443. Its authoritative client state is root-only under
+`/etc/jarvis-vpn/`; `/etc/xray/config.json` is generated from that state. Do
+not edit either file by hand and do not restore x-ui while Xray is active.
+
+Initial installation or an intentional rebuild uses a directly verified
+REALITY target and keeps a root-only x-ui rollback backup:
+
+```bash
+sudo bash deploy/vpn/install.sh VPS_ADDRESS REALITY_SERVER_NAME Owner-Happ
+sudo bash deploy/host-agent/install.sh
+sudo bash deploy/host-agent/enable-safe-actions.sh
+systemctl is-active xray jarvis-host-agent
+sudo /usr/local/bin/xray run -test -c /etc/xray/config.json
+```
+
+The owner controls access from Telegram or a paired Desktop with `/vpn`,
+`/vpn_clients`, `/vpn_issue LABEL`, `/vpn_revoke ID`, `/vpn_rotate ID`,
+`/vpn_export ID`, and `/vpn_restart`. All mutations require confirmation in the
+originating client. Never print or archive the resulting VLESS URI; Telegram
+sends it as a one-time document and Desktop writes it under its private runtime
+data directory.
 
 ## Model configuration
 

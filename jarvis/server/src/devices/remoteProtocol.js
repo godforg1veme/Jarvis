@@ -10,6 +10,7 @@ const MESSAGE_TYPES = new Set([
   'command.cancel',
   'command.result',
   'workflow.update',
+  'life.proposal',
   'server.error',
 ]);
 
@@ -65,6 +66,13 @@ function validateRemoteMessage(input) {
     message.payload.status = requiredId(payload.status, 'workflow status');
     message.payload.answer = optionalText(payload.answer, 10000, 'workflow answer');
     if (!message.payload.answer) throw new Error('workflow answer is required');
+  }
+  if (type === 'life.proposal') {
+    message.payload.proposalId = requiredId(payload.proposalId, 'proposal id');
+    message.payload.title = optionalText(payload.title, 300, 'proposal title');
+    message.payload.explanation = optionalText(payload.explanation, 1000, 'proposal explanation');
+    message.payload.risk = ['safe', 'changing'].includes(payload.risk) ? payload.risk : 'safe';
+    if (!message.payload.title) throw new Error('proposal title is required');
   }
   if (type === 'command.result') message.payload.result = validateCommandResult(payload.result);
   if (type === 'server.error') {

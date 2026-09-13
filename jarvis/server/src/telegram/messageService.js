@@ -6,6 +6,7 @@ const { attachmentReply, isDeviceAttachmentQuestion } = require('../devices/devi
 const { attachmentFromTelegramMessage } = require('../knowledge/fileTypes');
 const { publicDocumentStatus, renderDocumentCitations } = require('../knowledge/knowledgeService');
 const { parseRemoteCommand, remoteCommandReply } = require('../commands/commandText');
+const { recordMessageEvent } = require('../life/lifeSourceEvents');
 
 function voiceFromTelegramMessage(message = {}) {
   const candidate = message.voice;
@@ -82,7 +83,7 @@ function normalizeTelegramMessage(update) {
 function commandReply(text) {
   const command = String(text || '').split(/\s+/, 1)[0].split('@', 1)[0].toLowerCase();
   if (command === '/start') return 'Jarvis подключён. Напишите вопрос обычным сообщением.';
-  if (command === '/help') return 'Доступно: текстовые вопросы, загрузка файлов, /documents, /document_delete ID confirm, /devices, /pair Имя ПК, /revoke ID устройства, /desktop DEVICE_ID ACTION JSON, /confirm COMMAND_ID, /reject COMMAND_ID, /command COMMAND_ID, /memory, а также «запомни», «забудь» и «исправь старое → новое».';
+  if (command === '/help') return 'Доступно: текстовые вопросы, загрузка файлов, /life, /life_confirm ID, /life_dismiss ID, /documents, /document_delete ID confirm, /devices, /pair Имя ПК, /revoke ID устройства, /desktop DEVICE_ID ACTION JSON, /confirm COMMAND_ID, /reject COMMAND_ID, /command COMMAND_ID, /memory. Для владельца: /vpn, /vpn_clients, /vpn_issue ИМЯ, /vpn_revoke ID, /vpn_rotate ID, /vpn_export ID, /vpn_restart. Также можно писать «запомни», «забудь» и «исправь старое → новое».';
   if (command === '/memory') return null;
   return null;
 }
@@ -110,6 +111,10 @@ class TelegramMessageService {
     this.visualMemoryService = options.visualMemoryService || null;
     this.asr = options.asr || null;
     this.voiceLimiter = options.voiceLimiter || null;
+    this.vpnService = options.vpnService || null;
+    this.lifeEventGateway = options.lifeEventGateway || null;
+    this.lifeMissionControlService = options.lifeMissionControlService || null;
+    this.lifeProposalService = options.lifeProposalService || null;
   }
 
   async remoteCommandReply({ text, user, conversationId }) {
@@ -165,6 +170,25 @@ class TelegramMessageService {
       return revoked ? `Устройство «${revoked.name}» отозвано.` : 'Устройство не найдено или уже отозвано.';
     }
     return null;
+  }
+
+  async lifeCommandReply({ text, user, conversation }) {
+    const { command, argument } = commandParts(text);
+    if (!['/life', '/life_confirm', '/life_dismiss'].includes(command)) return null;
+    if (!this.lifeMissionControlService || !this.lifeProposalService) return 'Life OS пока не включён.';
+    if (command === '/life') {
+      const data = await this.lifeMissionControlService.get({ userId: user.id });
+      const mission = data.currentMission ? `Текущая миссия: ${data.currentMission.name}` : 'Текущая миссия не выбрана.';
+      const commitments = data.commitments.slice(0, 5).map((item) => `• ${item.title}${item.dueAt ? ` — ${new Date(item.dueAt).toLocaleString('ru-RU')}` : ''}`).join('\n');
+      const proposals = data.proposals.slice(0, 5).map((item) => `• ${item.title}\n  /life_confirm ${item.id}\n  /life_dismiss ${item.id}`).join('\n');
+      return [mission, commitments ? `\nДоговорённости:\n${commitments}` : '', proposals ? `\nПредложения:\n${proposals}` : ''].join('').slice(0, MAX_TEXT_LENGTH);
+    }
+    if (!/^[a-f0-9-]{36}$/i.test(argument)) return `Укажите ID: ${command} ID`;
+    const action = command === '/life_confirm' ? 'confirm' : 'dismiss';
+    const proposal = await this.lifeProposalService[action]({
+      userId: user.id, proposalId: argument, originChannel: 'telegram', originConversationId: conversation.id,
+    });
+    return proposal ? (action === 'confirm' ? 'Предложение подтверждено.' : 'Предложение отклонено.') : 'Предложение недоступно, истекло или относится к другому каналу.';
   }
 
   async handle(update, options = {}) {
@@ -252,6 +276,37 @@ class TelegramMessageService {
         content: input.text,
         externalMessageId: input.messageId,
       });
+    }
+
+    await recordMessageEvent(this.lifeEventGateway, {
+      userId: user.id,
+      conversationId: conversation.id,
+      sourceChannel: 'telegram',
+      sourceRef: `telegram:${input.updateId}`,
+      deduplicationKey: `telegram-message:${user.id}:${input.updateId}`,
+      externalMessageId: input.messageId,
+      kind: voiceTranscript ? 'voice' : 'text',
+      text: input.text,
+    });
+
+    const lifeAnswer = await this.lifeCommandReply({ text: input.text, user, conversation });
+    if (lifeAnswer) {
+      await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: lifeAnswer });
+      return { status: 'answered', answer: lifeAnswer };
+    }
+
+    const vpnResult = this.vpnService ? await this.vpnService.handle({
+      text: input.text, userId: user.id, conversationId: conversation.id,
+      originChannel: 'telegram', originDeviceId: null,
+    }) : null;
+    if (vpnResult) {
+      await this.conversationRepository.appendMessage({
+        userId: user.id,
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: vpnResult.answer,
+      });
+      return { status: 'answered', answer: vpnResult.answer, ...(vpnResult.artifact ? { artifact: vpnResult.artifact } : {}) };
     }
 
     const remoteAnswer = await this.remoteCommandReply({ text: input.text, user, conversationId: conversation.id });

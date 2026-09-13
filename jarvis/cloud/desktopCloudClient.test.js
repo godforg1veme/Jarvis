@@ -165,3 +165,64 @@ test('cloud client forwards a validated asynchronous workflow result to the rend
     fs.rmSync(userDataPath, { recursive: true, force: true });
   }
 });
+
+test('cloud client forwards a validated Life OS proposal to the renderer bridge', async () => {
+  const userDataPath = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-cloud-client-'));
+  try {
+    let socket;
+    const proposals = [];
+    const client = new DesktopCloudClient({
+      userDataPath,
+      safeStorage: fakeSafeStorage(),
+      onLifeProposal: (proposal) => proposals.push(proposal),
+      WebSocket: class extends HandshakeSocket { constructor(url) { super(url); socket = this; } },
+      fetch: async () => response({ ok: true, device: { id: 'device-a', name: 'Home PC' }, token: 'x'.repeat(43) }, 201),
+    });
+    await client.pair({ serverUrl: 'https://jarvis.example.test', pairingCode: 'JARVIS-ABCD-1234-ABCD-1234' });
+    socket.emit('open');
+    socket.emit('message', { data: JSON.stringify({ version: 1, type: 'device.welcome', payload: { deviceId: 'device-a', status: 'online' } }) });
+    socket.emit('message', { data: JSON.stringify({
+      version: 1,
+      type: 'life.proposal',
+      payload: {
+        proposalId: 'proposal-1',
+        title: 'Вернуться к Life OS',
+        explanation: 'Есть открытая договорённость.',
+        risk: 'safe',
+      },
+    }) });
+    assert.deepEqual(proposals, [{
+      proposalId: 'proposal-1',
+      title: 'Вернуться к Life OS',
+      explanation: 'Есть открытая договорённость.',
+      risk: 'safe',
+    }]);
+    client.stopSession();
+  } finally {
+    fs.rmSync(userDataPath, { recursive: true, force: true });
+  }
+});
+
+test('cloud client stores a validated Happ artifact outside the repository and removes its secret from the response', async () => {
+  const userDataPath = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-cloud-client-'));
+  try {
+    const secret = 'vless://private-client@example.test:443?security=reality\n';
+    const client = new DesktopCloudClient({
+      userDataPath,
+      safeStorage: fakeSafeStorage(),
+      WebSocket: FailingSocket,
+      fetch: async (url) => url.endsWith('/v1/desktop/pair')
+        ? response({ ok: true, device: { id: 'device-a', name: 'Home PC' }, token: 'x'.repeat(43) }, 201)
+        : response({ ok: true, answer: 'VPN-доступ создан.', vpnArtifact: { kind: 'happ-vless', filename: 'Phone-vpn-0123456789ab.txt', content: secret } }),
+    });
+    await client.pair({ serverUrl: 'https://jarvis.example.test', pairingCode: 'JARVIS-ABCD-1234-ABCD-1234' });
+    const result = await client.sendText('/vpn_confirm 33333333-3333-4333-8333-333333333333');
+    assert.equal(result.vpnArtifact.content, undefined);
+    assert.equal(result.vpnArtifact.path, path.join(userDataPath, VPN_EXPORT_DIR, 'Phone-vpn-0123456789ab.txt'));
+    assert.equal(fs.readFileSync(result.vpnArtifact.path, 'utf8'), secret);
+    assert.match(result.answer, /Файл Happ:/);
+    client.stopSession();
+  } finally {
+    fs.rmSync(userDataPath, { recursive: true, force: true });
+  }
+});

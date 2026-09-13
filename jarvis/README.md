@@ -51,7 +51,14 @@ Jarvis — гибридная платформа персонального и �
   строгий JSON-план, до четырёх проверяемых шагов, поиск → opaque candidate →
   действие, продолжение после WSS-результата и подтверждение в исходном клиенте;
 - серверные маршруты привязки устройства, Desktop-чата и однократной отправки
-  голоса с изоляцией по владельцу устройства и идемпотентностью запросов.
+  голоса с изоляцией по владельцу устройства и идемпотентностью запросов;
+- Life OS Core v1: единая owner-scoped лента событий из Telegram, Desktop,
+  голоса, документов, Vision, устройств и Action Orchestrator; области, проекты,
+  контекстные связи, договорённости, объяснимые предложения, восстановление
+  контекста и Desktop Mission Control. Сырые аудио, изображения, OCR, тела
+  документов, локальные пути и секреты в Life OS не сохраняются; изменяющие
+  предложения исполняются только через существующее подтверждение исходного
+  клиента;
 - проверяемый серверный ответ о привязанных компьютерах: `/devices` и вопросы
   вида «К какому ПК я привязан?» не зависят от ответа модели.
 - гибридный поиск личной базы знаний: PostgreSQL FTS + production embeddings
@@ -74,6 +81,12 @@ Jarvis — гибридная платформа персонального и �
   в диалог попадает только `voice_transcript`. Лимиты — 5 MiB, 120 секунд и
   три заметки в минуту на владельца; `audio` и остальные медиа остаются
   приватными вложениями.
+- на VPS развёрнут выделенный Xray VPN для Happ: VLESS + REALITY + XTLS Vision
+  на 443, отдельные отзываемые клиентские доступы и мониторинг в Operations.
+  Владелец управляет им командами `/vpn`, `/vpn_clients`, `/vpn_issue`,
+  `/vpn_revoke`, `/vpn_rotate`, `/vpn_export` и `/vpn_restart`; каждое изменение
+  подтверждается в исходном Telegram/Desktop-клиенте, а URI выдаётся только
+  одноразовым файлом и не сохраняется в облачной истории.
 
 Развивается:
 
@@ -144,6 +157,8 @@ Tabletop Simulator на диске F». Если путь неизвестен, 
 ## Структура проекта
 
 - `server/` — постоянно работающий облачный control plane, Telegram и модели.
+- `server/src/life/` — Event Spine, проекции Life OS, Timeline, контекст и
+  безопасная проактивность.
 - `deploy/` — Docker Compose, PostgreSQL/pgvector и операции VPS.
 - `main.js`, `preload.js`, `renderer/` — Electron lifecycle и интерфейсы Windows.
 - `voice/` — захват микрофона, wake word, облачная передача голоса и Voice Lab;
@@ -187,6 +202,11 @@ npm run dist:win
 2. Устанавливает Desktop и вводит домен Jarvis и одноразовый код.
 3. Пишет в чат или включает голос и говорит «Джарвис».
 
+После изменений Windows-клиента нужно сравнить установленный EXE с текущими
+исходниками. Если установленная версия устарела, агент должен предложить собрать
+`npm run dist:win` и установить актуальный EXE, но не делать это автоматически
+без запроса пользователя. Полное правило находится в `AGENTS.md`.
+
 Установщик сейчас не подписан сертификатом кода: Windows может показать
 предупреждение SmartScreen. Для публичного распространения нужен отдельный
 сертификат подписи кода; не добавляйте его ключ в репозиторий или CI-логи.
@@ -216,6 +236,9 @@ node scripts/testFileCommands.js
 node scripts/testToolGateway.js
 node scripts/testRemoteProtocol.js
 node scripts/testToolPolicyMapping.js
+node scripts/testLifeOsIpc.js
+node scripts/testLifeOsRenderer.js
+node scripts/testLifeOsBrowser.cjs
 node scripts/testSttSettings.js
 node scripts/testVoiceServiceSttProvider.js
 node scripts/testVoiceQualityMonitor.js

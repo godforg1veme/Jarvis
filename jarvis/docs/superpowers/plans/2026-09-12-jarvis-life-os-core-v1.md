@@ -1,5 +1,8 @@
 # Jarvis Life OS Core v1 — implementation plan
 
+Status: implemented, packaged, installed, and production-verified on 2026-09-13.
+Optional model enrichment remains disabled; deterministic Core v1 is active.
+
 Date: 2026-09-12
 
 Status: approved for implementation. This plan implements

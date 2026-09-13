@@ -37,6 +37,14 @@ class ConversationRepository {
     `, [userId, conversationId, boundedLimit]);
     return result.rows.reverse();
   }
+
+  async getForUser({ userId, conversationId }) {
+    const result = await this.pool.query(`
+      SELECT id, channel, external_chat_id, created_at, updated_at
+      FROM conversations WHERE id = $1 AND user_id = $2
+    `, [conversationId, userId]);
+    return result.rows[0] || null;
+  }
 }
 
 module.exports = { ConversationRepository };

@@ -8,6 +8,24 @@ test('loads safe development defaults', () => {
   assert.equal(config.port, 3210);
   assert.deepEqual(config.telegramAllowedIds, []);
   assert.equal(config.telegramVoiceEnabled, false);
+  assert.equal(config.lifeOsEnabled, false);
+  assert.equal(config.lifeOsEnrichmentEnabled, false);
+  assert.equal(config.lifeOsProactivityEnabled, false);
+  assert.equal(config.lifeOsWorkerIntervalMs, 2000);
+});
+
+test('keeps Life OS ingestion, enrichment, and proactivity independently opt-in', () => {
+  const config = loadConfig({
+    JARVIS_LIFE_OS_ENABLED: 'true',
+    JARVIS_LIFE_OS_ENRICHMENT_ENABLED: 'true',
+    JARVIS_LIFE_OS_PROACTIVITY_ENABLED: 'false',
+    JARVIS_LIFE_OS_WORKER_INTERVAL_MS: '750',
+  });
+  assert.equal(config.lifeOsEnabled, true);
+  assert.equal(config.lifeOsEnrichmentEnabled, true);
+  assert.equal(config.lifeOsProactivityEnabled, false);
+  assert.equal(config.lifeOsWorkerIntervalMs, 750);
+  assert.throws(() => loadConfig({ JARVIS_LIFE_OS_WORKER_INTERVAL_MS: '50' }));
 });
 
 test('keeps Telegram voice ASR opt-in', () => {

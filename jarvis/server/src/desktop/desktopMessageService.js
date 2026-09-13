@@ -2,6 +2,7 @@ const MAX_TEXT_LENGTH = 10000;
 const { attachmentReply, isDeviceAttachmentQuestion } = require('../devices/deviceReplies');
 const { renderDocumentCitations } = require('../knowledge/knowledgeService');
 const { remoteCommandReply } = require('../commands/commandText');
+const { recordMessageEvent } = require('../life/lifeSourceEvents');
 
 class DesktopRequestPendingError extends Error {
   constructor() {
@@ -38,6 +39,8 @@ class DesktopMessageService {
     this.commandService = options.commandService || null;
     this.orchestrator = options.orchestrator || null;
     this.visualMemoryService = options.visualMemoryService || null;
+    this.vpnService = options.vpnService || null;
+    this.lifeEventGateway = options.lifeEventGateway || null;
   }
 
   async handle({ device, clientMessageId, kind = 'text', resolveContent }) {
@@ -69,6 +72,43 @@ class DesktopMessageService {
         contentType: kind === 'voice' ? 'voice_transcript' : 'text',
         externalMessageId: clientMessageId,
       });
+      await recordMessageEvent(this.lifeEventGateway, {
+        userId: device.user_id,
+        conversationId: conversation.id,
+        sourceChannel: 'desktop',
+        sourceDeviceId: device.id,
+        sourceRef: `desktop:${device.id}:${clientMessageId}`,
+        deduplicationKey: `desktop-message:${device.user_id}:${device.id}:${clientMessageId}`,
+        externalMessageId: clientMessageId,
+        kind,
+        text: content,
+      });
+      const vpnResult = this.vpnService ? await this.vpnService.handle({
+        text: content, userId: device.user_id, conversationId: conversation.id,
+        originChannel: 'desktop', originDeviceId: device.id,
+      }) : null;
+      if (vpnResult) {
+        const assistantMessage = await this.conversationRepository.appendMessage({
+          userId: device.user_id,
+          conversationId: conversation.id,
+          role: 'assistant',
+          content: vpnResult.answer,
+          externalMessageId: `${clientMessageId}:assistant`,
+        });
+        const publicResponse = {
+          status: 'answered', conversationId: conversation.id, messageId: userMessage.id,
+          answerMessageId: assistantMessage.id, answer: vpnResult.answer,
+          ...(vpnResult.artifact ? { vpnArtifact: vpnResult.artifact } : {}),
+        };
+        const persistedResponse = { ...publicResponse };
+        delete persistedResponse.vpnArtifact;
+        await this.requestRepository.complete({
+          userId: device.user_id, deviceId: device.id, clientMessageId,
+          conversationId: conversation.id, response: persistedResponse,
+        });
+        return publicResponse;
+      }
+
       const remoteAnswer = await remoteCommandReply({
         text: content,
         userId: device.user_id,

@@ -602,6 +602,12 @@ function updateTrayMenu() {
     onStopVision: () => {
       if (visionRuntime) void visionRuntime.stop('tray_stop').finally(updateTrayMenu);
     },
+    onOpenLifeOs: () => {
+      if (!mainWindow || mainWindow.isDestroyed()) createWindow();
+      mainWindow.show();
+      mainWindow.focus();
+      mainWindow.webContents.send('life:open');
+    },
     onQuit: () => shutdownApp(),
   }));
   tray.setContextMenu(contextMenu);
@@ -1061,6 +1067,10 @@ app.whenReady().then(() => {
         }
       }
     },
+    onLifeProposal: (proposal) => {
+      sendCloudEvent('life:proposal', proposal);
+      broadcastCoreMode('alert', { duration: 2200 });
+    },
   });
   cloudVoiceService = new CloudVoiceService({
     cloudClient: desktopCloudClient,
@@ -1201,6 +1211,42 @@ app.whenReady().then(() => {
     if (!isTrustedMainRenderer(event) || !desktopCloudClient) return { ok: false, error: 'Access denied.' };
     try { return await desktopCloudClient.rejectRemoteCommand(input.commandId); } catch (_) { return { ok: false, error: 'Не удалось отменить команду.' }; }
   });
+  const lifeCall = async (event, action) => {
+    if (!isTrustedMainRenderer(event) || !desktopCloudClient) return { ok: false, error: 'Access denied.' };
+    try { return await action(); } catch (error) {
+      if (error && error.code === 'LIFE_REVISION_CONFLICT') return { ok: false, code: error.code, error: 'Данные уже изменились. Обновите экран.' };
+      return { ok: false, code: error && error.code, error: 'Life OS сейчас недоступен.' };
+    }
+  };
+  const lifeId = (value) => /^[a-f0-9-]{36}$/i.test(String(value || '')) ? String(value) : '';
+  ipcMain.handle('life:bootstrap', (event) => lifeCall(event, () => desktopCloudClient.getLifeBootstrap()));
+  ipcMain.handle('life:mission-control', (event) => lifeCall(event, () => desktopCloudClient.getMissionControl()));
+  ipcMain.handle('life:timeline', (event, input = {}) => lifeCall(event, () => desktopCloudClient.getLifeTimeline({
+    projectId: lifeId(input.projectId), cursor: String(input.cursor || '').slice(0, 512), limit: input.limit,
+  })));
+  ipcMain.handle('life:project-create', (event, input = {}) => lifeCall(event, () => desktopCloudClient.createLifeProject({
+    name: String(input.name || '').trim().slice(0, 160), summary: String(input.summary || '').trim().slice(0, 2000),
+    ...(lifeId(input.areaId) ? { areaId: lifeId(input.areaId) } : {}),
+  })));
+  ipcMain.handle('life:project-update', (event, payload = {}) => {
+    const input = payload.input || {};
+    const patch = { revision: Number(input.revision) };
+    if (typeof input.name === 'string') patch.name = input.name.trim().slice(0, 160);
+    if (typeof input.summary === 'string') patch.summary = input.summary.trim().slice(0, 2000);
+    if (['active', 'paused', 'completed', 'archived'].includes(input.status)) patch.status = input.status;
+    if (input.areaId === null || lifeId(input.areaId)) patch.areaId = input.areaId === null ? null : lifeId(input.areaId);
+    if (input.targetAt === null || (typeof input.targetAt === 'string' && input.targetAt.length <= 40)) patch.targetAt = input.targetAt;
+    return lifeCall(event, () => desktopCloudClient.updateLifeProject(lifeId(payload.projectId), patch));
+  });
+  ipcMain.handle('life:project-context', (event, input = {}) => lifeCall(event, () => desktopCloudClient.getLifeProjectContext(lifeId(input.projectId))));
+  ipcMain.handle('life:feedback', (event, payload = {}) => lifeCall(event, () => desktopCloudClient.recordLifeFeedback(
+    lifeId(payload.eventId), { kind: String(payload.input?.kind || '').slice(0, 40), note: String(payload.input?.note || '').slice(0, 500) },
+  )));
+  ipcMain.handle('life:proposal-confirm', (event, input = {}) => lifeCall(event, () => desktopCloudClient.confirmLifeProposal(lifeId(input.proposalId), Number(input.revision))));
+  ipcMain.handle('life:proposal-dismiss', (event, input = {}) => lifeCall(event, () => desktopCloudClient.dismissLifeProposal(lifeId(input.proposalId), Number(input.revision))));
+  ipcMain.handle('life:commitment-update', (event, input = {}) => lifeCall(event, () => desktopCloudClient.updateLifeCommitment(
+    lifeId(input.commitmentId), Number(input.revision), input.status === 'dismissed' ? 'dismissed' : 'completed',
+  )));
   registerVisionIpc({ ipcMain, isTrustedRenderer: isTrustedMainRenderer, getRuntime: () => visionRuntime });
   ipcMain.handle('voice-lab:open', (event) => {
     if (!isTrustedMainRenderer(event) || !voiceLabController) return { ok: false, error: 'Voice Lab unavailable in cloud mode.' };

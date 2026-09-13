@@ -5,7 +5,7 @@ const {
   DesktopRequestPendingError,
 } = require('../src/desktop/desktopMessageService');
 
-function harness(requestResult = { created: true, request: { id: 1, status: 'processing' } }, devices = [], commandService = null, orchestrator = null) {
+function harness(requestResult = { created: true, request: { id: 1, status: 'processing' } }, devices = [], commandService = null, orchestrator = null, vpnService = null) {
   const calls = { requests: [], conversations: [], messages: [], answers: [] };
   const service = new DesktopMessageService({
     requestRepository: {
@@ -26,6 +26,7 @@ function harness(requestResult = { created: true, request: { id: 1, status: 'pro
     },
     commandService,
     orchestrator,
+    vpnService,
   });
   return { service, calls };
 }
@@ -159,4 +160,22 @@ test('Desktop sends a follow-up folder request to the same orchestrator instead 
   assert.equal(result.answer, 'Ищу папку на этом компьютере.');
   assert.deepEqual(seen, ['Привет ты можешь открыть папку?']);
   assert.equal(calls.answers.length, 0);
+});
+
+test('Desktop returns a VPN artifact once while persisting only the redacted response', async () => {
+  const secret = 'vless://private-client@example.test:443?security=reality\n';
+  const { service, calls } = harness(undefined, [], null, null, {
+    async handle(input) {
+      assert.equal(input.originChannel, 'desktop');
+      return { answer: 'VPN-доступ создан.', artifact: { kind: 'happ-vless', filename: 'Phone-vpn-0123456789ab.txt', content: secret } };
+    },
+  });
+  const result = await service.handle({
+    device: { id: 'device-a', user_id: 'user-a' }, clientMessageId: 'vpn-request',
+    resolveContent: async () => ({ content: '/vpn_confirm 33333333-3333-4333-8333-333333333333' }),
+  });
+  assert.equal(result.vpnArtifact.content, secret);
+  const completed = calls.requests.find((request) => request.type === 'complete');
+  assert.equal(completed.response.vpnArtifact, undefined);
+  assert.equal(calls.messages.some((message) => String(message.content).includes('vless://')), false);
 });

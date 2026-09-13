@@ -20,7 +20,19 @@ test('migration files are ordered and narrowly named', () => {
     '010_operations_notification_delivery.sql',
     '011_operations_health_checks.sql',
     '012_visual_memory.sql',
+    '013_life_os_core.sql',
+    '014_vpn_control.sql',
   ]);
+});
+
+test('Life OS migration keeps events and projections owner-scoped and bounded', () => {
+  const migration = fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, '013_life_os_core.sql'), 'utf8');
+  assert.match(migration, /CREATE TABLE life_events/);
+  assert.match(migration, /UNIQUE \(user_id, deduplication_key\)/);
+  assert.match(migration, /FOREIGN KEY \(user_id, event_id\) REFERENCES life_events\(user_id, id\)/);
+  assert.match(migration, /octet_length\(convert_to\(structured_data::text, 'UTF8'\)\) <= 16384/);
+  assert.match(migration, /CREATE TABLE life_proposal_evidence/);
+  assert.doesNotMatch(migration, /audio_bytes|image_data|ocr_text|document_body|api_key|local_path/i);
 });
 
 test('visual memory migration is owner-scoped and stores no plaintext scene or OCR payload', () => {

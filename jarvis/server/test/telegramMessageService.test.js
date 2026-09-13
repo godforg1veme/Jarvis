@@ -113,6 +113,7 @@ function harness(allowedIds = ['101', '202'], devices = null, commandService = n
     ...(options.knowledgeService ? { knowledgeService: options.knowledgeService } : {}),
     ...(options.asr ? { asr: options.asr } : {}),
     ...(options.voiceLimiter ? { voiceLimiter: options.voiceLimiter } : {}),
+    ...(options.vpnService ? { vpnService: options.vpnService } : {}),
   });
   return { service, state, assistantCalls };
 }
@@ -318,4 +319,18 @@ test('Telegram keeps changing remote actions behind an origin-channel confirmati
   assert.match(result.answer, /\/confirm 33333333-3333-4333-8333-333333333333/);
   assert.equal(calls[0][1].originChannel, 'telegram');
   assert.equal(calls[0][1].userId, 'user-101');
+});
+
+test('Telegram returns a VPN artifact without persisting its secret content', async () => {
+  const secret = 'vless://private-client@example.test:443?security=reality\n';
+  const { service, state, assistantCalls } = harness(['101'], null, null, {
+    vpnService: { async handle(input) {
+      assert.equal(input.originChannel, 'telegram');
+      return { answer: 'VPN-доступ создан.', artifact: { kind: 'happ-vless', filename: 'Phone-vpn-0123456789ab.txt', content: secret } };
+    } },
+  });
+  const result = await service.handle(update(50, 101, 101, '/vpn_confirm 33333333-3333-4333-8333-333333333333'));
+  assert.equal(result.artifact.content, secret);
+  assert.equal(state.messages.some((message) => String(message.content).includes('vless://')), false);
+  assert.equal(assistantCalls.length, 0);
 });

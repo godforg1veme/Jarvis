@@ -7,6 +7,7 @@ function buildTrayMenuTemplate({
   onToggleHologramWidget,
   onToggleTranscriptionBar,
   onStopVision,
+  onOpenLifeOs,
   onQuit
 }) {
   return [
@@ -30,6 +31,10 @@ function buildTrayMenuTemplate({
       label: visionActive ? "Зрение активно — STOP" : "Зрение выключено",
       enabled: visionActive === true,
       click: onStopVision,
+    },
+    {
+      label: "Life OS · Mission Control",
+      click: onOpenLifeOs,
     },
     { type: "separator" },
     {

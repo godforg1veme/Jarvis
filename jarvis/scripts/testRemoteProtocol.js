@@ -45,6 +45,13 @@ assert.throws(() => createRemoteMessage('workflow.update', {
   workflowId: 'workflow-1', status: 'completed', answer: '',
 }), /answer is required/);
 
+const lifeProposal = createRemoteMessage('life.proposal', {
+  proposalId: 'proposal-1', title: 'Вернуться к Life OS',
+  explanation: 'Есть открытая договорённость.', risk: 'safe',
+});
+assert.strictEqual(lifeProposal.payload.risk, 'safe');
+assert.throws(() => createRemoteMessage('life.proposal', { proposalId: 'proposal-1', title: '', risk: 'safe' }), /title is required/);
+
 assert.throws(() => validateRemoteMessage({ version: 2, type: 'device.heartbeat', payload: {} }), /unsupported/);
 assert.throws(() => createRemoteMessage('device.hello', { deviceId: 'x', token: '' }), /token is required/);
 assert.throws(() => createRemoteMessage('command.execute', {

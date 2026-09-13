@@ -1,4 +1,5 @@
 const { validateDeviceSessionMessage } = require('./sessionProtocol');
+const { recordSimpleEvent } = require('../life/lifeSourceEvents');
 
 function send(socket, message) {
   if (socket && socket.readyState === 1) socket.send(JSON.stringify(message));
@@ -10,6 +11,7 @@ function createDeviceSessionHandler(options) {
   const sessionRegistry = options.sessionRegistry || null;
   const commandService = options.commandService || null;
   const logger = options.logger || null;
+  const lifeEventGateway = options.lifeEventGateway || null;
 
   return async function handle(socket) {
     let device = null;
@@ -42,6 +44,16 @@ function createDeviceSessionHandler(options) {
             clearTimeout(authenticationTimer);
             authenticationTimer = null;
             send(socket, { version: 1, type: 'device.welcome', payload: { deviceId: device.id, status: 'online' } });
+            await recordSimpleEvent(lifeEventGateway, {
+              userId: device.user_id,
+              eventType: 'device.connected',
+              sourceChannel: 'device',
+              sourceDeviceId: device.id,
+              sourceRef: `device:${device.id}:session`,
+              deduplicationKey: `device-connected:${device.id}:${new Date().toISOString().slice(0, 16)}`,
+              summary: `Устройство «${device.name || 'Desktop'}» подключено`,
+              structuredData: { deviceId: device.id, state: 'online' },
+            });
           } finally {
             authenticating = false;
           }
@@ -95,6 +107,16 @@ function createDeviceSessionHandler(options) {
       if (!current) return;
       void repository.markOffline({ userId: device.user_id, deviceId: device.id })
         .catch((error) => logger && logger.warn({ deviceId: device.id, err: error }, 'failed to mark device offline'));
+      void recordSimpleEvent(lifeEventGateway, {
+        userId: device.user_id,
+        eventType: 'device.disconnected',
+        sourceChannel: 'device',
+        sourceDeviceId: device.id,
+        sourceRef: `device:${device.id}:session`,
+        deduplicationKey: `device-disconnected:${device.id}:${new Date().toISOString().slice(0, 16)}`,
+        summary: `Устройство «${device.name || 'Desktop'}» отключено`,
+        structuredData: { deviceId: device.id, state: 'offline' },
+      });
     });
   };
 }

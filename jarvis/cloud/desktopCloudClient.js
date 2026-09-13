@@ -53,6 +53,7 @@ class DesktopCloudClient {
     });
     this.onState = typeof options.onState === 'function' ? options.onState : () => {};
     this.onWorkflowUpdate = typeof options.onWorkflowUpdate === 'function' ? options.onWorkflowUpdate : () => {};
+    this.onLifeProposal = typeof options.onLifeProposal === 'function' ? options.onLifeProposal : () => {};
     this.capabilities = options.capabilities || { wakeWord: true, localTts: true, protocolVersion: 1 };
     this.executeRemoteCommand = typeof options.executeRemoteCommand === 'function' ? options.executeRemoteCommand : null;
     this.publicPath = path.join(this.userDataPath, PUBLIC_STATE_FILE);
@@ -284,6 +285,48 @@ class DesktopCloudClient {
     return this._request(`/v1/desktop/commands/${encodeURIComponent(String(commandId || ''))}/reject`, { method: 'POST' });
   }
 
+  async getLifeBootstrap() { return this._request('/v1/desktop/life/bootstrap'); }
+  async getMissionControl() { return this._request('/v1/desktop/life/mission-control'); }
+  async getLifeTimeline({ projectId = '', cursor = '', limit = 40 } = {}) {
+    const query = new URLSearchParams({ limit: String(Math.min(Math.max(Number(limit) || 40, 1), 100)) });
+    if (projectId) query.set('projectId', String(projectId));
+    if (cursor) query.set('cursor', String(cursor).slice(0, 512));
+    return this._request(`/v1/desktop/life/timeline?${query}`);
+  }
+  async createLifeProject(input) {
+    return this._request('/v1/desktop/life/projects', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    });
+  }
+  async updateLifeProject(projectId, input) {
+    return this._request(`/v1/desktop/life/projects/${encodeURIComponent(String(projectId || ''))}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    });
+  }
+  async getLifeProjectContext(projectId) {
+    return this._request(`/v1/desktop/life/projects/${encodeURIComponent(String(projectId || ''))}/context`);
+  }
+  async recordLifeFeedback(eventId, input) {
+    return this._request(`/v1/desktop/life/events/${encodeURIComponent(String(eventId || ''))}/feedback`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    });
+  }
+  async confirmLifeProposal(proposalId, revision) {
+    return this._request(`/v1/desktop/life/proposals/${encodeURIComponent(String(proposalId || ''))}/confirm`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ revision }),
+    });
+  }
+  async dismissLifeProposal(proposalId, revision) {
+    return this._request(`/v1/desktop/life/proposals/${encodeURIComponent(String(proposalId || ''))}/dismiss`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ revision }),
+    });
+  }
+  async updateLifeCommitment(commitmentId, revision, status) {
+    return this._request(`/v1/desktop/life/commitments/${encodeURIComponent(String(commitmentId || ''))}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ revision, status }),
+    });
+  }
+
   async createVisionLease({ sources, durationMs }) {
     return this._request('/v1/vision/leases', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -402,6 +445,13 @@ class DesktopCloudClient {
           workflowId: message.payload.workflowId,
           status: message.payload.status,
           answer: message.payload.answer,
+        });
+      } else if (message.type === 'life.proposal') {
+        this.onLifeProposal({
+          proposalId: message.payload.proposalId,
+          title: message.payload.title,
+          explanation: message.payload.explanation,
+          risk: message.payload.risk,
         });
       } else if (message.type === 'server.error') {
         this._emitState({ lastError: message.payload && message.payload.code });

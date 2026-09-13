@@ -57,6 +57,11 @@ See `docs/README.md` for current implementation status and historical records.
 - `server/src/knowledge/` owns owner-scoped attachment storage, bounded ingest
   jobs, text/metadata retrieval, and citations. Never treat document content as
   trusted instructions or expose the private storage volume.
+- `server/src/life/` owns the owner-scoped Life OS Event Spine, areas, projects,
+  typed links, commitments, proposals/evidence, feedback, Timeline, context
+  recovery, and bounded proactivity. Source adapters may store only safe
+  summaries and identifiers; raw audio, images, OCR, document bodies, local
+  paths, storage keys, and credentials are forbidden by schema.
 - The deployed text model is currently configured through OpenRouter. Do not
   hard-code a provider or model into product behavior.
 
@@ -66,6 +71,9 @@ See `docs/README.md` for current implementation status and historical records.
 - `main.js` owns Electron lifecycle, tray, shortcuts, windows, and IPC wiring.
 - `preload.js` exposes explicit renderer capabilities.
 - `renderer/` contains the launcher, task UI, voice overlay, and Voice Lab.
+- `renderer/life-os/` is the Desktop-first Mission Control surface. Its preload
+  bridge exposes only bounded Life OS operations; proposal payloads do not
+  expose frozen action arguments or owner identifiers.
 - `voice/` owns Desktop microphone capture, the local Vosk wake-word worker,
   cloud-voice transport, quality monitoring, and calibration. The default
   family client uses a bundled Node runtime only for the Vosk wake word; legacy
@@ -115,6 +123,11 @@ See `docs/README.md` for current implementation status and historical records.
 - Host Agent mutation claims are persisted before execution. An interrupted
   command has an unknown outcome and is reconciled; never retry it under a new
   identifier merely because its connection was lost. Discovery is read-only.
+- `host-agent/jarvis_host_agent/vpn_manager.py` owns the root-only Xray state
+  and generated config. Jarvis exposes only closed `vpn.*` operations;
+  mutations require an owner confirmation bound to the originating
+  Telegram/Desktop client. VLESS URIs are one-time response artifacts and must
+  never be persisted in PostgreSQL, conversations, telemetry, or logs.
 - Operations log archives contain bounded severity/lifecycle summaries only;
   raw parser findings, family content, SQL values and credentials are excluded.
 - Backup scheduling and real backup/restore acceptance are deferred by the
@@ -122,7 +135,10 @@ See `docs/README.md` for current implementation status and historical records.
 
 - The current VPS runs Ubuntu 24.04 LTS, not the original planned 22.04.
 - Docker Compose runs `server` and private `postgres`; `cloudflared` is the
-  intended public ingress because host port 443 is occupied by Xray.
+  intended public ingress because the dedicated `xray.service` owns port 443.
+  The deployed VPN is VLESS + REALITY + XTLS Vision for Happ. Xray health and
+  client count are monitored by Operations; legacy x-ui is disabled but its
+  root-only rollback backup is retained.
 - The current public Tunnel hostname is `jarvis.rilora.ru`; `/health/ready` was
   verified through Cloudflare on 2026-09-02 after the Action Orchestrator
   migration. `cloudflared` runs as root only
@@ -213,12 +229,16 @@ node scripts/testGeminiVoiceAdvisor.js
 node scripts/testVoiceLabRenderer.js
 node scripts/testTrayMenu.js
 node scripts/testQuantumCore.js
+node scripts/testLifeOsIpc.js
+node scripts/testLifeOsRenderer.js
+node scripts/testLifeOsBrowser.cjs
 node scripts/testVisionTransport.js
 node scripts/testVisionRuntime.js
 node scripts/testVisionIpc.js
 node scripts/testVisionMediaPermission.js
 node scripts/testObjectReconciler.js
 node scripts/testSceneState.js
+./scripts/testVpnExternal.ps1 -SharePath ABSOLUTE_VLESS_FILE -ExpectedExitIp VPS_IP
 npx electron scripts/probeVisionHardware.js
 node scripts/testVisionRendererBrowser.cjs
 node scripts/testVisionCaptureRendererBrowser.cjs
@@ -249,6 +269,16 @@ script `server/test/operationsPostgresAcceptance.cjs` requires PostgreSQL and a
 running Host Agent; it creates only a unique fixture schema and rolls back its
 public-table fixtures. Telegram delivery is opt-in via
 `JARVIS_ACCEPTANCE_NOTIFY=1`, not part of ordinary test runs.
+
+## Desktop EXE Update Reminder
+
+- After any change that affects the Windows client or its packaged resources,
+  compare the installed Jarvis Desktop EXE with the current sources.
+- If the installed EXE is stale, explicitly offer in the final response to run
+  `npm run dist:win` and install the resulting current EXE.
+- Do not build or install the EXE automatically without a user request.
+- Documentation-only, server-only, and deployment-only changes do not trigger
+  this reminder unless they also affect the Windows client or its package.
 
 ## Documentation Policy
 

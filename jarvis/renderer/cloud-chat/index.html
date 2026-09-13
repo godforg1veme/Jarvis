@@ -6,6 +6,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; media-src 'self'">
   <title>Jarvis Desktop</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="../life-os/life-os.css">
 </head>
 <body>
   <main class="console">
@@ -70,7 +71,10 @@
           <p class="eyebrow">CLOUD BRAIN · LOCAL HANDS</p>
           <h2>Разговор с Jarvis</h2>
         </div>
-        <div id="mode-badge" class="mode-badge">ОЖИДАЕТ ПРИВЯЗКИ</div>
+        <div class="topline-actions">
+          <button id="life-os-open" class="life-os-launch" type="button">LIFE OS <span aria-hidden="true">↗</span></button>
+          <div id="mode-badge" class="mode-badge">ОЖИДАЕТ ПРИВЯЗКИ</div>
+        </div>
       </header>
 
       <section id="pairing-card" class="pairing-card">
@@ -111,6 +115,36 @@
       </section>
     </section>
   </main>
+  <section id="life-os" class="life-os" aria-labelledby="life-os-title" aria-hidden="true">
+    <header class="life-os-header">
+      <div class="life-os-brand">
+        <span class="life-os-monogram" aria-hidden="true">J</span>
+        <div><p class="life-kicker">JARVIS / PERSONAL OPERATING SYSTEM</p><h2 id="life-os-title">Mission Control</h2></div>
+      </div>
+      <div class="life-os-header-actions">
+        <span id="life-os-sync" class="life-os-sync" role="status">Ожидание</span>
+        <button id="life-os-close" class="life-icon-button" type="button" aria-label="Закрыть Mission Control">×</button>
+      </div>
+    </header>
+    <nav class="life-os-nav" aria-label="Разделы Life OS">
+      <button class="life-nav-item is-active" type="button" data-life-view="mission">01 / Сейчас</button>
+      <button class="life-nav-item" type="button" data-life-view="timeline">02 / Timeline</button>
+      <button class="life-nav-item" type="button" data-life-view="projects">03 / Проекты</button>
+      <button id="life-project-new" class="life-nav-create" type="button">＋ Новый проект</button>
+    </nav>
+    <main id="life-os-content" class="life-os-content" tabindex="-1">
+      <div class="life-loading" role="status"><span></span><p>Собираю рабочий контекст…</p></div>
+    </main>
+    <dialog id="life-project-dialog" class="life-project-dialog" aria-labelledby="life-project-dialog-title">
+      <form id="life-project-form" method="dialog">
+        <header><div><p class="life-kicker">NEW FOCUS</p><h3 id="life-project-dialog-title">Новый проект</h3></div><button value="cancel" aria-label="Закрыть">×</button></header>
+        <label>Название<input id="life-project-name" maxlength="160" required placeholder="Например, Life OS"></label>
+        <label>Область<select id="life-project-area"><option value="">Без области</option></select></label>
+        <label>Коротко о результате<textarea id="life-project-summary" maxlength="2000" rows="4" placeholder="Что должно измениться, когда проект будет завершён?"></textarea></label>
+        <footer><button value="cancel" class="life-button-quiet">Отмена</button><button id="life-project-submit" value="default" class="life-button-primary">Создать проект</button></footer>
+      </form>
+    </dialog>
+  </section>
   <dialog id="vision-timeline" class="vision-timeline" aria-labelledby="vision-timeline-title">
     <header><div><p class="eyebrow">VISUAL MEMORY</p><h2 id="vision-timeline-title">Лента восприятия</h2></div><button id="vision-timeline-close" type="button" aria-label="Закрыть">×</button></header>
     <div class="timeline-layout">
@@ -120,6 +154,7 @@
   </dialog>
   <script src="../vendor/three.min.js"></script>
   <script src="../quantumCore.js"></script>
+  <script src="../life-os/life-os.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>
