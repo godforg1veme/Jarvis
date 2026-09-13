@@ -4,7 +4,12 @@ This file is the status authority for project documentation. Specifications and
 plans under `docs/superpowers/` are preserved as decision history; their old
 future-tense wording does not override the current architecture in `AGENTS.md`.
 
-Status snapshot: 2026-09-13.
+Status snapshot: 2026-09-14.
+
+App resolution & AI recovery update, 2026-09-14: Start Menu indexing was fixed
+to use UTF-8 encoded PowerShell invocations, Cyrillic inflection stemming was added
+to appResolver, and AI-assisted candidate recovery via AppRecoveryService was wired
+into ToolGateway for local and remote command execution.
 
 Life OS update, 2026-09-13: Core v1 is implemented and production-enabled across
 the Event Spine, projections, explainable proposals, context recovery,

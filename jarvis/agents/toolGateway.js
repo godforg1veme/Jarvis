@@ -412,8 +412,60 @@ async function executeAppAction(action, args, options = {}) {
   if (action === 'app.resolve') {
     const query = String(args.query || args.name || '').trim();
     if (!query) throw new Error('app query is required');
-    const result = appResolver.resolve(query, { infoOnly: !!args.infoOnly });
-    return { ok: result.ok !== false, action, policy: POLICY.OBSERVE, result };
+    let result = appResolver.resolve(query, { infoOnly: !!args.infoOnly });
+    if ((!result || result.ok === false || result.notFound) && options.appRecoveryService) {
+      try {
+        const snapshot = await options.appRecoveryService.start(query, { inputChannel: 'text' });
+        if (snapshot && Array.isArray(snapshot.presented) && snapshot.presented.length > 0) {
+          const attempt = options.appRecoveryService.registry.get(snapshot.recoveryId);
+          if (snapshot.presented.length === 1 || snapshot.state === 'awaiting_confirmation') {
+            const top = snapshot.presented[0];
+            const raw = attempt ? attempt.candidates.get(top.candidateId) : null;
+            result = {
+              ok: true,
+              app: {
+                name: top.displayName,
+                type: top.type || 'exe',
+                launch: raw?.launch,
+                path: raw?.launch?.target || top.target,
+                source: 'app-recovery',
+                score: top.localScore ?? 0.9,
+                reason: 'ai recovery',
+                aliases: attempt?.match?.aliases || [],
+                recoveryQuery: query,
+              },
+            };
+          } else {
+            result = {
+              ok: true,
+              needsSelection: true,
+              candidates: snapshot.presented.map((p) => {
+                const raw = attempt ? attempt.candidates.get(p.candidateId) : null;
+                return {
+                  name: p.displayName,
+                  type: p.type || 'exe',
+                  launch: raw?.launch,
+                  path: raw?.launch?.target || p.target,
+                  source: 'app-recovery',
+                  score: p.localScore ?? 0.8,
+                  reason: 'ai recovery selection',
+                  aliases: attempt?.match?.aliases || [],
+                  recoveryQuery: query,
+                };
+              }),
+            };
+          }
+        }
+      } catch {}
+    }
+    const isOk = result && result.ok !== false && !result.notFound;
+    return {
+      ok: isOk,
+      action,
+      policy: POLICY.OBSERVE,
+      ...(isOk ? {} : { errorCode: 'APP_NOT_FOUND' }),
+      result,
+    };
   }
 
   if (action === 'app.launch') {
@@ -423,6 +475,14 @@ async function executeAppAction(action, args, options = {}) {
     const app = options.resolveAppCandidate(candidateId);
     if (!app || typeof app !== 'object') throw new Error('app candidate is unavailable or expired');
     const result = await launchApp.launch(app);
+    if (result && result.ok && app.source === 'app-recovery' && app.launch && app.recoveryQuery) {
+      try {
+        const learnedAppStore = options.learnedAppStore || require('../tools/learnedAppStore');
+        learnedAppStore.learn(app.recoveryQuery, app.name, app.launch, {
+          aliases: app.aliases || [],
+        });
+      } catch {}
+    }
     return { ok: result.ok !== false, action, policy: POLICY.CONFIRM, result };
   }
 

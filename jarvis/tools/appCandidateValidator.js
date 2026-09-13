@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const { normalizeAlias } = require('./appIdentity');
+const { normalizeAlias, stemRussianToken, stemRussianPhrase } = require('./appIdentity');
 const { normalizeLaunchDescriptor, canonicalizeLaunchDescriptor } = require('./launchDescriptor');
 
 const HELPER_WORDS = /(?:unins(?:tall)?|setup|update(?:r)?|crash(?:pad|report)?|helper|service|maintenance)/i;
@@ -79,14 +79,20 @@ function validateCandidate(raw, options = {}) {
 function localScore(query, candidate) {
   const normalized = normalizeAlias(query);
   const tokens = normalized.split(' ').filter(Boolean);
+  const stemmedQuery = stemRussianPhrase(normalized);
+  const stemmedTokens = stemmedQuery.split(' ').filter(Boolean);
   const names = [candidate.displayName, candidate.productName, candidate.description, ...(candidate.aliases || [])]
     .map(normalizeAlias).filter(Boolean);
+  const stemmedNames = names.map(stemRussianPhrase).filter(Boolean);
   let score = 0;
-  if (names.some(name => name === normalized)) score = 0.98;
-  else if (names.some(name => name.startsWith(normalized) || normalized.startsWith(name))) score = 0.88;
+  if (names.some(name => name === normalized) || (stemmedQuery && stemmedNames.some(name => name === stemmedQuery))) score = 0.98;
+  else if (names.some(name => name.startsWith(normalized) || normalized.startsWith(name)) ||
+           (stemmedQuery && stemmedNames.some(name => name.startsWith(stemmedQuery) || stemmedQuery.startsWith(name)))) score = 0.88;
   else if (tokens.length > 0) {
     const matched = tokens.filter(token => names.some(name => name.includes(token))).length;
-    score = Math.min(0.82, matched / tokens.length * 0.82);
+    const stemmedMatched = stemmedTokens.filter(token => stemmedNames.some(name => name.includes(token))).length;
+    const bestRatio = Math.max(matched / tokens.length, stemmedTokens.length > 0 ? stemmedMatched / stemmedTokens.length : 0);
+    score = Math.min(0.82, bestRatio * 0.82);
   }
   if (candidate.source === 'start-menu' || candidate.source === 'app-paths') score += 0.04;
   if (candidate.helper && !normalizeAlias(candidate.displayName).includes(normalized)) score -= 0.35;

@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const learnedAppStore = require('./learnedAppStore');
-const { normalizeAlias, compactAlias, stripLaunchTrigger } = require('./appIdentity');
+const { normalizeAlias, compactAlias, stripLaunchTrigger, stemRussianPhrase } = require('./appIdentity');
 const { getWritableDataPath } = require('../runtimeDataPath');
 
 const USER_APPS_PATH = path.join(__dirname, '..', 'data', 'apps.user.json');
@@ -31,6 +31,10 @@ const EXACT_OR_STARTS_WITH_MATCHES = new Set([
   'exactNormalizedName',
   'startsWithAlias',
   'startsWithName',
+  'exactStemmedAlias',
+  'exactStemmedName',
+  'startsWithStemmedAlias',
+  'startsWithStemmedName',
 ]);
 
 // --- Helpers ---
@@ -189,6 +193,43 @@ function scoreApp(app, queryLower, queryNormalized) {
     for (const aliasNorm of aliasesNorm) {
       if (aliasNorm === queryNormalized) {
         return { score: 0.96, reason: 'exact alias', matchType: 'exactNormalizedAlias' };
+      }
+    }
+  }
+
+  const queryStemmed = stemRussianPhrase(queryLower);
+  const nameStemmed = stemRussianPhrase(nameLower);
+  const aliasesStemmed = aliases.map(stemRussianPhrase);
+  const hasStemmedQuery = queryStemmed.length > 0;
+
+  if (hasStemmedQuery) {
+    for (const aliasStemmed of aliasesStemmed) {
+      if (aliasStemmed === queryStemmed) {
+        return { score: 0.96, reason: 'exact stemmed alias', matchType: 'exactStemmedAlias' };
+      }
+    }
+    if (nameStemmed === queryStemmed) {
+      return { score: 0.95, reason: 'exact stemmed name', matchType: 'exactStemmedName' };
+    }
+    const queryCompactStemmed = compactAlias(queryStemmed);
+    if (queryCompactStemmed.length > 0) {
+      for (const aliasStemmed of aliasesStemmed) {
+        if (compactAlias(aliasStemmed) === queryCompactStemmed) {
+          return { score: 0.96, reason: 'exact compact stemmed alias', matchType: 'exactStemmedAlias' };
+        }
+      }
+      if (compactAlias(nameStemmed) === queryCompactStemmed) {
+        return { score: 0.95, reason: 'exact compact stemmed name', matchType: 'exactStemmedName' };
+      }
+    }
+    if (!isShort) {
+      if (nameStemmed.startsWith(queryStemmed)) {
+        return { score: 0.85, reason: 'startsWith stemmed name', matchType: 'startsWithStemmedName' };
+      }
+      for (const aliasStemmed of aliasesStemmed) {
+        if (aliasStemmed.startsWith(queryStemmed)) {
+          return { score: 0.85, reason: 'startsWith stemmed alias', matchType: 'startsWithStemmedAlias' };
+        }
       }
     }
   }
@@ -496,7 +537,7 @@ function resolve(rawQuery, options = {}) {
   const scoreGap = second ? (top.score - second.score) : 1;
 
   // Check if both top and second are exact match types
-  const exactLaunchTypes = new Set(['exactName', 'exactAlias', 'exactNormalizedAlias', 'exactNormalizedName', 'whereExact']);
+  const exactLaunchTypes = new Set(['exactName', 'exactAlias', 'exactNormalizedAlias', 'exactNormalizedName', 'exactStemmedName', 'exactStemmedAlias', 'whereExact']);
   const topIsExact = exactLaunchTypes.has(top.matchType);
   const secondIsExact = second && exactLaunchTypes.has(second.matchType);
 

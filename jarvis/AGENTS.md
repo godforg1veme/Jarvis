@@ -79,7 +79,11 @@ See `docs/README.md` for current implementation status and historical records.
   family client uses a bundled Node runtime only for the Vosk wake word; legacy
   `stt_runtime/`/Faster Whisper remains a development-only local subsystem.
 - `tts/` keeps Silero/Piper behind `tts/ttsService.js`.
-- `tools/` and `actions/` implement bounded local operations.
+- tools/ and actions/ implement bounded local operations. tools/appResolver.js
+  and tools/appIndexer.js index Start Menu and UWP apps with UTF-8 encoding and
+  support Russian inflection/stemming. When local resolution fails or is ambiguous,
+  agents/toolGateway.js falls back to tools/appRecoveryService.js for AI-assisted
+  candidate discovery and ranking, recording confirmed launches in apps.learned.json.
 - `renderer/quantumCore.js` provides procedural 3D WebGL (Three.js r160) avatar
   («Quantum Holographic Core 2.0»), integrated into Cloud Chat sidebar, floating
   Voice Overlay, and a dedicated desktop companion widget (`renderer/quantum-widget.*`)

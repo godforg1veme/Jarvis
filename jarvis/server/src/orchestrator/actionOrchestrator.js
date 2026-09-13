@@ -24,6 +24,7 @@ function publicErrorText(error) {
   if (code === 'DEVICE_REVOKED') return 'Выбранный компьютер отозван.';
   if (code === 'CONFIRMATION_UNAVAILABLE') return 'Подтверждение не найдено, уже использовано или истекло.';
   if (code === 'VISION_LOCAL_LEASE_REQUIRED') return 'Сначала включите зрение на самом компьютере; удалённо запускать камеру нельзя.';
+  if (code === 'APP_NOT_FOUND') return 'Приложение не найдено на компьютере.';
   return 'Не удалось выполнить действие на компьютере.';
 }
 

@@ -50,10 +50,25 @@ function stableId(prefix, value) {
   return `${prefix}-${digest}`;
 }
 
+function stemRussianToken(token) {
+  if (!/^[а-яё]+$/i.test(token) || token.length <= 3) return token;
+  const t = token.toLowerCase().replace(/ё/g, 'е');
+  if (t.endsWith('ами') || t.endsWith('ями') || t.endsWith('иями')) return t.slice(0, -3);
+  if (t.endsWith('ой') || t.endsWith('ей') || t.endsWith('ом') || t.endsWith('ем') || t.endsWith('ам') || t.endsWith('ям') || t.endsWith('ах') || t.endsWith('ях')) return t.slice(0, -2);
+  if (t.endsWith('а') || t.endsWith('я') || t.endsWith('у') || t.endsWith('ю') || t.endsWith('е') || t.endsWith('и') || t.endsWith('ы') || t.endsWith('о')) return t.slice(0, -1);
+  return t;
+}
+
+function stemRussianPhrase(phrase) {
+  return normalizeAlias(phrase).split(' ').filter(Boolean).map(stemRussianToken).join(' ');
+}
+
 module.exports = {
   normalizeAlias,
   compactAlias,
   stripLaunchTrigger,
+  stemRussianToken,
+  stemRussianPhrase,
   uniqueAliases,
   stableId,
 };

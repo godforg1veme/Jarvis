@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { getWritableDataPath } = require('../runtimeDataPath');
+const { compactAlias, normalizeAlias } = require('./appIdentity');
 
 const SETTINGS_PATH = path.join(__dirname, '..', 'data', 'settings.json');
 const INDEX_PATH = path.join(__dirname, '..', 'data', 'app-index.json');
@@ -34,11 +35,22 @@ function expandEnv(str) {
 }
 
 function normalize(str) {
-  return (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  return compactAlias(str);
 }
 
 function isSafeName(name) {
   return /^[a-zA-Z0-9._-]+$/.test(name);
+}
+
+function runPowerShellScript(script, timeout = 15000) {
+  const fullScript = `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $ProgressPreference = 'SilentlyContinue'; ${script}`;
+  const b64 = Buffer.from(fullScript, 'utf16le').toString('base64');
+  return execSync(`powershell.exe -NoProfile -NonInteractive -EncodedCommand ${b64}`, {
+    encoding: 'utf-8',
+    timeout,
+    maxBuffer: 4 * 1024 * 1024,
+    windowsHide: true,
+  }).trim();
 }
 
 // --- Source 1: Start Menu .lnk shortcuts ---
@@ -52,22 +64,22 @@ async function indexStartMenu() {
   for (const smDir of startMenuPaths) {
     if (!fs.existsSync(smDir)) continue;
     try {
-      const ps = `Get-ChildItem -Path "${smDir}" -Recurse -Filter *.lnk | ForEach-Object { [PSCustomObject]@{ Name=[System.IO.Path]::GetFileNameWithoutExtension($_.Name); FullName=$_.FullName } } | ConvertTo-Json -Compress`;
-      const result = execSync(`powershell.exe -NoProfile -NonInteractive -Command "${ps.replace(/"/g, '\\"')}"`, {
-        encoding: 'utf-8',
-        timeout: 15000,
-        maxBuffer: 1024 * 1024,
-        windowsHide: true,
-      }).trim();
+      const escapedDir = smDir.replace(/'/g, "''");
+      const ps = `Get-ChildItem -LiteralPath '${escapedDir}' -Recurse -Filter *.lnk | ForEach-Object { [PSCustomObject]@{ Name=[System.IO.Path]::GetFileNameWithoutExtension($_.Name); FullName=$_.FullName } } | ConvertTo-Json -Compress`;
+      const result = runPowerShellScript(ps, 15000);
 
       if (!result) continue;
       const items = JSON.parse(result);
       const arr = Array.isArray(items) ? items : [items];
 
       for (const item of arr) {
+        if (!item || !item.Name) continue;
+        const aliases = [normalize(item.Name)];
+        const normalized = normalizeAlias(item.Name);
+        if (normalized && !aliases.includes(normalized)) aliases.push(normalized);
         apps.push({
           name: item.Name,
-          aliases: [normalize(item.Name)],
+          aliases,
           type: 'lnk',
           path: item.FullName,
           source: 'start-menu',
@@ -75,7 +87,9 @@ async function indexStartMenu() {
           discoveredAt: new Date().toISOString(),
         });
       }
-    } catch {}
+    } catch (err) {
+      console.warn('[appIndexer] Start Menu scan failed for', smDir, err.message);
+    }
   }
   return apps;
 }
@@ -84,21 +98,22 @@ async function indexStartMenu() {
 async function indexUWP() {
   const apps = [];
   try {
-    const result = execSync('powershell.exe -NoProfile -NonInteractive -Command "Get-StartApps | ConvertTo-Json -Compress"', {
-      encoding: 'utf-8',
-      timeout: 15000,
-      maxBuffer: 1024 * 1024,
-      windowsHide: true,
-    }).trim();
+    const result = runPowerShellScript('Get-StartApps | ConvertTo-Json -Compress', 15000);
 
     if (!result) return apps;
     const items = JSON.parse(result);
     const arr = Array.isArray(items) ? items : [items];
 
     for (const item of arr) {
+      if (!item) continue;
+      const name = item.Name || item.AppName || '';
+      if (!name) continue;
+      const aliases = [normalize(name)];
+      const normalized = normalizeAlias(name);
+      if (normalized && !aliases.includes(normalized)) aliases.push(normalized);
       apps.push({
-        name: item.Name || item.AppName || '',
-        aliases: [normalize(item.Name || item.AppName || '')],
+        name,
+        aliases,
         type: 'uwp',
         aumid: item.AppID || item.AppId || '',
         source: 'uwp',
@@ -106,7 +121,9 @@ async function indexUWP() {
         discoveredAt: new Date().toISOString(),
       });
     }
-  } catch {}
+  } catch (err) {
+    console.warn('[appIndexer] UWP scan failed:', err.message);
+  }
   return apps;
 }
 

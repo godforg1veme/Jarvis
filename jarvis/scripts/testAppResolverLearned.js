@@ -29,4 +29,8 @@ assert.strictEqual(stale.notFound, true);
 const score = appResolver.scoreApp({ name: 'Пример', aliases: ['ёлка'] }, 'елка', 'елка');
 assert.strictEqual(score.matchType, 'exactAlias');
 
+const scoreInflected = appResolver.scoreApp({ name: 'Яндекс Музыка', aliases: ['яндекс музыка'] }, 'яндекс музыку', 'яндексмузыку');
+assert.strictEqual(scoreInflected.matchType, 'exactStemmedAlias');
+assert(scoreInflected.score >= 0.95);
+
 console.log('testAppResolverLearned: ok');

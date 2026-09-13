@@ -1026,6 +1026,7 @@ app.whenReady().then(() => {
           workArea: screen.getPrimaryDisplay().workArea,
           resolveAppCandidate: resolveRemoteAppCandidate,
           resolveFileCandidate: resolveRemoteFileCandidate,
+          appRecoveryService: getAppRecoveryService(),
           ...executionOptions,
         });
         if (request?.action === 'file.search') return registerRemoteFileSearch(result);

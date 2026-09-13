@@ -371,6 +371,81 @@ async function run() {
   assert.strictEqual(closed.ok, true);
   assert.deepStrictEqual(closed.result.killed, ['Code.exe']);
 
+  // Test app.resolve fallback to appRecoveryService
+  const fakeRecovery = {
+    registry: {
+      get: (id) => ({
+        candidates: new Map([
+          ['candidate-rec-1', { launch: { type: 'exe', target: 'C:\\YandexMusic.exe' } }],
+        ]),
+        match: { aliases: ['яндекс музыка', 'музыка'] },
+      }),
+    },
+    start: async (query) => ({
+      recoveryId: 'rec-123',
+      state: 'awaiting_confirmation',
+      presented: [{
+        candidateId: 'candidate-rec-1',
+        displayName: 'Яндекс Музыка',
+        type: 'exe',
+        target: 'C:\\YandexMusic.exe',
+        localScore: 0.95,
+      }],
+    }),
+  };
+
+  const recoveredApp = await executeToolRequest({
+    action: 'app.resolve',
+    args: { query: 'яндекс музыка' },
+  }, {
+    appResolver: { resolve: () => ({ ok: false, notFound: true }) },
+    appRecoveryService: fakeRecovery,
+  });
+  assert.strictEqual(recoveredApp.ok, true);
+  assert.strictEqual(recoveredApp.result.app.name, 'Яндекс Музыка');
+  assert.strictEqual(recoveredApp.result.app.source, 'app-recovery');
+  assert.strictEqual(recoveredApp.result.app.path, 'C:\\YandexMusic.exe');
+
+  // Test app.resolve failure when not found anywhere
+  const failedResolve = await executeToolRequest({
+    action: 'app.resolve',
+    args: { query: 'несуществующее приложение' },
+  }, {
+    appResolver: { resolve: () => ({ ok: false, notFound: true }) },
+    appRecoveryService: { start: async () => ({ presented: [] }) },
+  });
+  assert.strictEqual(failedResolve.ok, false);
+  assert.strictEqual(failedResolve.errorCode, 'APP_NOT_FOUND');
+
+  // Test app.launch with app-recovery learning
+  let learnedCall = null;
+  const fakeLearnedStore = {
+    learn: (query, name, launch, opts) => {
+      learnedCall = { query, name, launch, opts };
+    },
+  };
+  const launchedRecovered = await executeToolRequest({
+    action: 'app.launch',
+    args: { candidateId: 'candidate-rec-1' },
+  }, {
+    confirmed: true,
+    resolveAppCandidate: () => ({
+      name: 'Яндекс Музыка',
+      type: 'exe',
+      path: 'C:\\YandexMusic.exe',
+      source: 'app-recovery',
+      recoveryQuery: 'яндекс музыка',
+      launch: { type: 'exe', target: 'C:\\YandexMusic.exe', args: [] },
+      aliases: ['яндекс музыка'],
+    }),
+    launchApp: { launch: async (app) => ({ ok: true, app }) },
+    learnedAppStore: fakeLearnedStore,
+  });
+  assert.strictEqual(launchedRecovered.ok, true);
+  assert.ok(learnedCall);
+  assert.strictEqual(learnedCall.name, 'Яндекс Музыка');
+  assert.strictEqual(learnedCall.query, 'яндекс музыка');
+
   console.log('[testToolGateway] gateway policy tests passed');
 }
 

@@ -187,6 +187,18 @@ test('a failed Desktop tool never exposes its raw system error to the user', asy
   assert.equal(result.answer.includes('private.ps1'), false);
 });
 
+test('APP_NOT_FOUND error code returns a clear public message', async () => {
+  const { orchestrator } = createHarness([
+    { kind: 'tool_call', action: 'app.resolve', args: { query: 'несуществующее' } },
+  ], {
+    devices: [{ id: deviceId, name: 'Основной ПК', status: 'online', capabilities: { actions: ['app.resolve'] } }],
+    terminals: { 'app.resolve': { status: 'failed', error_code: 'APP_NOT_FOUND', result: { ok: false } } },
+  });
+
+  const result = await orchestrator.handle({ userId, conversationId, originChannel: 'desktop', originDeviceId: deviceId, text: 'Открой несуществующее', history: [] });
+  assert.equal(result.answer, 'Приложение не найдено на компьютере.');
+});
+
 test('an initial planner failure returns a retryable answer instead of failing the Desktop request', async () => {
   const { orchestrator, executions } = createHarness([]);
   const result = await orchestrator.handle({ userId, conversationId, originChannel: 'desktop', originDeviceId: deviceId, text: 'Сложная команда', history: [] });
