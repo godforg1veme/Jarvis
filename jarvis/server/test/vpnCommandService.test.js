@@ -27,17 +27,20 @@ function harness(options = {}) {
   };
   const client = { async request(input) {
     calls.push(['request', input]);
-    if (input.operation === 'vpn.status') return { result: { state: 'succeeded', data: { serviceState: 'active', configValid: true, listenerReady: true, clientCount: 1 } } };
-    if (input.operation === 'vpn.clients.list') return { result: { state: 'succeeded', data: { clients: [{ id: 'vpn-0123456789ab', label: 'Phone', createdAt: '2026-09-12T00:00:00Z' }] } } };
-    return { result: { state: 'succeeded', data: { client: { id: 'vpn-0123456789ab', label: 'Phone', createdAt: '2026-09-12T00:00:00Z' }, shareUri: 'vless://secret@example.test:443?security=reality' } } };
+    if (input.operation.endsWith('status')) return { result: { state: 'succeeded', data: { serviceState: 'active', configValid: true, listenerReady: true, clientCount: 1 } } };
+    if (input.operation.endsWith('clients.list')) return { result: { state: 'succeeded', data: { clients: [{ id: 'vpn-0123456789ab', label: 'Phone', createdAt: '2026-09-12T00:00:00Z' }] } } };
+    const shareUri = input.operation.startsWith('vpn.hysteria2.') ? 'hy2://secret@vpn.example.test:443/?sni=vpn.example.test' : 'vless://secret@example.test:443?security=reality';
+    return { result: { state: 'succeeded', data: { client: { id: 'vpn-0123456789ab', label: 'Phone', createdAt: '2026-09-12T00:00:00Z' }, shareUri } } };
   } };
   return { service: new VpnCommandService({ repository, client, ownerTelegramId: '101', now: () => new Date('2026-09-12T12:00:00Z') }), calls, records };
 }
 
 test('parses only the closed VPN command set', () => {
-  assert.deepEqual(parseVpnCommand('/vpn'), { kind: 'read', action: 'status', arguments: {} });
-  assert.deepEqual(parseVpnCommand('/vpn_issue My Phone'), { kind: 'change', action: 'issue', arguments: { label: 'My Phone' } });
-  assert.deepEqual(parseVpnCommand('/vpn_export My Phone'), { kind: 'change', action: 'export', arguments: { label: 'My Phone' } });
+  assert.deepEqual(parseVpnCommand('/vpn'), { kind: 'menu' });
+  assert.deepEqual(parseVpnCommand('/vpn_status'), { kind: 'read', action: 'status', protocol: 'vless', arguments: {} });
+  assert.deepEqual(parseVpnCommand('/vpn_issue My Phone'), { kind: 'change', action: 'issue', protocol: 'vless', arguments: { label: 'My Phone' } });
+  assert.deepEqual(parseVpnCommand('/vpn_hysteria2_issue My Phone'), { kind: 'change', action: 'issue', protocol: 'hysteria2', arguments: { label: 'My Phone' } });
+  assert.deepEqual(parseVpnCommand('/vpn_export My Phone'), { kind: 'change', action: 'export', protocol: 'vless', arguments: { label: 'My Phone' } });
   assert.deepEqual(parseVpnCommand('/vpn_confirm'), { kind: 'decision', decision: 'confirm', requestId: null });
   assert.equal(parseVpnCommand('расскажи о погоде'), null);
   assert.equal(parseVpnCommand('/vpn_issue').kind, 'invalid');
@@ -45,8 +48,10 @@ test('parses only the closed VPN command set', () => {
 });
 
 test('parses only bounded VPN callback actions', () => {
-  assert.deepEqual(parseVpnCallback('vpn:clients'), { action: 'clients' });
-  assert.deepEqual(parseVpnCallback('vpn:export:vpn-0123456789ab'), { action: 'export', clientId: 'vpn-0123456789ab' });
+  assert.deepEqual(parseVpnCallback('vpn:clients'), { action: 'clients', protocol: 'vless' });
+  assert.deepEqual(parseVpnCallback('vpn:export:vpn-0123456789ab'), { action: 'export', protocol: 'vless', clientId: 'vpn-0123456789ab' });
+  assert.deepEqual(parseVpnCallback('vpn:p:h'), { action: 'protocol', protocol: 'hysteria2' });
+  assert.deepEqual(parseVpnCallback('vpn:h:export:vpn-0123456789ab'), { action: 'export', protocol: 'hysteria2', clientId: 'vpn-0123456789ab' });
   assert.deepEqual(parseVpnCallback(`vpn:confirm:${REQUEST_ID}`), { action: 'confirm', requestId: REQUEST_ID });
   assert.equal(parseVpnCallback('ops:allow:anything'), null);
   assert.equal(parseVpnCallback('vpn:export:../../root'), null);
@@ -60,9 +65,12 @@ test('rejects unsafe labels and client identifiers', () => {
 test('owner can observe VPN without confirmation', async () => {
   const { service, calls } = harness();
   const result = await service.handle({ text: '/vpn', userId: USER_ID, conversationId: 'conversation', originChannel: 'telegram' });
-  assert.match(result.answer, /VPN работает/);
-  assert.equal(result.buttons.flat().some((button) => button.data === 'vpn:clients'), true);
-  assert.equal(calls.find((call) => call[0] === 'request')[1].operation, 'vpn.status');
+  assert.match(result.answer, /VPN-протокол/);
+  assert.equal(result.buttons.flat().some((button) => button.data === 'vpn:p:h'), true);
+  assert.equal(calls.some((call) => call[0] === 'request'), false);
+  const status = await service.handleCallback({ userId: USER_ID, originChannel: 'telegram', data: 'vpn:h:status' });
+  assert.match(status.answer, /Hysteria2 работает/);
+  assert.equal(calls.find((call) => call[0] === 'request')[1].operation, 'vpn.hysteria2.status');
 });
 
 test('non-owner cannot inspect or mutate VPN', async () => {
@@ -96,7 +104,7 @@ test('client menu hides IDs and label commands resolve internally', async () => 
   assert.equal(list.buttons[0][0].text, 'Phone');
   const detail = await service.handleCallback({ ...context, data: list.buttons[0][0].data });
   assert.equal(detail.answer.includes('vpn-0123456789ab'), false);
-  assert.equal(detail.buttons.flat().some((button) => button.data === 'vpn:export:vpn-0123456789ab'), true);
+  assert.equal(detail.buttons.flat().some((button) => button.data === 'vpn:v:export:vpn-0123456789ab'), true);
   const created = await service.handle({ ...context, text: '/vpn_export Phone' });
   assert.equal(created.answer.includes('vpn-0123456789ab'), false);
   assert.equal(calls.filter((call) => call[0] === 'request').at(-1)[1].operation, 'vpn.clients.list');
@@ -108,4 +116,17 @@ test('secret host fields are excluded from persistence metadata', () => {
   assert.equal(JSON.stringify(safe).includes('secret'), false);
   assert.equal(JSON.stringify(safe).includes('private'), false);
   assert.equal(artifactFrom(data).content, 'vless://secret\n');
+  assert.equal(artifactFrom({ ...data, shareUri: 'hy2://secret' }).kind, 'happ-hysteria2');
+});
+
+test('Hysteria2 confirmation stays protocol-bound and never sends protocol to Host Agent arguments', async () => {
+  const { service, calls } = harness();
+  const context = { userId: USER_ID, conversationId: 'conversation', originChannel: 'telegram' };
+  const created = await service.handle({ ...context, text: '/vpn_hysteria2_issue iPhone' });
+  assert.match(created.answer, /Hysteria2/);
+  const executed = await service.handle({ ...context, text: '/vpn_confirm' });
+  const request = calls.find((call) => call[0] === 'request');
+  assert.equal(request[1].operation, 'vpn.hysteria2.client.issue');
+  assert.deepEqual(request[1].arguments, { label: 'iPhone' });
+  assert.equal(executed.artifact.kind, 'happ-hysteria2');
 });

@@ -30,8 +30,8 @@ the deployed Xray/VLESS path.
    pinned Hysteria2 v2.12.2 download URL and SHA-256
    `6493dfffd55b5883f64c76c63880ecc32988f0c568c9ca9014907877b4d55f94`.
 2. Make the installer validate the second IP, public DNS-only A record, free
-   UDP 443 and TCP 80, exact binary checksum, and generated config before
-   enabling the service.
+   UDP 443 and TCP 80, exact binary checksum, and strict generated-config
+   equality before enabling the service; v2.12.2 has no dry-run check flag.
 3. Generate root-owned secrets/state without printing them, add exact UFW rules
    for UDP 443 and ACME TCP 80, and provide a bounded rollback trap that never
    changes Xray, 3proxy, cloudflared, Docker, or PostgreSQL.

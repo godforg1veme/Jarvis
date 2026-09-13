@@ -6,6 +6,7 @@ const SERVICE_CATALOG = Object.freeze({
   postgres: Object.freeze({ displayName: 'PostgreSQL', serviceType: 'docker' }),
   cloudflared: Object.freeze({ displayName: 'Cloudflare Tunnel', serviceType: 'docker' }),
   xray: Object.freeze({ displayName: 'Xray VPN', serviceType: 'systemd' }),
+  hysteria2: Object.freeze({ displayName: 'Hysteria2 VPN', serviceType: 'systemd' }),
   'telegram-parser': Object.freeze({ displayName: 'Telegram Parser', serviceType: 'parser' }),
 });
 
@@ -127,24 +128,28 @@ class CollectorWorker {
     const fingerprint = crypto.createHash('sha256').update(summary).digest();
     await this.repository.recordParserResult({ hostId: this.hostId, kind: 'service_state', summary, observedAt: new Date(), fingerprint });
   }
-  async collectVpn() {
+  async collectVpnProtocol(serviceKey, operation) {
     if (typeof this.repository.serviceByKey !== 'function') return;
-    const response = await this.request('vpn.status');
+    const response = await this.request(operation);
     if (response.result.state !== 'succeeded' || !response.result.data) throw new Error('VPN status unavailable');
     const status = vpnStatusSchema.parse(response.result.data);
     const healthy = status.serviceState === 'active' && status.configValid && status.listenerReady;
-    const definition = SERVICE_CATALOG.xray;
+    const definition = SERVICE_CATALOG[serviceKey];
     const saved = await this.repository.upsertService({
-      hostId: this.hostId, serviceKey: 'xray', ...definition,
+      hostId: this.hostId, serviceKey, ...definition,
       sourceState: status.serviceState === 'active' ? 'active' : 'unavailable',
       healthState: healthy ? 'healthy' : status.serviceState === 'active' ? 'degraded' : 'unavailable',
     });
-    const normalized = { ...definition, ...saved, serviceKey: 'xray', sourceState: status.serviceState, healthState: healthy ? 'healthy' : 'degraded' };
+    const normalized = { ...definition, ...saved, serviceKey, sourceState: status.serviceState, healthState: healthy ? 'healthy' : status.serviceState === 'active' ? 'degraded' : 'unavailable' };
     if (this.incidentEngine) await this.incidentEngine.observe(normalized);
     await this.repository.recordMetricSamples({
       hostId: this.hostId, serviceId: saved.id, sampledAt: new Date(),
       metrics: { vpn_client_count: status.clientCount, vpn_config_valid: status.configValid ? 1 : 0, vpn_listener_ready: status.listenerReady ? 1 : 0 },
     });
+  }
+  async collectVpn() {
+    await this.collectVpnProtocol('xray', 'vpn.status');
+    await this.collectVpnProtocol('hysteria2', 'vpn.hysteria2.status');
   }
   async collectBackup() {
     if (typeof this.repository.recordBackupResult !== 'function') return;

@@ -1,7 +1,7 @@
 # Jarvis-managed Hysteria2 fallback design
 
 Date: 2026-09-13
-Status: approved design; written specification awaiting owner review
+Status: approved; implemented locally, production DNS and rollout pending
 
 ## Context
 
@@ -85,8 +85,9 @@ the first rollout. The baseline is measured before any tuning.
 ## State changes and rollback
 
 Every Hysteria2 mutation validates its closed input, writes a temporary state,
-generates a candidate config, runs the official config check, atomically
-replaces active files, and performs a bounded post-start health probe. A failed
+generates a candidate config, strictly compares it with the validated state,
+atomically replaces active files, and performs a bounded real process/listener
+health probe. Hysteria2 v2.12.2 exposes no dry-run config-check command. A failed
 validation, restart, listener check, or probe restores the previous Hysteria2
 state and service status. It never restarts or rewrites Xray.
 
@@ -161,7 +162,8 @@ causes an automatic restart of an otherwise healthy tunnel.
   protocol selection, one-time artifact handling, and VLESS regressions.
 - Operations tests cover independent Xray/Hysteria2 health and incident state.
 - Deployment preflight verifies the second IP, DNS-only A record, free UDP 443
-  and TCP 80, pinned binary checksum, UFW exact rules, and config validation.
+  and TCP 80, pinned binary checksum, UFW exact rules, strict generated-config
+  comparison, and a bounded real service start.
 - Production checks verify the UDP listener, trusted certificate chain, local
   service health, external QUIC handshake, Jarvis status/restart control, and
   unchanged Xray TCP 443/8443 health.

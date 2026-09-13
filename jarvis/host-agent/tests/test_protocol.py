@@ -44,6 +44,11 @@ class ProtocolTests(unittest.TestCase):
             validate_request(request(operation="vpn.client.issue", arguments={"label": "../../root"}))
         with self.assertRaises(ProtocolError):
             validate_request(request(operation="vpn.client.revoke", arguments={"clientId": "not-an-id"}))
+        hysteria = validate_request(request(operation="vpn.hysteria2.client.issue", arguments={"label": "My iPhone"}))
+        self.assertEqual(hysteria["arguments"], {"label": "My iPhone"})
+        self.assertEqual(validate_request(request(operation="vpn.hysteria2.status", arguments={}))["arguments"], {})
+        with self.assertRaises(ProtocolError):
+            validate_request(request(operation="vpn.hysteria2.restart", arguments={"port": 53}))
 
     def test_response_must_match_request_and_result_state(self):
         accepted = validate_request(request())

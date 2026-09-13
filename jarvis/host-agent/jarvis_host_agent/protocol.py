@@ -37,6 +37,13 @@ OPERATIONS = frozenset((
     "vpn.client.rotate",
     "vpn.client.export",
     "vpn.restart",
+    "vpn.hysteria2.status",
+    "vpn.hysteria2.clients.list",
+    "vpn.hysteria2.client.issue",
+    "vpn.hysteria2.client.revoke",
+    "vpn.hysteria2.client.rotate",
+    "vpn.hysteria2.client.export",
+    "vpn.hysteria2.restart",
 ))
 
 VPN_CLIENT_ID_RE = re.compile(r"^vpn-[a-f0-9]{12}$")
@@ -85,7 +92,7 @@ def _service_id(value: Any) -> str:
 
 def validate_arguments(operation: str, value: Any) -> dict[str, Any]:
     args = _require_mapping(value, "arguments")
-    if operation in {"host.snapshot", "inventory.snapshot", "services.snapshot", "backup.status", "backup.run", "parser.snapshot", "vpn.status", "vpn.clients.list", "vpn.restart"}:
+    if operation in {"host.snapshot", "inventory.snapshot", "services.snapshot", "backup.status", "backup.run", "parser.snapshot", "vpn.status", "vpn.clients.list", "vpn.restart", "vpn.hysteria2.status", "vpn.hysteria2.clients.list", "vpn.hysteria2.restart"}:
         _no_extra(args, set(), "arguments")
         return {}
     if operation in {"service.start", "service.stop", "service.restart"}:
@@ -108,7 +115,7 @@ def validate_arguments(operation: str, value: Any) -> dict[str, Any]:
             raise ProtocolError("arguments.maxLines is invalid")
         normalized["maxLines"] = max_lines
         return normalized
-    if operation == "vpn.client.issue":
+    if operation in {"vpn.client.issue", "vpn.hysteria2.client.issue"}:
         _no_extra(args, {"label"}, "arguments")
         label = args.get("label")
         if not isinstance(label, str):
@@ -117,7 +124,7 @@ def validate_arguments(operation: str, value: Any) -> dict[str, Any]:
         if not VPN_LABEL_RE.fullmatch(label) or ".." in label:
             raise ProtocolError("arguments.label is invalid")
         return {"label": label}
-    if operation in {"vpn.client.revoke", "vpn.client.rotate", "vpn.client.export"}:
+    if operation in {"vpn.client.revoke", "vpn.client.rotate", "vpn.client.export", "vpn.hysteria2.client.revoke", "vpn.hysteria2.client.rotate", "vpn.hysteria2.client.export"}:
         _no_extra(args, {"clientId"}, "arguments")
         client_id = args.get("clientId")
         if not isinstance(client_id, str) or not VPN_CLIENT_ID_RE.fullmatch(client_id):

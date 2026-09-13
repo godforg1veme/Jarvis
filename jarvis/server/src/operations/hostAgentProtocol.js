@@ -33,6 +33,15 @@ const operationArguments = {
   'vpn.client.rotate': z.object({ clientId: z.string().regex(/^vpn-[a-f0-9]{12}$/) }).strict(),
   'vpn.client.export': z.object({ clientId: z.string().regex(/^vpn-[a-f0-9]{12}$/) }).strict(),
   'vpn.restart': z.object({}).strict(),
+  'vpn.hysteria2.status': z.object({}).strict(),
+  'vpn.hysteria2.clients.list': z.object({}).strict(),
+  'vpn.hysteria2.client.issue': z.object({
+    label: z.string().trim().min(1).max(40).regex(/^[A-Za-zА-Яа-яЁё0-9_. -]+$/).refine((value) => !value.includes('..')),
+  }).strict(),
+  'vpn.hysteria2.client.revoke': z.object({ clientId: z.string().regex(/^vpn-[a-f0-9]{12}$/) }).strict(),
+  'vpn.hysteria2.client.rotate': z.object({ clientId: z.string().regex(/^vpn-[a-f0-9]{12}$/) }).strict(),
+  'vpn.hysteria2.client.export': z.object({ clientId: z.string().regex(/^vpn-[a-f0-9]{12}$/) }).strict(),
+  'vpn.hysteria2.restart': z.object({}).strict(),
 };
 
 const operationNames = Object.keys(operationArguments);

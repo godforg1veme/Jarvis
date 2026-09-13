@@ -6,6 +6,7 @@
     { "id": "postgres", "type": "docker", "target": "jarvis-family-postgres-1", "actions": [] },
     { "id": "cloudflared", "type": "docker", "target": "jarvis-family-cloudflared-1", "actions": [] },
     { "id": "xray", "type": "systemd", "target": "xray.service", "actions": [] },
+    { "id": "hysteria2", "type": "systemd", "target": "hysteria-server.service", "actions": [] },
     { "id": "telegram-parser", "type": "systemd", "target": "tg-parser.service", "actions": [] }
   ]
 }

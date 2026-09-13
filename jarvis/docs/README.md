@@ -20,6 +20,12 @@ and monitored by Operations. Owner-only Telegram/Desktop commands use
 origin-bound confirmation and one-time credential delivery. See
 `updates/2026-09-13-happ-vpn-rollout.md`.
 
+Hysteria2 fallback update, 2026-09-14: the isolated Host Agent manager,
+protocol-aware Telegram controls, deployment assets, monitoring, and local test
+coverage are implemented. Production activation is pending the DNS-only
+`vpn.rilora.ru` record and real iPhone Wi-Fi/LTE acceptance. See
+`superpowers/specs/2026-09-13-jarvis-managed-hysteria2-fallback-design.md`.
+
 Operations update, 2026-09-06: see
 `updates/2026-09-06-operations-verification.md` for the corrective rollout,
 verified checks, and the owner's decision to defer backups. The earlier
@@ -71,6 +77,8 @@ attachment ingestion.
 | `superpowers/specs/2026-09-11-telegram-voice-asr-design.md` | Implemented and enabled on DE-4: allowlisted Telegram `voice` → private GigaAM → owner-scoped `voice_transcript`, with synthetic OGG live-contract acceptance and explicit bounds. Real inbound owner Telegram acceptance remains manual. |
 | `superpowers/specs/2026-09-12-jarvis-managed-happ-vpn-design.md` | Implemented and deployed: dedicated Xray, closed Host Agent operations, owner-only confirmed Telegram/Desktop control, one-time Happ export, recovery, Operations monitoring, and external exit-IP acceptance. Final import in the user's Happ app remains manual. |
 | `superpowers/plans/2026-09-12-jarvis-managed-happ-vpn.md` | Implemented and production-verified on 2026-09-13; retained as rollout history. |
+| `superpowers/specs/2026-09-13-jarvis-managed-hysteria2-fallback-design.md` | Implemented locally with isolated Hysteria2 state, owner-only protocol-aware controls, pinned deployment, and monitoring; production DNS, rollout, and iPhone acceptance remain. |
+| `superpowers/plans/2026-09-13-jarvis-managed-hysteria2-fallback.md` | Local implementation and automated verification complete; production activation is blocked only on the DNS-only hostname. |
 | `superpowers/specs/2026-09-12-jarvis-life-os-core-v1-design.md` | Implemented and production-enabled: owner-scoped Event Spine, projections, Timeline, context recovery, explainable proposals, Telegram commands, and Desktop Mission Control. Optional model enrichment remains disabled. |
 | `superpowers/plans/2026-09-12-jarvis-life-os-core-v1.md` | Implemented, packaged, installed, and production-verified on 2026-09-13; retained as execution history. |
 | `superpowers/plans/2026-09-09-jarvis-vision.md` | Execution plan adapted to the current cloud-brain/local-hands architecture; first camera + two-display + memory slice implemented and locally accepted |

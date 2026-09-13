@@ -40,6 +40,9 @@ test('Host Agent protocol validates VPN operations without accepting config or s
   assert.deepEqual(issue.arguments, { label: 'My Phone' });
   assert.throws(() => validateRequest({ ...issue, arguments: { label: 'Phone', config: {} } }), /invalid/i);
   assert.throws(() => validateRequest({ ...issue, operation: 'vpn.client.revoke', arguments: { clientId: '../../root' } }), /invalid/i);
+  const hysteria = validateRequest({ ...issue, operation: 'vpn.hysteria2.client.issue', arguments: { label: 'My iPhone' } });
+  assert.deepEqual(hysteria.arguments, { label: 'My iPhone' });
+  assert.throws(() => validateRequest({ ...hysteria, operation: 'vpn.hysteria2.restart', arguments: { port: 53 } }), /invalid/i);
 });
 
 test('Host Agent protocol rejects malformed, oversized, and mismatched envelopes', () => {

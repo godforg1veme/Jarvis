@@ -36,6 +36,8 @@ with open(path, encoding='utf-8') as source:
 services = data.setdefault('managedServices', [])
 if not any(service.get('id') == 'xray' for service in services):
     services.append({'id': 'xray', 'type': 'systemd', 'target': 'xray.service', 'actions': []})
+if not any(service.get('id') == 'hysteria2' for service in services):
+    services.append({'id': 'hysteria2', 'type': 'systemd', 'target': 'hysteria-server.service', 'actions': []})
 directory = os.path.dirname(path)
 fd, temporary = tempfile.mkstemp(prefix='config.', suffix='.json', dir=directory)
 try:

@@ -185,6 +185,31 @@ archive the resulting VLESS URI; Telegram
 sends it as a one-time document and Desktop writes it under its private runtime
 data directory.
 
+### Hysteria2 fallback
+
+The optional Hysteria2 path is isolated from Xray. It binds the second public
+IPv4 address on UDP 443, uses a DNS-only hostname with a trusted ACME
+certificate, and keeps independent root-owned client credentials. Hysteria2
+v2.12.2 is pinned by SHA-256 because the current binary has no dry-run config
+check command; Jarvis validates its generated JSON exactly and treats the real
+process/listener probe as the activation check.
+
+Before installation, create a DNS-only A record for `vpn.rilora.ru` pointing to
+the second VPS address. Then run:
+
+```bash
+sudo bash deploy/vpn/install-hysteria2.sh 87.120.187.109 vpn.rilora.ru admin@rilora.ru Owner-iPhone
+sudo bash deploy/host-agent/install.sh
+sudo bash deploy/host-agent/enable-safe-actions.sh
+sudo PYTHONPATH=/opt/jarvis-host-agent python3 deploy/vpn/hysteria2_acceptance.py
+```
+
+The installer opens only UDP 443 on the second address plus TCP 80 for ACME
+HTTP-01, and verifies that Xray remains active on TCP 443/8443. Its bootstrap
+URI is protected at `/etc/jarvis-vpn/hysteria2-bootstrap-client.txt`; deliver it
+through the owner-only Telegram artifact path and remove that bootstrap file
+after acceptance. Never print it in a terminal, log, issue, or chat.
+
 ## Model configuration
 
 The production model is selected through environment variables. The current

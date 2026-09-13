@@ -15,7 +15,7 @@ import tempfile
 path = sys.argv[1]
 with open(path, encoding="utf-8") as source:
     data = json.load(source)
-allowed = {"jarvis-server": ["restart"], "cloudflared": ["restart"], "xray": ["restart"]}
+allowed = {"jarvis-server": ["restart"], "cloudflared": ["restart"], "xray": ["restart"], "hysteria2": ["restart"]}
 for service in data.get("managedServices", []):
     service["actions"] = allowed.get(service.get("id"), [])
 directory = os.path.dirname(path)
@@ -45,4 +45,4 @@ WHERE service_key IN ('jarvis-server','cloudflared','xray')
 ON CONFLICT (service_id,action) DO UPDATE SET enabled=EXCLUDED.enabled,updated_at=now();
 SQL
 
-echo "Safe Operations actions enabled: restart jarvis-server, restart cloudflared, restart xray"
+echo "Safe Operations actions enabled: restart jarvis-server, restart cloudflared, restart xray, restart hysteria2"

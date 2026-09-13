@@ -40,7 +40,10 @@ async function sendResult(ctx, result) {
   await replyWithChunks(ctx, result.answer, result.buttons);
   if (result.artifact) {
     const artifact = result.artifact;
-    if (artifact.kind !== 'happ-vless' || !/^.{1,80}\.txt$/u.test(artifact.filename) || !String(artifact.content || '').startsWith('vless://') || String(artifact.content).length > 4096) {
+    const content = String(artifact.content || '');
+    const validVless = artifact.kind === 'happ-vless' && content.startsWith('vless://');
+    const validHysteria2 = artifact.kind === 'happ-hysteria2' && (content.startsWith('hy2://') || content.startsWith('hysteria2://'));
+    if ((!validVless && !validHysteria2) || !/^.{1,80}\.txt$/u.test(artifact.filename) || content.length > 4096) {
       throw new Error('invalid VPN artifact');
     }
     await ctx.replyWithDocument(new InputFile(Buffer.from(artifact.content, 'utf8'), artifact.filename));
