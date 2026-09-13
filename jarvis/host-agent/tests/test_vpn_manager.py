@@ -71,7 +71,7 @@ class VpnManagerTests(unittest.TestCase):
         self.assertIn("@203.0.113.10:8443?", uri)
         self.assertIn("headerType=none", uri)
         self.assertIn("xtls=2", uri)
-        self.assertIn("fragment=1-10%2C5-20%2Ctlshello", uri)
+        self.assertNotIn("fragment=", uri)
 
     def test_alternative_port_must_be_distinct_and_bounded(self):
         for invalid in (443, 0, 65536, "8443"):

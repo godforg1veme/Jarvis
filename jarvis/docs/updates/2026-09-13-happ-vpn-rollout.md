@@ -50,6 +50,10 @@ listeners on 1085 and 1086 were deliberately left unchanged.
   connects completed in 55.4–62.1 ms; both Xray listeners and UFW rules were
   verified, and the refreshed `Me` profile was delivered directly to the owner
   through Telegram without logging or persisting its VLESS URI.
+- The first 8443 export enabled an overly aggressive `1-10` byte TLS ClientHello
+  fragmentation profile. iOS Happ then reported 4.5–5 second connection checks
+  while an in-tunnel Speedtest still showed 144 ms. Fragmentation was removed;
+  the stable alternate port remains the transport workaround.
 
 The remaining manual acceptance is navigating the live Telegram `/vpn` menu,
 confirming and cancelling actions through its buttons, then importing the

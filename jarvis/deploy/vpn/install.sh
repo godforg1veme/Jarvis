@@ -86,8 +86,7 @@ if not state_path.exists():
         'publicKey': public_key,
         'clients': [client],
     })
-    fragment = quote('1-10,5-20,tlshello', safe='')
-    query = f'encryption=none&flow=xtls-rprx-vision&security=reality&headerType=none&sni={quote(server_name, safe="")}&fp=chrome&pbk={quote(public_key, safe="")}&sid={client["shortId"]}&type=tcp&xtls=2&fragment={fragment}'
+    query = f'encryption=none&flow=xtls-rprx-vision&security=reality&headerType=none&sni={quote(server_name, safe="")}&fp=chrome&pbk={quote(public_key, safe="")}&sid={client["shortId"]}&type=tcp&xtls=2'
     share_uri = f'vless://{client["uuid"]}@{address}:8443?{query}#{quote(label, safe="")}'
     state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     export_path.write_text(share_uri + '\n', encoding='utf-8')

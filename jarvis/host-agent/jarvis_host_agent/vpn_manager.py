@@ -257,12 +257,11 @@ class XrayVpnManager:
     @staticmethod
     def share_uri(state: dict[str, Any], client: dict[str, Any]) -> str:
         port = state.get("alternativePort") or state["port"]
-        fragment = quote("1-10,5-20,tlshello", safe="")
         query = (
             "encryption=none&flow=xtls-rprx-vision&security=reality&headerType=none"
             f'&sni={quote(state["serverName"], safe="")}&fp=chrome'
             f'&pbk={quote(state["publicKey"], safe="")}&sid={client["shortId"]}&type=tcp'
-            f'&xtls=2&fragment={fragment}'
+            "&xtls=2"
         )
         return f'vless://{client["uuid"]}@{state["address"]}:{port}?{query}#{quote(client["label"], safe="")}'
 
