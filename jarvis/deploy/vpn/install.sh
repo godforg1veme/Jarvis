@@ -54,7 +54,7 @@ import uuid
 from pathlib import Path
 from urllib.parse import quote
 
-from jarvis_host_agent.vpn_manager import validate_state, xray_config
+from jarvis_host_agent.vpn_manager import XrayVpnManager, validate_state, xray_config
 
 address, server_name, label, xray_bin = sys.argv[1:]
 state_path = Path('/etc/jarvis-vpn/state.json')
@@ -80,19 +80,28 @@ if not state_path.exists():
         'version': 1,
         'address': address,
         'port': 443,
+        'alternativePort': 8443,
         'serverName': server_name,
         'privateKey': private_key,
         'publicKey': public_key,
         'clients': [client],
     })
-    query = f'encryption=none&flow=xtls-rprx-vision&security=reality&sni={quote(server_name, safe="")}&fp=chrome&pbk={quote(public_key, safe="")}&sid={client["shortId"]}&type=tcp'
-    share_uri = f'vless://{client["uuid"]}@{address}:443?{query}#{quote(label, safe="")}'
+    fragment = quote('1-10,5-20,tlshello', safe='')
+    query = f'encryption=none&flow=xtls-rprx-vision&security=reality&headerType=none&sni={quote(server_name, safe="")}&fp=chrome&pbk={quote(public_key, safe="")}&sid={client["shortId"]}&type=tcp&xtls=2&fragment={fragment}'
+    share_uri = f'vless://{client["uuid"]}@{address}:8443?{query}#{quote(label, safe="")}'
     state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     export_path.write_text(share_uri + '\n', encoding='utf-8')
     os.chmod(state_path, 0o600)
     os.chmod(export_path, 0o600)
 else:
-    state = validate_state(json.loads(state_path.read_text(encoding='utf-8')))
+    existing = json.loads(state_path.read_text(encoding='utf-8'))
+    existing.setdefault('alternativePort', 8443)
+    state = validate_state(existing)
+    XrayVpnManager._write_atomic(
+        state_path,
+        (json.dumps(state, ensure_ascii=False, indent=2) + '\n').encode('utf-8'),
+        mode=0o600,
+    )
 
 config_path.write_text(json.dumps(xray_config(state), ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 os.chown(config_path, 0, __import__('grp').getgrnam('xray').gr_gid)
@@ -115,12 +124,13 @@ systemctl disable x-ui.service >/dev/null
 systemctl enable --now xray.service
 systemctl is-active --quiet xray.service
 for _attempt in {1..20}; do
-  if /usr/bin/ss -lnt 'sport = :443' | /usr/bin/grep ':443' >/dev/null; then
+  if /usr/bin/ss -lnt | /usr/bin/grep ':443' >/dev/null && /usr/bin/ss -lnt | /usr/bin/grep ':8443' >/dev/null; then
     break
   fi
   sleep 0.25
 done
-/usr/bin/ss -lnt 'sport = :443' | /usr/bin/grep ':443' >/dev/null
+/usr/bin/ss -lnt | /usr/bin/grep ':443' >/dev/null
+/usr/bin/ss -lnt | /usr/bin/grep ':8443' >/dev/null
 trap - ERR
 
 echo "Jarvis managed Xray VPN installed; protected bootstrap export: /etc/jarvis-vpn/bootstrap-client.txt"

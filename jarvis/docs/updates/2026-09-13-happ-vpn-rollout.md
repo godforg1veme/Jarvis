@@ -2,7 +2,8 @@
 
 ## Outcome
 
-The production VPS now runs a dedicated hardened `xray.service` on TCP 443.
+The production VPS now runs a dedicated hardened `xray.service` on TCP 443 and
+an independently reachable fallback on TCP 8443.
 The protocol is VLESS + REALITY + XTLS Vision and the generated share URI is
 compatible with Happ. Legacy x-ui is stopped and disabled; a root-only rollback
 backup remains under `/var/backups/jarvis-vpn/`.
@@ -23,8 +24,10 @@ menu navigation are buttons. Creating a new access still needs one label via
 backward-compatible paths without requiring an ID.
 
 Operations monitors Xray service state, configuration validity, port readiness,
-and bounded client count. The former x-ui panel and unused Xray ports 16777,
-2053, and 8443 were removed from UFW. Existing independently managed 3proxy
+and bounded client count. The former x-ui panel and unused Xray ports 16777 and
+2053 were removed from UFW. Port 8443 was restored as a managed fallback after
+live diagnostics found repeated SYN retransmission on 443 from the owner's
+network. Existing independently managed 3proxy
 listeners on 1085 and 1086 were deliberately left unchanged.
 
 ## Verification
@@ -42,6 +45,11 @@ listeners on 1085 and 1086 were deliberately left unchanged.
 - Operations reported `xray: active / healthy` and persisted VPN metrics.
 - Telegram button-control server tests passed (227 total); deployment preflight,
   public smoke, container health, and post-deploy error-log checks passed.
+- Owner-route diagnostics showed 21 of 40 TCP/443 connects above 200 ms with a
+  1058.5 ms median while TCP/22 stayed near 60 ms. After enabling 8443, 40 of 40
+  connects completed in 55.4–62.1 ms; both Xray listeners and UFW rules were
+  verified, and the refreshed `Me` profile was delivered directly to the owner
+  through Telegram without logging or persisting its VLESS URI.
 
 The remaining manual acceptance is navigating the live Telegram `/vpn` menu,
 confirming and cancelling actions through its buttons, then importing the

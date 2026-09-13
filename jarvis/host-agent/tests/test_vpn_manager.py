@@ -37,7 +37,7 @@ class VpnManagerTests(unittest.TestCase):
             if args[:2] == ["/usr/bin/systemctl", "is-active"]:
                 return {"state": "succeeded", "data": {"output": "active\n"}}
             if args[:2] == ["/usr/bin/ss", "-lnt"]:
-                return {"state": "succeeded", "data": {"output": "LISTEN 0 4096 *:443 *:*\n"}}
+                return {"state": "succeeded", "data": {"output": "LISTEN 0 4096 *:443 *:*\nLISTEN 0 4096 *:8443 *:*\n"}}
             return {"state": "succeeded", "data": {"output": "Configuration OK\n"}}
 
         self.manager = XrayVpnManager(run, self.state_path, self.config_path, "/xray", "xray.service")
@@ -57,6 +57,28 @@ class VpnManagerTests(unittest.TestCase):
         self.assertEqual(inbound["streamSettings"]["realitySettings"]["serverNames"], ["example.com"])
         self.assertEqual(inbound["settings"]["clients"][0]["email"], "vpn-0123456789ab")
         self.assertNotIn("publicKey", json.dumps(config))
+
+    def test_alternative_port_keeps_primary_listener_and_is_preferred_by_happ(self):
+        state = base_state()
+        state["alternativePort"] = 8443
+        state["clients"].append({
+            "id": "vpn-0123456789ab", "label": "Phone", "uuid": "12345678-1234-4234-8234-123456789abc",
+            "shortId": "0123456789abcdef", "createdAt": "2026-09-12T00:00:00Z",
+        })
+        config = xray_config(state)
+        self.assertEqual([item["port"] for item in config["inbounds"]], [443, 8443])
+        uri = self.manager.share_uri(validate_state(state), state["clients"][0])
+        self.assertIn("@203.0.113.10:8443?", uri)
+        self.assertIn("headerType=none", uri)
+        self.assertIn("xtls=2", uri)
+        self.assertIn("fragment=1-10%2C5-20%2Ctlshello", uri)
+
+    def test_alternative_port_must_be_distinct_and_bounded(self):
+        for invalid in (443, 0, 65536, "8443"):
+            state = base_state()
+            state["alternativePort"] = invalid
+            with self.assertRaises(VpnManagerError):
+                validate_state(state)
 
     def test_issue_returns_happ_uri_but_public_listing_contains_no_credential(self):
         result = self.manager.issue("My Phone")

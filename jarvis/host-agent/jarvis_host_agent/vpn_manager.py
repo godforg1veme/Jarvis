@@ -64,13 +64,18 @@ def validate_client_id(value: Any) -> str:
 
 
 def validate_state(value: Any) -> dict[str, Any]:
-    if not isinstance(value, dict) or set(value) != {
-        "version", "address", "port", "serverName", "privateKey", "publicKey", "clients"
-    }:
+    required_keys = {"version", "address", "port", "serverName", "privateKey", "publicKey", "clients"}
+    allowed_keys = required_keys | {"alternativePort"}
+    if not isinstance(value, dict) or not required_keys.issubset(value) or not set(value).issubset(allowed_keys):
         raise VpnManagerError("VPN_STATE_INVALID")
     if value["version"] != 1 or not _valid_host(value["address"]):
         raise VpnManagerError("VPN_STATE_INVALID")
     if type(value["port"]) is not int or not 1 <= value["port"] <= 65535:
+        raise VpnManagerError("VPN_STATE_INVALID")
+    alternative_port = value.get("alternativePort")
+    if alternative_port is not None and (
+        type(alternative_port) is not int or not 1 <= alternative_port <= 65535 or alternative_port == value["port"]
+    ):
         raise VpnManagerError("VPN_STATE_INVALID")
     if not _valid_host(value["serverName"]):
         raise VpnManagerError("VPN_STATE_INVALID")
@@ -106,14 +111,13 @@ def validate_state(value: Any) -> dict[str, Any]:
 
 def xray_config(state: dict[str, Any]) -> dict[str, Any]:
     state = validate_state(state)
-    return {
-        "log": {"loglevel": "warning", "access": "none", "dnsLog": False},
-        "stats": {},
-        "policy": {"levels": {"0": {"statsUserUplink": True, "statsUserDownlink": True}}},
-        "inbounds": [{
-            "tag": "vless-reality-443",
+    ports = [state["port"]] + ([state["alternativePort"]] if state.get("alternativePort") else [])
+    inbounds = []
+    for port in ports:
+        inbounds.append({
+            "tag": f"vless-reality-{port}",
             "listen": "0.0.0.0",
-            "port": state["port"],
+            "port": port,
             "protocol": "vless",
             "settings": {
                 "clients": [{"id": client["uuid"], "email": client["id"], "flow": "xtls-rprx-vision"} for client in state["clients"]],
@@ -132,7 +136,12 @@ def xray_config(state: dict[str, Any]) -> dict[str, Any]:
                 },
             },
             "sniffing": {"enabled": True, "destOverride": ["http", "tls", "quic"], "routeOnly": True},
-        }],
+        })
+    return {
+        "log": {"loglevel": "warning", "access": "none", "dnsLog": False},
+        "stats": {},
+        "policy": {"levels": {"0": {"statsUserUplink": True, "statsUserDownlink": True}}},
+        "inbounds": inbounds,
         "outbounds": [
             {"tag": "direct", "protocol": "freedom"},
             {"tag": "blocked", "protocol": "blackhole"},
@@ -247,23 +256,28 @@ class XrayVpnManager:
 
     @staticmethod
     def share_uri(state: dict[str, Any], client: dict[str, Any]) -> str:
+        port = state.get("alternativePort") or state["port"]
+        fragment = quote("1-10,5-20,tlshello", safe="")
         query = (
-            "encryption=none&flow=xtls-rprx-vision&security=reality"
+            "encryption=none&flow=xtls-rprx-vision&security=reality&headerType=none"
             f'&sni={quote(state["serverName"], safe="")}&fp=chrome'
             f'&pbk={quote(state["publicKey"], safe="")}&sid={client["shortId"]}&type=tcp'
+            f'&xtls=2&fragment={fragment}'
         )
-        return f'vless://{client["uuid"]}@{state["address"]}:{state["port"]}?{query}#{quote(client["label"], safe="")}'
+        return f'vless://{client["uuid"]}@{state["address"]}:{port}?{query}#{quote(client["label"], safe="")}'
 
     def status(self) -> dict[str, Any]:
         try:
             state = self._read_state()
             checked = self.run([self.xray_bin, "run", "-test", "-c", str(self.config_path)], timeout=30)
             active = self.run(["/usr/bin/systemctl", "is-active", self.service], timeout=15)
-            listener = self.run(["/usr/bin/ss", "-lnt", "sport", "=", f':{state["port"]}'], timeout=15)
+            ports = [state["port"]] + ([state["alternativePort"]] if state.get("alternativePort") else [])
+            listener = self.run(["/usr/bin/ss", "-lnt"], timeout=15)
+            listener_output = listener.get("data", {}).get("output", "")
             return {
                 "serviceState": "active" if active.get("state") == "succeeded" and active.get("data", {}).get("output", "").strip() == "active" else "unavailable",
                 "configValid": checked.get("state") == "succeeded",
-                "listenerReady": listener.get("state") == "succeeded" and f':{state["port"]}' in listener.get("data", {}).get("output", ""),
+                "listenerReady": listener.get("state") == "succeeded" and all(f':{port}' in listener_output for port in ports),
                 "clientCount": len(state["clients"]),
             }
         except VpnManagerError:

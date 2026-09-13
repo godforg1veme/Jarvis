@@ -2,7 +2,7 @@
 
 Current production target: Ubuntu 24.04 LTS on the Jarvis VPS. Docker Compose
 runs the Fastify server and a private PostgreSQL/pgvector instance. The current
-host also runs Xray on port 443, so Jarvis uses the `tunnel` profile and a
+host also runs Xray on ports 443 and 8443, so Jarvis uses the `tunnel` profile and a
 Cloudflare Tunnel instead of binding public web ports.
 
 The original Ubuntu 22.04/Caddy-only deployment plan is historical. The
@@ -161,7 +161,9 @@ originating Telegram/Desktop client.
 ## Happ VPN
 
 The current host runs a dedicated hardened `xray.service` with VLESS + REALITY
-+ XTLS Vision on TCP 443. Its authoritative client state is root-only under
++ XTLS Vision on TCP 443 and a managed 8443 fallback for unstable client
+routes. Happ exports prefer 8443 and retain 443 as a rollback listener. Its
+authoritative client state is root-only under
 `/etc/jarvis-vpn/`; `/etc/xray/config.json` is generated from that state. Do
 not edit either file by hand and do not restore x-ui while Xray is active.
 
@@ -176,10 +178,10 @@ systemctl is-active xray jarvis-host-agent
 sudo /usr/local/bin/xray run -test -c /etc/xray/config.json
 ```
 
-The owner controls access from Telegram or a paired Desktop with `/vpn`,
-`/vpn_clients`, `/vpn_issue LABEL`, `/vpn_revoke ID`, `/vpn_rotate ID`,
-`/vpn_export ID`, and `/vpn_restart`. All mutations require confirmation in the
-originating client. Never print or archive the resulting VLESS URI; Telegram
+The owner controls access from Telegram or a paired Desktop with `/vpn` buttons
+and `/vpn_issue LABEL`; manual client actions accept labels rather than IDs.
+All mutations require confirmation in the originating client. Never print or
+archive the resulting VLESS URI; Telegram
 sends it as a one-time document and Desktop writes it under its private runtime
 data directory.
 

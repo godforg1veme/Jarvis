@@ -146,6 +146,11 @@ See `docs/README.md` for current implementation status and historical records.
   VPS token file must remain mode `0600`.
 - `deploy/docker-compose.yml` also retains an optional Caddy profile for hosts
   where 80/443 are available. Do not start both ingress modes accidentally.
+- Xray keeps the original VLESS + REALITY + XTLS Vision listener on TCP 443 and
+  a managed TCP 8443 fallback. Happ exports prefer 8443 with bounded client-side
+  TLS ClientHello fragmentation after live owner-route diagnostics found
+  repeated SYN retransmission on 443. Both listeners use the same validated
+  root-only client state; Host Agent changes must preserve them together.
 - PostgreSQL must never be published publicly.
 - The DE-4 runs the private `gigaam-asr` service for Russian server ASR with a
   four-CPU/8-GiB cap and no host port. Its observed steady-state RSS is about
