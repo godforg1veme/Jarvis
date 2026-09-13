@@ -13,13 +13,87 @@ function safeValue(value, max = 500) {
   return String(value === undefined || value === null ? '' : value).replace(/[\r\n]+/g, ' ').slice(0, max);
 }
 
-function commandPrompt(action, args) {
+const ACTION_PROMPT_TITLES = Object.freeze({
+  'app.launch': 'Запустить приложение',
+  'app.close': 'Закрыть приложение',
+  'file.open': 'Открыть файл',
+  'file.open_folder': 'Открыть папку',
+  'file.reveal': 'Показать в Проводнике',
+  'file.create_folder': 'Создать папку',
+  'file.create_text_file': 'Создать файл',
+  'file.rename': 'Переименовать файл',
+  'file.move': 'Переместить файл',
+  'file.copy': 'Скопировать файл',
+  'file.delete': 'Удалить в корзину',
+  'file.permanent_delete': 'Удалить навсегда',
+  'file.move_batch': 'Переместить выбранные файлы',
+  'file.copy_batch': 'Скопировать выбранные файлы',
+  'file.rename_batch': 'Переименовать выбранные файлы',
+  'file.delete_batch': 'Удалить выбранные файлы',
+  'window.focus': 'Переключиться на окно',
+  'window.restore': 'Развернуть окно',
+  'window.close': 'Закрыть окно',
+  'window.move': 'Переместить окно',
+  'window.resize': 'Изменить размер окна',
+  'window.layout': 'Применить расположение окон',
+});
+
+function commandPrompt(action, args = {}) {
+  const name = safeValue(args.name || args.title || args.query || (args.appId && !/^[a-f0-9-]{36}$/i.test(args.appId) ? args.appId : ''));
+  const path = safeValue(args.path || '');
+  const from = safeValue(args.from || '');
+  const to = safeValue(args.to || args.destination || '');
+  const newName = safeValue(args.newName || '');
+
+  if (action === 'app.launch') {
+    return name ? `Запустить приложение «${name}»?` : 'Запустить выбранное приложение?';
+  }
+  if (action === 'app.close') {
+    return name ? `Закрыть приложение «${name}»?` : 'Закрыть выбранное приложение?';
+  }
+  if (action === 'file.delete') {
+    return path ? `Удалить в корзину: ${path}?` : 'Удалить выбранный файл в корзину?';
+  }
+  if (action === 'file.permanent_delete') {
+    return path ? `Удалить навсегда: ${path}?` : 'Удалить выбранный файл навсегда?';
+  }
+  if (action === 'file.open') {
+    return path ? `Открыть файл «${path}»?` : (name ? `Открыть файл «${name}»?` : 'Открыть выбранный файл?');
+  }
+  if (action === 'file.open_folder') {
+    return path ? `Открыть папку «${path}»?` : 'Открыть выбранную папку?';
+  }
+  if (action === 'file.reveal') {
+    return path ? `Показать в Проводнике: ${path}?` : 'Показать выбранный объект в Проводнике?';
+  }
+  if (action === 'file.create_folder') {
+    return path ? `Создать папку «${path}»?` : 'Создать папку?';
+  }
+  if (action === 'file.create_text_file') {
+    return path ? `Создать файл «${path}»?` : 'Создать файл?';
+  }
+  if (action === 'file.rename') {
+    return from && newName ? `Переименовать «${from}» в «${newName}»?` : (newName ? `Переименовать в «${newName}»?` : 'Переименовать файл?');
+  }
+  if (action === 'file.move') {
+    return from && to ? `Переместить «${from}» в «${to}»?` : (to ? `Переместить в «${to}»?` : 'Переместить файл?');
+  }
+  if (action === 'file.copy') {
+    return from && to ? `Скопировать «${from}» в «${to}»?` : (to ? `Скопировать в «${to}»?` : 'Скопировать файл?');
+  }
+
+  const title = ACTION_PROMPT_TITLES[action];
   const details = [];
-  for (const key of ['path', 'from', 'to', 'destination', 'newName', 'appId', 'candidateId', 'query']) {
-    if (args && args[key] !== undefined) details.push(`${key}: ${safeValue(args[key])}`);
+  for (const key of ['path', 'from', 'to', 'destination', 'newName', 'query']) {
+    if (args && args[key] !== undefined && typeof args[key] === 'string' && args[key].trim()) {
+      details.push(`${key}: ${safeValue(args[key])}`);
+    }
   }
   const suffix = details.length ? ` (${details.join(', ')})` : '';
-  return `Подтвердить удалённое действие «${safeValue(action, 128)}»${suffix}?`;
+  if (title) {
+    return `Подтвердить действие «${title}»${suffix}?`;
+  }
+  return `Подтвердить действие «${safeValue(action, 128)}»${suffix}?`;
 }
 
 function isChangingPolicy(policy) {

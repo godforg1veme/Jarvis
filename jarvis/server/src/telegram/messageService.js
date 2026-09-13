@@ -80,7 +80,7 @@ function normalizeTelegramMessage(update) {
   };
 }
 
-function normalizeVpnCallbackUpdate(update) {
+function normalizeTelegramCallbackUpdate(update) {
   const query = update && update.callback_query;
   const telegramUserId = query && query.from && String(query.from.id || '');
   const chatId = query && query.message && query.message.chat && String(query.message.chat.id || '');
@@ -88,7 +88,7 @@ function normalizeVpnCallbackUpdate(update) {
   const updateId = Number(update && update.update_id);
   if (!/^\d{1,20}$/.test(telegramUserId) || !/^-?\d{1,20}$/.test(chatId)) throw new Error('invalid Telegram callback identity');
   if (!Number.isSafeInteger(updateId) || updateId < 0) throw new Error('invalid Telegram update ID');
-  if (!data.startsWith('vpn:') || Buffer.byteLength(data, 'utf8') > 64) throw new Error('invalid VPN callback');
+  if (Buffer.byteLength(data, 'utf8') > 64) throw new Error('invalid Telegram callback');
   return {
     updateId,
     telegramUserId,
@@ -96,6 +96,12 @@ function normalizeVpnCallbackUpdate(update) {
     data,
     displayName: [query.from.first_name, query.from.last_name].filter(Boolean).join(' ').trim().slice(0, 100) || `Telegram ${telegramUserId}`,
   };
+}
+
+function normalizeVpnCallbackUpdate(update) {
+  const normalized = normalizeTelegramCallbackUpdate(update);
+  if (!normalized.data.startsWith('vpn:')) throw new Error('invalid VPN callback');
+  return normalized;
 }
 
 function vpnPublicError(error) {
@@ -111,7 +117,7 @@ function vpnPublicError(error) {
 function commandReply(text) {
   const command = String(text || '').split(/\s+/, 1)[0].split('@', 1)[0].toLowerCase();
   if (command === '/start') return 'Jarvis подключён. Напишите вопрос обычным сообщением.';
-  if (command === '/help') return 'Доступно: текстовые вопросы, загрузка файлов, /life, /life_confirm ID, /life_dismiss ID, /documents, /document_delete ID confirm, /devices, /pair Имя ПК, /revoke ID устройства, /desktop DEVICE_ID ACTION JSON, /confirm COMMAND_ID, /reject COMMAND_ID, /command COMMAND_ID, /memory. VPN управляется кнопками из /vpn; для нового доступа можно написать /vpn_issue Имя. Также можно писать «запомни», «забудь» и «исправь старое → новое».';
+  if (command === '/help') return 'Доступно: текстовые вопросы, отправка файлов, /life, /documents, /devices, /confirm, /reject для подтверждения действий на ПК, /memory, /vpn. Все операции подтверждения и выбора выполняются удобными кнопками.';
   if (command === '/memory') return null;
   return null;
 }
@@ -156,34 +162,150 @@ class TelegramMessageService {
     });
   }
 
-  async handleVpnCallback(update) {
-    const input = normalizeVpnCallbackUpdate(update);
+  async handleCallback(update) {
+    const input = normalizeTelegramCallbackUpdate(update);
     if (!this.accessPolicy.isAllowed(input.telegramUserId)) return { status: 'forbidden' };
-    if (!this.vpnService || typeof this.vpnService.handleCallback !== 'function') return { status: 'ignored' };
     const claimed = await this.updateRepository.claim(input.updateId, input.telegramUserId);
     if (!claimed) return { status: 'duplicate' };
     const user = await this.userRepository.findOrCreateTelegramUser({ telegramUserId: input.telegramUserId, displayName: input.displayName });
     const conversation = await this.conversationRepository.getOrCreate({ userId: user.id, channel: 'telegram', externalChatId: input.chatId });
-    let result;
-    try {
-      result = await this.vpnService.handleCallback({
-        data: input.data,
-        userId: user.id,
-        conversationId: conversation.id,
-        originChannel: 'telegram',
-        originDeviceId: null,
-      });
-    } catch (error) {
-      result = vpnPublicError(error);
+
+    if (input.data.startsWith('vpn:')) {
+      if (!this.vpnService || typeof this.vpnService.handleCallback !== 'function') return { status: 'ignored' };
+      let result;
+      try {
+        result = await this.vpnService.handleCallback({
+          data: input.data,
+          userId: user.id,
+          conversationId: conversation.id,
+          originChannel: 'telegram',
+          originDeviceId: null,
+        });
+      } catch (error) {
+        result = vpnPublicError(error);
+      }
+      if (!result) return { status: 'ignored' };
+      await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: result.answer });
+      return {
+        status: 'answered',
+        answer: result.answer,
+        ...(result.artifact ? { artifact: result.artifact } : {}),
+        ...(result.buttons ? { buttons: result.buttons } : {}),
+      };
     }
-    if (!result) return { status: 'ignored' };
-    await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: result.answer });
-    return {
-      status: 'answered',
-      answer: result.answer,
-      ...(result.artifact ? { artifact: result.artifact } : {}),
-      ...(result.buttons ? { buttons: result.buttons } : {}),
-    };
+
+    const cmdMatch = /^cmd:(confirm|reject):([a-f0-9-]{36})$/i.exec(input.data);
+    if (cmdMatch) {
+      const decision = cmdMatch[1].toLowerCase();
+      const commandId = cmdMatch[2];
+      try {
+        let answer = '';
+        if (this.orchestrator) {
+          const wfResult = decision === 'confirm'
+            ? await this.orchestrator.confirm({ userId: user.id, conversationId: conversation.id, originChannel: 'telegram', originDeviceId: null, commandId, text: decision })
+            : await this.orchestrator.reject({ userId: user.id, conversationId: conversation.id, originChannel: 'telegram', originDeviceId: null, commandId, text: decision });
+          if (wfResult && wfResult.handled) answer = wfResult.answer;
+        }
+        if (!answer && this.commandService) {
+          const res = decision === 'confirm'
+            ? await this.commandService.approve({ userId: user.id, commandId, originChannel: 'telegram', originDeviceId: null })
+            : await this.commandService.reject({ userId: user.id, commandId, originChannel: 'telegram', originDeviceId: null });
+          if (res.status === 'running') answer = 'Подтверждение принято. Действие выполняется на компьютере.';
+          else if (res.status === 'failed') answer = `Команда не выполнена: ${res.error || 'ошибка доставки'}.`;
+          else answer = 'Действие отменено.';
+        }
+        if (!answer) answer = decision === 'confirm' ? 'Подтверждение принято.' : 'Действие отменено.';
+        await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: answer });
+        return { status: 'answered', answer };
+      } catch (error) {
+        const errorAnswer = error.publicCode === 'CONFIRMATION_UNAVAILABLE'
+          ? 'Подтверждение не найдено, уже использовано или истекло.'
+          : 'Не удалось обработать подтверждение.';
+        await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: errorAnswer });
+        return { status: 'answered', answer: errorAnswer };
+      }
+    }
+
+    const lifeMatch = /^life:(confirm|dismiss):([a-f0-9-]{36})$/i.exec(input.data);
+    if (lifeMatch) {
+      if (!this.lifeProposalService) return { status: 'ignored' };
+      const action = lifeMatch[1].toLowerCase();
+      const proposalId = lifeMatch[2];
+      const proposal = await this.lifeProposalService[action]({
+        userId: user.id, proposalId, originChannel: 'telegram', originConversationId: conversation.id,
+      });
+      const answer = proposal ? (action === 'confirm' ? 'Предложение подтверждено.' : 'Предложение отклонено.') : 'Предложение недоступно, истекло или относится к другому каналу.';
+      await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: answer });
+      return { status: 'answered', answer };
+    }
+
+    const docMatch = /^doc:(del_prompt|delete|cancel)(?::([a-f0-9-]{36}))?$/i.exec(input.data);
+    if (docMatch) {
+      if (!this.knowledgeService) return { status: 'ignored' };
+      const subAction = docMatch[1].toLowerCase();
+      const documentId = docMatch[2];
+      if (subAction === 'cancel') {
+        const answer = 'Удаление документа отменено.';
+        await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: answer });
+        return { status: 'answered', answer };
+      }
+      if (subAction === 'del_prompt' && documentId) {
+        const docs = await this.knowledgeService.list({ userId: user.id });
+        const doc = docs.find((d) => d.id === documentId);
+        const name = doc ? `«${doc.original_name}»` : 'выбранный документ';
+        const answer = `Удалить документ ${name}? Удаление необратимо.`;
+        const buttons = [
+          [
+            { text: '🗑 Да, удалить', data: `doc:delete:${documentId}` },
+            { text: 'Отмена', data: 'doc:cancel' },
+          ],
+        ];
+        return { status: 'answered', answer, buttons };
+      }
+      if (subAction === 'delete' && documentId) {
+        const deleted = await this.knowledgeService.remove({ userId: user.id, documentId });
+        const answer = deleted ? `Документ «${deleted.original_name}» удалён.` : 'Документ не найден.';
+        await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: answer });
+        return { status: 'answered', answer };
+      }
+    }
+
+    const devMatch = /^dev:(revoke_prompt|revoke|cancel)(?::([a-f0-9-]{36}))?$/i.exec(input.data);
+    if (devMatch) {
+      if (!this.deviceService) return { status: 'ignored' };
+      const subAction = devMatch[1].toLowerCase();
+      const deviceId = devMatch[2];
+      if (subAction === 'cancel') {
+        const answer = 'Отзыв устройства отменён.';
+        await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: answer });
+        return { status: 'answered', answer };
+      }
+      if (subAction === 'revoke_prompt' && deviceId) {
+        const devices = await this.deviceService.list({ userId: user.id });
+        const dev = devices.find((d) => d.id === deviceId);
+        const name = dev ? `«${dev.name}»` : 'выбранное устройство';
+        const answer = `Отозвать доступ для устройства ${name}?`;
+        const buttons = [
+          [
+            { text: '⛔ Да, отозвать', data: `dev:revoke:${deviceId}` },
+            { text: 'Отмена', data: 'dev:cancel' },
+          ],
+        ];
+        return { status: 'answered', answer, buttons };
+      }
+      if (subAction === 'revoke' && deviceId) {
+        const revoked = await this.deviceService.revoke({ userId: user.id, deviceId });
+        const answer = revoked ? `Устройство «${revoked.name}» отозвано.` : 'Устройство не найдено или уже отозвано.';
+        await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: answer });
+        return { status: 'answered', answer };
+      }
+    }
+
+    return { status: 'ignored' };
+  }
+
+  async handleVpnCallback(update) {
+    return this.handleCallback(update);
   }
 
   async documentCommandReply({ text, user }) {
@@ -192,12 +314,31 @@ class TelegramMessageService {
     if (command === '/documents') {
       const documents = await this.knowledgeService.list({ userId: user.id });
       if (documents.length === 0) return 'Личных документов пока нет. Отправь мне файл в Telegram.';
-      return documents.map((document) => `${document.original_name}\n${publicDocumentStatus(document)} · ${document.category} · ${document.id}`).join('\n\n');
+      const listText = documents.map((document) => `${document.original_name}\n${publicDocumentStatus(document)} · ${document.category}`).join('\n\n');
+      const buttons = documents.slice(0, 8).map((document) => [
+        { text: `🗑 Удалить «${document.original_name.slice(0, 30)}»`, data: `doc:del_prompt:${document.id}` },
+      ]);
+      return { answer: listText, buttons: buttons.length ? buttons : undefined };
     }
     if (command === '/document_delete') {
       const [documentId = '', confirmation = ''] = argument.split(/\s+/, 2);
-      if (!/^[a-f0-9-]{36}$/i.test(documentId)) return 'Укажи ID документа из /documents: /document_delete ID';
-      if (confirmation.toLowerCase() !== 'confirm') return `Удаление необратимо. Подтверди: /document_delete ${documentId} confirm`;
+      if (!documentId) {
+        const documents = await this.knowledgeService.list({ userId: user.id });
+        if (documents.length === 0) return 'Личных документов пока нет.';
+        const buttons = documents.slice(0, 8).map((doc) => [
+          { text: `🗑 ${doc.original_name.slice(0, 30)}`, data: `doc:del_prompt:${doc.id}` },
+        ]);
+        return { answer: 'Выбери документ для удаления:', buttons };
+      }
+      if (!/^[a-f0-9-]{36}$/i.test(documentId)) return 'Укажи ID документа из /documents или выбери в списке.';
+      if (confirmation.toLowerCase() !== 'confirm') {
+        return {
+          answer: 'Удаление необратимо. Подтвердить удаление документа?',
+          buttons: [
+            [{ text: '🗑 Да, удалить', data: `doc:delete:${documentId}` }, { text: 'Отмена', data: 'doc:cancel' }],
+          ],
+        };
+      }
       const deleted = await this.knowledgeService.remove({ userId: user.id, documentId });
       return deleted ? `Документ «${deleted.original_name}» удалён.` : 'Документ не найден.';
     }
@@ -213,7 +354,12 @@ class TelegramMessageService {
       const devices = await this.deviceService.list({ userId: user.id });
       if (attachmentQuestion) return attachmentReply(devices);
       if (devices.length === 0) return 'Подключённых устройств пока нет. Используйте /pair Имя ПК.';
-      return devices.map((device) => `${device.name} — ${device.status}\nID: ${device.id}`).join('\n\n');
+      const listText = devices.map((device) => `${device.name} — ${device.status}`).join('\n\n');
+      const activeDevices = devices.filter((d) => d.status !== 'revoked');
+      const buttons = activeDevices.slice(0, 8).map((device) => [
+        { text: `⛔ Отозвать «${device.name.slice(0, 25)}»`, data: `dev:revoke_prompt:${device.id}` },
+      ]);
+      return { answer: listText, buttons: buttons.length ? buttons : undefined };
     }
 
     if (command === '/pair') {
@@ -223,7 +369,15 @@ class TelegramMessageService {
     }
 
     if (command === '/revoke') {
-      if (!argument) return 'Укажите ID устройства: /revoke ID';
+      if (!argument) {
+        const devices = await this.deviceService.list({ userId: user.id });
+        const activeDevices = devices.filter((d) => d.status !== 'revoked');
+        if (activeDevices.length === 0) return 'Нет активных подключённых устройств.';
+        const buttons = activeDevices.slice(0, 8).map((d) => [
+          { text: `⛔ ${d.name.slice(0, 25)}`, data: `dev:revoke_prompt:${d.id}` },
+        ]);
+        return { answer: 'Выбери устройство для отзыва доступа:', buttons };
+      }
       const revoked = await this.deviceService.revoke({ userId: user.id, deviceId: argument });
       return revoked ? `Устройство «${revoked.name}» отозвано.` : 'Устройство не найдено или уже отозвано.';
     }
@@ -238,13 +392,26 @@ class TelegramMessageService {
       const data = await this.lifeMissionControlService.get({ userId: user.id });
       const mission = data.currentMission ? `Текущая миссия: ${data.currentMission.name}` : 'Текущая миссия не выбрана.';
       const commitments = data.commitments.slice(0, 5).map((item) => `• ${item.title}${item.dueAt ? ` — ${new Date(item.dueAt).toLocaleString('ru-RU')}` : ''}`).join('\n');
-      const proposals = data.proposals.slice(0, 5).map((item) => `• ${item.title}\n  /life_confirm ${item.id}\n  /life_dismiss ${item.id}`).join('\n');
-      return [mission, commitments ? `\nДоговорённости:\n${commitments}` : '', proposals ? `\nПредложения:\n${proposals}` : ''].join('').slice(0, MAX_TEXT_LENGTH);
+      const proposalsText = data.proposals.slice(0, 5).map((item) => `• ${item.title}`).join('\n');
+      const answer = [mission, commitments ? `\nДоговорённости:\n${commitments}` : '', proposalsText ? `\nПредложения:\n${proposalsText}` : ''].join('').slice(0, MAX_TEXT_LENGTH);
+      const buttons = data.proposals.slice(0, 5).map((item) => [
+        { text: `✅ Принять «${item.title.slice(0, 20)}»`, data: `life:confirm:${item.id}` },
+        { text: '❌', data: `life:dismiss:${item.id}` },
+      ]);
+      return { answer, buttons: buttons.length ? buttons : undefined };
     }
-    if (!/^[a-f0-9-]{36}$/i.test(argument)) return `Укажите ID: ${command} ID`;
+
+    let proposalId = argument;
+    if (!proposalId) {
+      const data = await this.lifeMissionControlService.get({ userId: user.id });
+      const first = data.proposals?.[0];
+      if (!first) return 'Нет предложений, ожидающих подтверждения.';
+      proposalId = first.id;
+    }
+    if (!/^[a-f0-9-]{36}$/i.test(proposalId)) return `Укажите ID или используйте кнопки в /life`;
     const action = command === '/life_confirm' ? 'confirm' : 'dismiss';
     const proposal = await this.lifeProposalService[action]({
-      userId: user.id, proposalId: argument, originChannel: 'telegram', originConversationId: conversation.id,
+      userId: user.id, proposalId, originChannel: 'telegram', originConversationId: conversation.id,
     });
     return proposal ? (action === 'confirm' ? 'Предложение подтверждено.' : 'Предложение отклонено.') : 'Предложение недоступно, истекло или относится к другому каналу.';
   }
@@ -349,8 +516,9 @@ class TelegramMessageService {
 
     const lifeAnswer = await this.lifeCommandReply({ text: input.text, user, conversation });
     if (lifeAnswer) {
-      await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: lifeAnswer });
-      return { status: 'answered', answer: lifeAnswer };
+      const answerText = typeof lifeAnswer === 'string' ? lifeAnswer : lifeAnswer.answer;
+      await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: answerText });
+      return { status: 'answered', answer: answerText, ...(lifeAnswer.buttons ? { buttons: lifeAnswer.buttons } : {}) };
     }
 
     let vpnResult = null;
@@ -381,13 +549,14 @@ class TelegramMessageService {
 
     const remoteAnswer = await this.remoteCommandReply({ text: input.text, user, conversationId: conversation.id });
     if (remoteAnswer) {
+      const answerText = typeof remoteAnswer === 'string' ? remoteAnswer : remoteAnswer.answer;
       await this.conversationRepository.appendMessage({
         userId: user.id,
         conversationId: conversation.id,
         role: 'assistant',
-        content: remoteAnswer,
+        content: answerText,
       });
-      return { status: 'answered', answer: remoteAnswer };
+      return { status: 'answered', answer: answerText, ...(remoteAnswer.buttons ? { buttons: remoteAnswer.buttons } : {}) };
     }
 
     const history = await this.conversationRepository.recentMessages({
@@ -412,7 +581,7 @@ class TelegramMessageService {
         role: 'assistant',
         content: answer,
       });
-      return { status: 'answered', answer };
+      return { status: 'answered', answer, ...(orchestration.buttons ? { buttons: orchestration.buttons } : {}) };
     }
 
     const memoryResult = this.memoryService
@@ -420,12 +589,24 @@ class TelegramMessageService {
       : { handled: false };
 
     const deviceAnswer = await this.deviceCommandReply({ text: input.text, user });
+    if (deviceAnswer) {
+      const answerText = typeof deviceAnswer === 'string' ? deviceAnswer : deviceAnswer.answer;
+      await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: answerText });
+      return { status: 'answered', answer: answerText, ...(deviceAnswer.buttons ? { buttons: deviceAnswer.buttons } : {}) };
+    }
+
     const documentAnswer = await this.documentCommandReply({ text: input.text, user });
+    if (documentAnswer) {
+      const answerText = typeof documentAnswer === 'string' ? documentAnswer : documentAnswer.answer;
+      await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: answerText });
+      return { status: 'answered', answer: answerText, ...(documentAnswer.buttons ? { buttons: documentAnswer.buttons } : {}) };
+    }
+
     const memories = this.memoryService ? await this.memoryService.memoriesForPrompt({ userId: user.id }) : [];
     const devices = this.deviceService ? await this.deviceService.list({ userId: user.id }) : [];
     const documentSources = this.knowledgeService ? await this.knowledgeService.searchForPrompt({ userId: user.id, query: input.text }) : [];
     const visualMemories = this.visualMemoryService ? await this.visualMemoryService.searchForPrompt({ userId: user.id, query: input.text }) : [];
-    const answer = commandReply(input.text) || deviceAnswer || documentAnswer || memoryResult.answer || await this.assistant.answer({
+    const answer = commandReply(input.text) || memoryResult.answer || await this.assistant.answer({
       userId: user.id,
       conversationId: conversation.id,
       currentRequest: input.text,
@@ -462,6 +643,7 @@ module.exports = {
   commandReply,
   commandParts,
   parseRemoteCommand,
+  normalizeTelegramCallbackUpdate,
   normalizeTelegramMessage,
   normalizeVpnCallbackUpdate,
   validateTelegramVoice,

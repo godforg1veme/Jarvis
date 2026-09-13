@@ -46,7 +46,7 @@ function clearEmptyChat() {
   if (empty) empty.remove();
 }
 
-function appendMessage(role, text, meta) {
+function appendMessage(role, text, meta, options = {}) {
   if (!text) return;
   clearEmptyChat();
   const message = document.createElement('article');
@@ -58,6 +58,30 @@ function appendMessage(role, text, meta) {
   body.className = 'message-body';
   body.textContent = text;
   message.append(label, body);
+  if (options && Array.isArray(options.buttons) && options.buttons.length) {
+    const actions = document.createElement('div');
+    actions.className = 'message-actions';
+    actions.style.display = 'flex';
+    actions.style.gap = '8px';
+    actions.style.marginTop = '8px';
+    for (const btnInfo of options.buttons) {
+      const btn = document.createElement('button');
+      btn.className = `action-btn ${btnInfo.primary ? 'primary' : 'secondary'}`;
+      btn.textContent = btnInfo.text;
+      btn.style.padding = '6px 12px';
+      btn.style.borderRadius = '6px';
+      btn.style.cursor = 'pointer';
+      btn.style.fontSize = '13px';
+      btn.addEventListener('click', async () => {
+        actions.remove();
+        if (typeof btnInfo.onClick === 'function') {
+          await btnInfo.onClick();
+        }
+      });
+      actions.appendChild(btn);
+    }
+    message.appendChild(actions);
+  }
   elements.messages.appendChild(message);
   elements.messages.scrollTop = elements.messages.scrollHeight;
 }
@@ -410,7 +434,34 @@ elements.messageForm.addEventListener('submit', async (event) => {
       }
       return;
     }
-    appendMessage('assistant', result.answer);
+    let msgButtons = null;
+    if (result.confirmation || (result.buttons && result.buttons.length)) {
+      msgButtons = [
+        {
+          text: '✅ Подтвердить',
+          primary: true,
+          onClick: async () => {
+            appendMessage('user', '/confirm');
+            const confirmResult = await cloud.sendMessage('/confirm');
+            if (confirmResult?.ok) {
+              appendMessage('assistant', confirmResult.answer);
+            }
+          },
+        },
+        {
+          text: '❌ Отклонить',
+          primary: false,
+          onClick: async () => {
+            appendMessage('user', '/reject');
+            const rejectResult = await cloud.sendMessage('/reject');
+            if (rejectResult?.ok) {
+              appendMessage('assistant', rejectResult.answer);
+            }
+          },
+        },
+      ];
+    }
+    appendMessage('assistant', result.answer, null, { buttons: msgButtons });
     if (quantumCore) {
       quantumCore.setMode('speech');
       quantumCore.setAudioLevel(0.85);

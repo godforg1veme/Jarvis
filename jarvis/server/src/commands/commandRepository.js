@@ -57,6 +57,24 @@ class CommandRepository {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
+      let targetCommandId = commandId;
+      if (!targetCommandId) {
+        const latest = await client.query(`
+          SELECT c.command_id
+          FROM confirmations c
+          JOIN commands cmd ON cmd.id = c.command_id AND cmd.user_id = c.user_id
+          WHERE c.user_id = $1 AND c.origin_channel = $2
+            AND c.decision = 'pending' AND c.expires_at > now()
+            AND ($3::uuid IS NULL OR cmd.origin_device_id = $3::uuid)
+          ORDER BY c.created_at DESC
+          LIMIT 1
+        `, [userId, originChannel, originDeviceId]);
+        if (latest.rowCount !== 1) {
+          await client.query('ROLLBACK');
+          return null;
+        }
+        targetCommandId = latest.rows[0].command_id;
+      }
       const confirmation = await client.query(`
         SELECT c.*, cmd.origin_device_id
         FROM confirmations c
@@ -65,7 +83,7 @@ class CommandRepository {
           AND c.decision = 'pending' AND c.expires_at > now()
           AND ($4::uuid IS NULL OR cmd.origin_device_id = $4::uuid)
         FOR UPDATE
-      `, [commandId, userId, originChannel, originDeviceId]);
+      `, [targetCommandId, userId, originChannel, originDeviceId]);
       if (confirmation.rowCount !== 1) {
         await client.query('ROLLBACK');
         return null;
@@ -73,12 +91,12 @@ class CommandRepository {
       await client.query(`
         UPDATE confirmations SET decision = 'approved', decided_at = now()
         WHERE command_id = $1 AND user_id = $2
-      `, [commandId, userId]);
+      `, [targetCommandId, userId]);
       const updated = await client.query(`
         UPDATE commands SET status = 'queued', updated_at = now()
         WHERE id = $1 AND user_id = $2 AND status = 'awaiting_confirmation'
         RETURNING *
-      `, [commandId, userId]);
+      `, [targetCommandId, userId]);
       if (updated.rowCount !== 1) {
         await client.query('ROLLBACK');
         return null;
@@ -86,7 +104,7 @@ class CommandRepository {
       await client.query(`
         INSERT INTO audit_events (user_id, device_id, command_id, event_type, metadata)
         VALUES ($1, $2, $3, 'command.approved', $4::jsonb)
-      `, [userId, updated.rows[0]?.device_id || null, commandId, JSON.stringify({ originChannel })]);
+      `, [userId, updated.rows[0]?.device_id || null, targetCommandId, JSON.stringify({ originChannel })]);
       await client.query('COMMIT');
       return updated.rows[0];
     } catch (error) {
@@ -101,6 +119,24 @@ class CommandRepository {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
+      let targetCommandId = commandId;
+      if (!targetCommandId) {
+        const latest = await client.query(`
+          SELECT c.command_id
+          FROM confirmations c
+          JOIN commands cmd ON cmd.id = c.command_id AND cmd.user_id = c.user_id
+          WHERE c.user_id = $1 AND c.origin_channel = $2
+            AND c.decision = 'pending' AND c.expires_at > now()
+            AND ($3::uuid IS NULL OR cmd.origin_device_id = $3::uuid)
+          ORDER BY c.created_at DESC
+          LIMIT 1
+        `, [userId, originChannel, originDeviceId]);
+        if (latest.rowCount !== 1) {
+          await client.query('ROLLBACK');
+          return null;
+        }
+        targetCommandId = latest.rows[0].command_id;
+      }
       const result = await client.query(`
         UPDATE confirmations c
         SET decision = 'rejected', decided_at = now()
@@ -110,7 +146,7 @@ class CommandRepository {
           AND cmd.id = c.command_id AND cmd.status = 'awaiting_confirmation'
           AND ($4::uuid IS NULL OR cmd.origin_device_id = $4::uuid)
         RETURNING c.command_id
-      `, [commandId, userId, originChannel, originDeviceId]);
+      `, [targetCommandId, userId, originChannel, originDeviceId]);
       if (result.rowCount !== 1) {
         await client.query('ROLLBACK');
         return null;
@@ -119,7 +155,7 @@ class CommandRepository {
         UPDATE commands SET status = 'cancelled', completed_at = now(), updated_at = now()
         WHERE id = $1 AND user_id = $2 AND status = 'awaiting_confirmation'
         RETURNING *
-      `, [commandId, userId]);
+      `, [targetCommandId, userId]);
       if (command.rowCount !== 1) {
         await client.query('ROLLBACK');
         return null;

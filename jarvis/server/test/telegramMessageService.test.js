@@ -328,7 +328,10 @@ test('Telegram keeps changing remote actions behind an origin-channel confirmati
     },
   });
   const result = await service.handle(update(12, 101, 101, '/desktop 22222222-2222-4222-8222-222222222222 file.delete {"path":"C:/Temp/old.txt"}'));
-  assert.match(result.answer, /\/confirm 33333333-3333-4333-8333-333333333333/);
+  assert.equal(result.answer, 'Подтвердить удалённое действие?');
+  assert.ok(!result.answer.includes('33333333-3333-4333-8333-333333333333'));
+  assert.equal(result.buttons[0][0].data, 'cmd:confirm:33333333-3333-4333-8333-333333333333');
+  assert.equal(result.buttons[0][1].data, 'cmd:reject:33333333-3333-4333-8333-333333333333');
   assert.equal(calls[0][1].originChannel, 'telegram');
   assert.equal(calls[0][1].userId, 'user-101');
 });

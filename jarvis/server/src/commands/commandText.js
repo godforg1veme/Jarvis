@@ -33,6 +33,22 @@ function isWindowsAbsolutePath(value) {
   return /^(?:[a-z]:[\\/]|\\\\[^\\/]+[\\/])/i.test(String(value || '').trim());
 }
 
+function confirmationResponse(prompt, commandId) {
+  const answer = String(prompt || '').trim();
+  const buttons = [
+    [
+      { text: '✅ Подтвердить', data: `cmd:confirm:${commandId}` },
+      { text: '❌ Отклонить', data: `cmd:reject:${commandId}` },
+    ],
+  ];
+  return {
+    answer,
+    buttons,
+    toString() { return answer; },
+    [Symbol.toPrimitive]() { return answer; },
+  };
+}
+
 async function createCommandReply({ command, userId, conversationId, originChannel, originDeviceId, commandService, defaultDeviceId }) {
   const deviceId = command.deviceId || defaultDeviceId;
   if (!deviceId) return 'Укажи ID устройства: /desktop DEVICE_ID ACTION JSON';
@@ -47,11 +63,11 @@ async function createCommandReply({ command, userId, conversationId, originChann
       args: command.args,
     });
     if (result.status === 'awaiting_confirmation') {
-      return `${result.prompt}\nПодтверди: /confirm ${result.command.id}\nОтмена: /reject ${result.command.id}`;
+      return confirmationResponse(result.prompt, result.command.id);
     }
     return result.status === 'running'
-      ? `Команда отправлена на Desktop. ID: ${result.command.id}`
-      : `Команда не выполнена: ${result.error || result.status}. ID: ${result.command.id}`;
+      ? 'Команда отправлена на Desktop.'
+      : `Команда не выполнена: ${result.error || result.status}.`;
   } catch (error) {
     if (error.publicCode === 'ACTION_UNSUPPORTED_BY_DEVICE') return 'Это действие не заявлено возможностями выбранного Desktop.';
     if (error.publicCode === 'DEVICE_NOT_FOUND') return 'Устройство не найдено среди ваших устройств.';
@@ -75,21 +91,23 @@ async function remoteCommandReply({ text, userId, conversationId = null, originC
     }
   }
 
-  const decisionMatch = /^\/(confirm|reject)\s+([a-f0-9-]{36})$/i.exec(value);
+  const decisionMatch = /^\/(confirm|reject)(?:\s+([a-f0-9-]{36}))?$/i.exec(value);
   if (decisionMatch) {
+    const action = decisionMatch[1].toLowerCase();
+    const commandId = decisionMatch[2] || null;
     try {
       if (orchestrator) {
-        const workflowResult = decisionMatch[1].toLowerCase() === 'confirm'
-          ? await orchestrator.confirm({ userId, conversationId, originChannel, originDeviceId, commandId: decisionMatch[2], text: value })
-          : await orchestrator.reject({ userId, conversationId, originChannel, originDeviceId, commandId: decisionMatch[2], text: value });
+        const workflowResult = action === 'confirm'
+          ? await orchestrator.confirm({ userId, conversationId, originChannel, originDeviceId, commandId, text: value })
+          : await orchestrator.reject({ userId, conversationId, originChannel, originDeviceId, commandId, text: value });
         if (workflowResult && workflowResult.handled) return workflowResult.answer;
       }
-      const result = decisionMatch[1].toLowerCase() === 'confirm'
-        ? await commandService.approve({ userId, commandId: decisionMatch[2], originChannel, originDeviceId })
-        : await commandService.reject({ userId, commandId: decisionMatch[2], originChannel, originDeviceId });
-      if (result.status === 'running') return 'Подтверждение принято. Команда отправлена на Desktop.';
+      const result = action === 'confirm'
+        ? await commandService.approve({ userId, commandId, originChannel, originDeviceId })
+        : await commandService.reject({ userId, commandId, originChannel, originDeviceId });
+      if (result.status === 'running') return 'Подтверждение принято. Действие выполняется на компьютере.';
       if (result.status === 'failed') return `Команда не выполнена: ${result.error || 'ошибка доставки'}.`;
-      return 'Удалённое действие отменено.';
+      return 'Действие отменено.';
     } catch (error) {
       if (error.publicCode === 'CONFIRMATION_UNAVAILABLE') return 'Подтверждение не найдено, уже использовано или истекло.';
       throw error;

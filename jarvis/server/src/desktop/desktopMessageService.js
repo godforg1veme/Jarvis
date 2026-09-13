@@ -120,11 +120,12 @@ class DesktopMessageService {
         orchestrator: this.orchestrator,
       });
       if (remoteAnswer) {
+        const answerText = typeof remoteAnswer === 'string' ? remoteAnswer : remoteAnswer.answer;
         const assistantMessage = await this.conversationRepository.appendMessage({
           userId: device.user_id,
           conversationId: conversation.id,
           role: 'assistant',
-          content: remoteAnswer,
+          content: answerText,
           externalMessageId: `${clientMessageId}:assistant`,
         });
         const response = {
@@ -132,7 +133,8 @@ class DesktopMessageService {
           conversationId: conversation.id,
           messageId: userMessage.id,
           answerMessageId: assistantMessage.id,
-          answer: remoteAnswer,
+          answer: answerText,
+          ...(remoteAnswer.buttons ? { buttons: remoteAnswer.buttons } : {}),
           ...(kind === 'voice' ? { transcript: content, transcription: resolved.transcription || {} } : {}),
         };
         await this.requestRepository.complete({
@@ -173,6 +175,7 @@ class DesktopMessageService {
           messageId: userMessage.id,
           answerMessageId: assistantMessage.id,
           answer: safeOrchestratedAnswer,
+          ...(orchestration.buttons ? { buttons: orchestration.buttons } : {}),
           ...(orchestration.confirmation ? { confirmation: orchestration.confirmation } : {}),
           ...(kind === 'voice' ? { transcript: content, transcription: resolved.transcription || {} } : {}),
         };

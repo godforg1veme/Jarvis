@@ -115,7 +115,9 @@ test('Desktop chat creates a remote command and keeps confirmation in the Deskto
     resolveContent: async () => ({ content: '/desktop file.create_folder {"path":"C:/Temp/new"}' }),
   });
 
-  assert.match(result.answer, new RegExp(`/confirm ${commandId}`));
+  assert.equal(result.answer, 'Подтвердить?');
+  assert.ok(!result.answer.includes(commandId));
+  assert.equal(result.buttons[0][0].data, `cmd:confirm:${commandId}`);
   assert.equal(commandCalls[0].originChannel, 'desktop');
   assert.equal(commandCalls[0].originDeviceId, '66666666-6666-4666-8666-666666666666');
   assert.equal(calls.answers.length, 0);

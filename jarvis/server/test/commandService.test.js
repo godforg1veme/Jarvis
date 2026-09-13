@@ -81,7 +81,8 @@ test('changing remote action is persisted awaiting confirmation and dispatched o
   });
   assert.equal(created.status, 'awaiting_confirmation');
   assert.equal(sent.length, 0);
-  assert.match(created.prompt, /file\.delete/);
+  assert.match(created.prompt, /Удалить в корзину/);
+  assert.ok(!created.prompt.includes('candidateId'));
 
   const approved = await service.approve({ userId, commandId: '33333333-3333-4333-8333-333333333333', originChannel: 'telegram' });
   assert.equal(approved.status, 'running');

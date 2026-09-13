@@ -210,22 +210,36 @@ class ActionOrchestrator {
   }
 
   async confirm(input) {
-    const command = await this.commandService.get({ userId: input.userId, commandId: input.commandId });
-    const workflow = input.workflow || (command.workflow_id
+    let commandId = input.commandId;
+    let workflow = input.workflow;
+    if (!commandId) {
+      workflow = workflow || (input.conversationId ? await this.repository.getActiveForConversation({
+        userId: input.userId,
+        conversationId: input.conversationId,
+        originChannel: input.originChannel,
+        originDeviceId: input.originDeviceId || null,
+      }) : null);
+      if (workflow && workflow.status === 'awaiting_confirmation') {
+        commandId = workflow.state?.pendingCommandId;
+      }
+    }
+    if (!commandId) return { handled: false };
+    const command = await this.commandService.get({ userId: input.userId, commandId });
+    workflow = workflow || (command.workflow_id
       ? await this.repository.getForUser({ userId: input.userId, workflowId: command.workflow_id })
       : null);
     if (!workflow) return { handled: false };
     try {
       const dispatched = await this.commandService.approve({
         userId: input.userId,
-        commandId: input.commandId,
+        commandId,
         originChannel: input.originChannel,
         originDeviceId: input.originDeviceId || null,
       });
       if (dispatched.status === 'failed') return this._finishFailed(workflow, dispatched.command);
       const waiting = await this._update(workflow, 'awaiting_result', {
         ...workflow.state,
-        pendingCommandId: input.commandId,
+        pendingCommandId: commandId,
       });
       return this._waitAndContinue({ input, workflow: waiting, command: dispatched.command, history: input.history || [] });
     } catch (error) {
@@ -257,15 +271,29 @@ class ActionOrchestrator {
   }
 
   async reject(input) {
-    const command = await this.commandService.get({ userId: input.userId, commandId: input.commandId });
-    const workflow = input.workflow || (command.workflow_id
+    let commandId = input.commandId;
+    let workflow = input.workflow;
+    if (!commandId) {
+      workflow = workflow || (input.conversationId ? await this.repository.getActiveForConversation({
+        userId: input.userId,
+        conversationId: input.conversationId,
+        originChannel: input.originChannel,
+        originDeviceId: input.originDeviceId || null,
+      }) : null);
+      if (workflow && workflow.status === 'awaiting_confirmation') {
+        commandId = workflow.state?.pendingCommandId;
+      }
+    }
+    if (!commandId) return { handled: false };
+    const command = await this.commandService.get({ userId: input.userId, commandId });
+    workflow = workflow || (command.workflow_id
       ? await this.repository.getForUser({ userId: input.userId, workflowId: command.workflow_id })
       : null);
     if (!workflow) return { handled: false };
     try {
       await this.commandService.reject({
         userId: input.userId,
-        commandId: input.commandId,
+        commandId,
         originChannel: input.originChannel,
         originDeviceId: input.originDeviceId || null,
       });
@@ -392,7 +420,13 @@ class ActionOrchestrator {
       }, true, false, target.id);
       return {
         handled: true,
-        answer: `${result.prompt}\nПодтверди: /confirm ${result.command.id}\nОтмена: /reject ${result.command.id}`,
+        answer: result.prompt,
+        buttons: [
+          [
+            { text: '✅ Подтвердить', data: `cmd:confirm:${result.command.id}` },
+            { text: '❌ Отклонить', data: `cmd:reject:${result.command.id}` },
+          ],
+        ],
         workflowId: waiting.id,
         confirmation: { commandId: result.command.id, policy: result.command.policy },
       };

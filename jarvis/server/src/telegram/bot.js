@@ -1,7 +1,8 @@
 const { Bot, InputFile } = require('grammy');
 const { sendTelegramText, splitTelegramText } = require('./telegramFormatting');
 
-const VPN_CALLBACK_RE = /^vpn:(?:menu|status|clients|new|restart|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12}|(?:confirm|reject):[a-f0-9-]{36})$/i;
+const VPN_CALLBACK_RE = /^vpn:(?:menu|status|clients|new|restart|p:[vh]|[vh]:(?:menu|status|clients|new|restart|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12})|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12}|(?:confirm|reject):[a-f0-9-]{36})$/i;
+const TELEGRAM_CALLBACK_RE = /^(?:vpn:(?:menu|status|clients|new|restart|p:[vh]|[vh]:(?:menu|status|clients|new|restart|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12})|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12}|(?:confirm|reject):[a-f0-9-]{36})|cmd:(?:confirm|reject):[a-f0-9-]{36}|life:(?:confirm|dismiss):[a-f0-9-]{36}|doc:(?:del_prompt|delete):[a-f0-9-]{36}|doc:cancel|dev:(?:revoke_prompt|revoke):[a-f0-9-]{36}|dev:cancel)$/i;
 
 function vpnReplyMarkup(buttons) {
   if (buttons === undefined) return undefined;
@@ -12,7 +13,7 @@ function vpnReplyMarkup(buttons) {
       return row.map((button) => {
         const text = String(button?.text || '');
         const data = String(button?.data || '');
-        if (text.length < 1 || text.length > 64 || Buffer.byteLength(data, 'utf8') > 64 || !VPN_CALLBACK_RE.test(data)) {
+        if (text.length < 1 || text.length > 64 || Buffer.byteLength(data, 'utf8') > 64 || !TELEGRAM_CALLBACK_RE.test(data)) {
           throw new Error('invalid VPN button');
         }
         return { text, callback_data: data };
@@ -78,10 +79,13 @@ function createTelegramBot(options) {
   });
 
   bot.on('callback_query:data', async (ctx, next) => {
-    if (!String(ctx.callbackQuery.data || '').startsWith('vpn:')) return next();
+    const data = String(ctx.callbackQuery?.data || '');
+    if (!TELEGRAM_CALLBACK_RE.test(data)) return next();
     await ctx.answerCallbackQuery().catch(() => {});
-    const result = await messageService.handleVpnCallback(ctx.update);
-    await sendResult(ctx, result);
+    const result = typeof messageService.handleCallback === 'function'
+      ? await messageService.handleCallback(ctx.update)
+      : (data.startsWith('vpn:') ? await messageService.handleVpnCallback(ctx.update) : null);
+    if (result) await sendResult(ctx, result);
   });
 
   if (typeof options.approvalHandler === 'function') {
@@ -109,4 +113,14 @@ function createTelegramBot(options) {
   return bot;
 }
 
-module.exports = { VPN_CALLBACK_RE, createTelegramBot, downloadTelegramAttachment, replyWithChunks, sendResult, splitTelegramText, vpnReplyMarkup };
+module.exports = {
+  TELEGRAM_CALLBACK_RE,
+  VPN_CALLBACK_RE,
+  createTelegramBot,
+  downloadTelegramAttachment,
+  replyWithChunks,
+  sendResult,
+  splitTelegramText,
+  telegramReplyMarkup: vpnReplyMarkup,
+  vpnReplyMarkup,
+};
