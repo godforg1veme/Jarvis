@@ -132,6 +132,10 @@ See `docs/README.md` for current implementation status and historical records.
   mutations require an owner confirmation bound to the originating
   Telegram/Desktop client. VLESS URIs are one-time response artifacts and must
   never be persisted in PostgreSQL, conversations, telemetry, or logs.
+- `host-agent/jarvis_host_agent/hysteria_vpn_manager.py` independently owns the
+  root-only Hysteria2 state and generated config. Its closed
+  `vpn.hysteria2.*` operations use the same owner-confirmation boundary, while
+  one-time `hy2://` exports follow the same non-persistence rule.
 - Operations log archives contain bounded severity/lifecycle summaries only;
   raw parser findings, family content, SQL values and credentials are excluded.
 - Backup scheduling and real backup/restore acceptance are deferred by the
@@ -157,6 +161,12 @@ See `docs/README.md` for current implementation status and historical records.
   single-node export: it caused multi-second iOS Happ connection checks. Both
   listeners use the same validated root-only client state; Host Agent changes
   must preserve them together.
+- Hysteria2 v2.12.2 is deployed as an isolated fallback on the second address,
+  `87.120.187.109:443/udp`, with the DNS-only hostname `vpn.rilora.ru`, strict
+  ACME TLS, userpass authentication, and Salamander obfuscation. Xray retains
+  TCP 443/8443. Operations monitors `hysteria-server.service` separately, and
+  rollback may remove only Hysteria2 plus its exact UDP 443 and ACME TCP 80
+  firewall rules.
 - PostgreSQL must never be published publicly.
 - The DE-4 runs the private `gigaam-asr` service for Russian server ASR with a
   four-CPU/8-GiB cap and no host port. Its observed steady-state RSS is about
