@@ -21,15 +21,15 @@ class OperationsRepository {
     return result.rows[0] || null;
   }
 
-  async recordMetricSamples({ hostId, sampledAt, metrics }) {
+  async recordMetricSamples({ hostId, serviceId = null, sampledAt, metrics }) {
     const entries = Object.entries(metrics).filter(([, value]) => Number.isFinite(value)).slice(0, 20);
     if (entries.length === 0) return;
     await this.pool.query(`
       INSERT INTO ops_metric_samples (host_id,service_id,metric_name,metric_value,sampled_at)
-      SELECT $1,NULL,item.name,item.value,$2
-      FROM jsonb_to_recordset($3::jsonb) AS item(name text,value double precision)
+      SELECT $1,$2,item.name,item.value,$3
+      FROM jsonb_to_recordset($4::jsonb) AS item(name text,value double precision)
       ON CONFLICT DO NOTHING
-    `, [hostId, sampledAt, JSON.stringify(entries.map(([name, value]) => ({ name, value })))]);
+    `, [hostId, serviceId, sampledAt, JSON.stringify(entries.map(([name, value]) => ({ name, value })))]);
   }
 
   async upsertService({ hostId, serviceKey, displayName, serviceType, sourceState, healthState }) {

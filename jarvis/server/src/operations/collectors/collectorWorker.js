@@ -5,6 +5,7 @@ const SERVICE_CATALOG = Object.freeze({
   'jarvis-server': Object.freeze({ displayName: 'Jarvis Server', serviceType: 'jarvis' }),
   postgres: Object.freeze({ displayName: 'PostgreSQL', serviceType: 'docker' }),
   cloudflared: Object.freeze({ displayName: 'Cloudflare Tunnel', serviceType: 'docker' }),
+  xray: Object.freeze({ displayName: 'Xray VPN', serviceType: 'systemd' }),
   'telegram-parser': Object.freeze({ displayName: 'Telegram Parser', serviceType: 'parser' }),
 });
 
@@ -31,6 +32,13 @@ const hostSnapshotSchema = z.object({
   diskFreeBytes: z.number().int().nonnegative().optional(),
   networkRxBytes: z.number().int().nonnegative().optional(),
   networkTxBytes: z.number().int().nonnegative().optional(),
+}).strict();
+
+const vpnStatusSchema = z.object({
+  serviceState: z.enum(['active', 'unavailable']),
+  configValid: z.boolean(),
+  listenerReady: z.boolean(),
+  clientCount: z.number().int().min(0).max(50),
 }).strict();
 
 function normalizeHostMetrics(data) {
@@ -119,6 +127,25 @@ class CollectorWorker {
     const fingerprint = crypto.createHash('sha256').update(summary).digest();
     await this.repository.recordParserResult({ hostId: this.hostId, kind: 'service_state', summary, observedAt: new Date(), fingerprint });
   }
+  async collectVpn() {
+    if (typeof this.repository.serviceByKey !== 'function') return;
+    const response = await this.request('vpn.status');
+    if (response.result.state !== 'succeeded' || !response.result.data) throw new Error('VPN status unavailable');
+    const status = vpnStatusSchema.parse(response.result.data);
+    const healthy = status.serviceState === 'active' && status.configValid && status.listenerReady;
+    const definition = SERVICE_CATALOG.xray;
+    const saved = await this.repository.upsertService({
+      hostId: this.hostId, serviceKey: 'xray', ...definition,
+      sourceState: status.serviceState === 'active' ? 'active' : 'unavailable',
+      healthState: healthy ? 'healthy' : status.serviceState === 'active' ? 'degraded' : 'unavailable',
+    });
+    const normalized = { ...definition, ...saved, serviceKey: 'xray', sourceState: status.serviceState, healthState: healthy ? 'healthy' : 'degraded' };
+    if (this.incidentEngine) await this.incidentEngine.observe(normalized);
+    await this.repository.recordMetricSamples({
+      hostId: this.hostId, serviceId: saved.id, sampledAt: new Date(),
+      metrics: { vpn_client_count: status.clientCount, vpn_config_valid: status.configValid ? 1 : 0, vpn_listener_ready: status.listenerReady ? 1 : 0 },
+    });
+  }
   async collectBackup() {
     if (typeof this.repository.recordBackupResult !== 'function') return;
     const response = await this.request('backup.status');
@@ -158,6 +185,11 @@ class CollectorWorker {
       if (this.logger) this.logger.warn({ err: error }, 'operations service collection failed');
     }
     try {
+      await this.collectVpn();
+    } catch (error) {
+      if (this.logger) this.logger.warn({ err: error }, 'operations VPN collection failed');
+    }
+    try {
       await this.collectParser();
     } catch (error) {
       if (this.logger) this.logger.warn({ err: error }, 'operations parser collection failed');
@@ -173,4 +205,4 @@ class CollectorWorker {
   }
 }
 
-module.exports = { CollectorWorker, SERVICE_CATALOG, hostSnapshotSchema, normalizeHostMetrics, serviceSnapshotSchema };
+module.exports = { CollectorWorker, SERVICE_CATALOG, hostSnapshotSchema, normalizeHostMetrics, serviceSnapshotSchema, vpnStatusSchema };

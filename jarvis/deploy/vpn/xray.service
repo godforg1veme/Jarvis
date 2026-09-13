@@ -1,0 +1,37 @@
+[Unit]
+Description=Jarvis managed Xray VPN
+Documentation=https://xtls.github.io/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=xray
+Group=xray
+Environment=XRAY_LOCATION_ASSET=/usr/local/share/xray
+ExecStartPre=/usr/local/bin/xray run -test -c /etc/xray/config.json
+ExecStart=/usr/local/bin/xray run -c /etc/xray/config.json
+Restart=on-failure
+RestartSec=3
+LimitNOFILE=1048576
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+PrivateDevices=true
+PrivateTmp=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectSystem=strict
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+SystemCallArchitectures=native
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

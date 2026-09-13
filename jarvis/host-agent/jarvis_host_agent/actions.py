@@ -14,6 +14,7 @@ from .config import HostAgentConfig
 from .backup_status import read_backup_status
 from .host_metrics import extra_metrics
 from .protocol import ProtocolError
+from .vpn_manager import XrayVpnManager
 
 MAX_OUTPUT_BYTES = 32 * 1024
 
@@ -108,6 +109,8 @@ def _service_snapshot(service: Any) -> dict[str, Any]:
 
 
 def execute(config: HostAgentConfig, operation: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    if operation.startswith("vpn."):
+        return XrayVpnManager(run=_run).execute(operation, arguments)
     if operation == 'inventory.snapshot':
         items = []
         unavailable = []

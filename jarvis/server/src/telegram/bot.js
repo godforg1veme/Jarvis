@@ -1,4 +1,4 @@
-const { Bot } = require('grammy');
+const { Bot, InputFile } = require('grammy');
 const { sendTelegramText, splitTelegramText } = require('./telegramFormatting');
 
 async function replyWithChunks(ctx, text) {
@@ -49,7 +49,16 @@ function createTelegramBot(options) {
       await ctx.reply('Доступ к этому Jarvis не разрешён.');
       return;
     }
-    if (result.status === 'answered') await replyWithChunks(ctx, result.answer);
+    if (result.status === 'answered') {
+      await replyWithChunks(ctx, result.answer);
+      if (result.artifact) {
+        const artifact = result.artifact;
+        if (artifact.kind !== 'happ-vless' || !/^.{1,80}\.txt$/u.test(artifact.filename) || !String(artifact.content || '').startsWith('vless://') || String(artifact.content).length > 4096) {
+          throw new Error('invalid VPN artifact');
+        }
+        await ctx.replyWithDocument(new InputFile(Buffer.from(artifact.content, 'utf8'), artifact.filename));
+      }
+    }
   });
 
   bot.catch(async (error) => {

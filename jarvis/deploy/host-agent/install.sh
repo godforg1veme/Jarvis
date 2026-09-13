@@ -24,6 +24,32 @@ else
   chown root:root /etc/jarvis-host-agent/config.json
   chmod 0600 /etc/jarvis-host-agent/config.json
 fi
+/usr/bin/python3 - /etc/jarvis-host-agent/config.json <<'PY'
+import json
+import os
+import sys
+import tempfile
+
+path = sys.argv[1]
+with open(path, encoding='utf-8') as source:
+    data = json.load(source)
+services = data.setdefault('managedServices', [])
+if not any(service.get('id') == 'xray' for service in services):
+    services.append({'id': 'xray', 'type': 'systemd', 'target': 'xray.service', 'actions': []})
+directory = os.path.dirname(path)
+fd, temporary = tempfile.mkstemp(prefix='config.', suffix='.json', dir=directory)
+try:
+    with os.fdopen(fd, 'w', encoding='utf-8') as target:
+        json.dump(data, target, ensure_ascii=False, indent=2)
+        target.write('\n')
+        target.flush()
+        os.fsync(target.fileno())
+    os.chmod(temporary, 0o600)
+    os.replace(temporary, path)
+finally:
+    if os.path.exists(temporary):
+        os.unlink(temporary)
+PY
 install -o root -g root -m 0600 "$secret_source" /etc/jarvis-host-agent/authenticator
 
 systemd-tmpfiles --create /usr/lib/tmpfiles.d/jarvis-host-agent.conf

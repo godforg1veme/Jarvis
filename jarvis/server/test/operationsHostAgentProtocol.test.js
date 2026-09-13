@@ -35,6 +35,13 @@ test('Host Agent protocol accepts only declared operations and closed arguments'
   assert.throws(() => validateRequest(request({ arguments: { serviceId: 'jarvis-server', maxLines: 501 } })), /invalid/);
 });
 
+test('Host Agent protocol validates VPN operations without accepting config or secrets', () => {
+  const issue = validateRequest({ version: 1, requestId: REQUEST_ID, operation: 'vpn.client.issue', arguments: { label: 'My Phone' }, sentAt: NOW });
+  assert.deepEqual(issue.arguments, { label: 'My Phone' });
+  assert.throws(() => validateRequest({ ...issue, arguments: { label: 'Phone', config: {} } }), /invalid/i);
+  assert.throws(() => validateRequest({ ...issue, operation: 'vpn.client.revoke', arguments: { clientId: '../../root' } }), /invalid/i);
+});
+
 test('Host Agent protocol rejects malformed, oversized, and mismatched envelopes', () => {
   assert.throws(() => validateRequest(request({ requestId: 'not-a-uuid' })), /invalid/);
   assert.throws(() => validateRequest({ ...request(), extra: true }), /invalid/);

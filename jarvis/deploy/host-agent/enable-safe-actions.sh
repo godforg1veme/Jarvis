@@ -15,7 +15,7 @@ import tempfile
 path = sys.argv[1]
 with open(path, encoding="utf-8") as source:
     data = json.load(source)
-allowed = {"jarvis-server": ["restart"], "cloudflared": ["restart"]}
+allowed = {"jarvis-server": ["restart"], "cloudflared": ["restart"], "xray": ["restart"]}
 for service in data.get("managedServices", []):
     service["actions"] = allowed.get(service.get("id"), [])
 directory = os.path.dirname(path)
@@ -39,10 +39,10 @@ systemctl is-active --quiet jarvis-host-agent
 cd "$app_root"
 docker compose -f deploy/docker-compose.yml exec -T postgres sh -lc 'exec psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <<'SQL'
 INSERT INTO ops_service_capabilities (service_id,action,enabled)
-SELECT id,'restart',service_key IN ('jarvis-server','cloudflared')
+SELECT id,'restart',service_key IN ('jarvis-server','cloudflared','xray')
 FROM ops_services
-WHERE service_key IN ('jarvis-server','cloudflared')
+WHERE service_key IN ('jarvis-server','cloudflared','xray')
 ON CONFLICT (service_id,action) DO UPDATE SET enabled=EXCLUDED.enabled,updated_at=now();
 SQL
 
-echo "Safe Operations actions enabled: restart jarvis-server, restart cloudflared"
+echo "Safe Operations actions enabled: restart jarvis-server, restart cloudflared, restart xray"

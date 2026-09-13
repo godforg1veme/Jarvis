@@ -23,25 +23,31 @@ test('operations collector validates and persists all declared service snapshots
   const client = { async request(request) {
     operations.push(request.operation);
     if (request.operation === 'host.snapshot') return { result: { state: 'succeeded', data: { loadavg: ['0.10', '0.20', '0.30'], meminfo: ['MemTotal: 1000 kB', 'MemFree: 200 kB', 'MemAvailable: 400 kB'], uptimeSeconds: 100, diskUsedPercent: 25, inodeUsedPercent: 2 } } };
+    if (request.operation === 'vpn.status') return { result: { state: 'succeeded', data: { serviceState: 'active', configValid: true, listenerReady: true, clientCount: 1 } } };
     if (request.operation === 'parser.snapshot') return { result: { state: 'succeeded', data: { id: 'telegram-parser', sourceType: 'systemd', sourceState: 'active', healthState: 'healthy', detail: 'running' } } };
     return { result: { state: 'succeeded', data: { services: [
       { id: 'jarvis-server', sourceType: 'docker', sourceState: 'active', healthState: 'healthy', detail: 'healthy' },
       { id: 'postgres', sourceType: 'docker', sourceState: 'active', healthState: 'healthy', detail: 'healthy' },
       { id: 'cloudflared', sourceType: 'docker', sourceState: 'active', healthState: 'healthy', detail: 'running' },
+      { id: 'xray', sourceType: 'systemd', sourceState: 'active', healthState: 'healthy', detail: 'running' },
       { id: 'telegram-parser', sourceType: 'systemd', sourceState: 'active', healthState: 'healthy', detail: 'running' },
     ] } } };
   } };
   const repository = {
     async recordHostSnapshot(value) { assert.equal(value.state, 'healthy'); },
-    async recordMetricSamples(value) { assert.equal(value.metrics.memory_used_percent, 60); },
-    async upsertService(value) { services.push(value); },
+    async recordMetricSamples(value) {
+      if (value.serviceId) assert.equal(value.metrics.vpn_listener_ready, 1);
+      else assert.equal(value.metrics.memory_used_percent, 60);
+    },
+    async upsertService(value) { services.push(value); return { id: value.serviceKey, ...value }; },
+    async serviceByKey() { return { id: 'xray' }; },
     async recordParserResult(value) { assert.equal(value.kind, 'service_state'); },
     async recordEvent(value) { return { id: services.length, event_type: value.type }; },
   };
   const worker = new CollectorWorker({ client, repository, hostId: 'host-1', intervalMs: 30000 });
   await worker.runOnce();
-  assert.deepEqual(operations, ['host.snapshot', 'services.snapshot', 'parser.snapshot']);
-  assert.deepEqual(services.map((service) => service.serviceKey).sort(), ['cloudflared', 'jarvis-server', 'postgres', 'telegram-parser']);
+  assert.deepEqual(operations, ['host.snapshot', 'services.snapshot', 'vpn.status', 'parser.snapshot']);
+  assert.deepEqual([...new Set(services.map((service) => service.serviceKey))].sort(), ['cloudflared', 'jarvis-server', 'postgres', 'telegram-parser', 'xray']);
   assert.ok(services.every((service) => service.healthState === 'healthy'));
 });
 
@@ -58,6 +64,6 @@ test('operations collector renders every declared service unavailable after an i
   };
   const worker = new CollectorWorker({ client, repository, hostId: 'host-1', intervalMs: 30000 });
   await worker.runOnce();
-  assert.equal(services.length, 4);
+  assert.equal(services.length, 5);
   assert.ok(services.every((service) => service.healthState === 'unavailable'));
 });

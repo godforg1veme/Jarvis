@@ -18,7 +18,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=true
 ProtectSystem=strict
-ReadWritePaths=/run/jarvis-host-agent /var/lib/jarvis-host-agent
+ReadWritePaths=/run/jarvis-host-agent /var/lib/jarvis-host-agent /etc/jarvis-vpn /etc/xray
 
 [Install]
 WantedBy=multi-user.target

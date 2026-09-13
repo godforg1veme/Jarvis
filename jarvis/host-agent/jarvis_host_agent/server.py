@@ -54,7 +54,7 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter, con
             original = journal.get_response(request["arguments"]["requestId"])
             result = {"state": "succeeded", "data": {"found": original is not None, "response": original}}
             payload = journal.put(request, response_for(request, result))
-        elif request["operation"] in {"service.start", "service.stop", "service.restart", "backup.run"}:
+        elif request["operation"] in {"service.start", "service.stop", "service.restart", "backup.run", "vpn.client.issue", "vpn.client.revoke", "vpn.client.rotate", "vpn.client.export", "vpn.restart"}:
             placeholder = response_for(request, {"state": "unknown", "errorCode": "ACTION_OUTCOME_PENDING"})
             if journal.claim(request, placeholder):
                 payload = journal.complete(request, response_for(request, execute(config, request["operation"], request["arguments"])))

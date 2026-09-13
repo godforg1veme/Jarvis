@@ -30,7 +30,17 @@ OPERATIONS = frozenset((
     "backup.run",
     "parser.snapshot",
     "operation.status",
+    "vpn.status",
+    "vpn.clients.list",
+    "vpn.client.issue",
+    "vpn.client.revoke",
+    "vpn.client.rotate",
+    "vpn.client.export",
+    "vpn.restart",
 ))
+
+VPN_CLIENT_ID_RE = re.compile(r"^vpn-[a-f0-9]{12}$")
+VPN_LABEL_RE = re.compile(r"^[A-Za-zА-Яа-яЁё0-9_. -]{1,40}$")
 
 
 class ProtocolError(ValueError):
@@ -75,7 +85,7 @@ def _service_id(value: Any) -> str:
 
 def validate_arguments(operation: str, value: Any) -> dict[str, Any]:
     args = _require_mapping(value, "arguments")
-    if operation in {"host.snapshot", "inventory.snapshot", "services.snapshot", "backup.status", "backup.run", "parser.snapshot"}:
+    if operation in {"host.snapshot", "inventory.snapshot", "services.snapshot", "backup.status", "backup.run", "parser.snapshot", "vpn.status", "vpn.clients.list", "vpn.restart"}:
         _no_extra(args, set(), "arguments")
         return {}
     if operation in {"service.start", "service.stop", "service.restart"}:
@@ -98,6 +108,21 @@ def validate_arguments(operation: str, value: Any) -> dict[str, Any]:
             raise ProtocolError("arguments.maxLines is invalid")
         normalized["maxLines"] = max_lines
         return normalized
+    if operation == "vpn.client.issue":
+        _no_extra(args, {"label"}, "arguments")
+        label = args.get("label")
+        if not isinstance(label, str):
+            raise ProtocolError("arguments.label is invalid")
+        label = label.strip()
+        if not VPN_LABEL_RE.fullmatch(label) or ".." in label:
+            raise ProtocolError("arguments.label is invalid")
+        return {"label": label}
+    if operation in {"vpn.client.revoke", "vpn.client.rotate", "vpn.client.export"}:
+        _no_extra(args, {"clientId"}, "arguments")
+        client_id = args.get("clientId")
+        if not isinstance(client_id, str) or not VPN_CLIENT_ID_RE.fullmatch(client_id):
+            raise ProtocolError("arguments.clientId is invalid")
+        return {"clientId": client_id}
     raise ProtocolError("operation is unsupported")
 
 

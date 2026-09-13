@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
-const { DEFAULT_CLOUD_SERVER_URL, DesktopCloudClient, normalizeServerUrl, toWebSocketUrl } = require('./desktopCloudClient');
+const { DEFAULT_CLOUD_SERVER_URL, DesktopCloudClient, VPN_EXPORT_DIR, normalizeServerUrl, toWebSocketUrl } = require('./desktopCloudClient');
 
 function response(body, status = 200) {
   return { ok: status >= 200 && status < 300, status, async text() { return JSON.stringify(body); } };

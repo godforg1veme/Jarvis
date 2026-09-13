@@ -11,6 +11,7 @@ const AUTHENTICATION_TIMEOUT_MS = 10000;
 const DEFAULT_CLOUD_SERVER_URL = 'https://jarvis.rilora.ru';
 const COMMAND_JOURNAL_FILE = 'cloud-command-journal.json';
 const MAX_COMMAND_JOURNAL_ENTRIES = 100;
+const VPN_EXPORT_DIR = 'vpn-exports';
 
 function normalizeServerUrl(value, options = {}) {
   const url = new URL(String(value || '').trim());
@@ -213,7 +214,28 @@ class DesktopCloudClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ clientMessageId, text: String(text || '').trim() }),
     });
+    if (body.vpnArtifact) {
+      body.vpnArtifact = this._saveVpnArtifact(body.vpnArtifact);
+      body.answer = `${String(body.answer || '').trim()}\nФайл Happ: ${body.vpnArtifact.path}`.trim();
+    }
     return body;
+  }
+
+  _saveVpnArtifact(artifact) {
+    if (!artifact || artifact.kind !== 'happ-vless') throw new Error('Invalid VPN artifact.');
+    const filename = String(artifact.filename || '');
+    const content = String(artifact.content || '');
+    if (!/^[A-Za-zА-Яа-яЁё0-9_. -]{1,80}\.txt$/u.test(filename) || !content.startsWith('vless://') || content.length > 4096) {
+      throw new Error('Invalid VPN artifact.');
+    }
+    const directory = path.join(this.userDataPath, VPN_EXPORT_DIR);
+    fs.mkdirSync(directory, { recursive: true });
+    const target = path.join(directory, filename);
+    if (path.dirname(target) !== directory) throw new Error('Invalid VPN artifact path.');
+    const temporary = `${target}.${process.pid}.tmp`;
+    fs.writeFileSync(temporary, content, { encoding: 'utf8', mode: 0o600 });
+    fs.renameSync(temporary, target);
+    return { kind: artifact.kind, filename, path: target };
   }
 
   async sendVoice(audio, options = {}) {
@@ -491,6 +513,7 @@ module.exports = {
   MAX_RECONNECT_MS,
   AUTHENTICATION_TIMEOUT_MS,
   COMMAND_JOURNAL_FILE,
+  VPN_EXPORT_DIR,
   createClientMessageId,
   normalizeServerUrl,
   toWebSocketUrl,

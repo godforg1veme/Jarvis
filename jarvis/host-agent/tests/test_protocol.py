@@ -35,6 +35,16 @@ class ProtocolTests(unittest.TestCase):
         with self.assertRaises(ProtocolError):
             validate_request(request(arguments={"serviceId": "jarvis-server", "maxLines": 501}))
 
+    def test_validates_closed_vpn_arguments(self):
+        issued = validate_request(request(operation="vpn.client.issue", arguments={"label": "My Phone"}))
+        self.assertEqual(issued["arguments"], {"label": "My Phone"})
+        rotated = validate_request(request(operation="vpn.client.rotate", arguments={"clientId": "vpn-0123456789ab"}))
+        self.assertEqual(rotated["arguments"]["clientId"], "vpn-0123456789ab")
+        with self.assertRaises(ProtocolError):
+            validate_request(request(operation="vpn.client.issue", arguments={"label": "../../root"}))
+        with self.assertRaises(ProtocolError):
+            validate_request(request(operation="vpn.client.revoke", arguments={"clientId": "not-an-id"}))
+
     def test_response_must_match_request_and_result_state(self):
         accepted = validate_request(request())
         response = {

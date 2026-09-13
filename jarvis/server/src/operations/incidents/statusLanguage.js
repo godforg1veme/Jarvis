@@ -9,6 +9,7 @@ function incidentImpact(serviceKey) {
     'jarvis-server': 'Jarvis может не отвечать в Telegram и на подключённых устройствах.',
     postgres: 'Память, диалоги и другие облачные данные временно недоступны.',
     cloudflared: 'Внешние клиенты могут потерять доступ к Jarvis.',
+    xray: 'VPN-клиенты Happ могут потерять доступ к интернету через VPS.',
     'telegram-parser': 'Отслеживание новых результатов парсером может быть остановлено.',
   };
   return impacts[serviceKey] || 'Часть функций Jarvis может быть временно недоступна.';
