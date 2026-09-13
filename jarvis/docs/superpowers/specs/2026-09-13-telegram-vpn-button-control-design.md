@@ -1,7 +1,7 @@
 # Telegram VPN button control design
 
 Date: 2026-09-13
-Status: approved for implementation
+Status: implemented and deployed; manual Telegram/Happ acceptance remains
 
 ## Problem
 

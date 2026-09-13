@@ -31,6 +31,16 @@ class VpnRepository {
     return result.rows[0] || null;
   }
 
+  async latestPending({ userId, originChannel, originDeviceId = null }) {
+    const result = await this.pool.query(`
+      SELECT * FROM vpn_action_requests
+      WHERE user_id=$1 AND origin_channel=$2 AND origin_device_id IS NOT DISTINCT FROM $3::uuid
+        AND status='awaiting_confirmation' AND expires_at>now()
+      ORDER BY created_at DESC LIMIT 1
+    `, [userId, originChannel, originDeviceId]);
+    return result.rows[0] || null;
+  }
+
   async approve({ userId, requestId, originChannel, originDeviceId = null }) {
     const result = await this.pool.query(`
       UPDATE vpn_action_requests SET status='running',updated_at=now()
@@ -80,4 +90,3 @@ class VpnRepository {
 }
 
 module.exports = { VpnRepository };
-

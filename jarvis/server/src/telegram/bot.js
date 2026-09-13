@@ -1,8 +1,49 @@
 const { Bot, InputFile } = require('grammy');
 const { sendTelegramText, splitTelegramText } = require('./telegramFormatting');
 
-async function replyWithChunks(ctx, text) {
-  await sendTelegramText((chunk, options) => ctx.reply(chunk, options), text);
+const VPN_CALLBACK_RE = /^vpn:(?:menu|status|clients|new|restart|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12}|(?:confirm|reject):[a-f0-9-]{36})$/i;
+
+function vpnReplyMarkup(buttons) {
+  if (buttons === undefined) return undefined;
+  if (!Array.isArray(buttons) || buttons.length < 1 || buttons.length > 60) throw new Error('invalid VPN buttons');
+  return {
+    inline_keyboard: buttons.map((row) => {
+      if (!Array.isArray(row) || row.length < 1 || row.length > 3) throw new Error('invalid VPN button row');
+      return row.map((button) => {
+        const text = String(button?.text || '');
+        const data = String(button?.data || '');
+        if (text.length < 1 || text.length > 64 || Buffer.byteLength(data, 'utf8') > 64 || !VPN_CALLBACK_RE.test(data)) {
+          throw new Error('invalid VPN button');
+        }
+        return { text, callback_data: data };
+      });
+    }),
+  };
+}
+
+async function replyWithChunks(ctx, text, buttons) {
+  const markup = vpnReplyMarkup(buttons);
+  await sendTelegramText(
+    (chunk, options) => ctx.reply(chunk, options),
+    text,
+    markup ? { reply_markup: markup } : {},
+  );
+}
+
+async function sendResult(ctx, result) {
+  if (result.status === 'forbidden') {
+    await ctx.reply('Доступ к этому Jarvis не разрешён.');
+    return;
+  }
+  if (result.status !== 'answered') return;
+  await replyWithChunks(ctx, result.answer, result.buttons);
+  if (result.artifact) {
+    const artifact = result.artifact;
+    if (artifact.kind !== 'happ-vless' || !/^.{1,80}\.txt$/u.test(artifact.filename) || !String(artifact.content || '').startsWith('vless://') || String(artifact.content).length > 4096) {
+      throw new Error('invalid VPN artifact');
+    }
+    await ctx.replyWithDocument(new InputFile(Buffer.from(artifact.content, 'utf8'), artifact.filename));
+  }
 }
 
 async function downloadTelegramAttachment(ctx, token, maxBytes = 20 * 1024 * 1024, fetchImpl = globalThis.fetch) {
@@ -36,6 +77,13 @@ function createTelegramBot(options) {
     }
   });
 
+  bot.on('callback_query:data', async (ctx, next) => {
+    if (!String(ctx.callbackQuery.data || '').startsWith('vpn:')) return next();
+    await ctx.answerCallbackQuery().catch(() => {});
+    const result = await messageService.handleVpnCallback(ctx.update);
+    await sendResult(ctx, result);
+  });
+
   if (typeof options.approvalHandler === 'function') {
     bot.on('callback_query:data', options.approvalHandler);
   }
@@ -45,20 +93,7 @@ function createTelegramBot(options) {
       downloadAttachment: () => downloadTelegramAttachment(ctx, options.token, options.documentMaxBytes, options.fetchImpl),
       downloadVoice: () => downloadTelegramAttachment(ctx, options.token, options.voiceMaxBytes, options.fetchImpl),
     });
-    if (result.status === 'forbidden') {
-      await ctx.reply('Доступ к этому Jarvis не разрешён.');
-      return;
-    }
-    if (result.status === 'answered') {
-      await replyWithChunks(ctx, result.answer);
-      if (result.artifact) {
-        const artifact = result.artifact;
-        if (artifact.kind !== 'happ-vless' || !/^.{1,80}\.txt$/u.test(artifact.filename) || !String(artifact.content || '').startsWith('vless://') || String(artifact.content).length > 4096) {
-          throw new Error('invalid VPN artifact');
-        }
-        await ctx.replyWithDocument(new InputFile(Buffer.from(artifact.content, 'utf8'), artifact.filename));
-      }
-    }
+    await sendResult(ctx, result);
   });
 
   bot.catch(async (error) => {
@@ -74,4 +109,4 @@ function createTelegramBot(options) {
   return bot;
 }
 
-module.exports = { createTelegramBot, downloadTelegramAttachment, replyWithChunks, splitTelegramText };
+module.exports = { VPN_CALLBACK_RE, createTelegramBot, downloadTelegramAttachment, replyWithChunks, sendResult, splitTelegramText, vpnReplyMarkup };

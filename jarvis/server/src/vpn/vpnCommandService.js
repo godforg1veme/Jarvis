@@ -17,15 +17,39 @@ function parseVpnCommand(text) {
   if (/^\/vpn(?:_status)?$/i.test(value)) return { kind: 'read', action: 'status', arguments: {} };
   if (/^\/vpn_clients$/i.test(value)) return { kind: 'read', action: 'clients', arguments: {} };
   if ((match = /^\/vpn_issue\s+(.{1,80})$/iu.exec(value))) return { kind: 'change', action: 'issue', arguments: { label: match[1].trim() } };
-  if ((match = /^\/vpn_(revoke|rotate|export)\s+(vpn-[a-f0-9]{12})$/i.exec(value))) {
-    return { kind: 'change', action: match[1].toLowerCase(), arguments: { clientId: match[2].toLowerCase() } };
+  if ((match = /^\/vpn_(revoke|rotate|export)\s+(.{1,80})$/iu.exec(value))) {
+    return { kind: 'change', action: match[1].toLowerCase(), arguments: { label: match[2].trim() } };
   }
   if (/^\/vpn_restart$/i.test(value)) return { kind: 'change', action: 'restart', arguments: {} };
-  if ((match = /^\/vpn_(confirm|reject)\s+([a-f0-9-]{36})$/i.exec(value))) {
-    return { kind: 'decision', decision: match[1].toLowerCase(), requestId: match[2].toLowerCase() };
+  if ((match = /^\/vpn_(confirm|reject)(?:\s+([a-f0-9-]{36}))?$/i.exec(value))) {
+    return { kind: 'decision', decision: match[1].toLowerCase(), requestId: match[2]?.toLowerCase() || null };
   }
   if (/^\/vpn_/i.test(value)) return { kind: 'invalid' };
   return null;
+}
+
+function parseVpnCallback(value) {
+  const data = String(value || '');
+  if (['vpn:menu', 'vpn:status', 'vpn:clients', 'vpn:new', 'vpn:restart'].includes(data)) {
+    return { action: data.slice(4) };
+  }
+  let match = /^vpn:(client|export|rotate|revoke):(vpn-[a-f0-9]{12})$/.exec(data);
+  if (match) return { action: match[1], clientId: match[2] };
+  match = /^vpn:(confirm|reject):([a-f0-9-]{36})$/i.exec(data);
+  if (match) return { action: match[1], requestId: match[2].toLowerCase() };
+  return null;
+}
+
+function menuButtons() {
+  return [
+    [{ text: '🔄 Статус', data: 'vpn:status' }, { text: '👥 Мои доступы', data: 'vpn:clients' }],
+    [{ text: '➕ Новый доступ', data: 'vpn:new' }],
+    [{ text: '♻️ Перезапустить VPN', data: 'vpn:restart' }],
+  ];
+}
+
+function backButton() {
+  return [[{ text: '← Назад', data: 'vpn:menu' }]];
 }
 
 function validateAction(action, args) {
@@ -71,7 +95,7 @@ function actionPrompt(action, args) {
   if (action === 'issue') return `Создать новый VPN-доступ «${args.label}»?`;
   if (action === 'restart') return 'Перезапустить Xray VPN? Активные соединения кратковременно прервутся.';
   const verbs = { revoke: 'Отозвать', rotate: 'Перевыпустить', export: 'Экспортировать' };
-  return `${verbs[action]} VPN-доступ ${args.clientId}?`;
+  return `${verbs[action]} VPN-доступ «${args.label || 'выбранный'}»?`;
 }
 
 function hostOperation(action) {
@@ -103,16 +127,41 @@ class VpnCommandService {
       if (response.result.state !== 'succeeded') return { answer: 'VPN недоступен для диагностики.' };
       const data = response.result.data || {};
       const state = data.serviceState === 'active' && data.configValid && data.listenerReady ? 'работает' : 'требует внимания';
-      return { answer: `VPN ${state}. Клиентов: ${Number(data.clientCount) || 0}. Конфигурация: ${data.configValid ? 'OK' : 'ошибка'}, порт 443: ${data.listenerReady ? 'слушает' : 'не слушает'}.` };
+      return { answer: `VPN ${state}. Клиентов: ${Number(data.clientCount) || 0}. Конфигурация: ${data.configValid ? 'OK' : 'ошибка'}, порт 443: ${data.listenerReady ? 'слушает' : 'не слушает'}.`, buttons: menuButtons() };
     }
+    const clients = await this._clients();
+    return {
+      answer: clients.length ? `VPN-доступы: ${clients.length}. Выбери нужный:` : 'VPN-доступов пока нет.',
+      buttons: [
+        ...clients.map((client) => [{ text: String(client.label || '').slice(0, 40), data: `vpn:client:${client.id}` }]),
+        ...backButton(),
+      ],
+    };
+  }
+
+  async _clients() {
     const response = await this._request('vpn.clients.list', {});
-    if (response.result.state !== 'succeeded') return { answer: 'Не удалось получить список VPN-клиентов.' };
-    const clients = Array.isArray(response.result.data?.clients) ? response.result.data.clients.slice(0, 50) : [];
-    return { answer: clients.length ? clients.map((client) => `${String(client.label || '').slice(0, 40)} — ${client.id}`).join('\n') : 'VPN-клиентов пока нет.' };
+    if (response.result.state !== 'succeeded') throw publicError('VPN_CLIENTS_UNAVAILABLE');
+    return (Array.isArray(response.result.data?.clients) ? response.result.data.clients : [])
+      .filter((client) => CLIENT_ID_RE.test(String(client.id || '')) && LABEL_RE.test(String(client.label || '')))
+      .slice(0, 50);
+  }
+
+  async _resolveClient(label) {
+    const normalized = String(label || '').trim();
+    if (!LABEL_RE.test(normalized) || normalized.includes('..')) throw publicError('VPN_LABEL_INVALID');
+    const matches = (await this._clients()).filter((client) => String(client.label).localeCompare(normalized, undefined, { sensitivity: 'accent' }) === 0);
+    if (matches.length !== 1) throw publicError(matches.length ? 'VPN_CLIENT_LABEL_AMBIGUOUS' : 'VPN_CLIENT_NOT_FOUND');
+    return matches[0];
   }
 
   async _create(command, context) {
-    const args = validateAction(command.action, command.arguments);
+    let rawArgs = command.arguments;
+    if (['revoke', 'rotate', 'export'].includes(command.action) && !rawArgs.clientId) {
+      const client = await this._resolveClient(rawArgs.label);
+      rawArgs = { clientId: client.id };
+    }
+    const args = validateAction(command.action, rawArgs);
     const id = crypto.randomUUID();
     const fingerprint = crypto.createHash('sha256').update(JSON.stringify({ action: command.action, args })).digest();
     const record = await this.repository.create({
@@ -121,18 +170,33 @@ class VpnCommandService {
       action: command.action, arguments: args, fingerprint,
       expiresAt: new Date(this.now().getTime() + CONFIRMATION_TTL_MS),
     });
-    return { answer: `${actionPrompt(command.action, args)}\nПодтверди: /vpn_confirm ${record.id}\nОтмена: /vpn_reject ${record.id}` };
+    return {
+      answer: actionPrompt(command.action, command.arguments?.label ? { ...args, label: command.arguments.label } : args),
+      buttons: [[
+        { text: '✅ Подтвердить', data: `vpn:confirm:${record.id}` },
+        { text: '✖️ Отмена', data: `vpn:reject:${record.id}` },
+      ]],
+    };
   }
 
   async _decide(command, context) {
-    if (!REQUEST_ID_RE.test(command.requestId)) throw publicError('VPN_CONFIRMATION_INVALID');
+    let requestId = command.requestId;
+    if (!requestId && typeof this.repository.latestPending === 'function') {
+      const pending = await this.repository.latestPending({
+        userId: context.userId,
+        originChannel: context.originChannel,
+        originDeviceId: context.originDeviceId || null,
+      });
+      requestId = pending?.id || null;
+    }
+    if (!REQUEST_ID_RE.test(String(requestId || ''))) throw publicError('VPN_CONFIRMATION_UNAVAILABLE');
     if (command.decision === 'reject') {
-      const rejected = await this.repository.reject({ userId: context.userId, requestId: command.requestId, originChannel: context.originChannel, originDeviceId: context.originDeviceId || null });
+      const rejected = await this.repository.reject({ userId: context.userId, requestId, originChannel: context.originChannel, originDeviceId: context.originDeviceId || null });
       if (!rejected) throw publicError('VPN_CONFIRMATION_UNAVAILABLE');
       await this.repository.audit({ userId: context.userId, requestId: rejected.id, type: 'vpn.action.rejected', metadata: { action: rejected.action } });
-      return { answer: 'VPN-действие отменено.' };
+      return { answer: 'VPN-действие отменено.', buttons: menuButtons() };
     }
-    const record = await this.repository.approve({ userId: context.userId, requestId: command.requestId, originChannel: context.originChannel, originDeviceId: context.originDeviceId || null });
+    const record = await this.repository.approve({ userId: context.userId, requestId, originChannel: context.originChannel, originDeviceId: context.originDeviceId || null });
     if (!record) throw publicError('VPN_CONFIRMATION_UNAVAILABLE');
     const operation = hostOperation(record.action);
     let response;
@@ -140,13 +204,13 @@ class VpnCommandService {
       response = await this._request(operation, record.arguments || {}, record.id);
     } catch (_) {
       await this.repository.complete({ requestId: record.id, status: 'unknown', errorCode: 'HOST_AGENT_UNREACHABLE' });
-      return { answer: 'Результат VPN-действия пока неизвестен; повторно оно не запущено.' };
+      return { answer: 'Результат VPN-действия пока неизвестен; повторно оно не запущено.', buttons: menuButtons() };
     }
     const success = response.result.state === 'succeeded';
     const metadata = safeHostData(response.result.data || {});
     await this.repository.complete({ requestId: record.id, status: success ? 'succeeded' : response.result.state === 'unknown' ? 'unknown' : 'failed', result: metadata, errorCode: response.result.errorCode || null });
     await this.repository.audit({ userId: context.userId, requestId: record.id, type: success ? 'vpn.action.succeeded' : 'vpn.action.failed', metadata: { action: record.action, errorCode: response.result.errorCode || null } });
-    if (!success) return { answer: `VPN-действие не выполнено: ${response.result.errorCode || 'неизвестный результат'}.` };
+    if (!success) return { answer: `VPN-действие не выполнено: ${response.result.errorCode || 'неизвестный результат'}.`, buttons: menuButtons() };
     const artifact = artifactFrom(response.result.data);
     const labels = {
       issue: 'VPN-доступ создан. Файл для импорта в Happ приложен.',
@@ -155,18 +219,47 @@ class VpnCommandService {
       export: 'Файл для импорта VPN в Happ подготовлен.',
       restart: 'Xray VPN перезапущен.',
     };
-    return { answer: labels[record.action], ...(artifact ? { artifact } : {}) };
+    return { answer: labels[record.action], ...(artifact ? { artifact } : {}), buttons: menuButtons() };
+  }
+
+  async handleCallback(context) {
+    const callback = parseVpnCallback(context.data);
+    if (!callback) return null;
+    await this._requireOwner(context.userId);
+    if (callback.action === 'menu') return { answer: 'Управление VPN:', buttons: menuButtons() };
+    if (callback.action === 'status') return this._read({ action: 'status' });
+    if (callback.action === 'clients') return this._read({ action: 'clients' });
+    if (callback.action === 'new') return { answer: 'Напиши имя нового доступа командой: /vpn_issue Имя', buttons: backButton() };
+    if (callback.action === 'restart') return this._create({ action: 'restart', arguments: {} }, context);
+    if (callback.action === 'client') {
+      const client = (await this._clients()).find((item) => item.id === callback.clientId);
+      if (!client) throw publicError('VPN_CLIENT_NOT_FOUND');
+      return {
+        answer: `VPN-доступ «${client.label}». Выбери действие:`,
+        buttons: [
+          [{ text: '📄 Получить конфиг', data: `vpn:export:${client.id}` }],
+          [{ text: '🔁 Перевыпустить', data: `vpn:rotate:${client.id}` }, { text: '🗑 Отозвать', data: `vpn:revoke:${client.id}` }],
+          [{ text: '← К доступам', data: 'vpn:clients' }],
+        ],
+      };
+    }
+    if (['export', 'rotate', 'revoke'].includes(callback.action)) {
+      const client = (await this._clients()).find((item) => item.id === callback.clientId);
+      if (!client) throw publicError('VPN_CLIENT_NOT_FOUND');
+      return this._create({ action: callback.action, arguments: { clientId: client.id, label: client.label } }, context);
+    }
+    return this._decide({ decision: callback.action, requestId: callback.requestId }, context);
   }
 
   async handle(context) {
     const command = parseVpnCommand(context.text);
     if (!command) return null;
     await this._requireOwner(context.userId);
-    if (command.kind === 'invalid') return { answer: 'Команда VPN некорректна. Используй /vpn, /vpn_clients, /vpn_issue ИМЯ, /vpn_revoke ID, /vpn_rotate ID, /vpn_export ID или /vpn_restart.' };
+    if (command.kind === 'invalid') return { answer: 'Открой /vpn и используй кнопки. Для нового доступа: /vpn_issue Имя.', buttons: menuButtons() };
     if (command.kind === 'read') return this._read(command);
     if (command.kind === 'change') return this._create(command, context);
     return this._decide(command, context);
   }
 }
 
-module.exports = { CONFIRMATION_TTL_MS, VpnCommandService, artifactFrom, parseVpnCommand, safeHostData, validateAction };
+module.exports = { CONFIRMATION_TTL_MS, VpnCommandService, artifactFrom, menuButtons, parseVpnCallback, parseVpnCommand, safeHostData, validateAction };

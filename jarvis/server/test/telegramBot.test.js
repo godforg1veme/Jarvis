@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { downloadTelegramAttachment, replyWithChunks, splitTelegramText } = require('../src/telegram/bot');
+const { downloadTelegramAttachment, replyWithChunks, splitTelegramText, vpnReplyMarkup } = require('../src/telegram/bot');
 const { formatTelegramHtml } = require('../src/telegram/telegramFormatting');
 
 test('splits long Telegram replies without losing text', () => {
@@ -29,6 +29,18 @@ test('sends Telegram replies with HTML parsing enabled', async () => {
     text: '<b>Когда их класть:</b>\nСначала обжарь лук.',
     options: { parse_mode: 'HTML' },
   }]);
+});
+
+test('renders only closed bounded VPN inline buttons on the final reply', async () => {
+  const calls = [];
+  await replyWithChunks({
+    async reply(text, options) { calls.push({ text, options }); },
+  }, 'Управление VPN:', [[{ text: 'Статус', data: 'vpn:status' }]]);
+  assert.deepEqual(calls[0].options.reply_markup, {
+    inline_keyboard: [[{ text: 'Статус', callback_data: 'vpn:status' }]],
+  });
+  assert.throws(() => vpnReplyMarkup([[{ text: 'Shell', data: 'vpn:shell:whoami' }]]), /invalid VPN button/);
+  assert.throws(() => vpnReplyMarkup([[{ text: 'X', data: `vpn:confirm:${'a'.repeat(80)}` }]]), /invalid VPN button/);
 });
 
 test('Telegram attachment download bounds bytes and never exposes the bot token in errors', async () => {

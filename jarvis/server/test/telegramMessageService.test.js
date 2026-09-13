@@ -21,6 +21,18 @@ function update(id, userId, chatId, text) {
   };
 }
 
+function callbackUpdate(id, userId, chatId, data) {
+  return {
+    update_id: id,
+    callback_query: {
+      id: `callback-${id}`,
+      from: { id: userId, first_name: `User ${userId}` },
+      message: { message_id: id + 100, chat: { id: chatId } },
+      data,
+    },
+  };
+}
+
 function voiceUpdate(id, userId, chatId, overrides = {}) {
   return {
     update_id: id,
@@ -333,4 +345,22 @@ test('Telegram returns a VPN artifact without persisting its secret content', as
   assert.equal(result.artifact.content, secret);
   assert.equal(state.messages.some((message) => String(message.content).includes('vless://')), false);
   assert.equal(assistantCalls.length, 0);
+});
+
+test('Telegram VPN callback stays owner-scoped and persists no technical ID', async () => {
+  const requestId = '33333333-3333-4333-8333-333333333333';
+  const { service, state } = harness(['101'], null, null, {
+    vpnService: { async handleCallback(input) {
+      assert.equal(input.userId, 'user-101');
+      assert.equal(input.originChannel, 'telegram');
+      assert.equal(input.data, `vpn:confirm:${requestId}`);
+      return { answer: 'VPN-доступ создан.', buttons: [[{ text: 'В меню', data: 'vpn:menu' }]] };
+    } },
+  });
+  const result = await service.handleVpnCallback(callbackUpdate(51, 101, 101, `vpn:confirm:${requestId}`));
+  assert.equal(result.status, 'answered');
+  assert.equal(result.buttons[0][0].data, 'vpn:menu');
+  assert.equal(state.messages.some((message) => String(message.content).includes(requestId)), false);
+  assert.equal((await service.handleVpnCallback(callbackUpdate(51, 101, 101, `vpn:confirm:${requestId}`))).status, 'duplicate');
+  assert.equal((await service.handleVpnCallback(callbackUpdate(52, 999, 999, 'vpn:menu'))).status, 'forbidden');
 });

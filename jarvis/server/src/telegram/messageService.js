@@ -80,10 +80,38 @@ function normalizeTelegramMessage(update) {
   };
 }
 
+function normalizeVpnCallbackUpdate(update) {
+  const query = update && update.callback_query;
+  const telegramUserId = query && query.from && String(query.from.id || '');
+  const chatId = query && query.message && query.message.chat && String(query.message.chat.id || '');
+  const data = query && typeof query.data === 'string' ? query.data : '';
+  const updateId = Number(update && update.update_id);
+  if (!/^\d{1,20}$/.test(telegramUserId) || !/^-?\d{1,20}$/.test(chatId)) throw new Error('invalid Telegram callback identity');
+  if (!Number.isSafeInteger(updateId) || updateId < 0) throw new Error('invalid Telegram update ID');
+  if (!data.startsWith('vpn:') || Buffer.byteLength(data, 'utf8') > 64) throw new Error('invalid VPN callback');
+  return {
+    updateId,
+    telegramUserId,
+    chatId,
+    data,
+    displayName: [query.from.first_name, query.from.last_name].filter(Boolean).join(' ').trim().slice(0, 100) || `Telegram ${telegramUserId}`,
+  };
+}
+
+function vpnPublicError(error) {
+  if (!error || !error.publicCode) throw error;
+  const unavailable = ['VPN_CONFIRMATION_UNAVAILABLE', 'VPN_CLIENT_NOT_FOUND'].includes(error.publicCode);
+  return {
+    status: 'answered',
+    answer: unavailable ? 'Эта кнопка уже недоступна. Открой актуальное меню VPN.' : 'Не удалось выполнить VPN-действие. Открой меню и попробуй ещё раз.',
+    buttons: [[{ text: '← В меню VPN', data: 'vpn:menu' }]],
+  };
+}
+
 function commandReply(text) {
   const command = String(text || '').split(/\s+/, 1)[0].split('@', 1)[0].toLowerCase();
   if (command === '/start') return 'Jarvis подключён. Напишите вопрос обычным сообщением.';
-  if (command === '/help') return 'Доступно: текстовые вопросы, загрузка файлов, /life, /life_confirm ID, /life_dismiss ID, /documents, /document_delete ID confirm, /devices, /pair Имя ПК, /revoke ID устройства, /desktop DEVICE_ID ACTION JSON, /confirm COMMAND_ID, /reject COMMAND_ID, /command COMMAND_ID, /memory. Для владельца: /vpn, /vpn_clients, /vpn_issue ИМЯ, /vpn_revoke ID, /vpn_rotate ID, /vpn_export ID, /vpn_restart. Также можно писать «запомни», «забудь» и «исправь старое → новое».';
+  if (command === '/help') return 'Доступно: текстовые вопросы, загрузка файлов, /life, /life_confirm ID, /life_dismiss ID, /documents, /document_delete ID confirm, /devices, /pair Имя ПК, /revoke ID устройства, /desktop DEVICE_ID ACTION JSON, /confirm COMMAND_ID, /reject COMMAND_ID, /command COMMAND_ID, /memory. VPN управляется кнопками из /vpn; для нового доступа можно написать /vpn_issue Имя. Также можно писать «запомни», «забудь» и «исправь старое → новое».';
   if (command === '/memory') return null;
   return null;
 }
@@ -126,6 +154,36 @@ class TelegramMessageService {
       commandService: this.commandService,
       orchestrator: this.orchestrator,
     });
+  }
+
+  async handleVpnCallback(update) {
+    const input = normalizeVpnCallbackUpdate(update);
+    if (!this.accessPolicy.isAllowed(input.telegramUserId)) return { status: 'forbidden' };
+    if (!this.vpnService || typeof this.vpnService.handleCallback !== 'function') return { status: 'ignored' };
+    const claimed = await this.updateRepository.claim(input.updateId, input.telegramUserId);
+    if (!claimed) return { status: 'duplicate' };
+    const user = await this.userRepository.findOrCreateTelegramUser({ telegramUserId: input.telegramUserId, displayName: input.displayName });
+    const conversation = await this.conversationRepository.getOrCreate({ userId: user.id, channel: 'telegram', externalChatId: input.chatId });
+    let result;
+    try {
+      result = await this.vpnService.handleCallback({
+        data: input.data,
+        userId: user.id,
+        conversationId: conversation.id,
+        originChannel: 'telegram',
+        originDeviceId: null,
+      });
+    } catch (error) {
+      result = vpnPublicError(error);
+    }
+    if (!result) return { status: 'ignored' };
+    await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: result.answer });
+    return {
+      status: 'answered',
+      answer: result.answer,
+      ...(result.artifact ? { artifact: result.artifact } : {}),
+      ...(result.buttons ? { buttons: result.buttons } : {}),
+    };
   }
 
   async documentCommandReply({ text, user }) {
@@ -295,10 +353,17 @@ class TelegramMessageService {
       return { status: 'answered', answer: lifeAnswer };
     }
 
-    const vpnResult = this.vpnService ? await this.vpnService.handle({
-      text: input.text, userId: user.id, conversationId: conversation.id,
-      originChannel: 'telegram', originDeviceId: null,
-    }) : null;
+    let vpnResult = null;
+    if (this.vpnService) {
+      try {
+        vpnResult = await this.vpnService.handle({
+          text: input.text, userId: user.id, conversationId: conversation.id,
+          originChannel: 'telegram', originDeviceId: null,
+        });
+      } catch (error) {
+        vpnResult = vpnPublicError(error);
+      }
+    }
     if (vpnResult) {
       await this.conversationRepository.appendMessage({
         userId: user.id,
@@ -306,7 +371,12 @@ class TelegramMessageService {
         role: 'assistant',
         content: vpnResult.answer,
       });
-      return { status: 'answered', answer: vpnResult.answer, ...(vpnResult.artifact ? { artifact: vpnResult.artifact } : {}) };
+      return {
+        status: 'answered',
+        answer: vpnResult.answer,
+        ...(vpnResult.artifact ? { artifact: vpnResult.artifact } : {}),
+        ...(vpnResult.buttons ? { buttons: vpnResult.buttons } : {}),
+      };
     }
 
     const remoteAnswer = await this.remoteCommandReply({ text: input.text, user, conversationId: conversation.id });
@@ -393,6 +463,8 @@ module.exports = {
   commandParts,
   parseRemoteCommand,
   normalizeTelegramMessage,
+  normalizeVpnCallbackUpdate,
   validateTelegramVoice,
+  vpnPublicError,
   voiceFromTelegramMessage,
 };

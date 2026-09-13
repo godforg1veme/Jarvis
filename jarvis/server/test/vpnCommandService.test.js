@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { VpnCommandService, artifactFrom, parseVpnCommand, safeHostData, validateAction } = require('../src/vpn/vpnCommandService');
+const { VpnCommandService, artifactFrom, parseVpnCallback, parseVpnCommand, safeHostData, validateAction } = require('../src/vpn/vpnCommandService');
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 const DEVICE_ID = '22222222-2222-4222-8222-222222222222';
@@ -21,6 +21,7 @@ function harness(options = {}) {
       row.status = 'running'; return row;
     },
     async reject(input) { return this.approve(input); },
+    async latestPending() { return [...records.values()].at(-1) || null; },
     async complete(input) { calls.push(['complete', input]); return input; },
     async audit(input) { calls.push(['audit', input]); },
   };
@@ -36,9 +37,19 @@ function harness(options = {}) {
 test('parses only the closed VPN command set', () => {
   assert.deepEqual(parseVpnCommand('/vpn'), { kind: 'read', action: 'status', arguments: {} });
   assert.deepEqual(parseVpnCommand('/vpn_issue My Phone'), { kind: 'change', action: 'issue', arguments: { label: 'My Phone' } });
+  assert.deepEqual(parseVpnCommand('/vpn_export My Phone'), { kind: 'change', action: 'export', arguments: { label: 'My Phone' } });
+  assert.deepEqual(parseVpnCommand('/vpn_confirm'), { kind: 'decision', decision: 'confirm', requestId: null });
   assert.equal(parseVpnCommand('расскажи о погоде'), null);
   assert.equal(parseVpnCommand('/vpn_issue').kind, 'invalid');
   assert.equal(parseVpnCommand('/vpn_shell id').kind, 'invalid');
+});
+
+test('parses only bounded VPN callback actions', () => {
+  assert.deepEqual(parseVpnCallback('vpn:clients'), { action: 'clients' });
+  assert.deepEqual(parseVpnCallback('vpn:export:vpn-0123456789ab'), { action: 'export', clientId: 'vpn-0123456789ab' });
+  assert.deepEqual(parseVpnCallback(`vpn:confirm:${REQUEST_ID}`), { action: 'confirm', requestId: REQUEST_ID });
+  assert.equal(parseVpnCallback('ops:allow:anything'), null);
+  assert.equal(parseVpnCallback('vpn:export:../../root'), null);
 });
 
 test('rejects unsafe labels and client identifiers', () => {
@@ -50,6 +61,7 @@ test('owner can observe VPN without confirmation', async () => {
   const { service, calls } = harness();
   const result = await service.handle({ text: '/vpn', userId: USER_ID, conversationId: 'conversation', originChannel: 'telegram' });
   assert.match(result.answer, /VPN работает/);
+  assert.equal(result.buttons.flat().some((button) => button.data === 'vpn:clients'), true);
   assert.equal(calls.find((call) => call[0] === 'request')[1].operation, 'vpn.status');
 });
 
@@ -62,17 +74,32 @@ test('changing action is origin-bound and executes only after confirmation', asy
   const { service, calls } = harness();
   const context = { userId: USER_ID, conversationId: 'conversation', originChannel: 'desktop', originDeviceId: DEVICE_ID };
   const created = await service.handle({ ...context, text: '/vpn_issue Phone' });
-  assert.match(created.answer, new RegExp(`/vpn_confirm ${REQUEST_ID}`));
+  assert.equal(created.answer.includes(REQUEST_ID), false);
+  assert.equal(created.buttons[0][0].data, `vpn:confirm:${REQUEST_ID}`);
   assert.equal(calls.some((call) => call[0] === 'request'), false);
   await assert.rejects(
     service.handle({ ...context, originDeviceId: '44444444-4444-4444-8444-444444444444', text: `/vpn_confirm ${REQUEST_ID}` }),
     (error) => error.publicCode === 'VPN_CONFIRMATION_UNAVAILABLE',
   );
-  const executed = await service.handle({ ...context, text: `/vpn_confirm ${REQUEST_ID}` });
+  const executed = await service.handle({ ...context, text: '/vpn_confirm' });
   assert.equal(executed.artifact.content.startsWith('vless://'), true);
   const request = calls.find((call) => call[0] === 'request');
   assert.equal(request[1].operation, 'vpn.client.issue');
   assert.equal(request[1].requestId, REQUEST_ID);
+});
+
+test('client menu hides IDs and label commands resolve internally', async () => {
+  const { service, calls } = harness();
+  const context = { userId: USER_ID, conversationId: 'conversation', originChannel: 'telegram' };
+  const list = await service.handle({ ...context, text: '/vpn_clients' });
+  assert.equal(list.answer.includes('vpn-0123456789ab'), false);
+  assert.equal(list.buttons[0][0].text, 'Phone');
+  const detail = await service.handleCallback({ ...context, data: list.buttons[0][0].data });
+  assert.equal(detail.answer.includes('vpn-0123456789ab'), false);
+  assert.equal(detail.buttons.flat().some((button) => button.data === 'vpn:export:vpn-0123456789ab'), true);
+  const created = await service.handle({ ...context, text: '/vpn_export Phone' });
+  assert.equal(created.answer.includes('vpn-0123456789ab'), false);
+  assert.equal(calls.filter((call) => call[0] === 'request').at(-1)[1].operation, 'vpn.clients.list');
 });
 
 test('secret host fields are excluded from persistence metadata', () => {

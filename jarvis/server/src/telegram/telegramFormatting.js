@@ -47,9 +47,13 @@ function splitTelegramText(text, maxLength = TELEGRAM_MESSAGE_LIMIT) {
   return chunks;
 }
 
-async function sendTelegramText(send, text) {
-  for (const chunk of splitTelegramText(text)) {
-    await send(formatTelegramHtml(chunk), { parse_mode: 'HTML' });
+async function sendTelegramText(send, text, finalOptions = {}) {
+  const chunks = splitTelegramText(text);
+  for (let index = 0; index < chunks.length; index += 1) {
+    await send(formatTelegramHtml(chunks[index]), {
+      parse_mode: 'HTML',
+      ...(index === chunks.length - 1 ? finalOptions : {}),
+    });
   }
 }
 
