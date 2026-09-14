@@ -80,6 +80,8 @@ const { PriorityEngine } = require('./life/priority/priorityEngine');
 const { ReminderRepository } = require('./life/reminders/reminderRepository');
 const { RecoveryPlanRepository } = require('./life/recovery/recoveryPlanRepository');
 const { SourceConnectionRepository } = require('./life/sources/sourceConnectionRepository');
+const { CommitmentRepository } = require('./life/commitments/commitmentRepository');
+const { CommitmentLifecycleService } = require('./life/commitments/commitmentLifecycleService');
 const { PeopleRepository } = require('./life/people/peopleRepository');
 const { PeopleService } = require('./life/people/peopleService');
 const { PersonLinker } = require('./life/people/personLinker');
@@ -146,6 +148,8 @@ async function createRuntime(config, overrides = {}) {
     let lifeReminderRepository = null;
     let lifeRecoveryRepository = null;
     let lifeSourceRepository = null;
+    let lifeCommitmentRepository = null;
+    let lifeCommitmentLifecycleService = null;
     if (config.lifeOsEnabled) {
       lifeEventRepository = overrides.lifeEventRepository || new LifeEventRepository(pool);
       lifeProjectionRepository = overrides.lifeProjectionRepository || new LifeProjectionRepository(pool);
@@ -156,6 +160,7 @@ async function createRuntime(config, overrides = {}) {
       lifeReminderRepository = overrides.lifeReminderRepository || new ReminderRepository(pool);
       lifeRecoveryRepository = overrides.lifeRecoveryRepository || new RecoveryPlanRepository(pool);
       lifeSourceRepository = overrides.lifeSourceRepository || new SourceConnectionRepository(pool);
+      lifeCommitmentRepository = overrides.lifeCommitmentRepository || new CommitmentRepository(pool);
       lifePriorityEngine = overrides.lifePriorityEngine || new PriorityEngine({ repository: lifePriorityRepository });
       lifeEventGateway = overrides.lifeEventGateway || new LifeEventGateway({
         repository: lifeEventRepository,
@@ -176,6 +181,9 @@ async function createRuntime(config, overrides = {}) {
       });
       lifeFamilyAccessService = overrides.lifeFamilyAccessService || new FamilyAccessService({
         repository: lifePeopleRepository, gateway: lifeEventGateway,
+      });
+      lifeCommitmentLifecycleService = overrides.lifeCommitmentLifecycleService || new CommitmentLifecycleService({
+        repository: lifeCommitmentRepository, gateway: lifeEventGateway,
       });
     }
     const commandRepository = overrides.commandRepository || new CommandRepository(pool);
@@ -270,7 +278,10 @@ async function createRuntime(config, overrides = {}) {
         },
       });
       const enrichment = new LifeEnrichmentService({
-        linker, commitmentDetector, repository: lifeProjectionRepository, gateway: lifeEventGateway,
+        linker, commitmentDetector, repository: lifeProjectionRepository,
+        commitmentRepository: lifeCommitmentRepository,
+        commitmentLifecycleService: lifeCommitmentLifecycleService,
+        gateway: lifeEventGateway,
       });
       lifeProjectionWorker = overrides.lifeProjectionWorker || new LifeProjectionWorker({
         eventRepository: lifeEventRepository, projectionRepository: lifeProjectionRepository,
