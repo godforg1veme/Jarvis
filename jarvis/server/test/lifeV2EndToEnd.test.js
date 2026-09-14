@@ -1,14 +1,22 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const { LifeEventGateway } = require('../src/life/lifeEventGateway');
 const { LifeEnrichmentService } = require('../src/life/lifeEnrichmentService');
 const { LifeLinker } = require('../src/life/lifeLinker');
 const { CommitmentDetector } = require('../src/life/commitmentDetector');
+const { LifeContextComposer } = require('../src/life/context/lifeContextComposer');
+const { ContextRecoveryService } = require('../src/life/contextRecoveryService');
 const { PriorityEngine } = require('../src/life/priority/priorityEngine');
 const { ProactivityWorker } = require('../src/life/proactivityWorker');
 const { ProactivityEngine } = require('../src/life/proactivity/proactivityEngine');
 const { ProposalService } = require('../src/life/proposalService');
 const { createActionManifest } = require('../src/orchestrator/actionManifest');
+const { executeToolRequest } = require('../../agents/toolGateway');
+const { WorkspaceRegistry } = require('../../tools/workspaceRegistry');
+const { WorkspacePreparationService } = require('../../tools/workspacePreparationService');
 
 const USER = '11111111-1111-4111-8111-111111111111';
 const OTHER = '22222222-2222-4222-8222-222222222222';
@@ -40,7 +48,7 @@ class EventStore {
 
 class ProjectionStore {
   constructor() {
-    this.projects = [{ id: PROJECT, user_id: USER, area_id: AREA, name: 'Life OS', summary: 'Integrated loop', status: 'active', updated_at: NOW }];
+    this.projects = [{ id: PROJECT, user_id: USER, area_id: AREA, name: 'Life OS', summary: 'Integrated loop', status: 'active', revision: 1, created_at: NOW, updated_at: NOW }];
     this.links = []; this.commitments = [];
   }
   async listProjects({ userId }) { return this.projects.filter((row) => row.user_id === userId); }
@@ -87,7 +95,7 @@ class ProposalStore {
   }
 }
 
-test('Life OS v2 carries one Russian commitment through linking, priority, proposal, origin confirmation and verified result exactly once', async () => {
+test('Life OS v2 carries one Russian commitment through context, real Tool Gateway and recovered verified result exactly once', async (t) => {
   const events = new EventStore(); const projections = new ProjectionStore(); const proposals = new ProposalStore(events);
   const gateway = new LifeEventGateway({ repository: events });
   const source = await gateway.record({ userId: USER, eventType: 'voice.transcribed', occurredAt: NOW,
@@ -109,15 +117,43 @@ test('Life OS v2 carries one Russian commitment through linking, priority, propo
   assert.match(enriched.commitment.due_at.toISOString(), /^2026-09-14T1[5-9]:/);
   assert.ok(enriched.commitment.due_window_end_at > enriched.commitment.due_at);
 
+  const contextRepository = {
+    listProjects: (input) => projections.listProjects(input),
+    async listCommitments({ userId }) { return projections.commitments.filter((row) => row.user_id === userId); },
+    async listProposals() { return []; },
+    async listTimeline({ userId }) { return events.ownerRows(userId).map((row) => ({ ...row, links: projections.links.filter((link) => link.event_id === row.id).map((link) => ({ targetType: link.target_type, targetId: link.target_id, origin: link.origin })) })); },
+    async listAreas() { return [{ id: AREA, name: 'Работа', status: 'active' }]; },
+  };
+  const composer = new LifeContextComposer({ repository: contextRepository, priorityEngine: new PriorityEngine({ now: () => NOW }), now: () => NOW });
+  const replyContext = await composer.compose({ userId: USER, channel: 'desktop', text: 'Что дальше по проекту Life OS?' });
+  assert.equal(replyContext.status, 'fresh');
+  assert.equal(replyContext.lifeContext.currentProject.name, 'Life OS');
+  assert.ok(replyContext.lifeContext.items.some((item) => item.kind === 'commitment'));
+
   const priority = await new PriorityEngine({ now: () => NOW }).evaluate({ userId: USER,
     projects: projections.projects, areas: [{ id: AREA }], commitments: projections.commitments,
     events: [{ ...source, links: [{ targetType: 'project', targetId: PROJECT }] }], states: [], mode: { mode: 'work' }, preferences: [], persist: false });
   assert.equal(priority.selected.project.id, PROJECT);
   assert.ok(priority.selected.factors.some((factor) => factor.code === 'commitments.open'));
 
-  let desktopDispatches = 0;
+  const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-life-e2e-'));
+  t.after(() => fs.rmSync(temporaryRoot, { recursive: true, force: true }));
+  const workspacePath = path.join(temporaryRoot, 'workspace');
+  fs.mkdirSync(workspacePath);
+  const registry = new WorkspaceRegistry({ filePath: path.join(temporaryRoot, 'workspaces.local.json') });
+  assert.ok(registry.save({ projectId: PROJECT, label: 'Life OS end-to-end', appAliases: ['Fixture Editor'], fileSearchHints: [], localPaths: [workspacePath] }));
+  let desktopDispatches = 0; let launchedApps = 0; let openedPaths = 0;
+  const workspacePreparationService = new WorkspacePreparationService({ registry,
+    appResolver: { resolve() { return { ok: true, app: { id: 'fixture-editor' } }; } },
+    async launchApp() { launchedApps += 1; return { ok: true }; },
+    shell: { async openPath(value) { assert.equal(value, workspacePath); openedPaths += 1; return ''; } },
+  });
   const proposalService = new ProposalService({ repository: proposals, gateway, manifest: createActionManifest(), now: () => PREPARATION_TIME,
-    orchestrator: { async executeDeclaredProposal(input) { desktopDispatches += 1; assert.equal(input.actionName, 'workspace.prepare'); assert.equal(input.originDeviceId, DEVICE); await gateway.record({ userId: input.userId, eventType: 'workflow.succeeded', occurredAt: NOW, sourceChannel: 'orchestrator', sourceRef: 'workflow:e2e', deduplicationKey: 'workflow:e2e:terminal', summary: 'Рабочее пространство подтверждено Desktop', structuredData: { proposalId: input.proposalId }, trustLevel: 'trusted', privacyClass: 'personal' }); return { pending: false, status: 'succeeded', workflowId: idFor(400) }; } } });
+    orchestrator: { async executeDeclaredProposal(input) { desktopDispatches += 1; assert.equal(input.actionName, 'workspace.prepare'); assert.equal(input.originDeviceId, DEVICE);
+      const toolResult = await executeToolRequest({ action: input.actionName, args: input.actionArguments }, { confirmed: true, workspacePreparationService });
+      assert.equal(toolResult.ok, true);
+      assert.doesNotMatch(JSON.stringify(toolResult), /jarvis-life-e2e|workspaces\.local|fixture-editor/i);
+      await gateway.record({ userId: input.userId, eventType: 'workflow.succeeded', occurredAt: PREPARATION_TIME, sourceChannel: 'orchestrator', sourceRef: 'workflow:e2e', deduplicationKey: 'workflow:e2e:terminal', summary: 'Рабочее пространство подтверждено Desktop', structuredData: { proposalId: input.proposalId }, trustLevel: 'trusted', privacyClass: 'personal' }); return { pending: false, status: 'succeeded', workflowId: idFor(400) }; } } });
   const engine = new ProactivityEngine({ proposalService, manifest: createActionManifest(), now: () => PREPARATION_TIME,
     repository: { async countOpenForRule() { return 0; }, async countCreatedSince() { return 0; } } });
   const reminderEvent = await gateway.record({ userId: USER, eventType: 'reminder.delivered', occurredAt: PREPARATION_TIME,
@@ -135,11 +171,22 @@ test('Life OS v2 carries one Russian commitment through linking, priority, propo
   assert.equal(await proposalService.confirm({ userId: USER, proposalId: created[0].id, revision: 1, originChannel: 'desktop', originDeviceId: OTHER_DEVICE }), null);
   const completed = await proposalService.confirm({ userId: USER, proposalId: created[0].id, revision: 1, originChannel: 'desktop', originDeviceId: DEVICE });
   assert.equal(completed.status, 'completed'); assert.equal(desktopDispatches, 1);
+  assert.equal(launchedApps, 1); assert.equal(openedPaths, 1);
   assert.equal(await proposalService.confirm({ userId: USER, proposalId: created[0].id, revision: completed.revision, originChannel: 'desktop', originDeviceId: DEVICE }), null);
   assert.equal(desktopDispatches, 1);
   assert.equal(events.ownerRows(USER).filter((event) => event.event_type === 'workflow.succeeded').length, 1);
   assert.equal(events.ownerRows(OTHER).length, 0);
   assert.equal(JSON.stringify(events.rows).includes('action_arguments'), false);
+
+  const recovery = await new ContextRecoveryService({ repository: {
+    getProject: (input) => projections.getProject(input),
+    async listTimeline({ userId }) { return events.ownerRows(userId).slice().reverse().map((row) => ({ ...row, links: [] })); },
+    async listCommitments({ userId }) { return projections.commitments.filter((row) => row.user_id === userId && row.status === 'open'); },
+    async listProposals() { return []; },
+    async listProjectDocuments() { return []; },
+  } }).recover({ userId: USER, projectId: PROJECT });
+  assert.equal(recovery.continuation.summary, 'Рабочее пространство подтверждено Desktop');
+  assert.ok(recovery.verifiedFacts.some((fact) => fact.type === 'workflow.succeeded'));
 });
 
 test('an unknown terminal result stays unknown and replay never creates a second dispatch', async () => {
