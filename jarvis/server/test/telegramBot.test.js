@@ -91,6 +91,11 @@ test('sends a validated Hysteria2 artifact and rejects a mismatched kind', async
     artifact: { kind: 'happ-hysteria2', filename: 'iPhone-hysteria2.txt', content: 'hy2://secret@example.test:443/\n' },
   });
   assert.equal(documents.length, 1);
+  await sendResult(ctx, {
+    status: 'answered', answer: 'Маршрутизация',
+    artifact: { kind: 'happ-routing', filename: 'jarvis-ru-direct-routing.json', content: '{"Name":"test"}\n' },
+  });
+  assert.equal(documents.length, 2);
   await assert.rejects(sendResult(ctx, {
     status: 'answered', answer: 'Нет',
     artifact: { kind: 'happ-vless', filename: 'wrong.txt', content: 'hy2://secret\n' },

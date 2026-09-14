@@ -1,8 +1,8 @@
 const { Bot, InputFile } = require('grammy');
 const { sendTelegramText, splitTelegramText } = require('./telegramFormatting');
 
-const VPN_CALLBACK_RE = /^vpn:(?:menu|status|clients|new|restart|p:[vh]|[vh]:(?:menu|status|clients|new|restart|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12})|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12}|(?:confirm|reject):[a-f0-9-]{36})$/i;
-const TELEGRAM_CALLBACK_RE = /^(?:vpn:(?:menu|status|clients|new|restart|p:[vh]|[vh]:(?:menu|status|clients|new|restart|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12})|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12}|(?:confirm|reject):[a-f0-9-]{36})|cmd:(?:confirm|reject):[a-f0-9-]{36}|life:(?:confirm|dismiss):[a-f0-9-]{36}|mem:(?:menu|list|add|correct|forget|(?:edit|forget_prompt|forget_confirm):[a-f0-9-]{36})|doc:(?:menu|add|cancel|(?:del_prompt|delete):[a-f0-9-]{36})|dev:(?:menu|list|pair|cancel|(?:(?:select|task|revoke_prompt|revoke):[a-f0-9-]{36}))|flow:cancel:[a-f0-9-]{36}|gallery:(?:(?:page|keep):[0-9]{1,4}|(?:open|delete):[dv]:[a-f0-9-]{36}:[0-9]{1,4}))$/i;
+const VPN_CALLBACK_RE = /^vpn:(?:menu|status|clients|new|restart|routing|p:[vh]|[vh]:(?:menu|status|clients|new|restart|routing|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12})|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12}|(?:confirm|reject):[a-f0-9-]{36})$/i;
+const TELEGRAM_CALLBACK_RE = /^(?:vpn:(?:menu|status|clients|new|restart|routing|p:[vh]|[vh]:(?:menu|status|clients|new|restart|routing|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12})|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12}|(?:confirm|reject):[a-f0-9-]{36})|cmd:(?:confirm|reject):[a-f0-9-]{36}|life:(?:confirm|dismiss):[a-f0-9-]{36}|mem:(?:menu|list|add|correct|forget|(?:edit|forget_prompt|forget_confirm):[a-f0-9-]{36})|doc:(?:menu|add|cancel|(?:del_prompt|delete):[a-f0-9-]{36})|dev:(?:menu|list|pair|cancel|(?:(?:select|task|revoke_prompt|revoke):[a-f0-9-]{36}))|flow:cancel:[a-f0-9-]{36}|gallery:(?:(?:page|keep):[0-9]{1,4}|(?:open|delete):[dv]:[a-f0-9-]{36}:[0-9]{1,4}))$/i;
 
 function vpnReplyMarkup(buttons, options = {}) {
   if (buttons === undefined) return undefined;
@@ -98,9 +98,10 @@ async function sendResult(ctx, result, options = {}) {
   if (result.artifact) {
     const artifact = result.artifact;
     const content = String(artifact.content || '');
-    const validVless = artifact.kind === 'happ-vless' && content.startsWith('vless://');
-    const validHysteria2 = artifact.kind === 'happ-hysteria2' && (content.startsWith('hy2://') || content.startsWith('hysteria2://'));
-    if ((!validVless && !validHysteria2) || !/^.{1,80}\.txt$/u.test(artifact.filename) || content.length > 4096) {
+    const validVless = artifact.kind === 'happ-vless' && content.startsWith('vless://') && /^.{1,80}\.txt$/u.test(artifact.filename) && content.length <= 4096;
+    const validHysteria2 = artifact.kind === 'happ-hysteria2' && (content.startsWith('hy2://') || content.startsWith('hysteria2://')) && /^.{1,80}\.txt$/u.test(artifact.filename) && content.length <= 4096;
+    const validRouting = artifact.kind === 'happ-routing' && /^.{1,80}\.(json|txt|yaml)$/u.test(artifact.filename) && content.length <= 65536;
+    if (!validVless && !validHysteria2 && !validRouting) {
       throw new Error('invalid VPN artifact');
     }
     await ctx.replyWithDocument(new InputFile(Buffer.from(artifact.content, 'utf8'), artifact.filename));

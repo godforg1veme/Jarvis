@@ -41,6 +41,9 @@ test('parses only the closed VPN command set', () => {
   assert.deepEqual(parseVpnCommand('/vpn_issue My Phone'), { kind: 'change', action: 'issue', protocol: 'vless', arguments: { label: 'My Phone' } });
   assert.deepEqual(parseVpnCommand('/vpn_hysteria2_issue My Phone'), { kind: 'change', action: 'issue', protocol: 'hysteria2', arguments: { label: 'My Phone' } });
   assert.deepEqual(parseVpnCommand('/vpn_export My Phone'), { kind: 'change', action: 'export', protocol: 'vless', arguments: { label: 'My Phone' } });
+  assert.deepEqual(parseVpnCommand('/vpn_routing'), { kind: 'routing', protocol: 'hysteria2' });
+  assert.deepEqual(parseVpnCommand('/vpn_ru'), { kind: 'routing', protocol: 'hysteria2' });
+  assert.deepEqual(parseVpnCommand('/vpn_hysteria2_routing'), { kind: 'routing', protocol: 'hysteria2' });
   assert.deepEqual(parseVpnCommand('/vpn_confirm'), { kind: 'decision', decision: 'confirm', requestId: null });
   assert.equal(parseVpnCommand('расскажи о погоде'), null);
   assert.equal(parseVpnCommand('/vpn_issue').kind, 'invalid');
@@ -49,6 +52,8 @@ test('parses only the closed VPN command set', () => {
 
 test('parses only bounded VPN callback actions', () => {
   assert.deepEqual(parseVpnCallback('vpn:clients'), { action: 'clients', protocol: 'vless' });
+  assert.deepEqual(parseVpnCallback('vpn:routing'), { action: 'routing' });
+  assert.deepEqual(parseVpnCallback('vpn:h:routing'), { action: 'routing', protocol: 'hysteria2' });
   assert.deepEqual(parseVpnCallback('vpn:export:vpn-0123456789ab'), { action: 'export', protocol: 'vless', clientId: 'vpn-0123456789ab' });
   assert.deepEqual(parseVpnCallback('vpn:p:h'), { action: 'protocol', protocol: 'hysteria2' });
   assert.deepEqual(parseVpnCallback('vpn:h:export:vpn-0123456789ab'), { action: 'export', protocol: 'hysteria2', clientId: 'vpn-0123456789ab' });
@@ -129,4 +134,19 @@ test('Hysteria2 confirmation stays protocol-bound and never sends protocol to Ho
   assert.equal(request[1].operation, 'vpn.hysteria2.client.issue');
   assert.deepEqual(request[1].arguments, { label: 'iPhone' });
   assert.equal(executed.artifact.kind, 'happ-hysteria2');
+});
+
+test('routing command and callback return split-tunneling summary and artifact', async () => {
+  const { service } = harness();
+  const context = { userId: USER_ID, conversationId: 'conversation', originChannel: 'telegram' };
+  const viaCommand = await service.handle({ ...context, text: '/vpn_routing' });
+  assert.match(viaCommand.answer, /Раздельная маршрутизация/);
+  assert.ok(viaCommand.answer.includes('happ://routing/onadd/'));
+  assert.equal(viaCommand.artifact.kind, 'happ-routing');
+  assert.equal(viaCommand.artifact.filename, 'jarvis-ru-direct-routing.json');
+  assert.ok(viaCommand.buttons.flat().some((b) => b.data === 'vpn:h:routing'));
+
+  const viaCallback = await service.handleCallback({ ...context, data: 'vpn:h:routing' });
+  assert.match(viaCallback.answer, /Раздельная маршрутизация/);
+  assert.equal(viaCallback.artifact.kind, 'happ-routing');
 });

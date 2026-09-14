@@ -1,4 +1,5 @@
 const crypto = require('node:crypto');
+const { buildRoutingArtifact, buildRoutingSummary } = require('./vpnRoutingService');
 
 const CONFIRMATION_TTL_MS = 60 * 1000;
 const REQUEST_ID_RE = /^[a-f0-9-]{36}$/i;
@@ -36,6 +37,9 @@ function parseVpnCommand(text) {
   if ((match = /^\/vpn_(?:(hysteria2|hysteria|hy2)_)?restart$/i.exec(value))) {
     return { kind: 'change', action: 'restart', protocol: match[1] ? 'hysteria2' : 'vless', arguments: {} };
   }
+  if ((match = /^\/vpn_(?:(hysteria2|hysteria|hy2|vless)_)?(?:routing|ru)$/i.exec(value)) || /^\/vpn_ru$/i.test(value)) {
+    return { kind: 'routing', protocol: match && match[1]?.toLowerCase().startsWith('v') ? 'vless' : 'hysteria2' };
+  }
   if ((match = /^\/vpn_(confirm|reject)(?:\s+([a-f0-9-]{36}))?$/i.exec(value))) {
     return { kind: 'decision', decision: match[1].toLowerCase(), requestId: match[2]?.toLowerCase() || null };
   }
@@ -47,12 +51,12 @@ function parseVpnCallback(value) {
   const data = String(value || '');
   let match = /^vpn:p:(v|h)$/.exec(data);
   if (match) return { action: 'protocol', protocol: match[1] === 'h' ? 'hysteria2' : 'vless' };
-  match = /^vpn:(v|h):(menu|status|clients|new|restart)$/.exec(data);
+  match = /^vpn:(v|h):(menu|status|clients|new|restart|routing)$/.exec(data);
   if (match) return { action: match[2], protocol: match[1] === 'h' ? 'hysteria2' : 'vless' };
   match = /^vpn:(v|h):(client|export|rotate|revoke):(vpn-[a-f0-9]{12})$/.exec(data);
   if (match) return { action: match[2], protocol: match[1] === 'h' ? 'hysteria2' : 'vless', clientId: match[3] };
-  if (['vpn:menu', 'vpn:status', 'vpn:clients', 'vpn:new', 'vpn:restart'].includes(data)) {
-    return { action: data.slice(4), ...(data === 'vpn:menu' ? {} : { protocol: 'vless' }) };
+  if (['vpn:menu', 'vpn:status', 'vpn:clients', 'vpn:new', 'vpn:restart', 'vpn:routing'].includes(data)) {
+    return { action: data.slice(4), ...(data === 'vpn:menu' || data === 'vpn:routing' ? {} : { protocol: 'vless' }) };
   }
   match = /^vpn:(client|export|rotate|revoke):(vpn-[a-f0-9]{12})$/.exec(data);
   if (match) return { action: match[1], protocol: 'vless', clientId: match[2] };
@@ -65,6 +69,7 @@ function menuButtons() {
   return [
     [{ text: '⚡ Hysteria2 — рекомендуется', data: 'vpn:p:h' }],
     [{ text: '🛡 VLESS — резерв', data: 'vpn:p:v' }],
+    [{ text: '🌐 Обход РФ (Госуслуги, банки)', data: 'vpn:routing' }],
   ];
 }
 
@@ -73,6 +78,7 @@ function protocolButtons(protocol) {
   return [
     [{ text: '🔄 Статус', data: `vpn:${code}:status` }, { text: '👥 Мои доступы', data: `vpn:${code}:clients` }],
     [{ text: '➕ Новый доступ', data: `vpn:${code}:new` }],
+    [{ text: '🌐 Обход РФ (Госуслуги, банки)', data: `vpn:${code}:routing` }],
     [{ text: '♻️ Перезапустить', data: `vpn:${code}:restart` }],
     [{ text: '← Выбор протокола', data: 'vpn:menu' }],
   ];
@@ -252,10 +258,10 @@ class VpnCommandService {
     const artifact = artifactFrom(response.result.data);
     const title = PROTOCOLS[protocol].title;
     const labels = {
-      issue: `${title}-доступ создан. Файл для импорта в Happ приложен.`,
+      issue: `${title}-доступ создан. Файл для импорта в Happ приложен.\n\n💡 Чтобы Госуслуги, банки и .ru открывались напрямую без отключения VPN, используйте кнопку «🌐 Обход РФ» ниже.`,
       revoke: `${title}-доступ отозван.`,
-      rotate: `${title}-доступ перевыпущен. Старый ключ больше не работает; новый файл приложен.`,
-      export: `Файл ${title} для импорта в Happ подготовлен.`,
+      rotate: `${title}-доступ перевыпущен. Старый ключ больше не работает; новый файл приложен.\n\n💡 Чтобы Госуслуги, банки и .ru открывались напрямую без отключения VPN, используйте кнопку «🌐 Обход РФ» ниже.`,
+      export: `Файл ${title} для импорта в Happ подготовлен.\n\n💡 Чтобы Госуслуги, банки и .ru открывались напрямую без отключения VPN, используйте кнопку «🌐 Обход РФ» ниже.`,
       restart: `${title} VPN перезапущен.`,
     };
     return { answer: labels[record.action], ...(artifact ? { artifact } : {}), buttons: protocolButtons(protocol) };
@@ -265,6 +271,13 @@ class VpnCommandService {
     const callback = parseVpnCallback(context.data);
     if (!callback) return null;
     await this._requireOwner(context.userId);
+    if (callback.action === 'routing') {
+      return {
+        answer: buildRoutingSummary(),
+        artifact: buildRoutingArtifact(),
+        buttons: protocolButtons(callback.protocol || 'hysteria2'),
+      };
+    }
     if (callback.action === 'menu') return callback.protocol ? { answer: `Управление ${PROTOCOLS[callback.protocol].title}:`, buttons: protocolButtons(callback.protocol) } : { answer: 'Выбери VPN-протокол:', buttons: menuButtons() };
     if (callback.action === 'protocol') return { answer: `Управление ${PROTOCOLS[callback.protocol].title}:`, buttons: protocolButtons(callback.protocol) };
     if (callback.action === 'status') return this._read({ action: 'status', protocol: callback.protocol });
@@ -302,6 +315,13 @@ class VpnCommandService {
     if (!command) return null;
     await this._requireOwner(context.userId);
     if (command.kind === 'menu') return { answer: 'Выбери VPN-протокол:', buttons: menuButtons() };
+    if (command.kind === 'routing') {
+      return {
+        answer: buildRoutingSummary(),
+        artifact: buildRoutingArtifact(),
+        buttons: protocolButtons(command.protocol || 'hysteria2'),
+      };
+    }
     if (command.kind === 'invalid') return { answer: 'Открой /vpn и используй кнопки.', buttons: menuButtons() };
     if (command.kind === 'read') return this._read(command);
     if (command.kind === 'change') return this._create(command, context);
