@@ -19,11 +19,12 @@ test('valid pin overrides score, hidden projects are excluded, and calculations 
   const engine = new PriorityEngine({ repository: { async saveCalculation(input) { writes.push(input); } }, now: () => NOW });
   const result = await engine.evaluate({
     userId: USER, projects: projects(), areas: [], commitments: [], events: [],
-    states: [{ project_id: A, pinned: true }], mode: { mode: 'work' }, preferences: [],
+    states: [{ project_id: A, pinned: true, revision: 4 }], mode: { mode: 'work' }, preferences: [],
     resourceAvailable: null,
   });
   assert.equal(result.selected.project.id, A);
   assert.equal(result.selectionReason, 'user_pin');
+  assert.equal(result.selected.state.revision, 4);
   assert.equal(writes.length, 2);
   assert.equal(writes.every((write) => write.userId === USER), true);
 

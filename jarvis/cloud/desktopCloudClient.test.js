@@ -79,6 +79,38 @@ test('cloud client suggests the production endpoint before pairing', () => {
   }
 });
 
+test('cloud client exposes closed Life OS v2 routes without owner or action arguments', async () => {
+  const userDataPath = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-cloud-client-'));
+  try {
+    const requests = [];
+    const client = new DesktopCloudClient({
+      userDataPath, safeStorage: fakeSafeStorage(), WebSocket: FailingSocket,
+      fetch: async (url, options = {}) => {
+        requests.push({ url, options });
+        if (url.endsWith('/v1/desktop/pair')) return response({ ok: true, device: { id: 'device-a', name: 'Home PC' }, token: 'x'.repeat(43) }, 201);
+        return response({ ok: true });
+      },
+    });
+    await client.pair({ serverUrl: 'https://jarvis.example.test', pairingCode: 'JARVIS-ABCD-1234-ABCD-1234' });
+    await client.setLifeMode({ mode: 'focus', revision: 1 });
+    await client.getLifePreferences();
+    await client.getLifePeople(false);
+    await client.createLifeRecoveryPlan('11111111-1111-4111-8111-111111111111', 2);
+    await client.syncLifeSource('22222222-2222-4222-8222-222222222222');
+    const life = requests.slice(1);
+    assert.deepEqual(life.map((item) => new URL(item.url).pathname), [
+      '/v1/desktop/life/mode', '/v1/desktop/life/preferences', '/v1/desktop/life/people',
+      '/v1/desktop/life/projects/11111111-1111-4111-8111-111111111111/recovery-plans',
+      '/v1/desktop/life/sources/22222222-2222-4222-8222-222222222222/sync',
+    ]);
+    assert.equal(life.every((item) => !String(item.options.body || '').includes('owner')), true);
+    assert.equal(life.every((item) => !String(item.options.body || '').includes('actionArguments')), true);
+    client.stopSession();
+  } finally {
+    fs.rmSync(userDataPath, { recursive: true, force: true });
+  }
+});
+
 test('cloud client sends the credential only in the first WSS hello frame', async () => {
   const userDataPath = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-cloud-client-'));
   try {

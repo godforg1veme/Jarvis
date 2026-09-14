@@ -6,7 +6,8 @@ function publicPriority(entry, selectionReason = null) {
   if (!entry) return null;
   return {
     ...publicProject(entry.project), score: entry.score, confidence: entry.confidence,
-    pinned: entry.pinned === true, reasons: (entry.factors || []).slice(0, 8), selectionReason,
+    pinned: entry.pinned === true, priorityRevision: entry.state?.revision ?? null,
+    reasons: (entry.factors || []).slice(0, 8), selectionReason,
   };
 }
 

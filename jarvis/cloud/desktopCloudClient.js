@@ -327,6 +327,96 @@ class DesktopCloudClient {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ revision, status }),
     });
   }
+  async getLifeReminders(state = '') {
+    const query = state ? `?state=${encodeURIComponent(String(state))}` : '';
+    return this._request(`/v1/desktop/life/reminders${query}`);
+  }
+  async rescheduleLifeReminder(reminderId, input) {
+    return this._request(`/v1/desktop/life/reminders/${encodeURIComponent(String(reminderId || ''))}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    });
+  }
+  async mutateLifeReminder(reminderId, action, revision) {
+    return this._request(`/v1/desktop/life/reminders/${encodeURIComponent(String(reminderId || ''))}/${encodeURIComponent(String(action || ''))}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ revision }),
+    });
+  }
+  async setLifeMissionIntent(action, projectId, input) {
+    return this._request(`/v1/desktop/life/missions/${encodeURIComponent(String(projectId || ''))}/${encodeURIComponent(String(action || ''))}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    });
+  }
+  async getLifeMode() { return this._request('/v1/desktop/life/mode'); }
+  async setLifeMode(input) {
+    return this._request('/v1/desktop/life/mode', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    });
+  }
+  async getLifePreferences() { return this._request('/v1/desktop/life/preferences'); }
+  async setLifePreference(key, input) {
+    return this._request(`/v1/desktop/life/preferences/${encodeURIComponent(String(key || ''))}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    });
+  }
+  async resetLifePreference(key, revision) {
+    return this._request(`/v1/desktop/life/preferences/${encodeURIComponent(String(key || ''))}/reset`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ revision }),
+    });
+  }
+  async deleteLifePreference(key, revision) {
+    return this._request(`/v1/desktop/life/preferences/${encodeURIComponent(String(key || ''))}`, {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ revision }),
+    });
+  }
+  async getLifePeople(includeArchived = false) { return this._request(`/v1/desktop/life/people?includeArchived=${includeArchived === true}`); }
+  async createLifePerson(input) {
+    return this._request('/v1/desktop/life/people', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    });
+  }
+  async getLifeRelationships(personId = '') {
+    const query = personId ? `?personId=${encodeURIComponent(String(personId))}` : '';
+    return this._request(`/v1/desktop/life/relationships${query}`);
+  }
+  async getLifePersonProjectLinks({ projectId = '', personId = '' } = {}) {
+    const query = new URLSearchParams();
+    if (projectId) query.set('projectId', String(projectId));
+    if (personId) query.set('personId', String(personId));
+    return this._request(`/v1/desktop/life/person-project-links${query.size ? `?${query}` : ''}`);
+  }
+  async getLifeFamilyGrants({ memberUserId = '', includeInactive = false } = {}) {
+    const query = new URLSearchParams({ includeInactive: String(includeInactive === true) });
+    if (memberUserId) query.set('memberUserId', String(memberUserId));
+    return this._request(`/v1/desktop/life/family-grants?${query}`);
+  }
+  async getLifeFamilyShared() { return this._request('/v1/desktop/life/family/shared'); }
+  async createLifeRecoveryPlan(projectId, sourceContextRevision) {
+    return this._request(`/v1/desktop/life/projects/${encodeURIComponent(String(projectId || ''))}/recovery-plans`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceContextRevision }),
+    });
+  }
+  async getLifeRecoveryPlan(planId) { return this._request(`/v1/desktop/life/recovery-plans/${encodeURIComponent(String(planId || ''))}`); }
+  async proposeLifeRecoveryPlan(planId, revision) {
+    return this._request(`/v1/desktop/life/recovery-plans/${encodeURIComponent(String(planId || ''))}/propose`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ revision }),
+    });
+  }
+  async getLifeSources() { return this._request('/v1/desktop/life/sources'); }
+  async createLifeSource(input) {
+    return this._request('/v1/desktop/life/sources', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    });
+  }
+  async updateLifeSource(sourceId, input) {
+    return this._request(`/v1/desktop/life/sources/${encodeURIComponent(String(sourceId || ''))}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    });
+  }
+  async syncLifeSource(sourceId) {
+    return this._request(`/v1/desktop/life/sources/${encodeURIComponent(String(sourceId || ''))}/sync`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    });
+  }
 
   async createVisionLease({ sources, durationMs }) {
     return this._request('/v1/vision/leases', {

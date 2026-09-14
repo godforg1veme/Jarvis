@@ -127,10 +127,12 @@
       </div>
     </header>
     <nav class="life-os-nav" aria-label="Разделы Life OS">
-      <button class="life-nav-item is-active" type="button" data-life-view="mission">01 / Сейчас</button>
-      <button class="life-nav-item" type="button" data-life-view="timeline">02 / Timeline</button>
-      <button class="life-nav-item" type="button" data-life-view="projects">03 / Проекты</button>
-      <button id="life-project-new" class="life-nav-create" type="button">＋ Новый проект</button>
+      <button class="life-nav-item is-active" type="button" data-life-view="mission" aria-label="Пульс Life OS"><span class="life-nav-index">01 / </span>Пульс</button>
+      <button class="life-nav-item" type="button" data-life-view="timeline" aria-label="Living Timeline"><span class="life-nav-index">02 / </span>Timeline</button>
+      <button class="life-nav-item" type="button" data-life-view="projects" aria-label="Проекты и области"><span class="life-nav-index">03 / </span>Проекты</button>
+      <button class="life-nav-item" type="button" data-life-view="people" aria-label="Люди и отношения"><span class="life-nav-index">04 / </span>Люди</button>
+      <button class="life-nav-item" type="button" data-life-view="system" aria-label="Режим, предпочтения и источники"><span class="life-nav-index">05 / </span>Система</button>
+      <button id="life-project-new" class="life-nav-create" type="button">Новый проект</button>
     </nav>
     <main id="life-os-content" class="life-os-content" tabindex="-1">
       <div class="life-loading" role="status"><span></span><p>Собираю рабочий контекст…</p></div>
@@ -144,6 +146,22 @@
         <footer><button value="cancel" class="life-button-quiet">Отмена</button><button id="life-project-submit" value="default" class="life-button-primary">Создать проект</button></footer>
       </form>
     </dialog>
+    <dialog id="life-detail-dialog" class="life-project-dialog life-detail-dialog" aria-labelledby="life-detail-dialog-title">
+      <div class="life-dialog-shell">
+        <header><div><p id="life-detail-dialog-kicker" class="life-kicker">DECISION TRACE</p><h3 id="life-detail-dialog-title">Основания</h3></div><button id="life-detail-dialog-close" type="button" aria-label="Закрыть">×</button></header>
+        <div id="life-detail-dialog-content" class="life-dialog-content"></div>
+        <footer id="life-detail-dialog-actions" class="life-actions"></footer>
+      </div>
+    </dialog>
+    <dialog id="life-person-dialog" class="life-project-dialog" aria-labelledby="life-person-dialog-title">
+      <form id="life-person-form" method="dialog">
+        <header><div><p class="life-kicker">PEOPLE GRAPH</p><h3 id="life-person-dialog-title">Добавить человека</h3></div><button value="cancel" aria-label="Закрыть">×</button></header>
+        <label>Отображаемое имя<input id="life-person-name" maxlength="160" required autocomplete="off"></label>
+        <label>Связь<select id="life-person-type"><option value="family">Семья</option><option value="partner">Партнёр</option><option value="friend">Друг</option><option value="colleague">Коллега</option><option value="client">Клиент</option><option value="provider">Поставщик</option><option value="other">Другое</option></select></label>
+        <label>Псевдонимы<input id="life-person-aliases" maxlength="500" placeholder="Через запятую"></label>
+        <footer><button value="cancel" class="life-button-quiet">Отмена</button><button value="default" class="life-button-primary">Добавить</button></footer>
+      </form>
+    </dialog>
   </section>
   <dialog id="vision-timeline" class="vision-timeline" aria-labelledby="vision-timeline-title">
     <header><div><p class="eyebrow">VISUAL MEMORY</p><h2 id="vision-timeline-title">Лента восприятия</h2></div><button id="vision-timeline-close" type="button" aria-label="Закрыть">×</button></header>
@@ -154,6 +172,7 @@
   </dialog>
   <script src="../vendor/three.min.js"></script>
   <script src="../quantumCore.js"></script>
+  <script src="../life-os/life-os-view-model.js"></script>
   <script src="../life-os/life-os.js"></script>
   <script src="renderer.js"></script>
 </body>
