@@ -34,6 +34,8 @@ class LifeContextComposer {
     this.modeService = options.modeService || null;
     this.preferenceRepository = options.preferenceRepository || null;
     this.deviceRepository = options.deviceRepository || null;
+    this.peopleRepository = options.peopleRepository || null;
+    this.familyAccessService = options.familyAccessService || null;
     this.enabled = options.enabled !== false;
     this.deadlineMs = Math.min(Math.max(Number(options.deadlineMs) || 150, 25), 1000);
     this.maxItems = Math.min(Math.max(Number(options.maxItems) || 20, 1), 40);
@@ -63,6 +65,9 @@ class LifeContextComposer {
       call(() => (this.modeService ? this.modeService.get({ userId }) : (this.modeRepository ? this.modeRepository.get({ userId }) : null))),
       call(() => (this.preferenceRepository ? this.preferenceRepository.list({ userId }) : [])),
       call(() => (this.deviceRepository ? this.deviceRepository.listForUser(userId) : [])),
+      call(() => (this.peopleRepository ? this.peopleRepository.listPeople({ userId, includeArchived: false, limit: 100 }) : [])),
+      call(() => (this.peopleRepository ? this.peopleRepository.listProjectLinks({ userId, projectId: null, personId: null, limit: 100 }) : [])),
+      call(() => (this.familyAccessService ? this.familyAccessService.listShared({ memberUserId: userId }) : [])),
     ];
     const results = await Promise.allSettled(calls);
     if (results[0].status === 'rejected') throw new Error('Life project projection unavailable');
@@ -75,6 +80,9 @@ class LifeContextComposer {
     const mode = settledValue(results[6], null);
     const preferences = settledValue(results[7], []);
     const devices = settledValue(results[8], []);
+    const people = settledValue(results[9], []);
+    const personProjectLinks = settledValue(results[10], []);
+    const sharedFamily = settledValue(results[11], []);
     const partial = results.some((result) => result.status === 'rejected');
     const priorityByProject = new Map(priorities.map((row) => [row.project_id, row]));
     const now = this.now();
@@ -133,6 +141,27 @@ class LifeContextComposer {
     for (const device of devices.slice(0, 20)) candidates.push({
       kind: 'device', title: device.name, summary: device.status,
       status: device.status, occurredAt: device.last_seen_at, confidence: 1, trust: 'trusted',
+    });
+    const projectById = new Map(projects.map((project) => [project.id, project]));
+    const linksByPerson = new Map();
+    for (const link of personProjectLinks) {
+      if (!linksByPerson.has(link.person_id)) linksByPerson.set(link.person_id, []);
+      linksByPerson.get(link.person_id).push(link);
+    }
+    for (const person of people.slice(0, 30)) {
+      const projectLink = (linksByPerson.get(person.id) || []).find((link) => projectById.has(link.project_id));
+      candidates.push({
+        kind: 'person', id: person.id, projectId: projectLink?.project_id || null,
+        title: person.display_name, summary: projectLink ? `Роль в проекте: ${projectLink.role}` : person.relationship_type,
+        projectName: projectLink ? projectById.get(projectLink.project_id)?.name : null,
+        occurredAt: person.updated_at, confidence: 1, trust: 'user', sourceCategory: 'people',
+      });
+    }
+    for (const shared of sharedFamily.slice(0, 30)) candidates.push({
+      kind: shared.resourceType === 'commitment' ? 'commitment' : 'event',
+      title: shared.label, summary: shared.summary, dueAt: null,
+      confidence: 1, trust: 'trusted', sourceCategory: 'family',
+      family: true, authorizedGrant: true,
     });
     const continuationEvent = selectedProject ? events.find((event) => (
       Array.isArray(event.links) && event.links.some((link) => (

@@ -44,6 +44,19 @@ function fixture() {
       async reset() { return null; }, async remove() { return null; },
     },
     feedbackAggregator: { async aggregate({ userId }) { calls.push(userId); return { updated: false }; } },
+    peopleService: {
+      async list({ userId }) { calls.push(userId); return []; },
+      async create({ userId, input }) { calls.push(userId); return { id: DEVICE, display_name: input.displayName, aliases: input.aliases, relationship_type: input.relationshipType, status: 'active', revision: 1, created_at: new Date(), updated_at: new Date() }; },
+      async update() { return null; }, async listRelationships() { return []; },
+      async createRelationship() { return null; }, async listProjectLinks() { return []; },
+      async createProjectLink() { return null; },
+    },
+    familyAccessService: {
+      async listOwned({ userId }) { calls.push(userId); return []; },
+      async create({ userId, input }) { calls.push(userId); return { id: DEVICE, member_user_id: input.memberUserId, resource_type: input.resourceType, resource_id: input.resourceId, permission: input.permission, starts_at: new Date(), revision: 1 }; },
+      async revoke() { return null; },
+      async listShared({ memberUserId }) { calls.push(memberUserId); return [{ grantId: 'safe', resourceType: 'project', permission: 'view_summary', label: 'Life OS', summary: 'Семейный проект', expiresAt: null }]; },
+    },
   });
   return { app, calls };
 }
@@ -107,5 +120,28 @@ test('proposal feedback is owner-scoped and triggers bounded preference aggregat
   assert.equal(response.statusCode, 201);
   assert.equal(response.json().feedback.kind, 'not_useful');
   assert.deepEqual(calls.slice(-2), [USER, USER]);
+  await app.close();
+});
+
+test('people and family routes expose only authenticated owner-scoped records', async () => {
+  const { app, calls } = fixture();
+  const headers = { authorization: 'Bearer valid' };
+  const person = await app.inject({
+    method: 'POST', url: '/v1/desktop/life/people', headers,
+    payload: { displayName: 'Анна', aliases: ['Аня'], relationshipType: 'family', notes: 'private note' },
+  });
+  assert.equal(person.statusCode, 201);
+  assert.equal(person.json().person.displayName, 'Анна');
+  assert.equal(Object.hasOwn(person.json().person, 'notes'), false);
+  const grant = await app.inject({
+    method: 'POST', url: '/v1/desktop/life/family-grants', headers,
+    payload: { memberUserId: DEVICE, resourceType: 'project', resourceId: PROJECT, permission: 'view_summary' },
+  });
+  assert.equal(grant.statusCode, 201);
+  assert.equal(Object.hasOwn(grant.json().grant, 'userId'), false);
+  const shared = await app.inject({ method: 'GET', url: '/v1/desktop/life/family/shared', headers });
+  assert.equal(shared.statusCode, 200);
+  assert.equal(shared.json().shared[0].label, 'Life OS');
+  assert.deepEqual(calls.slice(-3), [USER, USER, USER]);
   await app.close();
 });

@@ -12,7 +12,7 @@ const POLICY_INPUTS = {
     responseLength: 'balanced', initiative: 'normal', interruptionPolicy: 'normal',
     notificationPolicy: 'normal', proposalVisibility: 'all', missionEmphasis: 'work',
     categoryWeights: { project: 1.15, commitment: 1.15, document: 1.05 },
-    allowedSourceCategories: ['calendar', 'tasks', 'email', 'documents', 'devices', 'travel', 'family', 'smart_home'],
+    allowedSourceCategories: ['calendar', 'tasks', 'email', 'documents', 'devices', 'travel', 'family', 'people', 'smart_home'],
   },
   focus: {
     responseLength: 'concise', initiative: 'minimal', interruptionPolicy: 'focus',
@@ -30,7 +30,7 @@ const POLICY_INPUTS = {
     responseLength: 'balanced', initiative: 'normal', interruptionPolicy: 'normal',
     notificationPolicy: 'normal', proposalVisibility: 'all', missionEmphasis: 'family',
     categoryWeights: { person: 1.3, commitment: 1.1, event: 1.1 },
-    allowedSourceCategories: ['calendar', 'tasks', 'family', 'travel', 'deliveries'],
+    allowedSourceCategories: ['calendar', 'tasks', 'family', 'people', 'travel', 'deliveries'],
   },
   meeting: {
     responseLength: 'concise', initiative: 'minimal', interruptionPolicy: 'focus',

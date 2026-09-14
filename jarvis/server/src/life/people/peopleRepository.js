@@ -51,6 +51,29 @@ class PeopleRepository {
     return result.rows;
   }
 
+  async listRelationships({ userId, personId = null, limit = 100 }) {
+    const result = await this.pool.query(`
+      SELECT * FROM life_person_relationships
+      WHERE user_id = $1 AND ($2::uuid IS NULL OR person_id = $2 OR related_person_id = $2)
+      ORDER BY updated_at DESC, id DESC LIMIT $3
+    `, [userId, personId, boundedLimit(limit)]);
+    return result.rows;
+  }
+
+  async listProjectLinks({ userId, projectId = null, personId = null, limit = 100 }) {
+    const result = await this.pool.query(`
+      SELECT link.*, person.display_name, project.name AS project_name
+      FROM life_person_project_links link
+      JOIN life_people person ON person.user_id = link.user_id AND person.id = link.person_id
+      JOIN life_projects project ON project.user_id = link.user_id AND project.id = link.project_id
+      WHERE link.user_id = $1
+        AND ($2::uuid IS NULL OR link.project_id = $2)
+        AND ($3::uuid IS NULL OR link.person_id = $3)
+      ORDER BY link.updated_at DESC, link.id DESC LIMIT $4
+    `, [userId, projectId, personId, boundedLimit(limit)]);
+    return result.rows;
+  }
+
   async updatePerson({ userId, personId, ...raw }) {
     const input = updatePersonSchema.parse(raw);
     const fields = [];
@@ -159,6 +182,43 @@ class PeopleRepository {
       ORDER BY created_at DESC, id DESC
       LIMIT $4
     `, [userId, memberUserId, Boolean(includeInactive), boundedLimit(limit)]);
+    return result.rows;
+  }
+
+  async findActiveGrant({ userId, memberUserId, resourceType, resourceId, permission, now = new Date() }) {
+    const result = await this.pool.query(`
+      SELECT * FROM life_family_access_grants
+      WHERE user_id = $1 AND member_user_id = $2 AND resource_type = $3
+        AND resource_id = $4 AND permission = $5 AND revoked_at IS NULL
+        AND starts_at <= $6 AND (expires_at IS NULL OR expires_at > $6)
+      LIMIT 1
+    `, [userId, memberUserId, resourceType, resourceId, permission, now]);
+    return result.rows[0] || null;
+  }
+
+  async listSharedSummaries({ memberUserId, now = new Date(), limit = 100 }) {
+    const result = await this.pool.query(`
+      SELECT grant.id AS grant_id, grant.resource_type, grant.resource_id, grant.permission, grant.expires_at,
+        COALESCE(project.name, area.name, commitment.title, source.display_name) AS label,
+        CASE
+          WHEN grant.resource_type = 'project' THEN project.summary
+          WHEN grant.resource_type = 'commitment' THEN concat_ws(' · ', commitment.status, commitment.due_at::text)
+          ELSE ''
+        END AS summary
+      FROM life_family_access_grants grant
+      LEFT JOIN life_projects project ON grant.resource_type = 'project'
+        AND project.user_id = grant.user_id AND project.id = grant.resource_id
+      LEFT JOIN life_areas area ON grant.resource_type = 'area'
+        AND area.user_id = grant.user_id AND area.id = grant.resource_id
+      LEFT JOIN life_commitments commitment ON grant.resource_type = 'commitment'
+        AND commitment.user_id = grant.user_id AND commitment.id = grant.resource_id
+      LEFT JOIN life_source_connections source ON grant.resource_type = 'calendar_source'
+        AND source.user_id = grant.user_id AND source.id = grant.resource_id AND source.adapter_type = 'calendar'
+      WHERE grant.member_user_id = $1 AND grant.permission = 'view_summary'
+        AND grant.revoked_at IS NULL AND grant.starts_at <= $2
+        AND (grant.expires_at IS NULL OR grant.expires_at > $2)
+      ORDER BY grant.updated_at DESC, grant.id DESC LIMIT $3
+    `, [memberUserId, now, boundedLimit(limit)]);
     return result.rows;
   }
 }

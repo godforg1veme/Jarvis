@@ -93,6 +93,7 @@ function rankLifeCandidates(options = {}) {
   for (let position = 0; position < candidates.length; position += 1) {
     const candidate = candidates[position];
     if (!candidate || typeof candidate !== 'object' || candidate.privacy === 'sensitive') continue;
+    if (candidate.family === true && candidate.authorizedGrant !== true) continue;
     if (allowedSources && candidate.sourceCategory && !allowedSources.has(candidate.sourceCategory)) continue;
     const overlap = overlapScore(queryTokens, candidate);
     const urgency = urgencyScore(candidate, now);

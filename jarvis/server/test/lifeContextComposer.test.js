@@ -61,3 +61,21 @@ test('composer does not return unrelated Timeline text for an ordinary factual r
   const result = await composer.compose({ userId: USER_ID, text: 'Какова скорость света?', channel: 'telegram' });
   assert.equal(result.lifeContext.items.some((item) => item.summary?.includes('завтра вечером')), false);
 });
+
+test('composer includes safe people and explicitly granted family summaries only when relevant', async () => {
+  let sharedInput = null;
+  const { composer } = harness({
+    peopleRepository: {
+      async listPeople() { return [{ id: 'person-a', display_name: 'Анна', relationship_type: 'family', updated_at: '2026-09-14T10:00:00.000Z' }]; },
+      async listProjectLinks() { return [{ person_id: 'person-a', project_id: PROJECT_ID, role: 'stakeholder' }]; },
+    },
+    familyAccessService: {
+      async listShared(input) { sharedInput = input; return [{ grantId: 'private-grant', resourceType: 'project', permission: 'view_summary', label: 'Семейный проект', summary: 'Общий план' }]; },
+    },
+  });
+  const result = await composer.compose({ userId: USER_ID, text: 'Анна, семейный проект', channel: 'desktop' });
+  assert.equal(result.lifeContext.items.some((item) => item.title === 'Анна'), true);
+  assert.equal(result.lifeContext.items.some((item) => item.title === 'Семейный проект'), true);
+  assert.equal(JSON.stringify(result).includes('private-grant'), false);
+  assert.deepEqual(sharedInput, { memberUserId: USER_ID });
+});

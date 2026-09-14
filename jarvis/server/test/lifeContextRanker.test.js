@@ -58,3 +58,14 @@ test('ranker applies closed mode weights and source-category filters', () => {
   });
   assert.deepEqual(result.items.map((item) => item.kind), ['commitment']);
 });
+
+test('family candidates require an explicit authorized grant marker', () => {
+  const result = rankLifeCandidates({
+    query: 'семейный проект', now: NOW,
+    candidates: [
+      { kind: 'event', title: 'Семейный проект', family: true, confidence: 1 },
+      { kind: 'event', title: 'Семейный проект разрешён', family: true, authorizedGrant: true, confidence: 1 },
+    ],
+  });
+  assert.deepEqual(result.items.map((item) => item.title), ['Семейный проект разрешён']);
+});

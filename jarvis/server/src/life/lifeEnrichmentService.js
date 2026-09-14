@@ -17,6 +17,7 @@ class LifeEnrichmentService {
       sourceEventId: event.id,
       areaId: linked?.project?.area_id || null,
       projectId: linked?.project?.id || null,
+      personId: linked?.person?.id || null,
       title: detected.title,
       dueAt: detected.dueAt,
       confidence: detected.confidence,

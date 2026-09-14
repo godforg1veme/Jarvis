@@ -8,10 +8,22 @@ class LifeLinker {
   constructor(options = {}) {
     this.repository = options.repository;
     this.classify = typeof options.classify === 'function' ? options.classify : null;
+    this.personLinker = options.personLinker || null;
   }
 
   async link(event) {
     if (!this.repository || !['message.received', 'voice.transcribed', 'document.ingested', 'vision.observed'].includes(event.event_type)) return null;
+    const [projectAttempt, personAttempt] = await Promise.allSettled([
+      this._linkProject(event),
+      this.personLinker ? this.personLinker.link(event) : Promise.resolve(null),
+    ]);
+    const projectResult = projectAttempt.status === 'fulfilled' ? projectAttempt.value : null;
+    const personResult = personAttempt.status === 'fulfilled' ? personAttempt.value : null;
+    if (!projectResult && !personResult) return null;
+    return { ...(projectResult || {}), person: personResult?.person || null, personLink: personResult?.link || null, personAmbiguous: personResult?.ambiguous === true };
+  }
+
+  async _linkProject(event) {
     const projects = await this.repository.listProjects({ userId: event.user_id, statuses: ['active', 'paused'] });
     const summary = normalized(event.summary);
     const exact = projects

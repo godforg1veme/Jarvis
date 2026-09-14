@@ -76,6 +76,10 @@ const { LifePreferenceRepository } = require('./life/preferences/lifePreferenceR
 const { LifePreferenceService } = require('./life/preferences/lifePreferenceService');
 const { FeedbackAggregator } = require('./life/preferences/feedbackAggregator');
 const { PriorityRepository } = require('./life/priority/priorityRepository');
+const { PeopleRepository } = require('./life/people/peopleRepository');
+const { PeopleService } = require('./life/people/peopleService');
+const { PersonLinker } = require('./life/people/personLinker');
+const { FamilyAccessService } = require('./life/people/familyAccessService');
 
 async function createRuntime(config, overrides = {}) {
   let pool = overrides.pool || null;
@@ -131,12 +135,16 @@ async function createRuntime(config, overrides = {}) {
     let lifeModeService = null;
     let lifePreferenceService = null;
     let lifeFeedbackAggregator = null;
+    let lifePeopleRepository = null;
+    let lifePeopleService = null;
+    let lifeFamilyAccessService = null;
     if (config.lifeOsEnabled) {
       lifeEventRepository = overrides.lifeEventRepository || new LifeEventRepository(pool);
       lifeProjectionRepository = overrides.lifeProjectionRepository || new LifeProjectionRepository(pool);
       lifeModeRepository = overrides.lifeModeRepository || new LifeModeRepository(pool);
       lifePreferenceRepository = overrides.lifePreferenceRepository || new LifePreferenceRepository(pool);
       lifePriorityRepository = overrides.lifePriorityRepository || new PriorityRepository(pool);
+      lifePeopleRepository = overrides.lifePeopleRepository || new PeopleRepository(pool);
       lifeEventGateway = overrides.lifeEventGateway || new LifeEventGateway({
         repository: lifeEventRepository,
         enabled: true,
@@ -150,6 +158,12 @@ async function createRuntime(config, overrides = {}) {
       });
       lifeFeedbackAggregator = overrides.lifeFeedbackAggregator || new FeedbackAggregator({
         repository: lifePreferenceRepository,
+      });
+      lifePeopleService = overrides.lifePeopleService || new PeopleService({
+        repository: lifePeopleRepository, gateway: lifeEventGateway,
+      });
+      lifeFamilyAccessService = overrides.lifeFamilyAccessService || new FamilyAccessService({
+        repository: lifePeopleRepository, gateway: lifeEventGateway,
       });
     }
     const commandRepository = overrides.commandRepository || new CommandRepository(pool);
@@ -204,9 +218,15 @@ async function createRuntime(config, overrides = {}) {
         repository: lifeProjectionRepository, gateway: lifeEventGateway, orchestrator,
       });
       if (!overrides.orchestrator) orchestrator.onWorkflowStatus = (workflow) => proposalService.onWorkflowStatus(workflow);
+      const personLinker = overrides.personLinker || new PersonLinker({
+        peopleRepository: lifePeopleRepository,
+        projectionRepository: lifeProjectionRepository,
+        classify: config.lifeOsEnrichmentEnabled ? overrides.personLinkClassifier : null,
+      });
       const linker = overrides.lifeLinker || new LifeLinker({
         repository: lifeProjectionRepository,
         classify: config.lifeOsEnrichmentEnabled ? overrides.lifeLinkClassifier : null,
+        personLinker,
       });
       const commitmentDetector = overrides.commitmentDetector || new CommitmentDetector({
         classify: config.lifeOsEnrichmentEnabled ? overrides.commitmentClassifier : null,
@@ -262,6 +282,8 @@ async function createRuntime(config, overrides = {}) {
         modeRepository: lifeModeRepository,
         modeService: lifeModeService,
         preferenceRepository: lifePreferenceRepository,
+        peopleRepository: lifePeopleRepository,
+        familyAccessService: lifeFamilyAccessService,
         deviceRepository,
         enabled: config.lifeOsContextEnabled,
         deadlineMs: config.lifeOsContextDeadlineMs,
@@ -375,6 +397,7 @@ async function createRuntime(config, overrides = {}) {
         contextService: contextRecoveryService, missionControlService,
         proposalService, gateway: lifeEventGateway, modeService: lifeModeService,
         preferenceService: lifePreferenceService, feedbackAggregator: lifeFeedbackAggregator,
+        peopleService: lifePeopleService, familyAccessService: lifeFamilyAccessService,
       });
     }
     if (typeof app.register === 'function' && typeof app.get === 'function') {

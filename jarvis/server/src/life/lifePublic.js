@@ -74,6 +74,40 @@ function publicPreference(value) {
   };
 }
 
+function publicPerson(row) {
+  return {
+    id: row.id, displayName: row.display_name,
+    aliases: Array.isArray(row.aliases) ? row.aliases.slice(0, 16) : [],
+    relationshipType: row.relationship_type, status: row.status,
+    revision: row.revision, createdAt: iso(row.created_at), updatedAt: iso(row.updated_at),
+  };
+}
+
+function publicRelationship(row) {
+  return {
+    id: row.id, personId: row.person_id, relatedPersonId: row.related_person_id || null,
+    direction: row.direction, relationType: row.relation_type, origin: row.origin,
+    confidence: Number(row.confidence), revision: row.revision,
+  };
+}
+
+function publicPersonProjectLink(row) {
+  return {
+    id: row.id, personId: row.person_id, projectId: row.project_id, role: row.role,
+    displayName: row.display_name || null, projectName: row.project_name || null,
+    origin: row.origin, confidence: Number(row.confidence),
+  };
+}
+
+function publicFamilyGrant(row) {
+  return {
+    id: row.id, memberUserId: row.member_user_id, resourceType: row.resource_type,
+    resourceId: row.resource_id, permission: row.permission,
+    startsAt: iso(row.starts_at), expiresAt: iso(row.expires_at), revokedAt: iso(row.revoked_at),
+    revision: row.revision,
+  };
+}
+
 function lifeError(statusCode, code) {
   const error = new Error(code);
   error.statusCode = statusCode;
@@ -82,6 +116,7 @@ function lifeError(statusCode, code) {
 }
 
 module.exports = {
-  iso, lifeError, publicArea, publicCommitment, publicEvent, publicMode,
-  publicPreference, publicProject, publicProposal,
+  iso, lifeError, publicArea, publicCommitment, publicEvent, publicFamilyGrant,
+  publicMode, publicPerson, publicPersonProjectLink, publicPreference,
+  publicProject, publicProposal, publicRelationship,
 };

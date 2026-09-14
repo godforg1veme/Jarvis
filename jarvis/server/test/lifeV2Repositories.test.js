@@ -47,6 +47,18 @@ test('people repository binds owner for records, links, and family grants', asyn
     userId: USER_ID, memberUserId: OTHER_USER_ID, resourceType: 'event_category',
     resourceId: EVENT_CATEGORY_IDS.family, permission: 'view_summary',
   });
+  await repository.listRelationships({ userId: USER_ID, personId: PERSON_ID });
+  await repository.listProjectLinks({ userId: USER_ID, projectId: PROJECT_ID });
+  await repository.findActiveGrant({
+    userId: USER_ID, memberUserId: OTHER_USER_ID, resourceType: 'project',
+    resourceId: PROJECT_ID, permission: 'view_summary',
+  });
+  await repository.listSharedSummaries({ memberUserId: OTHER_USER_ID });
+  assert.match(pool.calls.at(-4).sql, /life_person_relationships/);
+  assert.deepEqual(pool.calls.at(-3).params.slice(0, 2), [USER_ID, PROJECT_ID]);
+  assert.match(pool.calls.at(-2).sql, /revoked_at IS NULL/);
+  assert.deepEqual(pool.calls.at(-1).params[0], OTHER_USER_ID);
+  assert.doesNotMatch(pool.calls.at(-1).sql, /life_documents|devices|conversations/);
 });
 
 test('mode and preference repositories use owner scope and optimistic revisions', async () => {
