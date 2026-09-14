@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import copy
+import hmac
 import ipaddress
 import json
 import os
@@ -20,6 +22,9 @@ DEFAULT_STATE_PATH = Path("/etc/jarvis-vpn/hysteria2-state.json")
 DEFAULT_CONFIG_PATH = Path("/etc/hysteria/config.yaml")
 DEFAULT_HYSTERIA_BIN = "/usr/local/bin/hysteria"
 DEFAULT_SERVICE = "hysteria-server.service"
+DEFAULT_AUTH_PORT = 3211
+DEFAULT_AUTH_HOST = "127.0.0.1"
+DEFAULT_AUTH_URL = f"http://{DEFAULT_AUTH_HOST}:{DEFAULT_AUTH_PORT}/vpn/hysteria2/auth"
 HOST_RE = re.compile(r"^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
 EMAIL_RE = re.compile(r"^[^\s@]{1,64}@[^\s@]{1,190}$")
 SECRET_RE = re.compile(r"^[A-Za-z0-9_-]{32,96}$")
@@ -69,7 +74,7 @@ def validate_hysteria_state(value: Any) -> dict[str, Any]:
     return {**value, "clients": normalized}
 
 
-def hysteria_config(state: dict[str, Any]) -> dict[str, Any]:
+def hysteria_config(state: dict[str, Any], auth_url: str = DEFAULT_AUTH_URL) -> dict[str, Any]:
     state = validate_hysteria_state(state)
     return {
         "listen": f'{state["address"]}:{state["port"]}',
@@ -82,12 +87,100 @@ def hysteria_config(state: dict[str, Any]) -> dict[str, Any]:
             "http": {"altPort": 80},
             "dir": "/var/lib/hysteria/acme",
         },
-        "auth": {"type": "userpass", "userpass": {client["id"]: client["password"] for client in state["clients"]}},
+        "auth": {"type": "http", "http": {"url": auth_url}},
         "obfs": {"type": "salamander", "salamander": {"password": state["obfsPassword"]}},
         "disableUDP": False,
         "speedTest": False,
         "masquerade": {"type": "proxy", "proxy": {"url": "https://www.cloudflare.com/", "rewriteHost": True}},
     }
+
+
+def verify_client_auth(state_or_path: dict[str, Any] | Path, auth_str: str) -> tuple[bool, str]:
+    if not isinstance(auth_str, str) or ":" not in auth_str:
+        return False, ""
+    client_id, client_pass = auth_str.split(":", 1)
+    if not client_id or not client_pass:
+        return False, ""
+    if isinstance(state_or_path, Path):
+        try:
+            state = json.loads(state_or_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return False, ""
+    else:
+        state = state_or_path
+    if not isinstance(state, dict):
+        return False, ""
+    for client in state.get("clients", []):
+        if (
+            isinstance(client, dict)
+            and hmac.compare_digest(str(client.get("id", "")), client_id)
+            and hmac.compare_digest(str(client.get("password", "")), client_pass)
+        ):
+            return True, client["id"]
+    return False, ""
+
+
+async def _write_http_response(writer: asyncio.StreamWriter, status: int, body: bytes) -> None:
+    status_text = {200: "OK", 400: "Bad Request", 405: "Method Not Allowed", 500: "Internal Server Error"}.get(status, "OK")
+    response = (
+        f"HTTP/1.1 {status} {status_text}\r\n"
+        f"Content-Type: application/json\r\n"
+        f"Content-Length: {len(body)}\r\n"
+        f"Connection: close\r\n"
+        f"\r\n"
+    ).encode("latin1") + body
+    writer.write(response)
+    await writer.drain()
+
+
+async def handle_hysteria_auth(reader: asyncio.StreamReader, writer: asyncio.StreamWriter, state_path: Path = DEFAULT_STATE_PATH) -> None:
+    try:
+        line = await asyncio.wait_for(reader.readline(), timeout=5)
+        if not line:
+            return
+        parts = line.decode("latin1", errors="replace").split()
+        if len(parts) < 2 or parts[0] != "POST":
+            await _write_http_response(writer, 405, b'{"ok":false}')
+            return
+
+        content_length = 0
+        while True:
+            header_line = await asyncio.wait_for(reader.readline(), timeout=5)
+            if not header_line or header_line in (b"\r\n", b"\n"):
+                break
+            header_text = header_line.decode("latin1", errors="replace")
+            if ":" in header_text:
+                name, val = header_text.split(":", 1)
+                if name.strip().lower() == "content-length":
+                    try:
+                        content_length = int(val.strip())
+                    except ValueError:
+                        content_length = 0
+
+        if content_length > 4096:
+            await _write_http_response(writer, 400, b'{"ok":false}')
+            return
+
+        body = await asyncio.wait_for(reader.readexactly(content_length), timeout=5) if content_length > 0 else b""
+        payload = json.loads(body.decode("utf-8")) if body else {}
+        auth_val = payload.get("auth", "")
+        ok, client_id = verify_client_auth(state_path, auth_val)
+        if ok:
+            resp_body = json.dumps({"ok": True, "id": client_id}).encode("utf-8")
+        else:
+            resp_body = b'{"ok":false}'
+        await _write_http_response(writer, 200, resp_body)
+    except Exception:
+        try:
+            await _write_http_response(writer, 500, b'{"ok":false}')
+        except Exception:
+            pass
+    finally:
+        try:
+            writer.close()
+            await writer.wait_closed()
+        except Exception:
+            pass
 
 
 class HysteriaVpnManager:
@@ -98,12 +191,14 @@ class HysteriaVpnManager:
         config_path: Path = DEFAULT_CONFIG_PATH,
         hysteria_bin: str = DEFAULT_HYSTERIA_BIN,
         service: str = DEFAULT_SERVICE,
+        auth_url: str = DEFAULT_AUTH_URL,
     ) -> None:
         self.run = run
         self.state_path = Path(state_path)
         self.config_path = Path(config_path)
         self.hysteria_bin = hysteria_bin
         self.service = service
+        self.auth_url = auth_url
 
     def _read_state(self) -> dict[str, Any]:
         try:
@@ -132,7 +227,7 @@ class HysteriaVpnManager:
 
     def _config_valid(self, state: dict[str, Any] | None = None) -> bool:
         try:
-            expected = hysteria_config(state or self._read_state())
+            expected = hysteria_config(state or self._read_state(), self.auth_url)
             actual = json.loads(self.config_path.read_text(encoding="utf-8"))
             return actual == expected
         except (OSError, json.JSONDecodeError, VpnManagerError):
@@ -143,18 +238,21 @@ class HysteriaVpnManager:
         previous_state = self.state_path.read_bytes() if self.state_path.exists() else None
         previous_config = self.config_path.read_bytes() if self.config_path.exists() else None
         state_bytes = (json.dumps(state, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
-        config_bytes = (json.dumps(hysteria_config(state), ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+        config_bytes = (json.dumps(hysteria_config(state, self.auth_url), ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+        restarted_service = False
         try:
             self._write_atomic(self.state_path, state_bytes)
-            self._write_atomic(self.config_path, config_bytes, mode=0o640, group_from_parent=True)
             if not self._config_valid(state):
-                raise VpnManagerError("VPN_HYSTERIA_CONFIG_REJECTED")
-            restarted = self.run(["/usr/bin/systemctl", "restart", self.service], timeout=45)
-            if restarted.get("state") != "succeeded":
-                raise VpnManagerError("VPN_HYSTERIA_RESTART_FAILED")
-            active = self.run(["/usr/bin/systemctl", "is-active", self.service], timeout=15)
-            if active.get("state") != "succeeded" or active.get("data", {}).get("output", "").strip() != "active":
-                raise VpnManagerError("VPN_HYSTERIA_HEALTH_FAILED")
+                self._write_atomic(self.config_path, config_bytes, mode=0o640, group_from_parent=True)
+                if not self._config_valid(state):
+                    raise VpnManagerError("VPN_HYSTERIA_CONFIG_REJECTED")
+                restarted = self.run(["/usr/bin/systemctl", "restart", self.service], timeout=45)
+                if restarted.get("state") != "succeeded":
+                    raise VpnManagerError("VPN_HYSTERIA_RESTART_FAILED")
+                active = self.run(["/usr/bin/systemctl", "is-active", self.service], timeout=15)
+                if active.get("state") != "succeeded" or active.get("data", {}).get("output", "").strip() != "active":
+                    raise VpnManagerError("VPN_HYSTERIA_HEALTH_FAILED")
+                restarted_service = True
         except (OSError, VpnManagerError) as exc:
             try:
                 if previous_state is None:
@@ -165,7 +263,7 @@ class HysteriaVpnManager:
                     self.config_path.unlink(missing_ok=True)
                 else:
                     self._write_atomic(self.config_path, previous_config, mode=0o640, group_from_parent=True)
-                if previous_config is not None:
+                if previous_config is not None and restarted_service:
                     self.run(["/usr/bin/systemctl", "restart", self.service], timeout=45)
             except OSError:
                 raise VpnManagerError("VPN_HYSTERIA_ROLLBACK_FAILED") from exc

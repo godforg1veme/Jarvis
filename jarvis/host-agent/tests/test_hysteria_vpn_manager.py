@@ -3,7 +3,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from jarvis_host_agent.hysteria_vpn_manager import HysteriaVpnManager, hysteria_config, validate_hysteria_state
+from jarvis_host_agent.hysteria_vpn_manager import (
+    DEFAULT_AUTH_URL,
+    HysteriaVpnManager,
+    hysteria_config,
+    validate_hysteria_state,
+    verify_client_auth,
+)
 from jarvis_host_agent.vpn_manager import VpnManagerError
 
 
@@ -42,15 +48,29 @@ class HysteriaVpnManagerTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
-    def test_config_is_bound_to_second_ip_and_contains_userpass_without_logs(self):
+    def test_config_is_bound_to_second_ip_and_contains_http_auth_without_logs(self):
         state = base_state()
         state["clients"] = [{"id": "vpn-0123456789ab", "label": "iPhone", "password": "P" * 40, "createdAt": "2026-09-13T00:00:00Z"}]
         config = hysteria_config(state)
         self.assertEqual(config["listen"], "203.0.113.11:443")
         self.assertEqual(config["acme"]["domains"], ["vpn.example.com"])
-        self.assertEqual(config["auth"]["userpass"]["vpn-0123456789ab"], "P" * 40)
+        self.assertEqual(config["auth"]["type"], "http")
+        self.assertEqual(config["auth"]["http"]["url"], DEFAULT_AUTH_URL)
         self.assertEqual(config["obfs"]["type"], "salamander")
         self.assertNotIn("log", config)
+
+    def test_issue_does_not_restart_service_when_config_is_valid(self):
+        result = self.manager.issue("iPhone")
+        restart_calls = [call for call in self.calls if call[0][:2] == ["/usr/bin/systemctl", "restart"]]
+        self.assertEqual(restart_calls, [])
+        state = json.loads(self.state_path.read_text(encoding="utf-8"))
+        self.assertEqual(len(state["clients"]), 1)
+        client = state["clients"][0]
+        ok, client_id = verify_client_auth(self.state_path, f'{client["id"]}:{client["password"]}')
+        self.assertTrue(ok)
+        self.assertEqual(client_id, client["id"])
+        bad_ok, _ = verify_client_auth(self.state_path, f'{client["id"]}:wrong_password')
+        self.assertFalse(bad_ok)
 
     def test_issue_returns_happ_uri_but_listing_has_no_secrets(self):
         result = self.manager.issue("iPhone")

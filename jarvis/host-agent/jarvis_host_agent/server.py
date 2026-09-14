@@ -13,6 +13,7 @@ from typing import Any
 
 from .actions import execute
 from .config import HostAgentConfig, load_config
+from .hysteria_vpn_manager import DEFAULT_AUTH_HOST, DEFAULT_AUTH_PORT, handle_hysteria_auth
 from .idempotency import IdempotencyJournal, request_mac
 from .protocol import MAX_ENVELOPE_BYTES, ProtocolError, validate_request
 
@@ -78,8 +79,9 @@ async def run(socket_path: Path, config: HostAgentConfig) -> None:
         socket_path.unlink()
     server = await asyncio.start_unix_server(lambda r, w: handle(r, w, config, authenticator, journal), path=str(socket_path))
     os.chmod(socket_path, 0o660)
-    async with server:
-        await server.serve_forever()
+    auth_server = await asyncio.start_server(lambda r, w: handle_hysteria_auth(r, w), host=DEFAULT_AUTH_HOST, port=DEFAULT_AUTH_PORT)
+    async with server, auth_server:
+        await asyncio.gather(server.serve_forever(), auth_server.serve_forever())
 
 
 def main() -> None:

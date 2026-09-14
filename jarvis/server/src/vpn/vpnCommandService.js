@@ -69,8 +69,27 @@ function menuButtons() {
   return [
     [{ text: '⚡ Hysteria2 — рекомендуется', data: 'vpn:p:h' }],
     [{ text: '🛡 VLESS — резерв', data: 'vpn:p:v' }],
-    [{ text: '🌐 Обход РФ (Госуслуги, банки)', data: 'vpn:routing' }],
   ];
+}
+
+function renderProtocolGreeting(protocol) {
+  const normalized = normalizeProtocol(protocol);
+  if (normalized === 'hysteria2') {
+    return [
+      '⚡ **Hysteria 2 — основной скоростной VPN**',
+      '',
+      'Работает через современный протокол QUIC/UDP: максимальная скорость, устойчивость к блокировкам и минимальный пинг в играх.',
+      '',
+      '🚀 **Как настроить за 2 шага (парой кликов):**',
+      '1️⃣ **Подключить VPN:**',
+      '   Откройте **«👥 Мои доступы»** (или **«➕ Новый доступ»**) → скопируйте ключ `hy2://...` → откройте приложение **Happ** (оно сразу предложит добавить ключ).',
+      '2️⃣ **Включить обход РФ:**',
+      '   Нажмите **«🌐 Обход РФ (Госуслуги, банки)»** ниже → нажмите кнопку быстрой активации. Госуслуги, банки и маркетплейсы пойдут напрямую через ваш телефон, а заблокированные сайты и игры — через VPN!',
+      '',
+      '💡 *Никаких отключений VPN ради банков больше не требуется.*',
+    ].join('\n');
+  }
+  return '🛡 **VLESS — резервный протокол**\n\nИспользуется как запасной канал (TCP / Reality), если UDP-трафик полностью блокируется сетью.\n\nВыберите действие:';
 }
 
 function protocolButtons(protocol) {
@@ -317,8 +336,8 @@ class VpnCommandService {
         ],
       };
     }
-    if (callback.action === 'menu') return callback.protocol ? { answer: `Управление ${PROTOCOLS[callback.protocol].title}:`, buttons: protocolButtons(callback.protocol) } : { answer: 'Выбери VPN-протокол:', buttons: menuButtons() };
-    if (callback.action === 'protocol') return { answer: `Управление ${PROTOCOLS[callback.protocol].title}:`, buttons: protocolButtons(callback.protocol) };
+    if (callback.action === 'menu') return callback.protocol ? { answer: renderProtocolGreeting(callback.protocol), buttons: protocolButtons(callback.protocol) } : { answer: 'Выбери VPN-протокол:', buttons: menuButtons() };
+    if (callback.action === 'protocol') return { answer: renderProtocolGreeting(callback.protocol), buttons: protocolButtons(callback.protocol) };
     if (callback.action === 'status') return this._read({ action: 'status', protocol: callback.protocol });
     if (callback.action === 'clients') return this._read({ action: 'clients', protocol: callback.protocol });
     if (callback.action === 'new') {

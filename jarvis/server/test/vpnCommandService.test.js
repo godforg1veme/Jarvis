@@ -72,7 +72,16 @@ test('owner can observe VPN without confirmation', async () => {
   const result = await service.handle({ text: '/vpn', userId: USER_ID, conversationId: 'conversation', originChannel: 'telegram' });
   assert.match(result.answer, /VPN-протокол/);
   assert.equal(result.buttons.flat().some((button) => button.data === 'vpn:p:h'), true);
+  assert.equal(result.buttons.flat().some((button) => button.data === 'vpn:p:v'), true);
+  assert.equal(result.buttons.flat().some((button) => button.data === 'vpn:routing'), false);
   assert.equal(calls.some((call) => call[0] === 'request'), false);
+
+  const h2Menu = await service.handleCallback({ userId: USER_ID, originChannel: 'telegram', data: 'vpn:p:h' });
+  assert.match(h2Menu.answer, /Hysteria 2 — основной скоростной VPN/);
+  assert.match(h2Menu.answer, /Как настроить за 2 шага/);
+  assert.match(h2Menu.answer, /Включить обход РФ/);
+  assert.equal(h2Menu.buttons.flat().some((button) => button.data === 'vpn:h:routing'), true);
+
   const status = await service.handleCallback({ userId: USER_ID, originChannel: 'telegram', data: 'vpn:h:status' });
   assert.match(status.answer, /Hysteria2 работает/);
   assert.equal(calls.find((call) => call[0] === 'request')[1].operation, 'vpn.hysteria2.status');
