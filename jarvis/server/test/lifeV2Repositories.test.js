@@ -54,16 +54,40 @@ test('mode and preference repositories use owner scope and optimistic revisions'
   const modes = new LifeModeRepository(modePool);
   await modes.get({ userId: OTHER_USER_ID });
   await modes.set({ userId: USER_ID, mode: 'focus', revision: 2 });
+  await modes.restoreExpired({ userId: USER_ID, now: new Date('2026-09-14T12:00:00.000Z') });
   assert.deepEqual(modePool.calls[0].params, [OTHER_USER_ID]);
   assert.match(modePool.calls[1].sql, /life_modes\.revision = \$7/);
   assert.equal(modePool.calls[1].params[0], USER_ID);
+  assert.match(modePool.calls[2].sql, /expires_at IS NOT NULL AND expires_at <= \$2/);
 
   const preferencePool = poolWithRows([{ id: PERSON_ID }]);
   const preferences = new LifePreferenceRepository(preferencePool);
   await preferences.setExplicit({ userId: USER_ID, key: 'response.style', value: 'concise', revision: 1 });
   await preferences.remove({ userId: OTHER_USER_ID, key: 'response.style', revision: 2 });
+  await preferences.listProposalFeedback({ userId: USER_ID, limit: 99999 });
   assert.match(preferencePool.calls[0].sql, /life_preferences\.revision = \$4/);
   assert.deepEqual(preferencePool.calls[1].params, [OTHER_USER_ID, 'response.style', 2]);
+  assert.match(preferencePool.calls[2].sql, /proposal\.user_id = feedback\.user_id/);
+  assert.match(preferencePool.calls[2].sql, /event\.event_type = 'preference\.deleted'/);
+  assert.deepEqual(preferencePool.calls[2].params, [USER_ID, 5000]);
+});
+
+test('area-priority preferences reject resources outside the owner scope', async () => {
+  const calls = [];
+  const pool = {
+    async query(sql, params) {
+      calls.push({ sql: String(sql), params });
+      if (String(sql).includes('FROM life_areas')) return { rows: [{ count: 0 }] };
+      return { rows: [{ preference_key: 'areas.priorities' }] };
+    },
+  };
+  const repository = new LifePreferenceRepository(pool);
+  const result = await repository.setExplicit({
+    userId: USER_ID, key: 'areas.priorities', value: [{ areaId: PROJECT_ID, weight: 0.8 }],
+  });
+  assert.equal(result, null);
+  assert.deepEqual(calls[0].params, [USER_ID, [PROJECT_ID]]);
+  assert.equal(calls.length, 1);
 });
 
 test('reminder repository validates owner-linked resources and claims due work atomically', async () => {

@@ -43,3 +43,18 @@ test('ranker applies deterministic category and character budgets', () => {
   assert.ok(first.items.length <= 5);
   assert.ok(first.totalCharacters <= 1400);
 });
+
+test('ranker applies closed mode weights and source-category filters', () => {
+  const result = rankLifeCandidates({
+    query: 'Life OS', now: NOW,
+    modePolicy: {
+      categoryWeights: { commitment: 1.5, project: 0.5 },
+      allowedSourceCategories: ['tasks'],
+    },
+    candidates: [
+      { kind: 'project', title: 'Life OS', sourceCategory: 'documents', confidence: 1 },
+      { kind: 'commitment', title: 'Life OS', sourceCategory: 'tasks', confidence: 1 },
+    ],
+  });
+  assert.deepEqual(result.items.map((item) => item.kind), ['commitment']);
+});

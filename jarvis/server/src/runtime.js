@@ -71,7 +71,10 @@ const { ProactivityWorker } = require('./life/proactivityWorker');
 const { registerLifeRoutes } = require('./life/lifeRoutes');
 const { LifeContextComposer } = require('./life/context/lifeContextComposer');
 const { LifeModeRepository } = require('./life/modes/lifeModeRepository');
+const { LifeModeService } = require('./life/modes/lifeModeService');
 const { LifePreferenceRepository } = require('./life/preferences/lifePreferenceRepository');
+const { LifePreferenceService } = require('./life/preferences/lifePreferenceService');
+const { FeedbackAggregator } = require('./life/preferences/feedbackAggregator');
 const { PriorityRepository } = require('./life/priority/priorityRepository');
 
 async function createRuntime(config, overrides = {}) {
@@ -125,6 +128,9 @@ async function createRuntime(config, overrides = {}) {
     let lifeModeRepository = null;
     let lifePreferenceRepository = null;
     let lifePriorityRepository = null;
+    let lifeModeService = null;
+    let lifePreferenceService = null;
+    let lifeFeedbackAggregator = null;
     if (config.lifeOsEnabled) {
       lifeEventRepository = overrides.lifeEventRepository || new LifeEventRepository(pool);
       lifeProjectionRepository = overrides.lifeProjectionRepository || new LifeProjectionRepository(pool);
@@ -135,6 +141,15 @@ async function createRuntime(config, overrides = {}) {
         repository: lifeEventRepository,
         enabled: true,
         logger: app.log,
+      });
+      lifeModeService = overrides.lifeModeService || new LifeModeService({
+        repository: lifeModeRepository, gateway: lifeEventGateway,
+      });
+      lifePreferenceService = overrides.lifePreferenceService || new LifePreferenceService({
+        repository: lifePreferenceRepository, gateway: lifeEventGateway,
+      });
+      lifeFeedbackAggregator = overrides.lifeFeedbackAggregator || new FeedbackAggregator({
+        repository: lifePreferenceRepository,
       });
     }
     const commandRepository = overrides.commandRepository || new CommandRepository(pool);
@@ -245,6 +260,7 @@ async function createRuntime(config, overrides = {}) {
         repository: lifeProjectionRepository,
         priorityRepository: lifePriorityRepository,
         modeRepository: lifeModeRepository,
+        modeService: lifeModeService,
         preferenceRepository: lifePreferenceRepository,
         deviceRepository,
         enabled: config.lifeOsContextEnabled,
@@ -357,7 +373,8 @@ async function createRuntime(config, overrides = {}) {
         authenticate: authenticateDevice, limiter: desktopRateLimiter,
         repository: lifeProjectionRepository, projectService, timelineService,
         contextService: contextRecoveryService, missionControlService,
-        proposalService, gateway: lifeEventGateway,
+        proposalService, gateway: lifeEventGateway, modeService: lifeModeService,
+        preferenceService: lifePreferenceService, feedbackAggregator: lifeFeedbackAggregator,
       });
     }
     if (typeof app.register === 'function' && typeof app.get === 'function') {

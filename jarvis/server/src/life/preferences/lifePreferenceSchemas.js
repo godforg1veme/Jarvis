@@ -25,9 +25,23 @@ const preferenceInputEnvelopeSchema = z.object({
   revision: z.number().int().min(1).nullable().optional(),
 }).strict();
 
+const preferenceMutationSchema = z.object({
+  value: z.unknown(),
+  revision: z.number().int().min(1).nullable().optional(),
+}).strict();
+
+const preferenceRevisionSchema = z.object({
+  revision: z.number().int().min(1),
+}).strict();
+
 function parsePreferenceInput(raw) {
   const input = preferenceInputEnvelopeSchema.parse(raw);
   return { ...input, value: preferenceValueSchemas[input.key].parse(input.value) };
 }
 
-module.exports = { PREFERENCE_KEYS: Object.freeze(Object.keys(preferenceValueSchemas)), parsePreferenceInput };
+module.exports = {
+  PREFERENCE_KEYS: Object.freeze(Object.keys(preferenceValueSchemas)),
+  parsePreferenceInput,
+  preferenceMutationSchema,
+  preferenceRevisionSchema,
+};

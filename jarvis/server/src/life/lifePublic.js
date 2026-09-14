@@ -50,6 +50,30 @@ function publicProposal(row) {
   };
 }
 
+function publicMode(value) {
+  if (!value) return null;
+  return {
+    mode: value.mode, source: value.source, startsAt: value.startsAt || null,
+    expiresAt: value.expiresAt || null, revision: value.revision ?? null,
+    policy: value.policy ? {
+      notificationPolicy: value.policy.notificationPolicy,
+      proposalVisibility: value.policy.proposalVisibility,
+      missionEmphasis: value.policy.missionEmphasis,
+      responseLength: value.policy.responseLength,
+      initiative: value.policy.initiative,
+      interruptionPolicy: value.policy.interruptionPolicy,
+    } : null,
+  };
+}
+
+function publicPreference(value) {
+  return {
+    key: value.key, value: value.value, source: value.source,
+    explanation: value.explanation || '', evidenceCount: value.evidenceCount || 0,
+    confidence: Number(value.confidence ?? 1), revision: value.revision ?? null,
+  };
+}
+
 function lifeError(statusCode, code) {
   const error = new Error(code);
   error.statusCode = statusCode;
@@ -57,4 +81,7 @@ function lifeError(statusCode, code) {
   return error;
 }
 
-module.exports = { iso, lifeError, publicArea, publicCommitment, publicEvent, publicProject, publicProposal };
+module.exports = {
+  iso, lifeError, publicArea, publicCommitment, publicEvent, publicMode,
+  publicPreference, publicProject, publicProposal,
+};

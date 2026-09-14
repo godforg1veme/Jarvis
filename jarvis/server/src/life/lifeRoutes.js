@@ -1,9 +1,12 @@
 const { z } = require('zod');
 const { createProjectSchema, feedbackInputSchema, idSchema, timelineQuerySchema, updateProjectSchema } = require('./lifeSchemas');
-const { lifeError, publicArea, publicCommitment, publicProject, publicProposal } = require('./lifePublic');
+const { modeSelectionSchema } = require('./modes/lifeModeSchemas');
+const { PREFERENCE_KEYS, preferenceMutationSchema, preferenceRevisionSchema } = require('./preferences/lifePreferenceSchemas');
+const { lifeError, publicArea, publicCommitment, publicMode, publicPreference, publicProject, publicProposal } = require('./lifePublic');
 
 const revisionSchema = z.object({ revision: z.number().int().min(1) }).strict();
 const commitmentUpdateSchema = z.object({ revision: z.number().int().min(1), status: z.enum(['completed', 'dismissed']) }).strict();
+const preferenceKeySchema = z.enum(PREFERENCE_KEYS);
 
 function registerLifeRoutes(app, options) {
   const authenticate = options.authenticate;
@@ -15,6 +18,9 @@ function registerLifeRoutes(app, options) {
   const missionControlService = options.missionControlService;
   const proposalService = options.proposalService;
   const gateway = options.gateway;
+  const modeService = options.modeService || null;
+  const preferenceService = options.preferenceService || null;
+  const feedbackAggregator = options.feedbackAggregator || null;
   const requireDevice = async (request) => { request.device = await authenticate(request.headers); };
   const checkRead = (device) => limiter.check(`life-read:${device.id}`, { limit: 120, windowMs: 60000 });
   const checkWrite = (device) => limiter.check(`life-write:${device.id}`, { limit: 30, windowMs: 60000 });
@@ -67,6 +73,70 @@ function registerLifeRoutes(app, options) {
     return { ok: true, missionControl: await missionControlService.get({ userId: request.device.user_id }) };
   });
 
+  app.get('/v1/desktop/life/mode', { preHandler: requireDevice }, async (request) => {
+    checkRead(request.device);
+    return { ok: true, mode: publicMode(await modeService.get({ userId: request.device.user_id })) };
+  });
+
+  app.put('/v1/desktop/life/mode', { preHandler: requireDevice, bodyLimit: 4096 }, async (request) => {
+    checkWrite(request.device);
+    const mode = await modeService.setManual({
+      userId: request.device.user_id, sourceDeviceId: request.device.id,
+      input: modeSelectionSchema.parse(request.body),
+    });
+    if (!mode) throw lifeError(409, 'LIFE_REVISION_CONFLICT');
+    return { ok: true, mode: publicMode(mode) };
+  });
+
+  app.post('/v1/desktop/life/mode/accept-suggestion', { preHandler: requireDevice, bodyLimit: 4096 }, async (request) => {
+    checkWrite(request.device);
+    const mode = await modeService.acceptSuggestion({
+      userId: request.device.user_id, sourceDeviceId: request.device.id,
+      input: modeSelectionSchema.parse(request.body),
+    });
+    if (!mode) throw lifeError(409, 'LIFE_REVISION_CONFLICT');
+    return { ok: true, mode: publicMode(mode) };
+  });
+
+  app.get('/v1/desktop/life/preferences', { preHandler: requireDevice }, async (request) => {
+    checkRead(request.device);
+    const preferences = await preferenceService.list({ userId: request.device.user_id });
+    return { ok: true, preferences: preferences.map(publicPreference) };
+  });
+
+  app.put('/v1/desktop/life/preferences/:key', { preHandler: requireDevice, bodyLimit: 8192 }, async (request) => {
+    checkWrite(request.device);
+    const input = preferenceMutationSchema.parse(request.body);
+    const preference = await preferenceService.set({
+      userId: request.device.user_id, sourceDeviceId: request.device.id,
+      key: preferenceKeySchema.parse(request.params.key), ...input,
+    });
+    if (!preference) throw lifeError(409, 'LIFE_REVISION_CONFLICT');
+    return { ok: true, preference: publicPreference(preference) };
+  });
+
+  app.post('/v1/desktop/life/preferences/:key/reset', { preHandler: requireDevice, bodyLimit: 1024 }, async (request) => {
+    checkWrite(request.device);
+    const input = preferenceRevisionSchema.parse(request.body);
+    const preference = await preferenceService.reset({
+      userId: request.device.user_id, sourceDeviceId: request.device.id,
+      key: preferenceKeySchema.parse(request.params.key), revision: input.revision,
+    });
+    if (!preference) throw lifeError(409, 'LIFE_REVISION_CONFLICT');
+    return { ok: true, preference: publicPreference(preference) };
+  });
+
+  app.delete('/v1/desktop/life/preferences/:key', { preHandler: requireDevice, bodyLimit: 1024 }, async (request) => {
+    checkWrite(request.device);
+    const input = preferenceRevisionSchema.parse(request.body);
+    const removed = await preferenceService.remove({
+      userId: request.device.user_id, sourceDeviceId: request.device.id,
+      key: preferenceKeySchema.parse(request.params.key), revision: input.revision,
+    });
+    if (!removed) throw lifeError(409, 'LIFE_REVISION_CONFLICT');
+    return { ok: true, removed: true };
+  });
+
   app.post('/v1/desktop/life/events/:eventId/feedback', { preHandler: requireDevice, bodyLimit: 8 * 1024 }, async (request, reply) => {
     checkWrite(request.device);
     const input = feedbackInputSchema.parse({ ...request.body, targetType: 'event', targetId: id(request.params.eventId) });
@@ -79,6 +149,24 @@ function registerLifeRoutes(app, options) {
       structuredData: { feedbackId: feedback.id, targetEventId: input.targetId, kind: input.kind },
       trustLevel: 'user', privacyClass: 'personal',
     });
+    if (feedbackAggregator) await feedbackAggregator.aggregate({ userId: request.device.user_id }).catch(() => null);
+    reply.code(201);
+    return { ok: true, feedback: { id: feedback.id, kind: feedback.kind, targetId: feedback.target_id } };
+  });
+
+  app.post('/v1/desktop/life/proposals/:proposalId/feedback', { preHandler: requireDevice, bodyLimit: 8 * 1024 }, async (request, reply) => {
+    checkWrite(request.device);
+    const input = feedbackInputSchema.parse({ ...request.body, targetType: 'proposal', targetId: id(request.params.proposalId) });
+    const feedback = await repository.recordFeedback({ userId: request.device.user_id, ...input });
+    if (!feedback) throw lifeError(404, 'LIFE_SCOPE_NOT_FOUND');
+    await gateway.record({
+      userId: request.device.user_id, eventType: 'feedback.recorded', occurredAt: new Date(), sourceChannel: 'life_os',
+      sourceRef: `feedback:${feedback.id}`, sourceDeviceId: request.device.id,
+      deduplicationKey: `feedback:${feedback.id}`, summary: 'Сохранена оценка предложения Life OS',
+      structuredData: { feedbackId: feedback.id, targetProposalId: input.targetId, kind: input.kind },
+      trustLevel: 'user', privacyClass: 'personal',
+    });
+    if (feedbackAggregator) await feedbackAggregator.aggregate({ userId: request.device.user_id }).catch(() => null);
     reply.code(201);
     return { ok: true, feedback: { id: feedback.id, kind: feedback.kind, targetId: feedback.target_id } };
   });

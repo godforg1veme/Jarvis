@@ -85,11 +85,15 @@ function rankLifeCandidates(options = {}) {
   const planningIntent = PLANNING_PATTERN.test(query);
   const selectedProjectId = options.selectedProjectId || null;
   const candidates = Array.isArray(options.candidates) ? options.candidates.slice(0, 200) : [];
+  const modePolicy = options.modePolicy && typeof options.modePolicy === 'object' ? options.modePolicy : null;
+  const allowedSources = modePolicy?.allowedSourceCategories ? new Set(modePolicy.allowedSourceCategories) : null;
+  const categoryWeights = modePolicy?.categoryWeights || {};
   const scored = [];
 
   for (let position = 0; position < candidates.length; position += 1) {
     const candidate = candidates[position];
     if (!candidate || typeof candidate !== 'object' || candidate.privacy === 'sensitive') continue;
+    if (allowedSources && candidate.sourceCategory && !allowedSources.has(candidate.sourceCategory)) continue;
     const overlap = overlapScore(queryTokens, candidate);
     const urgency = urgencyScore(candidate, now);
     const selected = Boolean(selectedProjectId && candidate.projectId === selectedProjectId);
@@ -101,9 +105,11 @@ function rankLifeCandidates(options = {}) {
     if (!eligible) continue;
     const confidence = Math.min(Math.max(Number(candidate.confidence) || 0, 0), 1);
     const trust = candidate.trust === 'user' || candidate.trust === 'trusted' ? 0.05 : 0;
-    const score = (overlap * 0.6) + urgency + recencyScore(candidate, now)
+    const baseScore = (overlap * 0.6) + urgency + recencyScore(candidate, now)
       + (confidence * 0.1) + trust + (selected ? 0.2 : 0) + (pinned ? 0.5 : 0)
       + (candidate.critical === true ? 1 : 0);
+    const categoryWeight = Math.min(Math.max(Number(categoryWeights[candidate.kind]) || 1, 0.25), 2);
+    const score = baseScore * categoryWeight;
     scored.push({ candidate, score, position });
   }
 

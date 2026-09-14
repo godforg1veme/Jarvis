@@ -34,6 +34,18 @@ class LifeModeRepository {
       input.transitionEventId || null, input.revision]);
     return result.rows[0] || null;
   }
+
+  async restoreExpired({ userId, now = new Date() }) {
+    const result = await this.pool.query(`
+      UPDATE life_modes SET
+        mode = COALESCE(previous_mode, 'work'), previous_mode = NULL,
+        source = 'manual', starts_at = $2, expires_at = NULL,
+        transition_event_id = NULL, revision = revision + 1, updated_at = now()
+      WHERE user_id = $1 AND expires_at IS NOT NULL AND expires_at <= $2
+      RETURNING *
+    `, [userId, now]);
+    return result.rows[0] || null;
+  }
 }
 
 module.exports = { LifeModeRepository };

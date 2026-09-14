@@ -4,7 +4,7 @@ const LIFE_MODES = Object.freeze(['work', 'focus', 'home', 'family', 'meeting', 
 
 const setLifeModeSchema = z.object({
   mode: z.enum(LIFE_MODES),
-  source: z.literal('manual').default('manual'),
+  source: z.enum(['manual', 'accepted_suggestion']).default('manual'),
   startsAt: timestampSchema.optional(),
   expiresAt: timestampSchema.nullable().optional(),
   transitionEventId: idSchema.nullable().optional(),
@@ -16,4 +16,10 @@ const setLifeModeSchema = z.object({
   }
 });
 
-module.exports = { LIFE_MODES, setLifeModeSchema };
+const modeSelectionSchema = z.object({
+  mode: z.enum(LIFE_MODES),
+  expiresAt: timestampSchema.nullable().optional(),
+  revision: z.number().int().min(1).nullable().optional(),
+}).strict();
+
+module.exports = { LIFE_MODES, modeSelectionSchema, setLifeModeSchema };

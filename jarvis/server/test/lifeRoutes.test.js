@@ -20,7 +20,8 @@ function fixture() {
     limiter: new FixedWindowRateLimiter(),
     repository: {
       async listProjects({ userId }) { calls.push(userId); return []; },
-      async recordFeedback() { return null; }, async updateCommitment() { return null; },
+      async recordFeedback({ userId, ...input }) { calls.push(userId); return { id: DEVICE, ...input, target_id: input.targetId }; },
+      async updateCommitment() { return null; },
     },
     projectService: {
       async bootstrap({ userId }) { calls.push(userId); return { areas: [], projects: [] }; },
@@ -32,6 +33,17 @@ function fixture() {
     missionControlService: { async get({ userId }) { calls.push(userId); return { projects: [] }; } },
     proposalService: { async confirm() { return null; }, async dismiss() { return null; } },
     gateway: { async record() {} },
+    modeService: {
+      async get({ userId }) { calls.push(userId); return { mode: 'work', source: 'default', revision: null, policy: { notificationPolicy: 'normal', proposalVisibility: 'all', missionEmphasis: 'work', responseLength: 'balanced', initiative: 'normal', interruptionPolicy: 'normal' } }; },
+      async setManual({ userId, input }) { calls.push(userId); return { ...input, source: 'manual', revision: 1, policy: { notificationPolicy: 'defer_non_urgent', proposalVisibility: 'urgent_and_current', missionEmphasis: 'current_project', responseLength: 'concise', initiative: 'minimal', interruptionPolicy: 'focus' } }; },
+      async acceptSuggestion() { return null; },
+    },
+    preferenceService: {
+      async list({ userId }) { calls.push(userId); return [{ key: 'response.style', value: 'balanced', source: 'default', confidence: 1 }]; },
+      async set({ userId, key, value }) { calls.push(userId); return { key, value, source: 'explicit', revision: 1, confidence: 1 }; },
+      async reset() { return null; }, async remove() { return null; },
+    },
+    feedbackAggregator: { async aggregate({ userId }) { calls.push(userId); return { updated: false }; } },
   });
   return { app, calls };
 }
@@ -61,5 +73,39 @@ test('cross-owner project context is indistinguishable from missing', async () =
   const response = await app.inject({ method: 'GET', url: `/v1/desktop/life/projects/${PROJECT}/context`, headers: { authorization: 'Bearer valid' } });
   assert.equal(response.statusCode, 404);
   assert.equal(response.json().code, 'LIFE_SCOPE_NOT_FOUND');
+  await app.close();
+});
+
+test('mode and preference APIs derive owner scope and expose no authority controls', async () => {
+  const { app, calls } = fixture();
+  const headers = { authorization: 'Bearer valid' };
+  const mode = await app.inject({ method: 'PUT', url: '/v1/desktop/life/mode', headers, payload: { mode: 'focus' } });
+  assert.equal(mode.statusCode, 200);
+  assert.equal(mode.json().mode.mode, 'focus');
+  assert.equal(Object.hasOwn(mode.json().mode.policy, 'bypassesConfirmation'), false);
+  const preference = await app.inject({
+    method: 'PUT', url: '/v1/desktop/life/preferences/response.style', headers,
+    payload: { value: 'concise' },
+  });
+  assert.equal(preference.statusCode, 200);
+  assert.equal(preference.json().preference.value, 'concise');
+  assert.equal(calls.filter((value) => value === USER).length, 2);
+  const injected = await app.inject({
+    method: 'PUT', url: '/v1/desktop/life/preferences/response.style', headers,
+    payload: { value: 'concise', authority: 'admin' },
+  });
+  assert.equal(injected.statusCode, 400);
+  await app.close();
+});
+
+test('proposal feedback is owner-scoped and triggers bounded preference aggregation', async () => {
+  const { app, calls } = fixture();
+  const response = await app.inject({
+    method: 'POST', url: `/v1/desktop/life/proposals/${PROJECT}/feedback`,
+    headers: { authorization: 'Bearer valid' }, payload: { kind: 'not_useful', note: 'Не вовремя' },
+  });
+  assert.equal(response.statusCode, 201);
+  assert.equal(response.json().feedback.kind, 'not_useful');
+  assert.deepEqual(calls.slice(-2), [USER, USER]);
   await app.close();
 });

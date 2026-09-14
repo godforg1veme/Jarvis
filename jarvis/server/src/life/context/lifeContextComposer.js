@@ -1,5 +1,6 @@
 const { buildCommunicationGuidance } = require('./communicationGuidance');
 const { rankLifeCandidates } = require('./lifeContextRanker');
+const { getLifeModePolicy } = require('../modes/lifeModePolicy');
 
 function safeDate(value) {
   if (!value) return null;
@@ -30,6 +31,7 @@ class LifeContextComposer {
     this.repository = options.repository;
     this.priorityRepository = options.priorityRepository || null;
     this.modeRepository = options.modeRepository || null;
+    this.modeService = options.modeService || null;
     this.preferenceRepository = options.preferenceRepository || null;
     this.deviceRepository = options.deviceRepository || null;
     this.enabled = options.enabled !== false;
@@ -58,7 +60,7 @@ class LifeContextComposer {
       call(() => (typeof this.repository.listTimeline === 'function' ? this.repository.listTimeline({ userId, limit: 25 }) : [])),
       call(() => (typeof this.repository.listAreas === 'function' ? this.repository.listAreas({ userId }) : [])),
       call(() => (this.priorityRepository ? this.priorityRepository.list({ userId }) : [])),
-      call(() => (this.modeRepository ? this.modeRepository.get({ userId }) : null)),
+      call(() => (this.modeService ? this.modeService.get({ userId }) : (this.modeRepository ? this.modeRepository.get({ userId }) : null))),
       call(() => (this.preferenceRepository ? this.preferenceRepository.list({ userId }) : [])),
       call(() => (this.deviceRepository ? this.deviceRepository.listForUser(userId) : [])),
     ];
@@ -142,8 +144,16 @@ class LifeContextComposer {
       summary: continuationEvent.summary, occurredAt: continuationEvent.occurred_at,
       confidence: continuationEvent.confidence, trust: continuationEvent.trust_level,
     });
+    const modePolicy = getLifeModePolicy(mode?.mode);
+    const visibleCandidates = candidates.filter((candidate) => {
+      if (candidate.kind !== 'proposal') return true;
+      if (modePolicy.proposalVisibility === 'all') return true;
+      if (modePolicy.proposalVisibility === 'urgent_and_current') return candidate.projectId === selectedProject?.id || candidate.critical === true;
+      if (modePolicy.proposalVisibility === 'important') return candidate.critical === true || candidate.confidence >= 0.8;
+      return candidate.critical === true;
+    });
     const ranked = rankLifeCandidates({
-      query: input.text, candidates, selectedProjectId: selectedProject?.id,
+      query: input.text, candidates: visibleCandidates, selectedProjectId: selectedProject?.id, modePolicy,
       now, maxItems: this.maxItems, maxCharacters: this.maxCharacters,
     });
     const hasProject = ranked.items.some((item) => item.kind === 'project' && item.title === selectedProject?.name);

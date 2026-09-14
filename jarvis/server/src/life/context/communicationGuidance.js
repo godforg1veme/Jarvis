@@ -1,14 +1,13 @@
-const MODE_GUIDANCE = Object.freeze({
-  work: { responseLength: 'balanced', initiative: 'normal', interruptionPolicy: 'normal' },
-  focus: { responseLength: 'concise', initiative: 'minimal', interruptionPolicy: 'focus' },
-  home: { responseLength: 'balanced', initiative: 'normal', interruptionPolicy: 'normal' },
-  family: { responseLength: 'balanced', initiative: 'normal', interruptionPolicy: 'normal' },
-  meeting: { responseLength: 'concise', initiative: 'minimal', interruptionPolicy: 'focus' },
-  travel: { responseLength: 'concise', initiative: 'normal', interruptionPolicy: 'normal' },
-  rest: { responseLength: 'concise', initiative: 'minimal', interruptionPolicy: 'defer_non_urgent' },
-  sleep: { responseLength: 'concise', initiative: 'minimal', interruptionPolicy: 'quiet' },
-  emergency: { responseLength: 'concise', initiative: 'high', interruptionPolicy: 'critical_only' },
-});
+const { LIFE_MODE_POLICIES, getLifeModePolicy } = require('../modes/lifeModePolicy');
+
+const MODE_GUIDANCE = Object.freeze(Object.fromEntries(Object.entries(LIFE_MODE_POLICIES).map(([mode, policy]) => [
+  mode,
+  Object.freeze({
+    responseLength: policy.responseLength,
+    initiative: policy.initiative,
+    interruptionPolicy: policy.interruptionPolicy,
+  }),
+])));
 
 function preferenceMap(rows) {
   const result = new Map();
@@ -22,7 +21,7 @@ function preferenceMap(rows) {
 
 function buildCommunicationGuidance({ mode = null, preferences = [], recentEventTypes = [] } = {}) {
   const modeName = MODE_GUIDANCE[mode?.mode] ? mode.mode : 'work';
-  const base = MODE_GUIDANCE[modeName];
+  const base = getLifeModePolicy(modeName);
   const values = preferenceMap(preferences);
   const explicitLength = values.get('response.style');
   const explicitInitiative = values.get('initiative.level');
