@@ -320,6 +320,9 @@ test('routes identity questions through the canonical assistant service', async 
   const result = await service.handle(update(9, 101, 101, 'Кто ты и как тебя зовут?'));
   assert.equal(result.answer, 'answer:Кто ты и как тебя зовут?');
   assert.equal(assistantCalls.length, 1);
+  assert.equal(assistantCalls[0].userId, 'user-101');
+  assert.equal(assistantCalls[0].conversationId, 'conversation-user-101:101');
+  assert.equal(assistantCalls[0].runtimeContext.channel, 'telegram');
 });
 
 test('passes only the current user conversation history to the provider', async () => {

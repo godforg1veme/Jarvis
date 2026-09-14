@@ -43,6 +43,7 @@ test('Desktop text is persisted and answered only inside the authenticated devic
   assert.deepEqual(calls.conversations[0], { userId: 'user-a', channel: 'desktop', externalChatId: 'device-a' });
   assert.equal(calls.messages[0].userId, 'user-a');
   assert.equal(calls.answers[0].runtimeContext.channel, 'desktop');
+  assert.equal(calls.answers[0].deviceId, 'device-a');
   assert.equal(calls.requests.at(-1).type, 'complete');
 });
 

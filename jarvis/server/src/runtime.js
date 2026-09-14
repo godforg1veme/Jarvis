@@ -69,6 +69,10 @@ const { MissionControlService } = require('./life/missionControlService');
 const { ProposalService } = require('./life/proposalService');
 const { ProactivityWorker } = require('./life/proactivityWorker');
 const { registerLifeRoutes } = require('./life/lifeRoutes');
+const { LifeContextComposer } = require('./life/context/lifeContextComposer');
+const { LifeModeRepository } = require('./life/modes/lifeModeRepository');
+const { LifePreferenceRepository } = require('./life/preferences/lifePreferenceRepository');
+const { PriorityRepository } = require('./life/priority/priorityRepository');
 
 async function createRuntime(config, overrides = {}) {
   let pool = overrides.pool || null;
@@ -118,9 +122,15 @@ async function createRuntime(config, overrides = {}) {
     const sessionRegistry = overrides.sessionRegistry || new DeviceSessionRegistry();
     let lifeEventRepository = null;
     let lifeProjectionRepository = null;
+    let lifeModeRepository = null;
+    let lifePreferenceRepository = null;
+    let lifePriorityRepository = null;
     if (config.lifeOsEnabled) {
       lifeEventRepository = overrides.lifeEventRepository || new LifeEventRepository(pool);
       lifeProjectionRepository = overrides.lifeProjectionRepository || new LifeProjectionRepository(pool);
+      lifeModeRepository = overrides.lifeModeRepository || new LifeModeRepository(pool);
+      lifePreferenceRepository = overrides.lifePreferenceRepository || new LifePreferenceRepository(pool);
+      lifePriorityRepository = overrides.lifePriorityRepository || new PriorityRepository(pool);
       lifeEventGateway = overrides.lifeEventGateway || new LifeEventGateway({
         repository: lifeEventRepository,
         enabled: true,
@@ -231,6 +241,18 @@ async function createRuntime(config, overrides = {}) {
       timelineService = new TimelineService({ repository: lifeProjectionRepository });
       contextRecoveryService = new ContextRecoveryService({ repository: lifeProjectionRepository, deviceRepository });
       missionControlService = new MissionControlService({ repository: lifeProjectionRepository, deviceRepository });
+      const lifeContextComposer = overrides.lifeContextComposer || new LifeContextComposer({
+        repository: lifeProjectionRepository,
+        priorityRepository: lifePriorityRepository,
+        modeRepository: lifeModeRepository,
+        preferenceRepository: lifePreferenceRepository,
+        deviceRepository,
+        enabled: config.lifeOsContextEnabled,
+        deadlineMs: config.lifeOsContextDeadlineMs,
+      });
+      if (assistant && typeof assistant.setLifeContextComposer === 'function') {
+        assistant.setLifeContextComposer(lifeContextComposer);
+      }
     }
     if (resultBroker && typeof resultBroker.subscribe === 'function') {
       resultBroker.subscribe((command) => orchestrator.onCommandTerminal(command));

@@ -72,6 +72,8 @@ const baseSchema = z.object({
   asrTimeoutMs: z.number().int().min(1000).max(120000),
   telegramVoiceEnabled: z.boolean(),
   lifeOsEnabled: z.boolean(),
+  lifeOsContextEnabled: z.boolean(),
+  lifeOsContextDeadlineMs: z.number().int().min(25).max(1000),
   lifeOsEnrichmentEnabled: z.boolean(),
   lifeOsProactivityEnabled: z.boolean(),
   lifeOsWorkerIntervalMs: z.number().int().min(250).max(60000),
@@ -228,6 +230,8 @@ function loadConfig(env = process.env) {
     asrTimeoutMs: Number(env.JARVIS_ASR_TIMEOUT_MS || 60000),
     telegramVoiceEnabled: parseBoolean(env.JARVIS_TELEGRAM_VOICE_ENABLED),
     lifeOsEnabled: parseBoolean(env.JARVIS_LIFE_OS_ENABLED),
+    lifeOsContextEnabled: parseBoolean(env.JARVIS_LIFE_OS_CONTEXT_ENABLED),
+    lifeOsContextDeadlineMs: Number(env.JARVIS_LIFE_OS_CONTEXT_DEADLINE_MS || 150),
     lifeOsEnrichmentEnabled: parseBoolean(env.JARVIS_LIFE_OS_ENRICHMENT_ENABLED),
     lifeOsProactivityEnabled: parseBoolean(env.JARVIS_LIFE_OS_PROACTIVITY_ENABLED),
     lifeOsWorkerIntervalMs: Number(env.JARVIS_LIFE_OS_WORKER_INTERVAL_MS || 2000),
@@ -253,6 +257,9 @@ function loadConfig(env = process.env) {
   validateAsr(config);
   validateEmbeddings(config);
   validateVision(config);
+  if (config.lifeOsContextEnabled && !config.lifeOsEnabled) {
+    throw new Error('JARVIS_LIFE_OS_ENABLED is required when Life OS context is enabled');
+  }
   if (config.operationsEnabled) {
     if (!config.operationsPublicOrigin) throw new Error('JARVIS_OPERATIONS_PUBLIC_ORIGIN is required when operations are enabled');
     const operationsUrl = new URL(config.operationsPublicOrigin);

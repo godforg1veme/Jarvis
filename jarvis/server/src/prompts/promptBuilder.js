@@ -1,6 +1,10 @@
 const { PERSONA_POLICY_ID, PERSONA_POLICY_TEXT } = require('./personaPolicy');
 const { hasProviderIdentity } = require('../assistant/outputPolicyValidator');
 const { normalizeDevicePromptContext } = require('../devices/devicePromptContext');
+const {
+  normalizeCommunicationGuidance,
+  normalizeLifeContext,
+} = require('../life/context/lifeContextSchemas');
 
 const ALLOWED_HISTORY_ROLES = new Set(['user', 'assistant']);
 
@@ -85,6 +89,8 @@ function buildCanonicalPrompt(input) {
     documents: Object.freeze(normalizeDocuments(input.documents)),
     visualMemories: Object.freeze(normalizeVisualMemories(input.visualMemories)),
     devices: Object.freeze(devices),
+    communicationGuidance: Object.freeze(normalizeCommunicationGuidance(input.communicationGuidance) || {}),
+    lifeContext: Object.freeze(normalizeLifeContext(input.lifeContext) || {}),
     currentRequest,
   });
 }
@@ -98,4 +104,6 @@ module.exports = {
   normalizeMemories,
   normalizeVisualMemories,
   normalizeHistory,
+  normalizeCommunicationGuidance,
+  normalizeLifeContext,
 };

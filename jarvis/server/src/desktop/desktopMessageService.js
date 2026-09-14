@@ -67,6 +67,7 @@ class DesktopMessageService {
       const userMessage = await this.conversationRepository.appendMessage({
         userId: device.user_id,
         conversationId: conversation.id,
+        deviceId: device.id,
         role: 'user',
         content,
         contentType: kind === 'voice' ? 'voice_transcript' : 'text',
@@ -202,6 +203,7 @@ class DesktopMessageService {
       const answer = memoryResult.answer || deviceAnswer || await this.assistant.answer({
         userId: device.user_id,
         conversationId: conversation.id,
+        deviceId: device.id,
         currentRequest: content,
         history,
         memories,
