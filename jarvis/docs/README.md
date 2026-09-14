@@ -108,6 +108,7 @@ attachment ingestion.
 | `updates/2026-09-14-telegram-memory-gallery-vpn-fix.md` | Production rollout record for the VPN owner-context fix and unified Telegram memory gallery |
 | `updates/2026-09-14-hysteria2-fallback-rollout.md` | Production rollout record for isolated Hysteria2 service |
 | `updates/2026-09-14-happ-vpn-ru-routing.md` | Production rollout record for Happ domestic RU split-routing and 1-click web activation |
+| `VPN_PC_SETUP.md` | Руководство по настройке Hysteria 2 и VLESS на ПК (Windows / macOS) и устранению неполадок |
 | `CLAUDE.md`, `gemini.md` | Thin pointers to the authoritative agent context |
 | This file | Status and supersession index |
 

@@ -40,6 +40,9 @@ function parseVpnCommand(text) {
   if ((match = /^\/vpn_(?:(hysteria2|hysteria|hy2|vless)_)?(?:routing|ru)$/i.exec(value)) || /^\/vpn_ru$/i.test(value)) {
     return { kind: 'routing', protocol: match && match[1]?.toLowerCase().startsWith('v') ? 'vless' : 'hysteria2' };
   }
+  if ((match = /^\/vpn_(?:(hysteria2|hysteria|hy2|vless)_)?pc$/i.exec(value)) || /^\/vpn_pc$/i.test(value)) {
+    return { kind: 'pc', protocol: match && match[1]?.toLowerCase().startsWith('v') ? 'vless' : 'hysteria2' };
+  }
   if ((match = /^\/vpn_(confirm|reject)(?:\s+([a-f0-9-]{36}))?$/i.exec(value))) {
     return { kind: 'decision', decision: match[1].toLowerCase(), requestId: match[2]?.toLowerCase() || null };
   }
@@ -51,12 +54,12 @@ function parseVpnCallback(value) {
   const data = String(value || '');
   let match = /^vpn:p:(v|h)$/.exec(data);
   if (match) return { action: 'protocol', protocol: match[1] === 'h' ? 'hysteria2' : 'vless' };
-  match = /^vpn:(v|h):(menu|status|clients|new|restart|routing)$/.exec(data);
+  match = /^vpn:(v|h):(menu|status|clients|new|restart|routing|pc)$/.exec(data);
   if (match) return { action: match[2], protocol: match[1] === 'h' ? 'hysteria2' : 'vless' };
   match = /^vpn:(v|h):(client|export|rotate|revoke):(vpn-[a-f0-9]{12})$/.exec(data);
   if (match) return { action: match[2], protocol: match[1] === 'h' ? 'hysteria2' : 'vless', clientId: match[3] };
-  if (['vpn:menu', 'vpn:status', 'vpn:clients', 'vpn:new', 'vpn:restart', 'vpn:routing'].includes(data)) {
-    return { action: data.slice(4), ...(data === 'vpn:menu' || data === 'vpn:routing' ? {} : { protocol: 'vless' }) };
+  if (['vpn:menu', 'vpn:status', 'vpn:clients', 'vpn:new', 'vpn:restart', 'vpn:routing', 'vpn:pc'].includes(data)) {
+    return { action: data.slice(4), ...(data === 'vpn:menu' || data === 'vpn:routing' || data === 'vpn:pc' ? {} : { protocol: 'vless' }) };
   }
   match = /^vpn:(client|export|rotate|revoke):(vpn-[a-f0-9]{12})$/.exec(data);
   if (match) return { action: match[1], protocol: 'vless', clientId: match[2] };
@@ -86,10 +89,70 @@ function renderProtocolGreeting(protocol) {
       '2️⃣ **Включить обход РФ:**',
       '   Нажмите **«🌐 Обход РФ (Госуслуги, банки)»** ниже → нажмите кнопку быстрой активации. Госуслуги, банки и маркетплейсы пойдут напрямую через ваш телефон, а заблокированные сайты и игры — через VPN!',
       '',
+      '💻 *Для настройки на компьютере (Windows/Mac) нажмите «💻 Настройка на ПК» ниже.*',
       '💡 *Никаких отключений VPN ради банков больше не требуется.*',
     ].join('\n');
   }
   return '🛡 **VLESS — резервный протокол**\n\nИспользуется как запасной канал (TCP / Reality), если UDP-трафик полностью блокируется сетью.\n\nВыберите действие:';
+}
+
+function buildPcSetupGuide(protocol) {
+  const normalized = normalizeProtocol(protocol);
+  if (normalized === 'hysteria2') {
+    return [
+      '💻 **Настройка Hysteria 2 на ПК (Windows / macOS)**',
+      '',
+      'Hysteria 2 работает через быстрый протокол UDP/QUIC с маскировкой Salamander.',
+      '',
+      '📥 **1. Выберите приложение для ПК:**',
+      '• **Hiddify** (⭐ Рекомендуется): самый удобный и стабильный клиент под Windows с автоматическим TUN-режимом.',
+      '  Скачать: https://github.com/hiddify/hiddify-next/releases',
+      '• **Happ Desktop** (официальный клиент экосистемы Happ):',
+      '  Скачать: https://happ.su или https://github.com/happ-proxy/happ-desktop/releases',
+      '• **Nekoray** (для продвинутых пользователей, ядро sing-box).',
+      '',
+      '⚠️ **ВНИМАНИЕ ПО v2rayN:**',
+      'Стандартный v2rayN с ядром Xray-core **НЕ поддерживает** протокол Hysteria 2. Если вы используете v2rayN, переключитесь в меню бота на **«🛡 VLESS — резерв»** — он идеально работает в v2rayN!',
+      '',
+      '🚀 **2. Пошаговая настройка:**',
+      '1. Установите **Hiddify** или **Happ Desktop**.',
+      '2. В Telegram в разделе **«👥 Мои доступы»** скопируйте ключ `hy2://...` (нажмите на него в сообщении).',
+      '3. В приложении на ПК нажмите `Ctrl+V` (или «+» → «Импорт из буфера обмена»).',
+      '4. Включите **Режим TUN** (TUN Mode) и нажмите большую кнопку **«Подключить»**.',
+      '',
+      '❓ **ПОЧЕМУ ПИШЕТ «ПИНГ N/A» И КАК ИСПРАВИТЬ:**',
+      '1️⃣ **Запуск от Администратора:** Для создания виртуального адаптера Wintun приложению на Windows требуются права администратора. Запускайте клиент через *«Правой кнопкой мыши → Запуск от имени администратора»*.',
+      '2️⃣ **Брандмауэр Windows:** При первом запуске Защитник Windows запрашивает разрешение сети для ядра (`sing-box.exe`). Если вы нажали «Отмена» — сеть заблокирована. Разрешите доступ в настройках Брандмауэра.',
+      '3️⃣ **Синхронизация времени:** Протоколы QUIC/TLS требуют точного времени! Если часы на ПК отстают или спешат даже на 30–60 секунд, сервер мгновенно отклоняет соединение. Откройте *Параметры Windows → Время и язык → «Синхронизировать сейчас»*.',
+      '4️⃣ **Тип пинга в клиенте:** Обычный ICMP-пинг через прокси не проходит (всегда пишет n/a). Нажимайте *«Тест реальной задержки / URL Test»* (иконка молнии или Ctrl+R).',
+      '5️⃣ **Блокировка UDP провайдером:** Если домашний интернет (Ростелеком, Дом.ру и др.) глушит UDP 443, переключитесь на **«🛡 VLESS — резерв»** (он работает по TCP и не блокируется).',
+    ].join('\n');
+  }
+
+  return [
+    '💻 **Настройка VLESS на ПК (Windows / macOS)**',
+    '',
+    'VLESS + REALITY работает по надежному протоколу TCP с маскировкой под веб-трафик браузера Chrome.',
+    '',
+    '📥 **1. Выберите приложение для ПК:**',
+    '• **v2rayN** (⭐ Классика для Windows): быстрый и легкий.',
+    '  Скачать: https://github.com/2dust/v2rayN/releases (архив `v2rayN-with-core.zip`)',
+    '• **Hiddify** (универсальный клиент, поддерживает и VLESS, и Hysteria 2).',
+    '• **Happ Desktop**.',
+    '',
+    '🚀 **2. Пошаговая настройка в v2rayN:**',
+    '1. Скачайте архив `v2rayN-with-core.zip`, распакуйте в любую удобную папку.',
+    '2. В Telegram в разделе **«👥 Мои доступы»** скопируйте ключ `vless://...`.',
+    '3. В окне v2rayN нажмите `Ctrl+V` — сервер появится в списке.',
+    '4. Внизу окна v2rayN в поле «Системный прокси» выберите **«Автоматически настраивать системный прокси»** (или включите **«Режим TUN»**).',
+    '5. Выделите сервер и нажмите `Enter` (или правый клик → «Выбрать как активный сервер»).',
+    '',
+    '❓ **ПОЧЕМУ ПИШЕТ «ПИНГ N/A» И КАК ИСПРАВИТЬ:**',
+    '1️⃣ **Нажимайте «Тест реальной задержки» (`Ctrl+R`)**, а не обычный пинг. Обычный пинг для VLESS всегда выдаёт n/a.',
+    '2️⃣ **Синхронизируйте время Windows:** В *Параметры Windows → Время и язык → «Синхронизировать сейчас»*. Без точного времени Reality сбрасывает соединение.',
+    '3️⃣ **Запуск от Администратора:** При включении «Режима TUN» запускайте v2rayN от имени Администратора.',
+    '4️⃣ **Брандмауэр Windows:** Убедитесь, что `xray.exe` в папке v2rayN разрешён в Брандмауэре Windows.',
+  ].join('\n');
 }
 
 function protocolButtons(protocol) {
@@ -97,7 +160,7 @@ function protocolButtons(protocol) {
   return [
     [{ text: '🔄 Статус', data: `vpn:${code}:status` }, { text: '👥 Мои доступы', data: `vpn:${code}:clients` }],
     [{ text: '➕ Новый доступ', data: `vpn:${code}:new` }],
-    [{ text: '🌐 Обход РФ (Госуслуги, банки)', data: `vpn:${code}:routing` }],
+    [{ text: '🌐 Обход РФ (Госуслуги, банки)', data: `vpn:${code}:routing` }, { text: '💻 Настройка на ПК', data: `vpn:${code}:pc` }],
     [{ text: '♻️ Перезапустить', data: `vpn:${code}:restart` }],
     [{ text: '← Выбор протокола', data: 'vpn:menu' }],
   ];
@@ -183,8 +246,9 @@ function formatConnectionAnswer(protocol, action, data) {
     '',
     '📲 **Импорт в Happ за 1 клик:**',
     '• **iPhone / Android:** Нажмите на ключ выше (он скопируется в буфер) → откройте приложение Happ → оно автоматически предложит добавить сервер, нажмите **«Добавить»**!',
-    '• **ПК (Windows / Mac):** Скопируйте ключ выше → в приложении Happ нажмите **«+»** → **«Импорт из буфера обмена»** (или `Ctrl+V`).',
+    '• **ПК (Windows / Mac):** Скопируйте ключ выше → в приложении Happ или Hiddify нажмите **«+»** → **«Импорт из буфера обмена»** (или `Ctrl+V`). *(Для v2rayN используйте VLESS)*.',
     '',
+    '💻 *Подробная пошаговая инструкция для ПК и решение проблем (пинг n/a) — кнопка «💻 Настройка на ПК» ниже.*',
     '💡 *Импорт через буфер обмена работает без ошибок на всех платформах.*',
     '⚠️ *Не используйте «Открыть через Happ» для прикреплённого .txt файла — Happ пытается прочесть .txt как JSON и выдаёт ошибку «конфиг неправильный». Просто скопируйте ключ выше!*',
     '',
@@ -199,6 +263,28 @@ function actionPrompt(action, args) {
   if (action === 'restart') return `Перезапустить ${title} VPN? Активные соединения кратковременно прервутся.`;
   const verbs = { revoke: 'Отозвать', rotate: 'Перевыпустить', export: 'Экспортировать' };
   return `${verbs[action]} ${title}-доступ «${args.label || 'выбранный'}»?`;
+}
+
+function humanErrorMessage(code, context = {}) {
+  const label = context.label ? ` «${context.label}»` : '';
+  const protocolTitle = PROTOCOLS[normalizeProtocol(context.protocol)]?.title || 'VPN';
+  switch (code) {
+    case 'VPN_CLIENT_LABEL_EXISTS':
+      return `⚠️ Доступ с именем${label} уже существует!\n\nВы можете скопировать его ключ в разделе «👥 Мои доступы» или создать доступ с другим именем (например, «${context.label || 'Доступ'} 2»).`;
+    case 'VPN_CLIENT_LIMIT':
+      return `Достигнут лимит подключений (максимум 50). Удалите ненужные доступы в разделе «👥 Мои доступы».`;
+    case 'VPN_CLIENT_NOT_FOUND':
+      return `Выбранный ${protocolTitle}-доступ не найден.`;
+    case 'VPN_LABEL_INVALID':
+      return 'Недопустимое имя доступа. Используйте от 1 до 40 символов (буквы, цифры, дефис, пробел).';
+    case 'VPN_HYSTERIA_RESTART_FAILED':
+    case 'VPN_RESTART_FAILED':
+      return `Не удалось перезапустить ${protocolTitle}. Попробуйте ещё раз через минуту.`;
+    case 'HOST_AGENT_UNREACHABLE':
+      return 'Серверный агент временно недоступен. Попробуйте позже.';
+    default:
+      return `VPN-действие не выполнено: ${code || 'неизвестная ошибка'}.`;
+  }
 }
 
 function hostOperation(action, protocol) {
@@ -316,7 +402,19 @@ class VpnCommandService {
     const metadata = safeHostData(response.result.data || {});
     await this.repository.complete({ requestId: record.id, status: success ? 'succeeded' : response.result.state === 'unknown' ? 'unknown' : 'failed', result: metadata, errorCode: response.result.errorCode || null });
     await this.repository.audit({ userId: context.userId, requestId: record.id, type: success ? 'vpn.action.succeeded' : 'vpn.action.failed', metadata: { action: record.action, protocol, errorCode: response.result.errorCode || null } });
-    if (!success) return { answer: `VPN-действие не выполнено: ${response.result.errorCode || 'неизвестный результат'}.`, buttons: protocolButtons(protocol) };
+    if (!success) {
+      const errorCode = response.result.errorCode;
+      const isLabelExists = errorCode === 'VPN_CLIENT_LABEL_EXISTS';
+      const code = PROTOCOLS[protocol].code;
+      const buttons = isLabelExists
+        ? [
+            [{ text: '👥 Мои доступы', data: `vpn:${code}:clients` }],
+            [{ text: '➕ Новый доступ', data: `vpn:${code}:new` }],
+            [{ text: '← В меню VPN', data: `vpn:${code}:menu` }],
+          ]
+        : protocolButtons(protocol);
+      return { answer: humanErrorMessage(errorCode, { protocol, label: record.arguments?.label }), buttons };
+    }
     const artifact = artifactFrom(response.result.data);
     const answer = formatConnectionAnswer(protocol, record.action, response.result.data);
     return { answer, ...(artifact ? { artifact } : {}), buttons: protocolButtons(protocol) };
@@ -326,6 +424,13 @@ class VpnCommandService {
     const callback = parseVpnCallback(context.data);
     if (!callback) return null;
     await this._requireOwner(context.userId);
+    if (callback.action === 'pc') {
+      const protocol = callback.protocol || 'hysteria2';
+      return {
+        answer: buildPcSetupGuide(protocol),
+        buttons: protocolButtons(protocol),
+      };
+    }
     if (callback.action === 'routing') {
       return {
         answer: buildRoutingSummary(),
@@ -372,6 +477,13 @@ class VpnCommandService {
     const command = parseVpnCommand(context.text);
     if (!command) return null;
     await this._requireOwner(context.userId);
+    if (command.kind === 'pc') {
+      const protocol = command.protocol || 'hysteria2';
+      return {
+        answer: buildPcSetupGuide(protocol),
+        buttons: protocolButtons(protocol),
+      };
+    }
     if (command.kind === 'menu') return { answer: 'Выбери VPN-протокол:', buttons: menuButtons() };
     if (command.kind === 'routing') {
       return {
@@ -400,4 +512,4 @@ class VpnCommandService {
   }
 }
 
-module.exports = { CONFIRMATION_TTL_MS, PROTOCOLS, VpnCommandService, artifactFrom, formatConnectionAnswer, menuButtons, parseVpnCallback, parseVpnCommand, protocolButtons, safeHostData, validateAction };
+module.exports = { CONFIRMATION_TTL_MS, PROTOCOLS, VpnCommandService, artifactFrom, buildPcSetupGuide, formatConnectionAnswer, menuButtons, parseVpnCallback, parseVpnCommand, protocolButtons, safeHostData, validateAction };

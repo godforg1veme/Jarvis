@@ -17,23 +17,35 @@ test('buildHappRoutingProfile generates valid Happ schema with RU direct rules',
   const profile = buildHappRoutingProfile();
   assert.equal(profile.Name, DEFAULT_ROUTING_NAME);
   assert.equal(profile.GlobalProxy, 'false');
-  assert.equal(profile.DomainStrategy, 'AsIs');
+  assert.equal(profile.DomainStrategy, 'IPIfNonMatch');
   assert.equal(profile.DomesticDNSIP, '77.88.8.8');
   assert.equal(profile.DomesticDNSType, 'DoU');
   assert.equal(profile.RemoteDNSIP, '1.1.1.1');
   assert.equal(profile.RemoteDNSType, 'DoH');
+  assert.ok(profile.Geositeurl.includes('Loyalsoldier'));
+  assert.ok(profile.Geoipurl.includes('Loyalsoldier'));
 
-  assert.ok(profile.DirectSites.includes('geosite:category-gov-ru'));
-  assert.ok(profile.DirectSites.includes('geosite:ru'));
+  assert.ok(profile.DirectSites.includes('domain:ru'));
+  assert.ok(profile.DirectSites.includes('domain:su'));
+  assert.ok(profile.DirectSites.includes('domain:xn--p1ai'));
   assert.ok(profile.DirectSites.includes('domain:gosuslugi.ru'));
   assert.ok(profile.DirectSites.includes('domain:sberbank.ru'));
   assert.ok(profile.DirectSites.includes('domain:tbank.ru'));
   assert.ok(profile.DirectSites.includes('domain:ozon.ru'));
   assert.ok(profile.DirectSites.includes('domain:wildberries.ru'));
+  assert.ok(profile.DirectSites.includes('domain:vk.com'));
+  assert.ok(profile.DirectSites.includes('domain:yandex.net'));
+  assert.ok(profile.DirectSites.includes('domain:2gis.com'));
+  assert.ok(profile.DirectSites.includes('domain:max.ru'));
+  assert.ok(!profile.DirectSites.includes('geosite:ru'), 'geosite:ru must not be present to avoid crash on clean Happ');
 
   assert.ok(profile.ProxySites.includes('geosite:supercell'));
   assert.ok(profile.ProxySites.includes('domain:brawlstarsgame.com'));
   assert.ok(profile.ProxySites.includes('geosite:youtube'));
+  assert.ok(profile.ProxySites.includes('geosite:discord'));
+  assert.ok(profile.ProxySites.includes('domain:discordapp.com'));
+  assert.ok(profile.ProxySites.includes('geosite:telegram'));
+  assert.ok(profile.ProxyIp.includes('geoip:telegram'));
 
   assert.ok(profile.DirectIp.includes('geoip:ru'));
   assert.ok(profile.DirectIp.includes('geoip:private'));
@@ -47,9 +59,9 @@ test('buildHappRoutingDeeplink encodes valid base64 and roundtrips successfully'
   const base64Part = onaddLink.replace('happ://routing/onadd/', '');
   const decoded = JSON.parse(Buffer.from(base64Part, 'base64').toString('utf8'));
   assert.equal(decoded.Name, DEFAULT_ROUTING_NAME);
-  assert.equal(decoded.DomainStrategy, 'AsIs');
+  assert.equal(decoded.DomainStrategy, 'IPIfNonMatch');
   assert.ok(Array.isArray(decoded.DirectSites));
-  assert.ok(decoded.DirectSites.includes('geosite:ru'));
+  assert.ok(decoded.DirectSites.includes('domain:ru'));
   assert.ok(decoded.ProxySites.includes('geosite:supercell'));
 
   const addLink = buildHappRoutingDeeplink({ autoActivate: false });
@@ -58,8 +70,8 @@ test('buildHappRoutingDeeplink encodes valid base64 and roundtrips successfully'
 
 test('buildHysteriaAclBlock and YAML contain direct rules for RU domains and IPs', () => {
   const acl = buildHysteriaAclBlock();
-  assert.ok(acl.includes('direct(geosite:category-gov-ru)'));
-  assert.ok(acl.includes('direct(geosite:ru)'));
+  assert.ok(acl.includes('direct(domain-suffix:.ru)'));
+  assert.ok(acl.includes('direct(domain-suffix:vk.com)'));
   assert.ok(acl.includes('direct(geoip:ru)'));
   assert.ok(acl.includes('direct(geoip:private)'));
 
@@ -73,7 +85,7 @@ test('buildHysteriaAclBlock and YAML contain direct rules for RU domains and IPs
   assert.ok(yaml.includes('server: vpn.rilora.ru:443'));
   assert.ok(yaml.includes('auth: vpn-user:secret'));
   assert.ok(yaml.includes('password: obfspassword'));
-  assert.ok(yaml.includes('direct(geosite:ru)'));
+  assert.ok(yaml.includes('direct(domain-suffix:.ru)'));
 });
 
 test('buildRoutingSummary produces Telegram-ready instructions with public routing link', () => {

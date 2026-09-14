@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { VpnCommandService, artifactFrom, formatConnectionAnswer, parseVpnCallback, parseVpnCommand, safeHostData, validateAction } = require('../src/vpn/vpnCommandService');
+const { VpnCommandService, artifactFrom, buildPcSetupGuide, formatConnectionAnswer, parseVpnCallback, parseVpnCommand, safeHostData, validateAction } = require('../src/vpn/vpnCommandService');
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 const DEVICE_ID = '22222222-2222-4222-8222-222222222222';
@@ -44,6 +44,9 @@ test('parses only the closed VPN command set', () => {
   assert.deepEqual(parseVpnCommand('/vpn_routing'), { kind: 'routing', protocol: 'hysteria2' });
   assert.deepEqual(parseVpnCommand('/vpn_ru'), { kind: 'routing', protocol: 'hysteria2' });
   assert.deepEqual(parseVpnCommand('/vpn_hysteria2_routing'), { kind: 'routing', protocol: 'hysteria2' });
+  assert.deepEqual(parseVpnCommand('/vpn_pc'), { kind: 'pc', protocol: 'hysteria2' });
+  assert.deepEqual(parseVpnCommand('/vpn_vless_pc'), { kind: 'pc', protocol: 'vless' });
+  assert.deepEqual(parseVpnCommand('/vpn_hysteria2_pc'), { kind: 'pc', protocol: 'hysteria2' });
   assert.deepEqual(parseVpnCommand('/vpn_confirm'), { kind: 'decision', decision: 'confirm', requestId: null });
   assert.equal(parseVpnCommand('расскажи о погоде'), null);
   assert.equal(parseVpnCommand('/vpn_issue').kind, 'invalid');
@@ -54,6 +57,9 @@ test('parses only bounded VPN callback actions', () => {
   assert.deepEqual(parseVpnCallback('vpn:clients'), { action: 'clients', protocol: 'vless' });
   assert.deepEqual(parseVpnCallback('vpn:routing'), { action: 'routing' });
   assert.deepEqual(parseVpnCallback('vpn:h:routing'), { action: 'routing', protocol: 'hysteria2' });
+  assert.deepEqual(parseVpnCallback('vpn:pc'), { action: 'pc' });
+  assert.deepEqual(parseVpnCallback('vpn:h:pc'), { action: 'pc', protocol: 'hysteria2' });
+  assert.deepEqual(parseVpnCallback('vpn:v:pc'), { action: 'pc', protocol: 'vless' });
   assert.deepEqual(parseVpnCallback('vpn:export:vpn-0123456789ab'), { action: 'export', protocol: 'vless', clientId: 'vpn-0123456789ab' });
   assert.deepEqual(parseVpnCallback('vpn:p:h'), { action: 'protocol', protocol: 'hysteria2' });
   assert.deepEqual(parseVpnCallback('vpn:h:export:vpn-0123456789ab'), { action: 'export', protocol: 'hysteria2', clientId: 'vpn-0123456789ab' });
@@ -191,5 +197,39 @@ test('formatConnectionAnswer generates 1-click Happ instructions and code block 
 
   const restartAnswer = formatConnectionAnswer('hysteria2', 'restart', {});
   assert.equal(restartAnswer, 'Hysteria2 VPN перезапущен.');
+});
+
+test('PC guide command and callback return detailed PC setup and troubleshooting instructions', async () => {
+  const { service } = harness();
+  const context = { userId: USER_ID, conversationId: 'conversation', originChannel: 'telegram' };
+  const viaCommand = await service.handle({ ...context, text: '/vpn_pc' });
+  assert.match(viaCommand.answer, /Настройка Hysteria 2 на ПК/);
+  assert.match(viaCommand.answer, /ПОЧЕМУ ПИШЕТ «ПИНГ N\/A»/);
+  assert.match(viaCommand.answer, /Запуск от Администратора/);
+  assert.match(viaCommand.answer, /Синхронизация времени/);
+  assert.ok(viaCommand.buttons.flat().some((b) => b.data === 'vpn:h:pc'));
+
+  const viaCallback = await service.handleCallback({ ...context, data: 'vpn:v:pc' });
+  assert.match(viaCallback.answer, /Настройка VLESS на ПК/);
+  assert.match(viaCallback.answer, /v2rayN/);
+  assert.match(viaCallback.answer, /Тест реальной задержки/);
+  assert.ok(viaCallback.buttons.flat().some((b) => b.data === 'vpn:v:pc'));
+
+  assert.match(buildPcSetupGuide('hysteria2'), /Hiddify/);
+  assert.match(buildPcSetupGuide('vless'), /v2rayN/);
+});
+
+test('VPN_CLIENT_LABEL_EXISTS failure returns user-friendly guidance and direct access buttons', async () => {
+  const { service } = harness();
+  service.client.request = async () => ({
+    result: { state: 'failed', errorCode: 'VPN_CLIENT_LABEL_EXISTS' },
+  });
+  const context = { userId: USER_ID, conversationId: 'conversation', originChannel: 'telegram' };
+  await service.handle({ ...context, text: '/vpn_hysteria2_issue Duplicate' });
+  const decided = await service.handle({ ...context, text: '/vpn_confirm' });
+  assert.match(decided.answer, /уже существует/);
+  assert.match(decided.answer, /Duplicate/);
+  assert.ok(decided.buttons.flat().some((b) => b.data === 'vpn:h:clients'));
+  assert.ok(decided.buttons.flat().some((b) => b.data === 'vpn:h:new'));
 });
 
