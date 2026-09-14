@@ -26,7 +26,16 @@ test('migration files are ordered and narrowly named', () => {
     '015_telegram_interactions.sql',
     '016_life_os_v2.sql',
     '017_life_os_reminders.sql',
+    '018_life_os_proactivity_actions.sql',
   ]);
+});
+
+test('proactivity action migration preserves uncertain outcomes without retry coercion', () => {
+  const migration = fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, '018_life_os_proactivity_actions.sql'), 'utf8');
+  assert.match(migration, /action_workflows_status_check/);
+  assert.match(migration, /action_runs_status_check/);
+  assert.match(migration, /'outcome_unknown'/);
+  assert.doesNotMatch(migration, /DELETE|TRUNCATE|DROP TABLE/i);
 });
 
 test('reminder migration adds owner-scoped occurrence delivery and acknowledgement', () => {

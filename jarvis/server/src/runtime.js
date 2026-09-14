@@ -39,7 +39,7 @@ const { CommandWorker } = require('./commands/commandWorker');
 const { createActionManifest } = require('./orchestrator/actionManifest');
 const { ActionOrchestrator } = require('./orchestrator/actionOrchestrator');
 const { CommandResultBroker } = require('./orchestrator/commandResultBroker');
-const { DesktopCommandExecutor, ExecutorRegistry } = require('./orchestrator/executorRegistry');
+const { DesktopCommandExecutor, ExecutorRegistry, ServerActionExecutor } = require('./orchestrator/executorRegistry');
 const { ToolIntentPlanner } = require('./orchestrator/toolIntentPlanner');
 const { WorkflowRepository } = require('./orchestrator/workflowRepository');
 const { createRemoteMessage } = require('./devices/remoteProtocol');
@@ -68,6 +68,7 @@ const { ContextRecoveryService } = require('./life/contextRecoveryService');
 const { MissionControlService } = require('./life/missionControlService');
 const { ProposalService } = require('./life/proposalService');
 const { ProactivityWorker } = require('./life/proactivityWorker');
+const { ProactivityRepository } = require('./life/proactivity/proactivityRepository');
 const { registerLifeRoutes } = require('./life/lifeRoutes');
 const { LifeContextComposer } = require('./life/context/lifeContextComposer');
 const { LifeModeRepository } = require('./life/modes/lifeModeRepository');
@@ -204,10 +205,18 @@ async function createRuntime(config, overrides = {}) {
       resultBroker,
     });
     const actionManifest = overrides.actionManifest || createActionManifest();
+    const workflowRepository = overrides.workflowRepository || new WorkflowRepository(pool);
     const executorRegistry = overrides.executorRegistry || new ExecutorRegistry()
       .register('device', new DesktopCommandExecutor({ commandService }));
+    if (!overrides.executorRegistry && config.lifeOsEnabled) executorRegistry.register('server', new ServerActionExecutor({
+      reminderService: lifeReminderService,
+      commitmentRepository: lifeCommitmentRepository,
+      projectionRepository: lifeProjectionRepository,
+      deviceRepository,
+      workflowRepository,
+    }));
     orchestrator = overrides.orchestrator || new ActionOrchestrator({
-      repository: overrides.workflowRepository || new WorkflowRepository(pool),
+      repository: workflowRepository,
       planner: overrides.toolIntentPlanner || new ToolIntentPlanner({
         provider: answerProvider,
         manifest: actionManifest,
@@ -244,7 +253,7 @@ async function createRuntime(config, overrides = {}) {
     let missionControlService = null;
     if (config.lifeOsEnabled) {
       proposalService = overrides.proposalService || new ProposalService({
-        repository: lifeProjectionRepository, gateway: lifeEventGateway, orchestrator,
+        repository: lifeProjectionRepository, gateway: lifeEventGateway, orchestrator, manifest: actionManifest,
       });
       if (!overrides.orchestrator) orchestrator.onWorkflowStatus = (workflow) => proposalService.onWorkflowStatus(workflow);
       const personLinker = overrides.personLinker || new PersonLinker({
@@ -262,7 +271,20 @@ async function createRuntime(config, overrides = {}) {
       });
       const proactivity = new ProactivityWorker({
         repository: lifeProjectionRepository, eventRepository: lifeEventRepository,
-        proposalService, intervalMs: Math.max(config.lifeOsWorkerIntervalMs * 15, 30000), logger: app.log,
+        proposalService, manifest: actionManifest,
+        proactivityRepository: overrides.proactivityRepository || new ProactivityRepository(pool),
+        intervalMs: Math.max(config.lifeOsWorkerIntervalMs * 15, 30000), logger: app.log,
+        policyProvider: async ({ userId }) => {
+          const [mode, preferences] = await Promise.all([
+            lifeModeService.get({ userId }), lifePreferenceService.list({ userId }),
+          ]);
+          const values = new Map(preferences.map((item) => [item.key, item.value]));
+          return {
+            proposalVisibility: mode.policy.proposalVisibility,
+            suppressedRules: values.get('proposal.suppressed_rules') || [],
+            maxPerDay: values.get('notifications.max_proactive_per_day') ?? 10,
+          };
+        },
         deliverProposal: async (proposal) => {
           if (proposal.origin_channel === 'desktop' && proposal.origin_device_id) {
             sessionRegistry.send(proposal.origin_device_id, createRemoteMessage('life.proposal', {

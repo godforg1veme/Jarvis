@@ -39,3 +39,21 @@ test('changing proposal delegates a frozen declared action and tracks execution'
   assert.deepEqual(calls[0].actionArguments, { candidateId: 'candidate-a' });
   assert.deepEqual(transitions.map((item) => item.status), ['confirmed', 'executing']);
 });
+
+test('safe declared proposal executes after its origin-bound confirmation', async () => {
+  const safe = row({ risk_class: 'safe', action_name: 'project.show_documents', action_arguments: { projectId: PROPOSAL } });
+  const calls = [];
+  const repository = {
+    async getProposal() { return safe; },
+    async transitionProposal(input) {
+      return { ...safe, status: input.status, revision: input.status === 'confirmed' ? 2 : 3, workflow_id: input.workflowId || null };
+    },
+  };
+  const service = new ProposalService({ repository, gateway: { async record() {} },
+    orchestrator: { async executeDeclaredProposal(input) { calls.push(input); return { pending: false, workflowId: PROPOSAL }; } },
+    now: () => new Date('2026-09-13T10:00:00Z') });
+  const result = await service.confirm({ userId: USER, proposalId: PROPOSAL, revision: 1, originChannel: 'desktop', originDeviceId: DEVICE });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].actionName, 'project.show_documents');
+  assert.equal(result.status, 'completed');
+});

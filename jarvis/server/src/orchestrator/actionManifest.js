@@ -1,4 +1,5 @@
 const { ACTION_POLICIES, policyForAction, validateActionArgs } = require('../commands/commandSchemas');
+const { validateLifeActionArgs } = require('./lifeActionSchemas');
 
 const MANIFEST_VERSION = 1;
 
@@ -32,6 +33,17 @@ const ACTION_DETAILS = Object.freeze({
   'vision.capture': { description: 'Observe camera and/or screens only through an already active local Vision Lease. Never starts a camera remotely.', idempotency: 'read', timeoutMs: 120000 },
 });
 
+const LIFE_ACTIONS = Object.freeze({
+  'reminder.create': { executorType: 'server', policy: 'requires_confirmation', description: 'Create an owner-scoped reminder from a confirmed proposal.', idempotency: 'conditional' },
+  'reminder.reschedule': { executorType: 'server', policy: 'requires_confirmation', description: 'Reschedule an owner-scoped reminder.', idempotency: 'conditional' },
+  'life.commitment.reschedule': { executorType: 'server', policy: 'requires_confirmation', description: 'Reschedule an owner-scoped commitment.', idempotency: 'conditional' },
+  'life.task.create': { executorType: 'server', policy: 'requires_confirmation', description: 'Create an owner-scoped Life OS task.', idempotency: 'conditional' },
+  'project.show_documents': { executorType: 'server', policy: 'observe', description: 'Show safe metadata for documents linked to a project.', idempotency: 'read' },
+  'device.status.request': { executorType: 'server', policy: 'observe', description: 'Read the current safe state of an owned device.', idempotency: 'read' },
+  'workflow.continue': { executorType: 'server', policy: 'requires_confirmation', description: 'Continue an owner-scoped paused workflow.', idempotency: 'conditional' },
+  'workspace.prepare': { executorType: 'device', policy: 'requires_confirmation', description: 'Prepare a registered local workspace through Desktop.', idempotency: 'conditional', capability: 'workspace.prepare' },
+});
+
 function createActionManifest() {
   const actions = Object.entries(ACTION_POLICIES).map(([name, policy]) => {
     const details = ACTION_DETAILS[name] || {};
@@ -49,6 +61,15 @@ function createActionManifest() {
       policyForArgs(args) { return policyForAction(name, args); },
     });
   });
+  for (const [name, details] of Object.entries(LIFE_ACTIONS)) actions.push(Object.freeze({
+    name, version: MANIFEST_VERSION, executorType: details.executorType,
+    capability: details.capability || name, policy: details.policy,
+    description: details.description, idempotency: details.idempotency,
+    timeoutMs: details.timeoutMs || 10000, maxResultBytes: 128 * 1024,
+    proposalOnly: true,
+    validateArgs(args) { return validateLifeActionArgs(name, args); },
+    policyForArgs() { return details.policy; },
+  }));
   const byName = new Map(actions.map((action) => [action.name, action]));
   return Object.freeze({
     version: MANIFEST_VERSION,
@@ -62,4 +83,4 @@ function createActionManifest() {
   });
 }
 
-module.exports = { ACTION_DETAILS, MANIFEST_VERSION, createActionManifest };
+module.exports = { ACTION_DETAILS, LIFE_ACTIONS, MANIFEST_VERSION, createActionManifest };

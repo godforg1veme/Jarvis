@@ -415,6 +415,24 @@ class ActionOrchestrator {
       const failed = await this._update(workflow, 'failed', { ...workflow.state, failureCode: error.publicCode || 'COMMAND_CREATE_FAILED' }, true, true, target.id);
       return { handled: true, answer: publicErrorText(error), workflowId: failed.id };
     }
+    if (action.executorType !== 'device') {
+      const terminal = ['succeeded', 'failed', 'outcome_unknown'].includes(result?.status) ? result.status : 'outcome_unknown';
+      await this.repository.completeRun({
+        userId: input.userId, runId: run.id,
+        status: terminal, result: sanitizeToolResult(result?.result || { ok: terminal === 'succeeded' }),
+      });
+      const completed = await this._update(workflow, terminal, {
+        ...workflow.state,
+        toolResults: [{ action: action.name, callFingerprint: fingerprint, result: sanitizeToolResult(result?.result || {}) }],
+        completedCallFingerprints: terminal === 'succeeded' ? [fingerprint] : [],
+        ...(terminal === 'outcome_unknown' ? { outcomeUnknown: true } : {}),
+      }, true, true, null);
+      return {
+        handled: true, pending: false,
+        answer: String(result?.answer || (terminal === 'succeeded' ? 'Действие выполнено.' : terminal === 'outcome_unknown' ? 'Результат действия пока неизвестен.' : 'Действие не выполнено.')).slice(0, 10000),
+        workflowId: completed.id,
+      };
+    }
     const runStatus = result.status === 'awaiting_confirmation' ? 'awaiting_confirmation' : result.status === 'running' ? 'running' : 'failed';
     await this.repository.linkCommand({ userId: input.userId, runId: run.id, commandId: result.command.id, status: runStatus });
     if (result.status === 'awaiting_confirmation') {
@@ -605,11 +623,12 @@ class ActionOrchestrator {
     const candidates = devices.filter((device) => (!targetId || device.id === targetId) &&
       (originChannel !== 'desktop' || device.id === originDeviceId));
     const declared = [...new Set(candidates.flatMap((device) => Array.isArray(device.capabilities?.actions) ? device.capabilities.actions : []))]
-      .filter((name) => this.manifest.get(name));
-    return declared.length ? declared : this.manifest.list().map((action) => action.name);
+      .filter((name) => this.manifest.get(name) && !this.manifest.get(name).proposalOnly);
+    return declared.length ? declared : this.manifest.list().filter((action) => !action.proposalOnly).map((action) => action.name);
   }
 
   _selectDevice({ devices, input, workflow, plan, action }) {
+    if (action.executorType !== 'device') return { id: null, status: 'online', capabilities: { actions: [action.name] } };
     const eligible = devices.filter((device) => device.status === 'online' && this._supports(device, action.name));
     const requested = input.preferredDeviceId || plan.targetDeviceId || workflow.target_id || (input.originChannel === 'desktop' ? input.originDeviceId : null);
     if (requested) return eligible.find((device) => device.id === requested) || null;

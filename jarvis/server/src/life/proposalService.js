@@ -5,11 +5,18 @@ class ProposalService {
     this.repository = options.repository;
     this.gateway = options.gateway;
     this.orchestrator = options.orchestrator || null;
+    this.manifest = options.manifest || null;
     this.now = options.now || (() => new Date());
   }
 
   async create(input) {
     try {
+      if (input.actionName && this.manifest) {
+        const action = this.manifest.require(input.actionName);
+        input = { ...input, actionArguments: action.validateArgs(input.actionArguments || {}) };
+        const changing = ['requires_confirmation', 'requires_strong_confirmation'].includes(action.policy);
+        if ((input.riskClass === 'changing') !== changing) throw new Error('proposal risk does not match action policy');
+      }
       const proposal = await this.repository.createProposal(input);
       await recordSimpleEvent(this.gateway, {
         userId: input.userId, eventType: 'proposal.created', sourceChannel: 'life_os',
@@ -51,7 +58,7 @@ class ProposalService {
       structuredData: { proposalId, state: 'confirmed' },
     });
 
-    if (confirmed.risk_class === 'safe' || !confirmed.action_name) {
+    if (!confirmed.action_name) {
       return this.repository.transitionProposal({
         userId, proposalId, revision: confirmed.revision, fromStatuses: ['confirmed'], status: 'completed',
       });
