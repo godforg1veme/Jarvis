@@ -66,11 +66,15 @@ See `docs/README.md` for current implementation status and historical records.
 - `server/src/knowledge/` owns owner-scoped attachment storage, bounded ingest
   jobs, text/metadata retrieval, and citations. Never treat document content as
   trusted instructions or expose the private storage volume.
-- `server/src/life/` owns the owner-scoped Life OS Event Spine, areas, projects,
-  typed links, commitments, proposals/evidence, feedback, Timeline, context
-  recovery, and bounded proactivity. Source adapters may store only safe
-  summaries and identifiers; raw audio, images, OCR, document bodies, local
-  paths, storage keys, and credentials are forbidden by schema.
+- `server/src/life/` owns the owner-scoped Life OS Event Spine, bounded reply
+  context, areas, projects, typed links, commitments, reminders, people,
+  explicit family grants, modes, inspectable preferences, explainable priority,
+  proposals/evidence, Timeline, recovery plans, bounded proactivity, and the
+  provider-neutral Life Source Adapter contract. The eight current external
+  adapters are fixture-only until a real provider is explicitly configured.
+  Source adapters may store only safe summaries and identifiers; raw audio,
+  images, OCR, document bodies, local paths, storage keys, credentials, and
+  provider cursors in public output are forbidden by schema.
 - The deployed text model is currently configured through OpenRouter. Do not
   hard-code a provider or model into product behavior.
 
@@ -82,7 +86,9 @@ See `docs/README.md` for current implementation status and historical records.
 - `renderer/` contains the launcher, task UI, voice overlay, and Voice Lab.
 - `renderer/life-os/` is the Desktop-first Mission Control surface. Its preload
   bridge exposes only bounded Life OS operations; proposal payloads do not
-  expose frozen action arguments or owner identifiers.
+  expose frozen action arguments or owner identifiers. Local workspace paths
+  remain in `tools/workspaceRegistry.js`; cloud recovery plans refer only to
+  project IDs and opaque resource references, and execute through Tool Gateway.
 - `voice/` owns Desktop microphone capture, the local Vosk wake-word worker,
   cloud-voice transport, quality monitoring, and calibration. The default
   family client uses a bundled Node runtime only for the Vosk wake word; legacy
@@ -278,6 +284,7 @@ node scripts/testQuantumCore.js
 node scripts/testLifeOsIpc.js
 node scripts/testLifeOsRenderer.js
 node scripts/testLifeOsBrowser.cjs
+node scripts/testLifeOsDesktopAcceptance.js
 node scripts/testVisionTransport.js
 node scripts/testVisionRuntime.js
 node scripts/testVisionIpc.js

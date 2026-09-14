@@ -45,13 +45,14 @@ to use UTF-8 encoded PowerShell invocations, Cyrillic inflection stemming was ad
 to appResolver, and AI-assisted candidate recovery via AppRecoveryService was wired
 into ToolGateway for local and remote command execution.
 
-Life OS update, 2026-09-13: Core v1 is implemented and production-enabled across
-the Event Spine, projections, explainable proposals, context recovery,
-authenticated API, Telegram commands, and responsive Desktop Mission Control.
-Migration 013, an isolated real-PostgreSQL acceptance, VPS health/smoke, the
-installed Desktop package, and paired WSS reconnect were verified. Deterministic
-proactivity is enabled; optional model enrichment remains disabled. Details are
-recorded in `updates/2026-09-13-life-os-core-v1.md`.
+Life OS update, 2026-09-15: v2 is implemented in code and locally verified across
+bounded ordinary-reply context, cautious communication guidance, explainable
+priority, people/family grants, modes/preferences, reminders, recovery plans,
+actionable proactivity, eight fixture-only source adapters, authenticated API,
+and responsive Desktop Mission Control. It has not been deployed or checked
+against a real PostgreSQL instance; installed Desktop executables are stale.
+Core v1 remains the production-enabled baseline. Details are recorded in
+`updates/2026-09-15-jarvis-life-os-v2.md`.
 
 Happ VPN update, 2026-09-13: dedicated VLESS + REALITY + XTLS Vision Xray is
 deployed on port 443, externally accepted through the production client URI,
@@ -108,6 +109,7 @@ attachment ingestion.
 | `updates/2026-09-14-telegram-memory-gallery-vpn-fix.md` | Production rollout record for the VPN owner-context fix and unified Telegram memory gallery |
 | `updates/2026-09-14-hysteria2-fallback-rollout.md` | Production rollout record for isolated Hysteria2 service |
 | `updates/2026-09-14-happ-vpn-ru-routing.md` | Production rollout record for Happ domestic RU split-routing and 1-click web activation |
+| `updates/2026-09-15-jarvis-life-os-v2.md` | Local implementation and verification record for Life OS v2, including the evidence matrix and outstanding PostgreSQL/live acceptance |
 | `VPN_PC_SETUP.md` | Руководство по настройке Hysteria 2 и VLESS на ПК (Windows / macOS) и устранению неполадок |
 | `CLAUDE.md`, `gemini.md` | Thin pointers to the authoritative agent context |
 | This file | Status and supersession index |
@@ -130,6 +132,8 @@ attachment ingestion.
 | `superpowers/plans/2026-09-14-telegram-unified-memory-gallery-vpn-owner-fix.md` | Implemented and production-deployed on 2026-09-14; retained as execution history with manual Telegram acceptance explicitly outstanding. |
 | `superpowers/specs/2026-09-12-jarvis-life-os-core-v1-design.md` | Implemented and production-enabled: owner-scoped Event Spine, projections, Timeline, context recovery, explainable proposals, Telegram commands, and Desktop Mission Control. Optional model enrichment remains disabled. |
 | `superpowers/plans/2026-09-12-jarvis-life-os-core-v1.md` | Implemented, packaged, installed, and production-verified on 2026-09-13; retained as execution history. |
+| `superpowers/specs/2026-09-14-jarvis-life-os-v2-design.md` | Implemented in code and locally verified on 2026-09-15; real PostgreSQL, live connector, installed-Desktop, Telegram, and production acceptance remain outstanding. |
+| `superpowers/plans/2026-09-14-jarvis-life-os-v2.md` | All code checkpoints and local checks completed; real-PostgreSQL and live acceptance portions remain outstanding. No v2 deployment, EXE build/install, or external account connection was performed. |
 | `superpowers/plans/2026-09-09-jarvis-vision.md` | Execution plan adapted to the current cloud-brain/local-hands architecture; first camera + two-display + memory slice implemented and locally accepted |
 | `plans/2026-09-01-jarvis-family-cloud-assistant.md` | Active roadmap; Milestones 0–3 are partial, later milestones are not complete |
 | `specs/2026-09-01-jarvis-desktop-cloud-client-design.md` | Implemented and packaged: paired Windows chat, DPAPI device credentials, device-scoped HTTPS/WSS sessions, local wake word, server ASR contract, and NSIS installer. Live VPS configuration and clean-machine acceptance remain operational steps. |

@@ -4,6 +4,12 @@
 
 **Status:** Approved architecture; implementation has not started
 
+> Implementation update, 2026-09-15: the design is implemented in the local
+> repository and covered by focused, integration, browser, security, and
+> regression tests. Real PostgreSQL acceptance, live external providers,
+> production deployment, and an updated installed Desktop build have not been
+> performed. See `docs/updates/2026-09-15-jarvis-life-os-v2.md` for exact evidence.
+
 ## Summary
 
 Life OS v2 extends the deployed Life OS Core v1 into the contextual and

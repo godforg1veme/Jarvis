@@ -69,13 +69,19 @@ Jarvis — гибридная платформа персонального и �
   действие, продолжение после WSS-результата и подтверждение в исходном клиенте;
 - серверные маршруты привязки устройства, Desktop-чата и однократной отправки
   голоса с изоляцией по владельцу устройства и идемпотентностью запросов;
-- Life OS Core v1: единая owner-scoped лента событий из Telegram, Desktop,
-  голоса, документов, Vision, устройств и Action Orchestrator; области, проекты,
-  контекстные связи, договорённости, объяснимые предложения, восстановление
-  контекста и Desktop Mission Control. Сырые аудио, изображения, OCR, тела
-  документов, локальные пути и секреты в Life OS не сохраняются; изменяющие
-  предложения исполняются только через существующее подтверждение исходного
-  клиента;
+- Life OS v2 реализован в коде как контекстный слой поверх Jarvis: обычные
+  Telegram/Desktop-ответы получают ограниченный релевантный Life-контекст;
+  Timeline, проекты, договорённости, люди, явные семейные гранты, режимы,
+  прозрачные предпочтения, напоминания и объяснимый Priority Engine работают
+  совместно. Mission Control позволяет закрепить, заменить или скрыть миссию,
+  а Context Recovery готовит отдельный план и выполняет `workspace.prepare`
+  только после origin-bound подтверждения через Orchestrator и Tool Gateway.
+  Восемь provider-neutral адаптеров (календарь, почта, задачи, чеки, доставки,
+  поездки, подписки, умный дом) пока используют только fake transport/fixtures.
+  Сырые аудио, изображения, OCR, тела документов, локальные пути, storage keys,
+  credentials и замороженные action arguments не выдаются Life OS UI/Event
+  Spine. Локальные автоматические проверки пройдены 2026-09-15; v2 ещё не
+  развёрнут, не проверен с реальным PostgreSQL и требует нового Desktop EXE;
 - проверяемый серверный ответ о привязанных компьютерах: `/devices` и вопросы
   вида «К какому ПК я привязан?» не зависят от ответа модели.
 - гибридный поиск личной базы знаний: PostgreSQL FTS + production embeddings
@@ -129,6 +135,10 @@ Jarvis — гибридная платформа персонального и �
 - переключение между OpenRouter, Salad и другими совместимыми провайдерами;
 - PWA и расширение Vision после первого вертикального среза: production rollout
   и acceptance vision-провайдера, временные события и более широкая multi-device UX.
+- Life OS v2: реальная PostgreSQL acceptance, подключение выбранных внешних
+  провайдеров вместо fixture transport, production rollout и проверка
+  origin-confirmation на установленном Desktop/реальном Telegram остаются
+  операционными этапами.
 
 Планы не следует описывать как готовые функции. Актуальная карта документации и
 статусы находятся в [`docs/README.md`](docs/README.md).
@@ -264,6 +274,7 @@ node scripts/testToolPolicyMapping.js
 node scripts/testLifeOsIpc.js
 node scripts/testLifeOsRenderer.js
 node scripts/testLifeOsBrowser.cjs
+node scripts/testLifeOsDesktopAcceptance.js
 node scripts/testSttSettings.js
 node scripts/testVoiceServiceSttProvider.js
 node scripts/testVoiceQualityMonitor.js
