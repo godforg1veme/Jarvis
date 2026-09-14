@@ -24,7 +24,7 @@ class LifeLinker {
   }
 
   async _linkProject(event) {
-    const projects = await this.repository.listProjects({ userId: event.user_id, statuses: ['active', 'paused'] });
+    const projects = await this.repository.listProjects({ userId: event.user_id, statuses: ['active', 'paused'], limit: 100 });
     const summary = normalized(event.summary);
     const exact = projects
       .filter((project) => normalized(project.name) && summary.includes(normalized(project.name)))

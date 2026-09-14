@@ -19,6 +19,11 @@ const peopleQuerySchema = z.object({ includeArchived: queryBooleanSchema }).stri
 const relationshipQuerySchema = z.object({ personId: idSchema.optional() }).strict();
 const personProjectQuerySchema = z.object({ projectId: idSchema.optional(), personId: idSchema.optional() }).strict();
 const grantsQuerySchema = z.object({ memberUserId: idSchema.optional(), includeInactive: queryBooleanSchema }).strict();
+const missionRevisionSchema = z.object({ revision: z.number().int().min(1).nullable().optional() }).strict();
+const missionHideSchema = z.object({
+  revision: z.number().int().min(1).nullable().optional(),
+  hiddenUntil: z.string().datetime({ offset: true }),
+}).strict().refine((value) => new Date(value.hiddenUntil) > new Date(), 'hiddenUntil must be in the future');
 
 function registerLifeRoutes(app, options) {
   const authenticate = options.authenticate;
@@ -86,6 +91,25 @@ function registerLifeRoutes(app, options) {
     checkRead(request.device);
     return { ok: true, missionControl: await missionControlService.get({ userId: request.device.user_id }) };
   });
+
+  const missionIntent = (method, parse) => async (request) => {
+    checkWrite(request.device);
+    const input = parse(request.body || {});
+    const state = await missionControlService[method]({
+      userId: request.device.user_id, projectId: id(request.params.projectId),
+      sourceDeviceId: request.device.id, ...input,
+    });
+    if (!state) throw lifeError(409, 'LIFE_REVISION_CONFLICT');
+    return { ok: true, priority: {
+      projectId: state.project_id, pinned: state.pinned, hiddenUntil: state.hidden_until || null,
+      userWeight: Number(state.user_weight || 0), revision: state.revision,
+    } };
+  };
+
+  app.post('/v1/desktop/life/missions/:projectId/pin', { preHandler: requireDevice, bodyLimit: 1024 }, missionIntent('pin', (body) => missionRevisionSchema.parse(body)));
+  app.post('/v1/desktop/life/missions/:projectId/replace', { preHandler: requireDevice, bodyLimit: 1024 }, missionIntent('replace', (body) => missionRevisionSchema.parse(body)));
+  app.post('/v1/desktop/life/missions/:projectId/hide', { preHandler: requireDevice, bodyLimit: 1024 }, missionIntent('hide', (body) => missionHideSchema.parse(body)));
+  app.post('/v1/desktop/life/missions/:projectId/restore', { preHandler: requireDevice, bodyLimit: 1024 }, missionIntent('restore', (body) => missionRevisionSchema.parse(body)));
 
   app.get('/v1/desktop/life/mode', { preHandler: requireDevice }, async (request) => {
     checkRead(request.device);

@@ -79,3 +79,20 @@ test('composer includes safe people and explicitly granted family summaries only
   assert.equal(JSON.stringify(result).includes('private-grant'), false);
   assert.deepEqual(sharedInput, { memberUserId: USER_ID });
 });
+
+test('composer uses the explainable engine selection without persisting during a reply', async () => {
+  let input = null;
+  const { composer } = harness({
+    priorityEngine: {
+      async evaluate(value) {
+        input = value;
+        return { selected: { project: { id: PROJECT_ID, area_id: null, name: 'Life OS', status: 'active' } } };
+      },
+      fallback() { throw new Error('unexpected fallback'); },
+    },
+  });
+  const result = await composer.compose({ userId: USER_ID, text: 'Продолжить Life OS', channel: 'desktop' });
+  assert.equal(result.lifeContext.currentProject.name, 'Life OS');
+  assert.equal(input.persist, false);
+  assert.equal(input.userId, USER_ID);
+});

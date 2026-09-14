@@ -52,6 +52,7 @@ const LIFE_EVENT_TYPES = Object.freeze([
   'source.failed',
   'mission.pinned',
   'mission.hidden',
+  'mission.restored',
 ]);
 
 const SOURCE_CHANNELS = Object.freeze([

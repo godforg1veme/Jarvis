@@ -30,6 +30,7 @@ class LifeContextComposer {
   constructor(options = {}) {
     this.repository = options.repository;
     this.priorityRepository = options.priorityRepository || null;
+    this.priorityEngine = options.priorityEngine || null;
     this.modeRepository = options.modeRepository || null;
     this.modeService = options.modeService || null;
     this.preferenceRepository = options.preferenceRepository || null;
@@ -56,7 +57,7 @@ class LifeContextComposer {
   async _compose(input) {
     const userId = input.userId;
     const calls = [
-      call(() => this.repository.listProjects({ userId, statuses: ['active', 'paused'] })),
+      call(() => this.repository.listProjects({ userId, statuses: ['active', 'paused'], limit: 100 })),
       call(() => (typeof this.repository.listCommitments === 'function' ? this.repository.listCommitments({ userId, statuses: ['open'], limit: 30 }) : [])),
       call(() => (typeof this.repository.listProposals === 'function' ? this.repository.listProposals({ userId, statuses: ['open', 'executing', 'outcome_unknown'], limit: 20 }) : [])),
       call(() => (typeof this.repository.listTimeline === 'function' ? this.repository.listTimeline({ userId, limit: 25 }) : [])),
@@ -86,12 +87,31 @@ class LifeContextComposer {
     const partial = results.some((result) => result.status === 'rejected');
     const priorityByProject = new Map(priorities.map((row) => [row.project_id, row]));
     const now = this.now();
-    const selectedProject = projects.find((project) => {
-      const state = priorityByProject.get(project.id);
-      return project.status === 'active' && state?.pinned
-        && (!state.hidden_until || new Date(state.hidden_until) <= now);
-    }) || projects.find((project) => project.status === 'active') || null;
     const areaById = new Map(areas.map((area) => [area.id, area]));
+    let selectedProject = null;
+    if (this.priorityEngine) {
+      try {
+        const priority = await this.priorityEngine.evaluate({
+          userId, projects, areas, commitments, events, states: priorities, mode, preferences,
+          resourceAvailable: devices.length ? devices.some((device) => device.status === 'online') : null,
+          now, persist: false,
+        });
+        selectedProject = priority.selected?.project || null;
+      } catch {
+        selectedProject = typeof this.priorityEngine.fallback === 'function'
+          ? this.priorityEngine.fallback({ projects, states: priorities, now }).selected
+          : projects.filter((project) => project.status === 'active'
+            && !(priorityByProject.get(project.id)?.hidden_until && new Date(priorityByProject.get(project.id).hidden_until) > now))
+            .sort((left, right) => new Date(right.updated_at || 0) - new Date(left.updated_at || 0))[0] || null;
+      }
+    } else {
+      selectedProject = projects.find((project) => {
+        const state = priorityByProject.get(project.id);
+        return project.status === 'active' && state?.pinned
+          && (!state.hidden_until || new Date(state.hidden_until) <= now);
+      }) || projects.filter((project) => project.status === 'active')
+        .sort((left, right) => new Date(right.updated_at || 0) - new Date(left.updated_at || 0))[0] || null;
+    }
     const selectedArea = selectedProject?.area_id ? areaById.get(selectedProject.area_id) || null : null;
     let documents = [];
     let documentsPartial = false;

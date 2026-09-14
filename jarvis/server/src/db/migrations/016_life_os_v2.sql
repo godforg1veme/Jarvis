@@ -389,7 +389,7 @@ ALTER TABLE life_events ADD CONSTRAINT life_events_event_type_check CHECK (event
   'reminder.delivered', 'reminder.delivery_failed', 'reminder.outcome_unknown',
   'recovery.prepared', 'recovery.started', 'recovery.completed',
   'recovery.failed', 'recovery.outcome_unknown',
-  'source.synced', 'source.failed', 'mission.pinned', 'mission.hidden'
+  'source.synced', 'source.failed', 'mission.pinned', 'mission.hidden', 'mission.restored'
 ));
 
 ALTER TABLE life_events DROP CONSTRAINT life_events_source_channel_check;

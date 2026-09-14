@@ -162,6 +162,11 @@ test('recovery plan creation is transactional and verifies owner project before 
   assert.equal(calls.at(-2).sql, 'COMMIT');
   assert.equal(calls.at(-1).sql, 'RELEASE');
   assert.equal(result.steps.length, 1);
+  const listPool = poolWithRows([{ id: PERSON_ID, user_id: USER_ID }]);
+  await new RecoveryPlanRepository(listPool).list({ userId: USER_ID, limit: 999 });
+  assert.match(listPool.calls[0].sql, /WHERE user_id = \$1 AND status = ANY/);
+  assert.equal(listPool.calls[0].params[0], USER_ID);
+  assert.equal(listPool.calls[0].params[2], 50);
 });
 
 test('priority and source repositories keep owner intent separate from secret cursor state', async () => {

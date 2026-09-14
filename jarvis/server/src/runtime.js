@@ -76,6 +76,10 @@ const { LifePreferenceRepository } = require('./life/preferences/lifePreferenceR
 const { LifePreferenceService } = require('./life/preferences/lifePreferenceService');
 const { FeedbackAggregator } = require('./life/preferences/feedbackAggregator');
 const { PriorityRepository } = require('./life/priority/priorityRepository');
+const { PriorityEngine } = require('./life/priority/priorityEngine');
+const { ReminderRepository } = require('./life/reminders/reminderRepository');
+const { RecoveryPlanRepository } = require('./life/recovery/recoveryPlanRepository');
+const { SourceConnectionRepository } = require('./life/sources/sourceConnectionRepository');
 const { PeopleRepository } = require('./life/people/peopleRepository');
 const { PeopleService } = require('./life/people/peopleService');
 const { PersonLinker } = require('./life/people/personLinker');
@@ -138,6 +142,10 @@ async function createRuntime(config, overrides = {}) {
     let lifePeopleRepository = null;
     let lifePeopleService = null;
     let lifeFamilyAccessService = null;
+    let lifePriorityEngine = null;
+    let lifeReminderRepository = null;
+    let lifeRecoveryRepository = null;
+    let lifeSourceRepository = null;
     if (config.lifeOsEnabled) {
       lifeEventRepository = overrides.lifeEventRepository || new LifeEventRepository(pool);
       lifeProjectionRepository = overrides.lifeProjectionRepository || new LifeProjectionRepository(pool);
@@ -145,6 +153,10 @@ async function createRuntime(config, overrides = {}) {
       lifePreferenceRepository = overrides.lifePreferenceRepository || new LifePreferenceRepository(pool);
       lifePriorityRepository = overrides.lifePriorityRepository || new PriorityRepository(pool);
       lifePeopleRepository = overrides.lifePeopleRepository || new PeopleRepository(pool);
+      lifeReminderRepository = overrides.lifeReminderRepository || new ReminderRepository(pool);
+      lifeRecoveryRepository = overrides.lifeRecoveryRepository || new RecoveryPlanRepository(pool);
+      lifeSourceRepository = overrides.lifeSourceRepository || new SourceConnectionRepository(pool);
+      lifePriorityEngine = overrides.lifePriorityEngine || new PriorityEngine({ repository: lifePriorityRepository });
       lifeEventGateway = overrides.lifeEventGateway || new LifeEventGateway({
         repository: lifeEventRepository,
         enabled: true,
@@ -275,7 +287,13 @@ async function createRuntime(config, overrides = {}) {
       projectService = new LifeProjectService({ repository: lifeProjectionRepository, gateway: lifeEventGateway });
       timelineService = new TimelineService({ repository: lifeProjectionRepository });
       contextRecoveryService = new ContextRecoveryService({ repository: lifeProjectionRepository, deviceRepository });
-      missionControlService = new MissionControlService({ repository: lifeProjectionRepository, deviceRepository });
+      missionControlService = overrides.missionControlService || new MissionControlService({
+        repository: lifeProjectionRepository, deviceRepository,
+        priorityRepository: lifePriorityRepository, priorityEngine: lifePriorityEngine,
+        modeService: lifeModeService, preferenceRepository: lifePreferenceRepository,
+        reminderRepository: lifeReminderRepository, recoveryRepository: lifeRecoveryRepository,
+        sourceRepository: lifeSourceRepository, gateway: lifeEventGateway,
+      });
       const lifeContextComposer = overrides.lifeContextComposer || new LifeContextComposer({
         repository: lifeProjectionRepository,
         priorityRepository: lifePriorityRepository,
@@ -284,6 +302,7 @@ async function createRuntime(config, overrides = {}) {
         preferenceRepository: lifePreferenceRepository,
         peopleRepository: lifePeopleRepository,
         familyAccessService: lifeFamilyAccessService,
+        priorityEngine: lifePriorityEngine,
         deviceRepository,
         enabled: config.lifeOsContextEnabled,
         deadlineMs: config.lifeOsContextDeadlineMs,

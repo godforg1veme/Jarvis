@@ -102,14 +102,15 @@ class LifeProjectionRepository {
     return result.rows[0] || null;
   }
 
-  async listProjects({ userId, statuses = ['active', 'paused'] }) {
+  async listProjects({ userId, statuses = ['active', 'paused'], limit = 200 }) {
     const allowed = statuses.filter((status) => ['active', 'paused', 'completed', 'archived'].includes(status)).slice(0, 4);
     if (allowed.length === 0) return [];
     const result = await this.pool.query(`
       SELECT * FROM life_projects
       WHERE user_id = $1 AND status = ANY($2::text[])
       ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'paused' THEN 1 ELSE 2 END, updated_at DESC, id
-    `, [userId, allowed]);
+      LIMIT $3
+    `, [userId, allowed, Math.min(Math.max(Number(limit) || 200, 1), 200)]);
     return result.rows;
   }
 

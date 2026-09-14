@@ -30,7 +30,11 @@ function fixture() {
     },
     timelineService: { async list({ userId }) { calls.push(userId); return { items: [], nextCursor: null }; } },
     contextService: { async recover() { return null; } },
-    missionControlService: { async get({ userId }) { calls.push(userId); return { projects: [] }; } },
+    missionControlService: {
+      async get({ userId }) { calls.push(userId); return { projects: [] }; },
+      async pin({ userId, projectId }) { calls.push(userId); return { project_id: projectId, pinned: true, hidden_until: null, user_weight: 0, revision: 1 }; },
+      async replace() { return null; }, async hide() { return null; }, async restore() { return null; },
+    },
     proposalService: { async confirm() { return null; }, async dismiss() { return null; } },
     gateway: { async record() {} },
     modeService: {
@@ -143,5 +147,18 @@ test('people and family routes expose only authenticated owner-scoped records', 
   assert.equal(shared.statusCode, 200);
   assert.equal(shared.json().shared[0].label, 'Life OS');
   assert.deepEqual(calls.slice(-3), [USER, USER, USER]);
+  await app.close();
+});
+
+test('mission pin derives project owner from device authentication', async () => {
+  const { app, calls } = fixture();
+  const response = await app.inject({
+    method: 'POST', url: `/v1/desktop/life/missions/${PROJECT}/pin`,
+    headers: { authorization: 'Bearer valid' }, payload: {},
+  });
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json().priority.projectId, PROJECT);
+  assert.equal(response.json().priority.pinned, true);
+  assert.deepEqual(calls, [USER]);
   await app.close();
 });

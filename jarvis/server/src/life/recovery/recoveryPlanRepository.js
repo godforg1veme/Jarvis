@@ -68,6 +68,20 @@ class RecoveryPlanRepository {
     return { ...planResult.rows[0], steps: stepsResult.rows };
   }
 
+  async list({ userId, statuses = ['ready', 'awaiting_confirmation', 'executing', 'partial', 'outcome_unknown'], limit = 20 }) {
+    const allowed = statuses.filter((status) => [
+      'draft', 'ready', 'awaiting_confirmation', 'executing', 'completed', 'partial',
+      'failed', 'outcome_unknown', 'expired', 'cancelled',
+    ].includes(status)).slice(0, 10);
+    if (!allowed.length) return [];
+    const result = await this.pool.query(`
+      SELECT * FROM life_recovery_plans
+      WHERE user_id = $1 AND status = ANY($2::text[])
+      ORDER BY updated_at DESC, id DESC LIMIT $3
+    `, [userId, allowed, Math.min(Math.max(Number(limit) || 20, 1), 50)]);
+    return result.rows;
+  }
+
   async transition({ userId, planId, revision, fromStatuses, status }) {
     const allowedStatuses = [
       'draft', 'ready', 'awaiting_confirmation', 'executing', 'completed', 'partial',
