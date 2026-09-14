@@ -28,8 +28,10 @@ function publicEvent(row) {
 function publicCommitment(row) {
   return {
     id: row.id, sourceEventId: row.source_event_id, areaId: row.area_id || null, projectId: row.project_id || null,
+    personId: row.person_id || null, kind: row.kind || 'commitment',
     projectName: row.project_name || null, areaName: row.area_name || null, title: row.title, status: row.status,
-    dueAt: iso(row.due_at), confidence: Number(row.confidence), revision: row.revision,
+    dueAt: iso(row.due_at), dueWindowEndAt: iso(row.due_window_end_at), recurrence: row.recurrence || null,
+    confidence: Number(row.confidence), revision: row.revision,
     createdAt: iso(row.created_at), updatedAt: iso(row.updated_at),
   };
 }
@@ -37,9 +39,12 @@ function publicCommitment(row) {
 function publicProposal(row) {
   return {
     id: row.id, areaId: row.area_id || null, projectId: row.project_id || null,
+    personId: row.person_id || null, reminderId: row.reminder_id || null,
     projectName: row.project_name || null, commitmentId: row.commitment_id || null,
     commitmentTitle: row.commitment_title || null, title: row.title, explanation: row.explanation,
     status: row.status, risk: row.risk_class, action: row.action_name || null,
+    sourceRule: row.source_rule || 'core_v1', sourceRuleVersion: row.source_rule_version || 1,
+    confidence: Number(row.confidence ?? 1),
     origin: row.origin_channel, expiresAt: iso(row.expires_at), revision: row.revision,
     evidence: Array.isArray(row.evidence) ? row.evidence.slice(0, 32) : [],
   };

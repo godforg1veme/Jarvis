@@ -21,6 +21,12 @@ const TARGET_TABLES = Object.freeze({
   event: 'life_events',
   link: 'life_event_links',
   memory: 'memories',
+  person: 'life_people',
+  reminder: 'life_reminders',
+  recovery_plan: 'life_recovery_plans',
+  source_connection: 'life_source_connections',
+  mode: 'life_modes',
+  preference: 'life_preferences',
 });
 
 const DEFAULT_AREAS = Object.freeze([
@@ -159,17 +165,23 @@ class LifeProjectionRepository {
     const input = createCommitmentSchema.parse(raw);
     const result = await this.pool.query(`
       INSERT INTO life_commitments (
-        user_id, source_event_id, area_id, project_id, title, due_at, confidence
+        user_id, source_event_id, area_id, project_id, person_id, kind, title,
+        due_at, due_window_end_at, recurrence, external_source_ref, confidence
       )
-      SELECT $1, $2, $3, $4, $5, $6, $7
+      SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12
       WHERE EXISTS (SELECT 1 FROM life_events WHERE id = $2 AND user_id = $1)
         AND ($3::uuid IS NULL OR EXISTS (SELECT 1 FROM life_areas WHERE id = $3 AND user_id = $1))
         AND ($4::uuid IS NULL OR EXISTS (SELECT 1 FROM life_projects WHERE id = $4 AND user_id = $1))
+        AND ($5::uuid IS NULL OR EXISTS (SELECT 1 FROM life_people WHERE id = $5 AND user_id = $1))
       ON CONFLICT (user_id, source_event_id) DO UPDATE
         SET source_event_id = EXCLUDED.source_event_id
       RETURNING *
     `, [input.userId, input.sourceEventId, input.areaId || null, input.projectId || null,
-      input.title, input.dueAt ? new Date(input.dueAt) : null, input.confidence]);
+      input.personId || null, input.kind, input.title,
+      input.dueAt ? new Date(input.dueAt) : null,
+      input.dueWindowEndAt ? new Date(input.dueWindowEndAt) : null,
+      input.recurrence ? JSON.stringify(input.recurrence) : null,
+      input.externalSourceRef || null, input.confidence]);
     return result.rows[0] || null;
   }
 
@@ -189,18 +201,24 @@ class LifeProjectionRepository {
       }
       const result = await client.query(`
         INSERT INTO life_proposals (
-          id, user_id, area_id, project_id, commitment_id, title, explanation,
+          id, user_id, area_id, project_id, commitment_id, person_id, reminder_id,
+          title, explanation, source_rule, source_rule_version, confidence,
           risk_class, action_name, action_arguments, origin_channel,
           origin_conversation_id, origin_device_id, cooldown_key, expires_at
         )
-        SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12, $13, $14, $15
+        SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+          $13, $14, $15::jsonb, $16, $17, $18, $19, $20
         WHERE ($3::uuid IS NULL OR EXISTS (SELECT 1 FROM life_areas WHERE id = $3 AND user_id = $2))
           AND ($4::uuid IS NULL OR EXISTS (SELECT 1 FROM life_projects WHERE id = $4 AND user_id = $2))
           AND ($5::uuid IS NULL OR EXISTS (SELECT 1 FROM life_commitments WHERE id = $5 AND user_id = $2))
+          AND ($6::uuid IS NULL OR EXISTS (SELECT 1 FROM life_people WHERE id = $6 AND user_id = $2))
+          AND ($7::uuid IS NULL OR EXISTS (SELECT 1 FROM life_reminders WHERE id = $7 AND user_id = $2))
         RETURNING *
       `, [proposalId, input.userId, input.areaId || null, input.projectId || null,
-        input.commitmentId || null, input.title, input.explanation, input.riskClass,
-        input.actionName || null, JSON.stringify(input.actionArguments), input.originChannel,
+        input.commitmentId || null, input.personId || null, input.reminderId || null,
+        input.title, input.explanation, input.sourceRule, input.sourceRuleVersion,
+        input.confidence, input.riskClass, input.actionName || null,
+        JSON.stringify(input.actionArguments), input.originChannel,
         input.originConversationId || null, input.originDeviceId || null,
         input.cooldownKey, new Date(input.expiresAt)]);
       if (!result.rows[0]) throw new Error('proposal scope is unavailable');

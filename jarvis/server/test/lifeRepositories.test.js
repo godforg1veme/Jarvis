@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { LifeEventRepository } = require('../src/life/lifeEventRepository');
-const { LifeProjectionRepository } = require('../src/life/lifeProjectionRepository');
+const { LifeProjectionRepository, TARGET_TABLES } = require('../src/life/lifeProjectionRepository');
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 const OTHER_USER_ID = '99999999-9999-4999-8999-999999999999';
@@ -120,6 +120,24 @@ test('typed links select only an allowlisted target table and preserve owner che
     origin: 'trusted',
     confidence: 1,
   }));
+});
+
+test('Life OS v2 typed targets map only to closed owner-scoped tables', () => {
+  assert.deepEqual({
+    person: TARGET_TABLES.person,
+    reminder: TARGET_TABLES.reminder,
+    recovery_plan: TARGET_TABLES.recovery_plan,
+    source_connection: TARGET_TABLES.source_connection,
+    mode: TARGET_TABLES.mode,
+    preference: TARGET_TABLES.preference,
+  }, {
+    person: 'life_people',
+    reminder: 'life_reminders',
+    recovery_plan: 'life_recovery_plans',
+    source_connection: 'life_source_connections',
+    mode: 'life_modes',
+    preference: 'life_preferences',
+  });
 });
 
 test('proposal creation rolls back when any owner-scoped evidence is missing', async () => {

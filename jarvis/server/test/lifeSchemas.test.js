@@ -1,6 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
+  LIFE_EVENT_TYPES,
+  LINK_TARGET_TYPES,
+  SOURCE_CHANNELS,
   createProjectSchema,
   lifeEventInputSchema,
   lifeEventLinkInputSchema,
@@ -73,4 +76,19 @@ test('bounds project and Timeline request schemas', () => {
   assert.equal(timelineQuerySchema.parse({ limit: '100' }).limit, 100);
   assert.throws(() => timelineQuerySchema.parse({ limit: 101 }));
   assert.throws(() => timelineQuerySchema.parse({ cursor: 'x'.repeat(513) }));
+});
+
+test('Life OS v2 extends only closed event, source, and link registries', () => {
+  for (const eventType of ['person.created', 'mode.changed', 'reminder.delivered', 'recovery.completed', 'source.synced']) {
+    assert.ok(LIFE_EVENT_TYPES.includes(eventType));
+  }
+  for (const source of ['calendar', 'email', 'tasks', 'receipts', 'deliveries', 'travel', 'subscriptions', 'smart_home']) {
+    assert.ok(SOURCE_CHANNELS.includes(source));
+  }
+  for (const target of ['person', 'reminder', 'recovery_plan', 'source_connection']) {
+    assert.ok(LINK_TARGET_TYPES.includes(target));
+  }
+  assert.equal(LIFE_EVENT_TYPES.includes('shell.executed'), false);
+  assert.equal(SOURCE_CHANNELS.includes('arbitrary_provider'), false);
+  assert.equal(LINK_TARGET_TYPES.includes('table_name'), false);
 });

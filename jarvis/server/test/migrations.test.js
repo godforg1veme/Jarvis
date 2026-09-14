@@ -4,6 +4,7 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 const { DEFAULT_MIGRATIONS_DIR, listMigrationFiles, runMigrations } = require('../src/db/migrate');
+const { LIFE_EVENT_TYPES, LINK_TARGET_TYPES, SOURCE_CHANNELS } = require('../src/life/lifeSchemas');
 
 test('migration files are ordered and narrowly named', () => {
   const files = listMigrationFiles();
@@ -23,7 +24,39 @@ test('migration files are ordered and narrowly named', () => {
     '013_life_os_core.sql',
     '014_vpn_control.sql',
     '015_telegram_interactions.sql',
+    '016_life_os_v2.sql',
   ]);
+});
+
+test('Life OS v2 migration adds owner-scoped domains without sensitive payload storage', () => {
+  const migration = fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, '016_life_os_v2.sql'), 'utf8');
+  for (const table of [
+    'life_people',
+    'life_person_relationships',
+    'life_person_project_links',
+    'life_family_access_grants',
+    'life_modes',
+    'life_preferences',
+    'life_reminders',
+    'life_recovery_plans',
+    'life_recovery_steps',
+    'life_source_connections',
+    'life_source_cursors',
+    'life_project_priority_state',
+  ]) {
+    assert.match(migration, new RegExp(`CREATE TABLE ${table}`));
+  }
+  assert.match(migration, /FOREIGN KEY \(user_id, person_id\) REFERENCES life_people\(user_id, id\)/);
+  assert.match(migration, /FOREIGN KEY \(user_id, project_id\) REFERENCES life_projects\(user_id, id\)/);
+  assert.match(migration, /UNIQUE \(user_id, id\)/);
+  assert.match(migration, /UNIQUE \(user_id, idempotency_key\)/);
+  assert.match(migration, /claim_token uuid/);
+  assert.match(migration, /life_reminders_due_claim_idx/);
+  assert.match(migration, /target_type IN \([\s\S]*'person'[\s\S]*'reminder'[\s\S]*'recovery_plan'/);
+  for (const value of [...LIFE_EVENT_TYPES, ...SOURCE_CHANNELS, ...LINK_TARGET_TYPES]) {
+    assert.match(migration, new RegExp(`'${value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'`));
+  }
+  assert.doesNotMatch(migration, /audio_bytes|image_data|ocr_text|document_body|email_body|local_path|storage_key|api_key|access_token|refresh_token|password/i);
 });
 
 test('Telegram interaction migration keeps guided input owner-scoped and bounded', () => {

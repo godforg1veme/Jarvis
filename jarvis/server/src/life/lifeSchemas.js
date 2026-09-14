@@ -15,6 +15,9 @@ const LIFE_EVENT_TYPES = Object.freeze([
   'commitment.detected',
   'commitment.updated',
   'commitment.completed',
+  'task.created',
+  'task.updated',
+  'task.completed',
   'proposal.created',
   'proposal.dismissed',
   'proposal.confirmed',
@@ -25,15 +28,41 @@ const LIFE_EVENT_TYPES = Object.freeze([
   'workflow.failed',
   'workflow.outcome_unknown',
   'feedback.recorded',
+  'person.created',
+  'person.updated',
+  'person.archived',
+  'relationship.updated',
+  'family_access.granted',
+  'family_access.revoked',
+  'mode.changed',
+  'preference.updated',
+  'preference.deleted',
+  'reminder.created',
+  'reminder.rescheduled',
+  'reminder.cancelled',
+  'reminder.delivered',
+  'reminder.delivery_failed',
+  'reminder.outcome_unknown',
+  'recovery.prepared',
+  'recovery.started',
+  'recovery.completed',
+  'recovery.failed',
+  'recovery.outcome_unknown',
+  'source.synced',
+  'source.failed',
+  'mission.pinned',
+  'mission.hidden',
 ]);
 
 const SOURCE_CHANNELS = Object.freeze([
   'telegram', 'desktop', 'voice', 'vision', 'knowledge', 'memory', 'device', 'orchestrator', 'life_os', 'backfill',
+  'reminder', 'calendar', 'email', 'tasks', 'receipts', 'deliveries', 'travel', 'subscriptions', 'smart_home',
 ]);
 const PRIVACY_CLASSES = Object.freeze(['personal', 'family', 'sensitive']);
 const TRUST_LEVELS = Object.freeze(['trusted', 'inferred', 'user']);
 const LINK_TARGET_TYPES = Object.freeze([
   'area', 'project', 'conversation', 'document', 'device', 'workflow', 'commitment', 'proposal', 'event', 'memory',
+  'person', 'reminder', 'recovery_plan', 'source_connection',
 ]);
 const LINK_ORIGINS = Object.freeze(['trusted', 'inferred', 'user']);
 const PROJECT_STATUSES = Object.freeze(['active', 'paused', 'completed', 'archived']);
@@ -132,7 +161,7 @@ const timelineQuerySchema = z.object({
 
 const feedbackInputSchema = z.object({
   kind: z.enum(FEEDBACK_KINDS),
-  targetType: z.enum(['event', 'link', 'project', 'commitment', 'proposal']),
+  targetType: z.enum(['event', 'link', 'project', 'commitment', 'proposal', 'person', 'mode', 'preference', 'reminder']),
   targetId: idSchema,
   note: z.string().trim().max(500).default(''),
 }).strict();
@@ -142,18 +171,32 @@ const createCommitmentSchema = z.object({
   sourceEventId: idSchema,
   areaId: optionalId,
   projectId: optionalId,
+  personId: optionalId,
+  kind: z.enum(['commitment', 'task']).default('commitment'),
   title: boundedText(300),
   dueAt: timestampSchema.nullable().optional(),
+  dueWindowEndAt: timestampSchema.nullable().optional(),
+  recurrence: structuredDataSchema.nullable().optional(),
+  externalSourceRef: z.string().trim().min(1).max(256).nullable().optional(),
   confidence: z.number().min(0).max(1),
-}).strict();
+}).strict().superRefine((value, context) => {
+  if (value.dueAt && value.dueWindowEndAt && new Date(value.dueWindowEndAt) < new Date(value.dueAt)) {
+    context.addIssue({ code: 'custom', message: 'due window cannot end before it starts', path: ['dueWindowEndAt'] });
+  }
+});
 
 const createProposalSchema = z.object({
   userId: idSchema,
   areaId: optionalId,
   projectId: optionalId,
   commitmentId: optionalId,
+  personId: optionalId,
+  reminderId: optionalId,
   title: boundedText(300),
   explanation: boundedText(2000),
+  sourceRule: z.string().trim().regex(/^[a-z][a-z0-9_.-]{0,79}$/).default('core_v1'),
+  sourceRuleVersion: z.number().int().min(1).max(1000).default(1),
+  confidence: z.number().min(0).max(1).default(1),
   riskClass: z.enum(['safe', 'changing']),
   actionName: z.string().trim().regex(/^[a-z][a-z0-9_.-]{0,127}$/).nullable().optional(),
   actionArguments: z.record(z.string().min(1).max(80), z.unknown())
