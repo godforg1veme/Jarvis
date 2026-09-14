@@ -131,6 +131,49 @@ function artifactFrom(data) {
   };
 }
 
+function formatConnectionAnswer(protocol, action, data) {
+  const normalized = normalizeProtocol(protocol);
+  const title = PROTOCOLS[normalized]?.title || 'VPN';
+  const uri = String(data?.shareUri || '').trim();
+  const label = String(data?.client?.label || '').trim();
+
+  if (action === 'revoke') {
+    return `${title}-доступ ${label ? `«${label}» ` : ''}отозван.`;
+  }
+  if (action === 'restart') {
+    return `${title} VPN перезапущен.`;
+  }
+
+  const actionHeaders = {
+    issue: `✅ **${title}-доступ ${label ? `«${label}» ` : ''}создан!**`,
+    rotate: `🔄 **${title}-доступ ${label ? `«${label}» ` : ''}перевыпущен!**\n*Старый ключ больше не действует.*`,
+    export: `📄 **Ключ подключения ${title}${label ? ` «${label}»` : ''}:**`,
+  };
+
+  const header = actionHeaders[action] || `✅ **${title}-доступ готов!**`;
+
+  if (!uri) {
+    return `${header}\n\nФайл для импорта в Happ приложен.`;
+  }
+
+  return [
+    header,
+    '',
+    '🔑 **Ваш ключ (нажмите для копирования в 1 клик):**',
+    `\`${uri}\``,
+    '',
+    '📲 **Импорт в Happ за 1 клик:**',
+    '• **iPhone / Android:** Нажмите на ключ выше (он скопируется в буфер) → откройте приложение Happ → оно автоматически предложит добавить сервер, нажмите **«Добавить»**!',
+    '• **ПК (Windows / Mac):** Скопируйте ключ выше → в приложении Happ нажмите **«+»** → **«Импорт из буфера обмена»** (или `Ctrl+V`).',
+    '',
+    '💡 *Импорт через буфер обмена работает без ошибок на всех платформах.*',
+    '⚠️ *Не используйте «Открыть через Happ» для прикреплённого .txt файла — Happ пытается прочесть .txt как JSON и выдаёт ошибку «конфиг неправильный». Просто скопируйте ключ выше!*',
+    '',
+    '🌐 **Обход РФ (Госуслуги, банки, маркетплейсы):**',
+    'Нажмите кнопку **«🌐 Обход РФ»** ниже, чтобы все российские сайты работали напрямую без VPN на максимальной скорости.',
+  ].join('\n');
+}
+
 function actionPrompt(action, args) {
   const title = PROTOCOLS[normalizeProtocol(args.protocol)].title;
   if (action === 'issue') return `Создать новый ${title}-доступ «${args.label}»?`;
@@ -256,15 +299,8 @@ class VpnCommandService {
     await this.repository.audit({ userId: context.userId, requestId: record.id, type: success ? 'vpn.action.succeeded' : 'vpn.action.failed', metadata: { action: record.action, protocol, errorCode: response.result.errorCode || null } });
     if (!success) return { answer: `VPN-действие не выполнено: ${response.result.errorCode || 'неизвестный результат'}.`, buttons: protocolButtons(protocol) };
     const artifact = artifactFrom(response.result.data);
-    const title = PROTOCOLS[protocol].title;
-    const labels = {
-      issue: `${title}-доступ создан. Файл для импорта в Happ приложен.\n\n💡 Чтобы Госуслуги, банки и .ru открывались напрямую без отключения VPN, используйте кнопку «🌐 Обход РФ» ниже.`,
-      revoke: `${title}-доступ отозван.`,
-      rotate: `${title}-доступ перевыпущен. Старый ключ больше не работает; новый файл приложен.\n\n💡 Чтобы Госуслуги, банки и .ru открывались напрямую без отключения VPN, используйте кнопку «🌐 Обход РФ» ниже.`,
-      export: `Файл ${title} для импорта в Happ подготовлен.\n\n💡 Чтобы Госуслуги, банки и .ru открывались напрямую без отключения VPN, используйте кнопку «🌐 Обход РФ» ниже.`,
-      restart: `${title} VPN перезапущен.`,
-    };
-    return { answer: labels[record.action], ...(artifact ? { artifact } : {}), buttons: protocolButtons(protocol) };
+    const answer = formatConnectionAnswer(protocol, record.action, response.result.data);
+    return { answer, ...(artifact ? { artifact } : {}), buttons: protocolButtons(protocol) };
   }
 
   async handleCallback(context) {
@@ -339,4 +375,4 @@ class VpnCommandService {
   }
 }
 
-module.exports = { CONFIRMATION_TTL_MS, PROTOCOLS, VpnCommandService, artifactFrom, menuButtons, parseVpnCallback, parseVpnCommand, protocolButtons, safeHostData, validateAction };
+module.exports = { CONFIRMATION_TTL_MS, PROTOCOLS, VpnCommandService, artifactFrom, formatConnectionAnswer, menuButtons, parseVpnCallback, parseVpnCommand, protocolButtons, safeHostData, validateAction };

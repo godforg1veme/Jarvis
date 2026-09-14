@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { VpnCommandService, artifactFrom, parseVpnCallback, parseVpnCommand, safeHostData, validateAction } = require('../src/vpn/vpnCommandService');
+const { VpnCommandService, artifactFrom, formatConnectionAnswer, parseVpnCallback, parseVpnCommand, safeHostData, validateAction } = require('../src/vpn/vpnCommandService');
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 const DEVICE_ID = '22222222-2222-4222-8222-222222222222';
@@ -150,3 +150,36 @@ test('routing command and callback return split-tunneling summary and artifact',
   assert.match(viaCallback.answer, /Раздельная маршрутизация/);
   assert.equal(viaCallback.artifact.kind, 'happ-routing');
 });
+
+test('formatConnectionAnswer generates 1-click Happ instructions and code block for keys', () => {
+  const data = {
+    client: { id: 'vpn-0123456789ab', label: 'iPhone' },
+    shareUri: 'hy2://secret@vpn.rilora.ru:443/?obfs=salamander#iPhone',
+  };
+
+  const issueAnswer = formatConnectionAnswer('hysteria2', 'issue', data);
+  assert.match(issueAnswer, /Hysteria2-доступ «iPhone» создан!/);
+  assert.ok(issueAnswer.includes('`hy2://secret@vpn.rilora.ru:443/?obfs=salamander#iPhone`'));
+  assert.match(issueAnswer, /Импорт в Happ за 1 клик/);
+  assert.match(issueAnswer, /iPhone \/ Android/);
+  assert.match(issueAnswer, /ПК \(Windows \/ Mac\)/);
+  assert.match(issueAnswer, /Обход РФ/);
+
+  const rotateAnswer = formatConnectionAnswer('hysteria2', 'rotate', data);
+  assert.match(rotateAnswer, /перевыпущен/);
+  assert.ok(rotateAnswer.includes('`hy2://secret@vpn.rilora.ru:443/?obfs=salamander#iPhone`'));
+
+  const exportAnswer = formatConnectionAnswer('vless', 'export', {
+    client: { id: 'vpn-0123456789ab', label: 'Laptop' },
+    shareUri: 'vless://secret@example.test:443?security=reality#Laptop',
+  });
+  assert.match(exportAnswer, /Ключ подключения VLESS «Laptop»/);
+  assert.ok(exportAnswer.includes('`vless://secret@example.test:443?security=reality#Laptop`'));
+
+  const revokeAnswer = formatConnectionAnswer('hysteria2', 'revoke', { client: { label: 'Old Phone' } });
+  assert.equal(revokeAnswer, 'Hysteria2-доступ «Old Phone» отозван.');
+
+  const restartAnswer = formatConnectionAnswer('hysteria2', 'restart', {});
+  assert.equal(restartAnswer, 'Hysteria2 VPN перезапущен.');
+});
+

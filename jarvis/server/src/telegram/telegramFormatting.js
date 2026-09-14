@@ -1,10 +1,21 @@
 const TELEGRAM_MESSAGE_LIMIT = 4000;
 
+const ALLOWED_TELEGRAM_TAGS_RE = /<\/?(?:b|strong|i|em|u|ins|s|strike|del|span|tg-spoiler|code|pre|blockquote)\b[^>]*>|<a\s+href="https?:\/\/[^"]*"[^>]*>|<\/a>/gi;
+
 function escapeTelegramHtml(value) {
-  return String(value || '')
+  const text = String(value || '');
+  const placeholders = [];
+  const protectedText = text.replace(ALLOWED_TELEGRAM_TAGS_RE, (match) => {
+    placeholders.push(match);
+    return `\x00TAG_${placeholders.length - 1}\x00`;
+  });
+  const escaped = protectedText
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+  return placeholders.length
+    ? escaped.replace(/\x00TAG_(\d+)\x00/g, (_, index) => placeholders[Number(index)])
+    : escaped;
 }
 
 function formatPlainMarkdown(value) {
@@ -13,7 +24,9 @@ function formatPlainMarkdown(value) {
     .replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>')
     .replace(/__([^_\n]+)__/g, '<b>$1</b>')
     .replace(/~~([^~\n]+)~~/g, '<s>$1</s>')
-    .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<i>$2</i>');
+    .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<i>$2</i>')
+    .replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2">$1</a>')
+    .replace(/^&gt;\s*(.+)$/gm, '<blockquote>$1</blockquote>');
 }
 
 function formatTelegramHtml(markdown) {

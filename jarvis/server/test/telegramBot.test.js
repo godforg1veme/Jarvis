@@ -17,6 +17,18 @@ test('renders restrained Markdown as safe Telegram HTML', () => {
     '<b>Важно:</b> &lt;script&gt;alert(1)&lt;/script&gt; и <code>a &lt; b</code>',
   );
   assert.equal(formatTelegramHtml('*курсив* и ~~зачёркнуто~~'), '<i>курсив</i> и <s>зачёркнуто</s>');
+  assert.equal(
+    formatTelegramHtml('• Настройки → Маршрутизация -> Выбор => OK'),
+    '• Настройки → Маршрутизация -&gt; Выбор =&gt; OK',
+  );
+  assert.equal(
+    formatTelegramHtml('[Happ](https://happ.su)\n> Цитата'),
+    '<a href="https://happ.su">Happ</a>\n<blockquote>Цитата</blockquote>',
+  );
+  assert.equal(
+    formatTelegramHtml('<b>Жирный HTML</b> и <code>код</code>'),
+    '<b>Жирный HTML</b> и <code>код</code>',
+  );
 });
 
 test('sends Telegram replies with HTML parsing enabled', async () => {
