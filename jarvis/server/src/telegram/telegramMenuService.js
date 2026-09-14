@@ -9,6 +9,7 @@ function memoryMenu() {
     [{ text: '📋 Что ты помнишь', data: 'mem:list' }],
     [{ text: '➕ Запомнить', data: 'mem:add' }, { text: '✏️ Исправить', data: 'mem:correct' }],
     [{ text: '🗑 Забыть', data: 'mem:forget' }],
+    [{ text: '🖼 Файлы и кадры', data: 'gallery:page:0' }],
   ];
 }
 
@@ -37,6 +38,7 @@ class TelegramMenuService {
     this.knowledgeService = options.knowledgeService || null;
     this.vpnService = options.vpnService || null;
     this.lifeMissionControlService = options.lifeMissionControlService || null;
+    this.memoryGalleryService = options.memoryGalleryService || null;
     this.ownerTelegramId = String(options.ownerTelegramId || '0');
     this.operationsEnabled = options.operationsEnabled === true;
     const configuredOperationsUrl = this.operationsEnabled && options.operationsPublicOrigin
@@ -172,6 +174,13 @@ class TelegramMenuService {
     if (flow) {
       const cancelled = await this._cancel(context, flow[1]);
       return { answer: cancelled ? 'Действие отменено.' : 'Этот запрос уже недоступен.' };
+    }
+
+    if (data.startsWith('gallery:')) {
+      await this._cancel(context);
+      return this.memoryGalleryService
+        ? this.memoryGalleryService.handleCallback(data, context)
+        : { answer: 'Файлы и кадры сейчас недоступны.', buttons: memoryMenu() };
     }
 
     if (/^(?:mem|doc|dev|life):/.test(data) || /^vpn:(?!confirm:|reject:)/.test(data)) {

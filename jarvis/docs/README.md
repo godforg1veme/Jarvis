@@ -17,6 +17,20 @@ separately authenticated Operations link. Live owner/member Telegram client
 acceptance remains manual. See
 `updates/2026-09-14-telegram-button-navigation.md`.
 
+Telegram memory gallery and VPN fix, 2026-09-14: the bottom-menu dispatcher now
+preserves the authenticated canonical user UUID, so the existing VPN service can
+perform its owner check instead of rejecting a valid owner as
+`VPN_OWNER_REQUIRED`. `🧠 Память` now includes an owner-scoped, paginated
+`🖼 Файлы и кадры` gallery over uploaded documents and readable retained Visual
+Memory frames. A selection sends transient photo/file content first, then offers
+separate delete, keep, and back controls; callbacks and conversations contain no
+bytes or storage internals. The complete 261-test server suite passed. The
+server-only production rebuild, Compose health, public smoke, sanitized log
+review, actual VPN-menu service call, and gallery query against production data
+passed. Real Telegram taps, media delivery, and deletion of a disposable item
+remain manual client acceptance. See
+`updates/2026-09-14-telegram-memory-gallery-vpn-fix.md`.
+
 App resolution & AI recovery update, 2026-09-14: Start Menu indexing was fixed
 to use UTF-8 encoded PowerShell invocations, Cyrillic inflection stemming was added
 to appResolver, and AI-assisted candidate recovery via AppRecoveryService was wired
@@ -81,6 +95,7 @@ attachment ingestion.
 | `AGENTS.md` | Authoritative runtime, safety, code, and verification rules |
 | `deploy/README.md` | Current Ubuntu 24.04 and Cloudflare Tunnel operations |
 | `updates/2026-09-01-cloud-desktop-memory-rollout.md` | Итог текущего развёртывания Desktop, памяти, устройств и известных ограничений |
+| `updates/2026-09-14-telegram-memory-gallery-vpn-fix.md` | Production rollout record for the VPN owner-context fix and unified Telegram memory gallery |
 | `CLAUDE.md`, `gemini.md` | Thin pointers to the authoritative agent context |
 | This file | Status and supersession index |
 
@@ -98,6 +113,8 @@ attachment ingestion.
 | `superpowers/plans/2026-09-13-jarvis-managed-hysteria2-fallback.md` | Implemented and production-verified on 2026-09-14; retained as rollout history. |
 | `superpowers/specs/2026-09-14-telegram-human-button-navigation-design.md` | Implemented and deployed with persistent role-aware navigation, guided input, inline confirmations, and an owner-only Operations link; live owner/member Telegram acceptance remains. |
 | `superpowers/plans/2026-09-14-telegram-human-button-navigation.md` | Implemented, covered by the complete server test suite, and production-deployed on 2026-09-14; retained as execution history. |
+| `superpowers/specs/2026-09-14-telegram-unified-memory-gallery-vpn-owner-fix-design.md` | Implemented and production-deployed; automated owner-context, gallery-query, health, smoke, and 261-test acceptance passed. Real Telegram media/delete acceptance remains manual. |
+| `superpowers/plans/2026-09-14-telegram-unified-memory-gallery-vpn-owner-fix.md` | Implemented and production-deployed on 2026-09-14; retained as execution history with manual Telegram acceptance explicitly outstanding. |
 | `superpowers/specs/2026-09-12-jarvis-life-os-core-v1-design.md` | Implemented and production-enabled: owner-scoped Event Spine, projections, Timeline, context recovery, explainable proposals, Telegram commands, and Desktop Mission Control. Optional model enrichment remains disabled. |
 | `superpowers/plans/2026-09-12-jarvis-life-os-core-v1.md` | Implemented, packaged, installed, and production-verified on 2026-09-13; retained as execution history. |
 | `superpowers/plans/2026-09-09-jarvis-vision.md` | Execution plan adapted to the current cloud-brain/local-hands architecture; first camera + two-display + memory slice implemented and locally accepted |

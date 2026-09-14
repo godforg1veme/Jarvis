@@ -27,7 +27,7 @@ function harness(overrides = {}) {
     operationsEnabled: true,
     operationsPublicOrigin: 'https://ops.example.test',
     vpnService: {
-      async openMenu() { return { answer: 'Выбери VPN-протокол:', buttons: [[{ text: 'H2', data: 'vpn:p:h' }]] }; },
+      async openMenu(input) { calls.push(['vpn-open', input]); return { answer: 'Выбери VPN-протокол:', buttons: [[{ text: 'H2', data: 'vpn:p:h' }]] }; },
       async handleCallback(context) {
         if (context.data === 'vpn:h:new') return { answer: 'Как назвать?', requestInput: { kind: 'vpn_access_label', context: { protocol: 'hysteria2' } } };
         return null;
@@ -45,6 +45,9 @@ function harness(overrides = {}) {
       async correctById(input) { calls.push(['correct', input]); return { ok: true }; },
       async forgetById(input) { calls.push(['forget', input]); return { ok: true }; },
     },
+    memoryGalleryService: {
+      async handleCallback(data, context) { calls.push(['gallery', { data, userId: context.userId }]); return { answer: 'Галерея открыта.', buttons: [[{ text: 'Назад', data: 'mem:menu' }]] }; },
+    },
     knowledgeService: {
       async list() { return documents; },
       async remove(input) { calls.push(['remove', input]); return documents[0]; },
@@ -60,16 +63,27 @@ function harness(overrides = {}) {
 }
 
 test('home and Operations are role-aware and use only the configured panel URL', async () => {
-  const { service, context } = harness();
+  const { service, context, calls } = harness();
   const home = await service.handleMenuAction('home', context);
   assert.equal(home.replyKeyboard.keyboard.flat().some((button) => button.text === '🔐 VPN'), true);
   const panel = await service.handleMenuAction('operations', context);
   assert.equal(panel.buttons[0][0].url, 'https://ops.example.test/ops/');
+  await service.handleMenuAction('vpn', context);
+  assert.equal(calls.find(([name]) => name === 'vpn-open')[1].userId, USER_ID);
 
   const member = { ...context, user: { ...context.user, role: 'member' }, telegramUserId: '202' };
   const memberHome = await service.handleMenuAction('home', member);
   assert.equal(memberHome.replyKeyboard.keyboard.flat().some((button) => button.text === '🔐 VPN'), false);
   assert.equal((await service.handleMenuAction('operations', member)).buttons, undefined);
+});
+
+test('memory menu exposes the unified gallery and routes it with canonical owner scope', async () => {
+  const { service, context, calls } = harness();
+  const memory = await service.handleMenuAction('memory', context);
+  assert.equal(memory.buttons.some((row) => row.some((button) => button.data === 'gallery:page:0')), true);
+  const gallery = await service.handleCallback('gallery:page:0', context);
+  assert.equal(gallery.answer, 'Галерея открыта.');
+  assert.deepEqual(calls.find(([name]) => name === 'gallery')[1], { data: 'gallery:page:0', userId: USER_ID });
 });
 
 test('VPN new-access button asks only for a label and consumes the flow before creating confirmation', async () => {

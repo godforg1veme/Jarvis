@@ -104,3 +104,11 @@ test('document search always scopes the chunk and joined document to its owner',
   assert.match(calls[0].sql, /d\.id = c\.document_id AND d\.user_id = c\.user_id/);
   assert.deepEqual(calls[0].values, ['owner-a', 'секрет', 40]);
 });
+
+test('document delivery lookup binds the document to its owner', async () => {
+  const calls = [];
+  const repository = new DocumentRepository({ async query(sql, values) { calls.push({ sql: String(sql), values }); return { rows: [] }; } });
+  assert.equal(await repository.getActiveForUser({ userId: 'owner-a', documentId: 'doc-a' }), null);
+  assert.match(calls[0].sql, /id=\$1 AND user_id=\$2/);
+  assert.deepEqual(calls[0].values, ['doc-a', 'owner-a']);
+});

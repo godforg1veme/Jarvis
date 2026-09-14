@@ -237,6 +237,28 @@ class KnowledgeService {
     return this.repository.listForUser({ userId, limit: 30 });
   }
 
+  async readForDelivery({ userId, documentId }) {
+    const document = await this.repository.getActiveForUser({ userId, documentId });
+    if (!document) return null;
+    let content;
+    try {
+      content = await this.storage.read(document.storage_key);
+    } catch (_) {
+      throw new Error('document preview unavailable');
+    }
+    if (!Buffer.isBuffer(content) || content.length === 0 || content.length > this.maxBytes) throw new Error('document preview unavailable');
+    const contentType = /^[\w.+-]+\/[\w.+-]+$/i.test(String(document.media_type || ''))
+      ? String(document.media_type).toLowerCase()
+      : 'application/octet-stream';
+    return {
+      content,
+      contentType,
+      filename: safeDisplayName(document.original_name),
+      category: document.category,
+      byteLength: content.length,
+    };
+  }
+
   async remove({ userId, documentId }) {
     const deleted = await this.repository.deleteForUser({ userId, documentId });
     if (!deleted) return null;

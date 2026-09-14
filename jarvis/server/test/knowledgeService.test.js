@@ -272,3 +272,23 @@ test('rejects changed or oversized attachment bytes before persistence', async (
     /too large/,
   );
 });
+
+test('reads a document for delivery only through an owner-scoped record', async () => {
+  const calls = [];
+  const repository = {
+    async getActiveForUser(input) {
+      calls.push(input);
+      return input.userId === 'owner-a'
+        ? { original_name: 'photo.jpg', media_type: 'image/jpeg', category: 'image', storage_key: 'aa/opaque' }
+        : null;
+    },
+  };
+  const storage = { async read(key) { assert.equal(key, 'aa/opaque'); return Buffer.from('private-image'); } };
+  const service = new KnowledgeService({ repository, storage, maxBytes: 1024 });
+  const delivery = await service.readForDelivery({ userId: 'owner-a', documentId: 'doc-a' });
+  assert.equal(delivery.content.toString(), 'private-image');
+  assert.equal(delivery.filename, 'photo.jpg');
+  assert.equal('storageKey' in delivery || 'storage_key' in delivery, false);
+  assert.equal(await service.readForDelivery({ userId: 'other-owner', documentId: 'doc-a' }), null);
+  assert.deepEqual(calls[0], { userId: 'owner-a', documentId: 'doc-a' });
+});

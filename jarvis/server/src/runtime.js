@@ -11,6 +11,8 @@ const { MAX_TELEGRAM_VOICE_BYTES, TelegramMessageService } = require('./telegram
 const { TelegramUpdateRepository } = require('./telegram/telegramUpdateRepository');
 const { TelegramInteractionRepository } = require('./telegram/telegramInteractionRepository');
 const { TelegramMenuService } = require('./telegram/telegramMenuService');
+const { TelegramMemoryGalleryRepository } = require('./telegram/telegramMemoryGalleryRepository');
+const { TelegramMemoryGalleryService } = require('./telegram/telegramMemoryGalleryService');
 const { UserRepository } = require('./users/userRepository');
 const { ConversationRepository } = require('./conversations/conversationRepository');
 const { DeviceRepository } = require('./devices/deviceRepository');
@@ -348,6 +350,11 @@ async function createRuntime(config, overrides = {}) {
     }
 
     if (!bot && config.telegramBotToken) {
+      const memoryGalleryService = new TelegramMemoryGalleryService({
+        repository: overrides.telegramMemoryGalleryRepository || new TelegramMemoryGalleryRepository(pool),
+        knowledgeService,
+        visualMemoryService,
+      });
       const menuService = new TelegramMenuService({
         interactions: overrides.telegramInteractionRepository || new TelegramInteractionRepository(pool),
         deviceService,
@@ -355,6 +362,7 @@ async function createRuntime(config, overrides = {}) {
         knowledgeService,
         vpnService,
         lifeMissionControlService: missionControlService,
+        memoryGalleryService,
         ownerTelegramId: config.operationsOwnerTelegramId,
         operationsEnabled: config.operationsEnabled,
         operationsPublicOrigin: config.operationsPublicOrigin,

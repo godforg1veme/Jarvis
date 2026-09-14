@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { downloadTelegramAttachment, replyWithChunks, sendResult, splitTelegramText, validatedReplyKeyboard, vpnReplyMarkup } = require('../src/telegram/bot');
+const { downloadTelegramAttachment, replyWithChunks, sendResult, splitTelegramText, validatedMedia, validatedReplyKeyboard, vpnReplyMarkup } = require('../src/telegram/bot');
 const { formatTelegramHtml } = require('../src/telegram/telegramFormatting');
 
 test('splits long Telegram replies without losing text', () => {
@@ -46,6 +46,7 @@ test('renders only closed bounded VPN inline buttons on the final reply', async 
   assert.doesNotThrow(() => vpnReplyMarkup([[{ text: 'Память', data: 'mem:edit:33333333-3333-4333-8333-333333333333' }]]));
   assert.doesNotThrow(() => vpnReplyMarkup([[{ text: 'Устройство', data: 'dev:task:33333333-3333-4333-8333-333333333333' }]]));
   assert.doesNotThrow(() => vpnReplyMarkup([[{ text: 'Отмена', data: 'flow:cancel:33333333-3333-4333-8333-333333333333' }]]));
+  assert.doesNotThrow(() => vpnReplyMarkup([[{ text: 'Фото', data: 'gallery:open:d:33333333-3333-4333-8333-333333333333:0' }]]));
 });
 
 test('renders persistent bottom navigation separately from inline buttons', async () => {
@@ -94,4 +95,26 @@ test('sends a validated Hysteria2 artifact and rejects a mismatched kind', async
     status: 'answered', answer: 'Нет',
     artifact: { kind: 'happ-vless', filename: 'wrong.txt', content: 'hy2://secret\n' },
   }), /invalid VPN artifact/);
+});
+
+test('sends bounded gallery media with decision buttons and does not send duplicate text', async () => {
+  const photos = [];
+  const ctx = {
+    async reply() { throw new Error('media preview must not send a duplicate text message'); },
+    async replyWithPhoto(photo, options) { photos.push({ photo, options }); },
+  };
+  const content = Buffer.from([0xff, 0xd8, 0xff, 0x01]);
+  await sendResult(ctx, {
+    status: 'answered', answer: 'Файл отправлен для просмотра.',
+    media: {
+      kind: 'photo', content, contentType: 'image/jpeg', filename: 'photo.jpg', caption: 'Удалить или оставить?',
+      buttons: [[{ text: 'Оставить', data: 'gallery:keep:0' }]],
+    },
+  }, { mediaMaxBytes: 1024 });
+  assert.equal(photos.length, 1);
+  assert.equal(photos[0].options.reply_markup.inline_keyboard[0][0].callback_data, 'gallery:keep:0');
+  assert.throws(() => validatedMedia({ kind: 'photo', content, contentType: 'application/pdf', filename: 'photo.jpg' }), /photo/);
+  assert.throws(() => validatedMedia({ kind: 'photo', content: Buffer.from('not-a-jpeg'), contentType: 'image/jpeg', filename: 'photo.jpg' }), /photo/);
+  assert.throws(() => validatedMedia({ kind: 'document', content, contentType: 'application/pdf', filename: '../secret' }), /filename/);
+  assert.throws(() => validatedMedia({ kind: 'document', content: Buffer.alloc(2), contentType: 'application/pdf', filename: 'a.pdf' }, { mediaMaxBytes: 1 }), /media/);
 });

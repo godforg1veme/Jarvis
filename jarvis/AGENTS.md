@@ -42,10 +42,15 @@ See `docs/README.md` for current implementation status and historical records.
 - `server/` is a Node.js 20+, CommonJS, Fastify service.
 - `server/src/telegram/` handles allowlisted Telegram users, update
   deduplication, persistent role-aware bottom navigation, bounded inline
-  controls, and PostgreSQL-backed guided text input. Owner-only VPN and
-  Operations entries remain authorization-checked on every action; menu labels
-  are presentation, not authority. This navigation and migration 015 were
-  deployed on 2026-09-14; live owner/member client acceptance remains manual.
+  controls, PostgreSQL-backed guided text input, and an owner-scoped paginated
+  gallery that can transiently deliver uploaded documents and readable retained
+  Visual Memory frames before a separate keep/delete choice. Gallery callbacks
+  carry only closed source identifiers and bounded page state; bytes, storage
+  keys, and paths must not enter callbacks or conversation history. Owner-only
+  VPN and Operations entries remain authorization-checked on every action; menu
+  labels are presentation, not authority. Navigation, migration 015, the VPN
+  owner-context fix, and the memory gallery were deployed on 2026-09-14; live
+  owner/member media and deletion acceptance remains manual.
 - PostgreSQL with pgvector is the source of truth for cloud identity,
   conversations, memory, private document metadata/chunks, and device domains.
 - `server/src/prompts/` builds the versioned Jarvis persona and keeps trusted

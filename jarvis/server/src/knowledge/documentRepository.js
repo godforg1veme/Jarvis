@@ -130,6 +130,15 @@ class DocumentRepository {
     return result.rows;
   }
 
+  async getActiveForUser({ userId, documentId }) {
+    const result = await this.pool.query(`
+      SELECT id,original_name,media_type,storage_key,byte_size,category,status
+      FROM documents
+      WHERE id=$1 AND user_id=$2 AND status<>'deleted'
+    `, [documentId, userId]);
+    return result.rows[0] || null;
+  }
+
   async claimNextIngest(workerId) {
     const result = await this.pool.query(`
       WITH maintenance AS MATERIALIZED (

@@ -270,7 +270,7 @@ test('routes start and exact bottom-menu labels without storing presentation tex
   const menuCalls = [];
   const menuService = {
     async handleMenuAction(action, context) {
-      menuCalls.push({ action, telegramUserId: context.telegramUserId });
+      menuCalls.push({ action, telegramUserId: context.telegramUserId, userId: context.userId, conversationId: context.conversationId });
       return { answer: `menu:${action}`, replyKeyboard: { keyboard: [[{ text: '🏠 Главное' }]], resize_keyboard: true, is_persistent: true } };
     },
     async handlePendingText() { return null; },
@@ -282,6 +282,8 @@ test('routes start and exact bottom-menu labels without storing presentation tex
   assert.equal(started.answer, 'menu:home');
   assert.equal(devices.answer, 'menu:devices');
   assert.deepEqual(menuCalls.map((call) => call.action), ['home', 'devices']);
+  assert.equal(menuCalls[0].userId, 'user-101');
+  assert.equal(menuCalls[0].conversationId, 'conversation-user-101:101');
   assert.equal(state.messages.some((message) => message.role === 'user'), false);
   assert.equal(assistantCalls.length, 0);
 });

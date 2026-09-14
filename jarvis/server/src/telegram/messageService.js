@@ -9,6 +9,19 @@ const { parseRemoteCommand, remoteCommandReply } = require('../commands/commandT
 const { recordMessageEvent } = require('../life/lifeSourceEvents');
 const { menuAction } = require('./telegramMenu');
 
+function telegramMenuContext({ user, conversation, input }) {
+  return {
+    user,
+    userId: user.id,
+    conversation,
+    conversationId: conversation.id,
+    telegramUserId: input.telegramUserId,
+    chatId: input.chatId,
+    originChannel: 'telegram',
+    originDeviceId: null,
+  };
+}
+
 function voiceFromTelegramMessage(message = {}) {
   const candidate = message.voice;
   if (!candidate || !candidate.file_id) return null;
@@ -171,15 +184,12 @@ class TelegramMessageService {
     if (!claimed) return { status: 'duplicate' };
     const user = await this.userRepository.findOrCreateTelegramUser({ telegramUserId: input.telegramUserId, displayName: input.displayName });
     const conversation = await this.conversationRepository.getOrCreate({ userId: user.id, channel: 'telegram', externalChatId: input.chatId });
+    const menuContext = telegramMenuContext({ user, conversation, input });
 
     if (this.menuService) {
       let menuResult;
       try {
-        menuResult = await this.menuService.handleCallback(input.data, {
-          data: input.data, user, telegramUserId: input.telegramUserId, chatId: input.chatId,
-          conversation, userId: user.id, conversationId: conversation.id,
-          originChannel: 'telegram', originDeviceId: null,
-        });
+        menuResult = await this.menuService.handleCallback(input.data, { ...menuContext, data: input.data });
       } catch (error) {
         menuResult = input.data.startsWith('vpn:') ? vpnPublicError(error) : null;
         if (!menuResult) throw error;
@@ -455,6 +465,7 @@ class TelegramMessageService {
       channel: 'telegram',
       externalChatId: input.chatId,
     });
+    const menuContext = telegramMenuContext({ user, conversation, input });
 
     let guidedDesktopInstruction = null;
     if (this.menuService && !input.attachment && !input.voice) {
@@ -463,17 +474,13 @@ class TelegramMessageService {
         : /^\/help(?:@\w+)?$/i.test(input.text) ? 'help' : null;
       const action = menuAction(input.text) || legacyNavigation;
       if (action) {
-        const menuResult = await this.menuService.handleMenuAction(action, {
-          user, telegramUserId: input.telegramUserId, chatId: input.chatId, conversation,
-        });
+        const menuResult = await this.menuService.handleMenuAction(action, menuContext);
         const answer = String(menuResult?.answer || '').trim();
         if (!answer) throw new Error('Telegram menu returned an empty answer');
         await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: answer });
         return { status: 'answered', ...menuResult, answer };
       }
-      const pendingResult = await this.menuService.handlePendingText(input.text, {
-        user, telegramUserId: input.telegramUserId, chatId: input.chatId, conversation,
-      });
+      const pendingResult = await this.menuService.handlePendingText(input.text, menuContext);
       if (pendingResult?.desktopInstruction) {
         guidedDesktopInstruction = pendingResult.desktopInstruction;
         input.text = guidedDesktopInstruction.text;
@@ -699,4 +706,5 @@ module.exports = {
   validateTelegramVoice,
   vpnPublicError,
   voiceFromTelegramMessage,
+  telegramMenuContext,
 };
