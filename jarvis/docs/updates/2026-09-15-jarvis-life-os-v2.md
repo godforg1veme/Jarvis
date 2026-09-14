@@ -6,16 +6,17 @@ Date: 2026-09-15.
 
 Life OS v2 is implemented in the repository and locally verified. This is not
 a production rollout record. Core v1 remains the deployed baseline. No VPS
-deployment, database migration, external account connection, production
-dependency, Desktop package build, or installation was performed.
+deployment, database migration, external account connection, or production
+dependency was performed. After the implementation record was created, the
+owner explicitly requested the Desktop update: the package was built, inspected,
+installed over the existing machine-wide copy, and launch-smoked.
 
 The required real-PostgreSQL acceptance could not run on this workstation:
 `DATABASE_URL` is absent and neither PostgreSQL tools nor Docker are installed.
 `server/test/lifePostgresAcceptance.cjs` was extended to migrations 016/017 and
 the v2 repositories, syntax-checked, and is ready for a disposable database.
 The eight external source adapters therefore remain provider-neutral fixture
-implementations. Both discovered installed Desktop executables predate the v2
-client sources.
+implementations. The current Desktop executable now contains the v2 client.
 
 ## Verified end-to-end behavior
 
@@ -42,7 +43,7 @@ registry file, or local path.
 | 1 | `context/lifeContextComposer.js`, ranker, Telegram/Desktop message integration and prompt separation | context composer, prompt pipeline, Telegram message, Desktop message tests | Implemented and automatically verified; no production model acceptance |
 | 2 | `communicationGuidance.js`, explicit modes/preferences, cautious non-diagnostic wording | communication guidance, mode, preference and prompt tests | Implemented and automatically verified |
 | 3 | `priority/`, `missionControlService.js`, pin/replace/hide and reasons in Mission Control | priority engine/repository/routes and browser states | Implemented and locally verified |
-| 4 | `recovery/`, declared `workspace.prepare`, local workspace registry/preparation | recovery service, Orchestrator, Tool Gateway and Desktop acceptance | Implemented and locally executed against a temporary fixture; installed-client acceptance pending |
+| 4 | `recovery/`, declared `workspace.prepare`, local workspace registry/preparation | recovery service, Orchestrator, Tool Gateway and Desktop acceptance | Implemented and locally executed against a temporary fixture; package installed, live paired-client recovery acceptance pending |
 | 5 | 13 bounded rules in `proactivity/rules/`, manifest-validated action proposals | proactivity engine/worker/proposal tests and end-to-end scenario | Implemented and automatically verified; no autonomous changing action |
 | 6 | deterministic RU/EN commitment parser with ranges, recurrence and lifecycle enrichment | commitment detector/enrichment/lifecycle tests, exact-phrase scenario | Implemented and automatically verified |
 | 7 | `people/` entities, relationships, project links and explicit family grants | people/family policy/repository/routes and owner-isolation tests | Implemented and automatically verified |
@@ -50,7 +51,7 @@ registry file, or local path.
 | 9 | explicit/derived preferences, feedback aggregation, inspect/reset/delete | preference/feedback tests and Operating Profile browser view | Implemented and automatically verified |
 | 10 | one `LifeSourceAdapter` contract, cursor claims, bounded sync, eight parsers and fixtures | parser, registry and source-sync tests | Fixture-only implementation verified; live providers/credentials not connected |
 | 11 | strict schemas, owner predicates, grants, prompt trust labels, public DTOs, origin confirmation, replay/unknown handling | full security audit plus boundary, injection, cross-owner and replay tests | No unresolved high-risk finding; production penetration review not performed |
-| 12 | existing Quantum visual language extended in `renderer/life-os/` | browser test at 1440/390/320, keyboard dialogs, reduced motion, loading/empty/stale/offline/error/conflict/partial states; screenshots inspected | Locally verified; installed EXE is stale |
+| 12 | existing Quantum visual language extended in `renderer/life-os/` | browser test at 1440/390/320, keyboard dialogs, reduced motion, loading/empty/stale/offline/error/conflict/partial states; screenshots inspected | Locally verified; current EXE installed and launch-smoked |
 | 13 | focused CommonJS modules; IPC extracted from `main.js`; runtime and existing repositories remain bounded | diff/packaging inspection and module tests | Implemented |
 | 14 | degraded Life OS/model/projection paths plus Telegram, Voice, Vision, tools, remote protocol, Quantum and Operations regression | server 401/401, cloud 20/20, focused Desktop/Voice/Vision, Operations UI and Host Agent suites | Automatically verified locally; live hardware/multi-device acceptance unchanged |
 | 15 | unit, owner/schema/injection/fallback/replay/origin tests and exact full-loop acceptance | commands and totals below | Automatic/local fixture acceptance complete; real PostgreSQL pending |
@@ -73,7 +74,7 @@ registry file, or local path.
 - All eight connectors share the bounded adapter contract and are labelled
   fixture-only.
 - Existing automated Jarvis regressions pass. Live hardware, real multi-device,
-  real Telegram, external provider, PostgreSQL, package and deployment checks
+  real Telegram, external provider, PostgreSQL and deployment checks
   remain manual/external rather than being inferred from tests.
 
 ## Commands run
@@ -123,13 +124,22 @@ inspection confirmed that client modules are included, server/docs/build/models,
 secrets and runtime `data/` are excluded, and package manifests gained no
 production dependency.
 
+The resulting `Jarvis-Desktop-1.0.0-Setup.exe` is 183,672,116 bytes with SHA-256
+`6B2371DD5BF7D1698E57BAC063DF0E87A8A7A721B714E56BCEA8DEBA91030BF5`. It updated
+`C:\Program Files\Jarvis Desktop\Jarvis Desktop.exe`; the installed resources
+contain the Life OS IPC/UI/workspace modules, exclude server/docs/deploy/data and
+`.env`, preserve `%APPDATA%\jarvis\data`, and start successfully. The build was
+made from the branch already containing the latest VPN routing/auth changes at
+`origin/main`; server, Operations UI, and 32 Host Agent regressions passed with
+that combined state.
+
 ## Remaining acceptance
 
 1. Run the isolated Life OS PostgreSQL acceptance against a disposable real
    database with `node server/test/lifePostgresAcceptance.cjs`, then apply
    migrations only through the normal deployment process.
-2. Build and install a current Desktop EXE, then verify Mission Control and
-   origin-bound recovery using the paired client.
+2. Verify Mission Control and origin-bound recovery interactively using the
+   installed paired client; package build/install and launch smoke are complete.
 3. Deploy the server only with explicit owner approval; verify Telegram and
    Desktop ordinary replies, reminders, confirmation, WSS result continuation,
    and owner/family isolation live.
