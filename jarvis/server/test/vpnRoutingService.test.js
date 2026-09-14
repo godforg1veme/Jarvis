@@ -22,8 +22,8 @@ test('buildHappRoutingProfile generates valid Happ schema with RU direct rules',
   assert.equal(profile.DomesticDNSType, 'DoU');
   assert.equal(profile.RemoteDNSIP, '1.1.1.1');
   assert.equal(profile.RemoteDNSType, 'DoH');
-  assert.ok(profile.Geositeurl.includes('Loyalsoldier'));
-  assert.ok(profile.Geoipurl.includes('Loyalsoldier'));
+  assert.equal(profile.Geositeurl, '');
+  assert.equal(profile.Geoipurl, '');
 
   assert.ok(profile.DirectSites.includes('domain:ru'));
   assert.ok(profile.DirectSites.includes('domain:su'));
@@ -39,17 +39,17 @@ test('buildHappRoutingProfile generates valid Happ schema with RU direct rules',
   assert.ok(profile.DirectSites.includes('domain:max.ru'));
   assert.ok(!profile.DirectSites.includes('geosite:ru'), 'geosite:ru must not be present to avoid crash on clean Happ');
 
-  assert.ok(profile.ProxySites.includes('geosite:supercell'));
   assert.ok(profile.ProxySites.includes('domain:brawlstarsgame.com'));
-  assert.ok(profile.ProxySites.includes('geosite:youtube'));
-  assert.ok(profile.ProxySites.includes('geosite:discord'));
+  assert.ok(profile.ProxySites.includes('domain:youtube.com'));
+  assert.ok(profile.ProxySites.includes('domain:discord.com'));
   assert.ok(profile.ProxySites.includes('domain:discordapp.com'));
-  assert.ok(profile.ProxySites.includes('geosite:telegram'));
-  assert.ok(profile.ProxyIp.includes('geoip:telegram'));
+  assert.ok(profile.ProxySites.includes('domain:t.me'));
+  assert.ok(profile.ProxySites.includes('domain:instagram.com'));
+  assert.ok(!profile.ProxySites.some((s) => s.startsWith('geosite:')), 'no geosite in ProxySites to stay under 50MB iOS limit');
 
   assert.ok(profile.DirectIp.includes('geoip:ru'));
   assert.ok(profile.DirectIp.includes('geoip:private'));
-  assert.ok(profile.BlockSites.includes('geosite:category-ads-all'));
+  assert.equal(profile.BlockSites.length, 0);
 });
 
 test('buildHappRoutingDeeplink encodes valid base64 and roundtrips successfully', () => {
@@ -62,7 +62,7 @@ test('buildHappRoutingDeeplink encodes valid base64 and roundtrips successfully'
   assert.equal(decoded.DomainStrategy, 'IPIfNonMatch');
   assert.ok(Array.isArray(decoded.DirectSites));
   assert.ok(decoded.DirectSites.includes('domain:ru'));
-  assert.ok(decoded.ProxySites.includes('geosite:supercell'));
+  assert.ok(decoded.ProxySites.includes('domain:brawlstarsgame.com'));
 
   const addLink = buildHappRoutingDeeplink({ autoActivate: false });
   assert.ok(addLink.startsWith('happ://routing/add/'));
