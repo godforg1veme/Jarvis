@@ -17,10 +17,10 @@ test('buildHappRoutingProfile generates valid Happ schema with RU direct rules',
   const profile = buildHappRoutingProfile();
   assert.equal(profile.Name, DEFAULT_ROUTING_NAME);
   assert.equal(profile.GlobalProxy, 'false');
-  assert.equal(profile.DomainStrategy, 'IPIfNonMatch');
+  assert.equal(profile.DomainStrategy, 'AsIs');
   assert.equal(profile.DomesticDNSIP, '77.88.8.8');
-  assert.equal(profile.DomesticDNSType, 'DoH');
-  assert.equal(profile.RemoteDNSIP, '8.8.8.8');
+  assert.equal(profile.DomesticDNSType, 'DoU');
+  assert.equal(profile.RemoteDNSIP, '1.1.1.1');
   assert.equal(profile.RemoteDNSType, 'DoH');
 
   assert.ok(profile.DirectSites.includes('geosite:category-gov-ru'));
@@ -30,6 +30,10 @@ test('buildHappRoutingProfile generates valid Happ schema with RU direct rules',
   assert.ok(profile.DirectSites.includes('domain:tbank.ru'));
   assert.ok(profile.DirectSites.includes('domain:ozon.ru'));
   assert.ok(profile.DirectSites.includes('domain:wildberries.ru'));
+
+  assert.ok(profile.ProxySites.includes('geosite:supercell'));
+  assert.ok(profile.ProxySites.includes('domain:brawlstarsgame.com'));
+  assert.ok(profile.ProxySites.includes('geosite:youtube'));
 
   assert.ok(profile.DirectIp.includes('geoip:ru'));
   assert.ok(profile.DirectIp.includes('geoip:private'));
@@ -43,9 +47,10 @@ test('buildHappRoutingDeeplink encodes valid base64 and roundtrips successfully'
   const base64Part = onaddLink.replace('happ://routing/onadd/', '');
   const decoded = JSON.parse(Buffer.from(base64Part, 'base64').toString('utf8'));
   assert.equal(decoded.Name, DEFAULT_ROUTING_NAME);
-  assert.equal(decoded.DomainStrategy, 'IPIfNonMatch');
+  assert.equal(decoded.DomainStrategy, 'AsIs');
   assert.ok(Array.isArray(decoded.DirectSites));
   assert.ok(decoded.DirectSites.includes('geosite:ru'));
+  assert.ok(decoded.ProxySites.includes('geosite:supercell'));
 
   const addLink = buildHappRoutingDeeplink({ autoActivate: false });
   assert.ok(addLink.startsWith('happ://routing/add/'));

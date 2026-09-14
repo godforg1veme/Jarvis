@@ -28,6 +28,37 @@ const DOMESTIC_DIRECT_IPS = Object.freeze([
   'geoip:private',
 ]);
 
+const DEFAULT_PROXY_SITES = Object.freeze([
+  'geosite:supercell',
+  'domain:brawlstarsgame.com',
+  'domain:brawlstars.com',
+  'domain:supercell.com',
+  'domain:clashofclans.com',
+  'domain:clashroyale.com',
+  'geosite:google',
+  'geosite:youtube',
+  'geosite:telegram',
+  'geosite:instagram',
+  'geosite:twitter',
+  'geosite:facebook',
+  'geosite:openai',
+  'domain:instagram.com',
+  'domain:cdninstagram.com',
+  'domain:facebook.com',
+  'domain:fbcdn.net',
+  'domain:twitter.com',
+  'domain:x.com',
+  'domain:t.co',
+  'domain:youtube.com',
+  'domain:googlevideo.com',
+  'domain:ytimg.com',
+  'domain:discord.com',
+  'domain:discord.gg',
+  'domain:spotify.com',
+  'domain:chatgpt.com',
+  'domain:openai.com',
+]);
+
 const BLOCK_SITES = Object.freeze([
   'geosite:category-ads-all',
 ]);
@@ -36,11 +67,11 @@ function buildHappRoutingProfile(options = {}) {
   return {
     Name: options.name || DEFAULT_ROUTING_NAME,
     GlobalProxy: 'false',
-    RemoteDNSType: 'DoH',
-    RemoteDNSDomain: options.remoteDnsDomain || 'dns.google',
-    RemoteDNSIP: options.remoteDnsIp || '8.8.8.8',
-    DomesticDNSType: 'DoH',
-    DomesticDNSDomain: options.domesticDnsDomain || 'common.dot.dns.yandex.net',
+    RemoteDNSType: options.remoteDnsType || 'DoH',
+    RemoteDNSDomain: options.remoteDnsDomain || 'https://cloudflare-dns.com/dns-query',
+    RemoteDNSIP: options.remoteDnsIp || '1.1.1.1',
+    DomesticDNSType: options.domesticDnsType || 'DoU',
+    DomesticDNSDomain: options.domesticDnsDomain || '',
     DomesticDNSIP: options.domesticDnsIp || '77.88.8.8',
     Geoipurl: '',
     Geositeurl: '',
@@ -48,11 +79,11 @@ function buildHappRoutingProfile(options = {}) {
     DnsHosts: {},
     DirectSites: [...(options.directSites || DOMESTIC_DIRECT_SITES)],
     DirectIp: [...(options.directIp || DOMESTIC_DIRECT_IPS)],
-    ProxySites: options.proxySites ? [...options.proxySites] : [],
+    ProxySites: [...(options.proxySites || DEFAULT_PROXY_SITES)],
     ProxyIp: options.proxyIp ? [...options.proxyIp] : [],
     BlockSites: [...(options.blockSites || BLOCK_SITES)],
     BlockIp: options.blockIp ? [...options.blockIp] : [],
-    DomainStrategy: 'IPIfNonMatch',
+    DomainStrategy: options.domainStrategy || 'AsIs',
     FakeDNS: 'false',
   };
 }
@@ -146,6 +177,15 @@ function buildRoutingHtmlPage(options = {}) {
       transition: background 0.2s, transform 0.1s;
     }
     .btn:active { transform: scale(0.98); }
+    .btn-off {
+      display: inline-block;
+      margin-top: 14px;
+      color: #94a3b8;
+      text-decoration: underline;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .btn-off:hover { color: #f87171; }
     .hint { margin-top: 18px; font-size: 13px; color: #64748b; line-height: 1.4; }
   </style>
 </head>
@@ -154,7 +194,8 @@ function buildRoutingHtmlPage(options = {}) {
     <div class="icon">🌐</div>
     <h1>Jarvis RU Direct</h1>
     <p>Открываем приложение <b>Happ</b> для автоматической активации раздельной маршрутизации (Обход РФ)...</p>
-    <a class="btn" href="${deeplink}">Открыть в Happ</a>
+    <a class="btn" href="${deeplink}">Активировать в Happ</a>
+    <div><a class="btn-off" href="happ://routing/off">Отключить маршрутизацию в Happ</a></div>
     <div class="hint">Если появится диалог Safari/браузера, нажмите <b>«Открыть»</b>.</div>
   </div>
   <script>
