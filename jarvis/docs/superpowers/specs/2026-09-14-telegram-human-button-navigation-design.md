@@ -1,7 +1,7 @@
 # Telegram Human Button Navigation Design
 
 **Date:** 2026-09-14  
-**Status:** Approved for implementation planning
+**Status:** Implemented and deployed; live owner/member Telegram acceptance pending
 
 ## Summary
 
@@ -264,8 +264,9 @@ duplicate or concurrent Telegram delivery cannot consume the same input twice.
 The existing `telegram_updates` claim remains the first deduplication boundary.
 
 If an interaction expires before the next message, Jarvis explains that the
-step expired and treats the message as ordinary conversation input. It must not
-silently reinterpret an unrelated message as a privileged parameter.
+step expired and asks the user to reopen the section. The late message is not
+executed and is not silently reinterpreted as either a privileged parameter or
+an ordinary assistant request.
 
 ## Component Boundaries
 
@@ -404,6 +405,12 @@ session, and callback tests first. Then run the complete server suite with
 top-level buttons, one Hysteria2 create-confirm-export cycle, one cancelled
 mutation, one pairing flow, the Operations link and browser approval, clean
 logs, and healthy Jarvis/Xray/Hysteria2 checks.
+
+The server image and migration 015 were deployed on 2026-09-14. VPS preflight,
+Compose health, public HTTPS live/ready smoke checks, migration registration,
+and bounded startup-log inspection passed. The client-driven owner/member,
+VPN, pairing, Desktop, and Operations approval scenarios remain manual live
+acceptance because they require the real Telegram accounts and client UI.
 
 ## Acceptance Criteria
 

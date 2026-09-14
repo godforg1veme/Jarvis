@@ -244,6 +244,35 @@ test('Telegram asks which device when several compatible computers are online', 
   assert.equal(executions.length, 0);
 });
 
+test('Telegram guided task binds execution to the owner-selected device', async () => {
+  const selectedId = '44444444-4444-4444-8444-444444444444';
+  const otherId = '55555555-5555-4555-8555-555555555555';
+  const { orchestrator, executions, repository } = createHarness([
+    { kind: 'tool_call', action: 'file.search', args: { query: 'report' }, targetDeviceId: otherId },
+  ], {
+    devices: [
+      { id: selectedId, name: 'Выбранный ПК', status: 'online', capabilities: { actions: ['file.search'] } },
+      { id: otherId, name: 'Другой ПК', status: 'online', capabilities: { actions: ['file.search'] } },
+    ],
+  });
+  await orchestrator.handle({
+    userId, conversationId, originChannel: 'telegram', originChatId: '123',
+    preferredDeviceId: selectedId, text: 'Найди отчёт', history: [],
+  });
+  assert.equal(executions[0].targetId, selectedId);
+  assert.equal([...repository.workflows.values()][0].target_id, selectedId);
+});
+
+test('Telegram guided task rejects a device outside the owner device list', async () => {
+  const { orchestrator, executions } = createHarness([], { devices: [] });
+  const result = await orchestrator.handle({
+    userId, conversationId, originChannel: 'telegram', originChatId: '123',
+    preferredDeviceId: '44444444-4444-4444-8444-444444444444', text: 'Найди отчёт', history: [],
+  });
+  assert.match(result.answer, /больше недоступен/);
+  assert.equal(executions.length, 0);
+});
+
 test('seeded varied folder names and drives follow the same generic search-to-open path', async () => {
   let seed = 0x5eed1234;
   const random = () => {

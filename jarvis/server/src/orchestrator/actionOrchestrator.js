@@ -158,7 +158,11 @@ class ActionOrchestrator {
     if (!workflow && !hasPotentialDeviceAction(input.text)) return { handled: false };
 
     const devices = await this.deviceRepository.listForUser(input.userId);
-    const availableActions = this._availableActions(devices, input.originChannel, input.originDeviceId, workflow?.target_id);
+    const preferredDeviceId = input.preferredDeviceId ? String(input.preferredDeviceId) : null;
+    if (preferredDeviceId && !devices.some((device) => device.id === preferredDeviceId && device.status !== 'revoked')) {
+      return { handled: true, answer: 'Выбранный компьютер больше недоступен. Открой список устройств и выбери актуальный.' };
+    }
+    const availableActions = this._availableActions(devices, input.originChannel, input.originDeviceId, workflow?.target_id || preferredDeviceId);
     let plan;
     try {
       plan = await this.planner.plan({
@@ -189,7 +193,7 @@ class ActionOrchestrator {
         originChannel: input.originChannel,
         originDeviceId: input.originDeviceId || null,
         targetExecutorType: 'device',
-        targetId: null,
+        targetId: preferredDeviceId,
         expiresAt: new Date(this.now().getTime() + WORKFLOW_TTL_MS),
         state: {
           originalRequest: String(input.text || '').slice(0, 10000),
@@ -607,7 +611,7 @@ class ActionOrchestrator {
 
   _selectDevice({ devices, input, workflow, plan, action }) {
     const eligible = devices.filter((device) => device.status === 'online' && this._supports(device, action.name));
-    const requested = plan.targetDeviceId || workflow.target_id || (input.originChannel === 'desktop' ? input.originDeviceId : null);
+    const requested = input.preferredDeviceId || plan.targetDeviceId || workflow.target_id || (input.originChannel === 'desktop' ? input.originDeviceId : null);
     if (requested) return eligible.find((device) => device.id === requested) || null;
     return eligible.length === 1 ? eligible[0] : null;
   }

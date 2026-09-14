@@ -126,6 +126,8 @@ function harness(allowedIds = ['101', '202'], devices = null, commandService = n
     ...(options.asr ? { asr: options.asr } : {}),
     ...(options.voiceLimiter ? { voiceLimiter: options.voiceLimiter } : {}),
     ...(options.vpnService ? { vpnService: options.vpnService } : {}),
+    ...(options.menuService ? { menuService: options.menuService } : {}),
+    ...(options.orchestrator ? { orchestrator: options.orchestrator } : {}),
   });
   return { service, state, assistantCalls };
 }
@@ -262,6 +264,53 @@ test('handles built-in commands without calling the model', async () => {
   const result = await service.handle(update(5, 101, 101, '/devices'));
   assert.equal(result.answer, 'Устройства пока не подключены.');
   assert.equal(assistantCalls.length, 0);
+});
+
+test('routes start and exact bottom-menu labels without storing presentation text as user conversation', async () => {
+  const menuCalls = [];
+  const menuService = {
+    async handleMenuAction(action, context) {
+      menuCalls.push({ action, telegramUserId: context.telegramUserId });
+      return { answer: `menu:${action}`, replyKeyboard: { keyboard: [[{ text: '🏠 Главное' }]], resize_keyboard: true, is_persistent: true } };
+    },
+    async handlePendingText() { return null; },
+    async handleCallback() { return null; },
+  };
+  const { service, state, assistantCalls } = harness(['101'], null, null, { menuService });
+  const started = await service.handle(update(70, 101, 101, '/start'));
+  const devices = await service.handle(update(71, 101, 101, '🖥 Устройства'));
+  assert.equal(started.answer, 'menu:home');
+  assert.equal(devices.answer, 'menu:devices');
+  assert.deepEqual(menuCalls.map((call) => call.action), ['home', 'devices']);
+  assert.equal(state.messages.some((message) => message.role === 'user'), false);
+  assert.equal(assistantCalls.length, 0);
+});
+
+test('routes validated menu callbacks before legacy callback handlers', async () => {
+  const menuService = {
+    async handleCallback(data) { return data === 'mem:list' ? { answer: 'Память открыта.' } : null; },
+  };
+  const { service, state } = harness(['101'], null, null, { menuService });
+  const result = await service.handleCallback(callbackUpdate(72, 101, 101, 'mem:list'));
+  assert.equal(result.answer, 'Память открыта.');
+  assert.equal(state.messages.at(-1).content, 'Память открыта.');
+});
+
+test('guided Desktop text reaches the orchestrator with the selected owned device', async () => {
+  const selectedDeviceId = '22222222-2222-4222-8222-222222222222';
+  const orchestratorCalls = [];
+  const menuService = {
+    async handlePendingText(text) { return { desktopInstruction: { text, preferredDeviceId: selectedDeviceId } }; },
+    async handleCallback() { return null; },
+  };
+  const orchestrator = {
+    async handle(input) { orchestratorCalls.push(input); return { handled: true, answer: 'Поручение принято.' }; },
+  };
+  const { service, state } = harness(['101'], null, null, { menuService, orchestrator });
+  const result = await service.handle(update(73, 101, 101, 'Найди отчёт'));
+  assert.equal(result.answer, 'Поручение принято.');
+  assert.equal(orchestratorCalls[0].preferredDeviceId, selectedDeviceId);
+  assert.equal(state.messages.some((message) => message.role === 'user' && message.content === 'Найди отчёт'), true);
 });
 
 test('routes identity questions through the canonical assistant service', async () => {

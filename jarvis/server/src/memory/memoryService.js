@@ -54,6 +54,35 @@ class MemoryService {
     return memories.map(({ kind, content, updated_at: updatedAt }) => ({ kind, content, updatedAt }));
   }
 
+  async list({ userId, limit = 30 }) {
+    return this.repository.listActive({ userId, limit });
+  }
+
+  async remember({ userId, content, sourceConversationId = null }) {
+    const normalized = normalizeMemoryContent(content);
+    if (!normalized) return { ok: false, code: 'MEMORY_EMPTY' };
+    if (containsSensitiveMemoryData(normalized)) return { ok: false, code: 'MEMORY_SENSITIVE' };
+    const memory = await this.repository.create({
+      userId, kind: 'fact', content: normalized, sourceConversationId, changeReason: 'user_remember',
+    });
+    return { ok: true, memory };
+  }
+
+  async forgetById({ userId, memoryId }) {
+    const memory = await this.repository.deactivateById({ userId, memoryId, changeReason: 'user_forget' });
+    return { ok: Boolean(memory), memory };
+  }
+
+  async correctById({ userId, memoryId, content, sourceConversationId = null }) {
+    const normalized = normalizeMemoryContent(content);
+    if (!normalized) return { ok: false, code: 'MEMORY_EMPTY' };
+    if (containsSensitiveMemoryData(normalized)) return { ok: false, code: 'MEMORY_SENSITIVE' };
+    const memory = await this.repository.replaceById({
+      userId, memoryId, kind: 'fact', content: normalized, sourceConversationId, changeReason: 'user_correction',
+    });
+    return { ok: Boolean(memory), memory, ...(!memory ? { code: 'MEMORY_NOT_FOUND' } : {}) };
+  }
+
   async handleUserText({ userId, text, sourceConversationId = null }) {
     const command = parseMemoryCommand(text);
     if (command) return this._handleCommand({ userId, command, sourceConversationId });
@@ -91,14 +120,8 @@ class MemoryService {
     }
     if (command.type === 'remember') {
       if (!command.content) return { handled: true, answer: 'Напиши, что именно запомнить.' };
-      await this.repository.create({
-        userId,
-        kind: 'fact',
-        content: command.content,
-        sourceConversationId,
-        changeReason: 'user_remember',
-      });
-      return { handled: true, answer: 'Запомнил.' };
+      const result = await this.remember({ userId, content: command.content, sourceConversationId });
+      return { handled: true, answer: result.ok ? 'Запомнил.' : 'Я не сохраняю пароли, токены, ключи и платёжные данные.' };
     }
     if (command.type === 'forget') {
       if (!command.query) return { handled: true, answer: 'Напиши, какой факт забыть.' };

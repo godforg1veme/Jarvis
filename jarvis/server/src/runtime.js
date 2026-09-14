@@ -9,6 +9,8 @@ const { createTelegramBot } = require('./telegram/bot');
 const { sendTelegramText } = require('./telegram/telegramFormatting');
 const { MAX_TELEGRAM_VOICE_BYTES, TelegramMessageService } = require('./telegram/messageService');
 const { TelegramUpdateRepository } = require('./telegram/telegramUpdateRepository');
+const { TelegramInteractionRepository } = require('./telegram/telegramInteractionRepository');
+const { TelegramMenuService } = require('./telegram/telegramMenuService');
 const { UserRepository } = require('./users/userRepository');
 const { ConversationRepository } = require('./conversations/conversationRepository');
 const { DeviceRepository } = require('./devices/deviceRepository');
@@ -199,7 +201,11 @@ async function createRuntime(config, overrides = {}) {
             });
             if (conversation?.channel === 'telegram') await sendTelegramText(
               (chunk, options) => bot.api.sendMessage(conversation.external_chat_id, chunk, options),
-              `Life OS предлагает: ${proposal.title}\n${proposal.explanation}\n\nПодтвердить: /life_confirm ${proposal.id}\nНе сейчас: /life_dismiss ${proposal.id}`,
+              `Life OS предлагает: ${proposal.title}\n${proposal.explanation}`,
+              { reply_markup: { inline_keyboard: [[
+                { text: '✅ Принять', callback_data: `life:confirm:${proposal.id}` },
+                { text: 'Не сейчас', callback_data: `life:dismiss:${proposal.id}` },
+              ]] } },
             );
           }
         },
@@ -342,33 +348,46 @@ async function createRuntime(config, overrides = {}) {
     }
 
     if (!bot && config.telegramBotToken) {
-    const messageService = new TelegramMessageService({
-      accessPolicy: createTelegramAccessPolicy(config.telegramAllowedIds),
-      updateRepository: new TelegramUpdateRepository(pool),
-      userRepository: new UserRepository(pool),
-      conversationRepository,
-      assistant,
-      deviceService,
-      memoryService,
-      knowledgeService,
-      commandService,
-      orchestrator,
-      visualMemoryService,
-      asr: config.telegramVoiceEnabled ? asr : null,
-      voiceLimiter: overrides.telegramVoiceLimiter || new FixedWindowRateLimiter(),
-      vpnService,
-      lifeEventGateway,
-      lifeMissionControlService: missionControlService,
-      lifeProposalService: proposalService,
-    });
-    bot = createTelegramBot({
-      token: config.telegramBotToken,
-      messageService,
-      logger: app.log,
-      documentMaxBytes: config.documentMaxBytes,
-      voiceMaxBytes: MAX_TELEGRAM_VOICE_BYTES,
-      onPollingHealth: (value) => { pollingHealth = value; },
-    });
+      const menuService = new TelegramMenuService({
+        interactions: overrides.telegramInteractionRepository || new TelegramInteractionRepository(pool),
+        deviceService,
+        memoryService,
+        knowledgeService,
+        vpnService,
+        lifeMissionControlService: missionControlService,
+        ownerTelegramId: config.operationsOwnerTelegramId,
+        operationsEnabled: config.operationsEnabled,
+        operationsPublicOrigin: config.operationsPublicOrigin,
+      });
+      const messageService = new TelegramMessageService({
+        accessPolicy: createTelegramAccessPolicy(config.telegramAllowedIds),
+        updateRepository: new TelegramUpdateRepository(pool),
+        userRepository: new UserRepository(pool),
+        conversationRepository,
+        assistant,
+        deviceService,
+        memoryService,
+        knowledgeService,
+        commandService,
+        orchestrator,
+        visualMemoryService,
+        asr: config.telegramVoiceEnabled ? asr : null,
+        voiceLimiter: overrides.telegramVoiceLimiter || new FixedWindowRateLimiter(),
+        vpnService,
+        lifeEventGateway,
+        lifeMissionControlService: missionControlService,
+        lifeProposalService: proposalService,
+        menuService,
+      });
+      bot = createTelegramBot({
+        token: config.telegramBotToken,
+        messageService,
+        logger: app.log,
+        documentMaxBytes: config.documentMaxBytes,
+        voiceMaxBytes: MAX_TELEGRAM_VOICE_BYTES,
+        onPollingHealth: (value) => { pollingHealth = value; },
+        operationsPanelUrl: menuService.operationsPanelUrl,
+      });
     }
     operationsRuntime = await (overrides.createOperationsRuntime || createOperationsRuntime)({
       config,

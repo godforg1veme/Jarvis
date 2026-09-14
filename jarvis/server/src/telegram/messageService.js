@@ -7,6 +7,7 @@ const { attachmentFromTelegramMessage } = require('../knowledge/fileTypes');
 const { publicDocumentStatus, renderDocumentCitations } = require('../knowledge/knowledgeService');
 const { parseRemoteCommand, remoteCommandReply } = require('../commands/commandText');
 const { recordMessageEvent } = require('../life/lifeSourceEvents');
+const { menuAction } = require('./telegramMenu');
 
 function voiceFromTelegramMessage(message = {}) {
   const candidate = message.voice;
@@ -117,7 +118,7 @@ function vpnPublicError(error) {
 function commandReply(text) {
   const command = String(text || '').split(/\s+/, 1)[0].split('@', 1)[0].toLowerCase();
   if (command === '/start') return 'Jarvis подключён. Напишите вопрос обычным сообщением.';
-  if (command === '/help') return 'Доступно: текстовые вопросы, отправка файлов, /life, /documents, /devices, /confirm, /reject для подтверждения действий на ПК, /memory, /vpn. Все операции подтверждения и выбора выполняются удобными кнопками.';
+  if (command === '/help') return 'Пиши вопросы обычным текстом, отправляй голосовые и файлы или используй нижнее меню. Действия с последствиями подтверждаются отдельными кнопками под сообщением.';
   if (command === '/memory') return null;
   return null;
 }
@@ -149,6 +150,7 @@ class TelegramMessageService {
     this.lifeEventGateway = options.lifeEventGateway || null;
     this.lifeMissionControlService = options.lifeMissionControlService || null;
     this.lifeProposalService = options.lifeProposalService || null;
+    this.menuService = options.menuService || null;
   }
 
   async remoteCommandReply({ text, user, conversationId }) {
@@ -169,6 +171,24 @@ class TelegramMessageService {
     if (!claimed) return { status: 'duplicate' };
     const user = await this.userRepository.findOrCreateTelegramUser({ telegramUserId: input.telegramUserId, displayName: input.displayName });
     const conversation = await this.conversationRepository.getOrCreate({ userId: user.id, channel: 'telegram', externalChatId: input.chatId });
+
+    if (this.menuService) {
+      let menuResult;
+      try {
+        menuResult = await this.menuService.handleCallback(input.data, {
+          data: input.data, user, telegramUserId: input.telegramUserId, chatId: input.chatId,
+          conversation, userId: user.id, conversationId: conversation.id,
+          originChannel: 'telegram', originDeviceId: null,
+        });
+      } catch (error) {
+        menuResult = input.data.startsWith('vpn:') ? vpnPublicError(error) : null;
+        if (!menuResult) throw error;
+      }
+      if (menuResult) {
+        await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: menuResult.answer });
+        return { status: 'answered', ...menuResult };
+      }
+    }
 
     if (input.data.startsWith('vpn:')) {
       if (!this.vpnService || typeof this.vpnService.handleCallback !== 'function') return { status: 'ignored' };
@@ -436,6 +456,35 @@ class TelegramMessageService {
       externalChatId: input.chatId,
     });
 
+    let guidedDesktopInstruction = null;
+    if (this.menuService && !input.attachment && !input.voice) {
+      const legacyNavigation = /^\/start(?:@\w+)?$/i.test(input.text)
+        ? 'home'
+        : /^\/help(?:@\w+)?$/i.test(input.text) ? 'help' : null;
+      const action = menuAction(input.text) || legacyNavigation;
+      if (action) {
+        const menuResult = await this.menuService.handleMenuAction(action, {
+          user, telegramUserId: input.telegramUserId, chatId: input.chatId, conversation,
+        });
+        const answer = String(menuResult?.answer || '').trim();
+        if (!answer) throw new Error('Telegram menu returned an empty answer');
+        await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: answer });
+        return { status: 'answered', ...menuResult, answer };
+      }
+      const pendingResult = await this.menuService.handlePendingText(input.text, {
+        user, telegramUserId: input.telegramUserId, chatId: input.chatId, conversation,
+      });
+      if (pendingResult?.desktopInstruction) {
+        guidedDesktopInstruction = pendingResult.desktopInstruction;
+        input.text = guidedDesktopInstruction.text;
+      } else if (pendingResult) {
+        const answer = String(pendingResult.answer || '').trim();
+        if (!answer) throw new Error('Telegram interaction returned an empty answer');
+        await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: answer });
+        return { status: 'answered', ...pendingResult, answer };
+      }
+    }
+
     let voiceTranscript = false;
     if (input.voice && this.asr) {
       if (typeof options.downloadVoice !== 'function') throw new Error('voice transcription is unavailable');
@@ -571,6 +620,7 @@ class TelegramMessageService {
       originChatId: input.chatId,
       text: input.text,
       history,
+      ...(guidedDesktopInstruction ? { preferredDeviceId: guidedDesktopInstruction.preferredDeviceId } : {}),
     }) : { handled: false };
     if (orchestration.handled) {
       const answer = String(orchestration.answer || '').trim().slice(0, MAX_TEXT_LENGTH);

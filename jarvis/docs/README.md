@@ -6,6 +6,17 @@ future-tense wording does not override the current architecture in `AGENTS.md`.
 
 Status snapshot: 2026-09-14.
 
+Telegram navigation update, 2026-09-14: button-first control is implemented
+and covered by the full server suite. The server image and migration 015 are
+deployed on the VPS; preflight, Compose health, public HTTPS smoke, and migration
+registration passed. Telegram installs a persistent role-aware bottom keyboard;
+dynamic object choices and policy-required confirmations stay inline. Guided
+PostgreSQL-backed input replaces command composition for VPN labels, pairing
+names, memory changes, and selected-Desktop instructions. The owner receives a
+separately authenticated Operations link. Live owner/member Telegram client
+acceptance remains manual. See
+`updates/2026-09-14-telegram-button-navigation.md`.
+
 App resolution & AI recovery update, 2026-09-14: Start Menu indexing was fixed
 to use UTF-8 encoded PowerShell invocations, Cyrillic inflection stemming was added
 to appResolver, and AI-assisted candidate recovery via AppRecoveryService was wired
@@ -85,6 +96,8 @@ attachment ingestion.
 | `superpowers/plans/2026-09-12-jarvis-managed-happ-vpn.md` | Implemented and production-verified on 2026-09-13; retained as rollout history. |
 | `superpowers/specs/2026-09-13-jarvis-managed-hysteria2-fallback-design.md` | Implemented and production-active with isolated Hysteria2 state, owner-only protocol-aware controls, pinned deployment, separate monitoring, and verified authenticated proxy traffic. Real iPhone Wi-Fi/LTE acceptance remains. |
 | `superpowers/plans/2026-09-13-jarvis-managed-hysteria2-fallback.md` | Implemented and production-verified on 2026-09-14; retained as rollout history. |
+| `superpowers/specs/2026-09-14-telegram-human-button-navigation-design.md` | Implemented and deployed with persistent role-aware navigation, guided input, inline confirmations, and an owner-only Operations link; live owner/member Telegram acceptance remains. |
+| `superpowers/plans/2026-09-14-telegram-human-button-navigation.md` | Implemented, covered by the complete server test suite, and production-deployed on 2026-09-14; retained as execution history. |
 | `superpowers/specs/2026-09-12-jarvis-life-os-core-v1-design.md` | Implemented and production-enabled: owner-scoped Event Spine, projections, Timeline, context recovery, explainable proposals, Telegram commands, and Desktop Mission Control. Optional model enrichment remains disabled. |
 | `superpowers/plans/2026-09-12-jarvis-life-os-core-v1.md` | Implemented, packaged, installed, and production-verified on 2026-09-13; retained as execution history. |
 | `superpowers/plans/2026-09-09-jarvis-vision.md` | Execution plan adapted to the current cloud-brain/local-hands architecture; first camera + two-display + memory slice implemented and locally accepted |

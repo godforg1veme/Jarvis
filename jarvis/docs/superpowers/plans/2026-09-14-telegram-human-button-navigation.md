@@ -3,7 +3,7 @@
 **Date:** 2026-09-14  
 **Design:** `docs/superpowers/specs/2026-09-14-telegram-human-button-navigation-design.md`  
 **Scope:** Cloud server and Telegram bot only  
-**Status:** Ready for implementation
+**Status:** Implemented and deployed; live owner/member Telegram acceptance pending
 
 ## Objective
 
@@ -402,6 +402,12 @@ Commit documentation only after the relevant behavior is verified:
 `docs: record Telegram button navigation verification`
 
 ## Production acceptance (explicit follow-up, not ordinary tests)
+
+Deployment was requested and completed on 2026-09-14. The server was rebuilt
+with migration 015, Compose reported the server and PostgreSQL healthy, the
+public HTTPS smoke test passed, and the migration was registered in PostgreSQL.
+The remaining client-driven checks below still require the real owner/member
+Telegram accounts; do not mark them complete from server health alone.
 
 Do not deploy automatically. When the owner requests deployment:
 

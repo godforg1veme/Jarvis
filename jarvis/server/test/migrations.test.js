@@ -22,7 +22,17 @@ test('migration files are ordered and narrowly named', () => {
     '012_visual_memory.sql',
     '013_life_os_core.sql',
     '014_vpn_control.sql',
+    '015_telegram_interactions.sql',
   ]);
+});
+
+test('Telegram interaction migration keeps guided input owner-scoped and bounded', () => {
+  const migration = fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, '015_telegram_interactions.sql'), 'utf8');
+  assert.match(migration, /user_id uuid NOT NULL REFERENCES users\(id\) ON DELETE CASCADE/);
+  assert.match(migration, /conversation_id uuid NOT NULL REFERENCES conversations\(id\) ON DELETE CASCADE/);
+  assert.match(migration, /octet_length\(convert_to\(context::text, 'UTF8'\)\) <= 1024/);
+  assert.match(migration, /WHERE status = 'active'/);
+  assert.doesNotMatch(migration, /credential|share_uri|audio|file_body|local_path/i);
 });
 
 test('Life OS migration keeps events and projections owner-scoped and bounded', () => {

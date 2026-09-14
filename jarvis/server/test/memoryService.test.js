@@ -18,6 +18,19 @@ function harness() {
       matches.forEach((memory) => { memory.active = false; });
       return matches;
     },
+    async deactivateById({ memoryId }) {
+      const memory = state.memories.find((item) => item.id === memoryId && item.active !== false);
+      if (memory) memory.active = false;
+      return memory || null;
+    },
+    async replaceById({ memoryId, content, kind, sourceConversationId }) {
+      const previous = state.memories.find((item) => item.id === memoryId && item.active !== false);
+      if (!previous) return null;
+      previous.active = false;
+      const memory = { id: `memory-${state.memories.length + 1}`, active: true, content, kind, sourceConversationId };
+      state.memories.push(memory);
+      return memory;
+    },
   };
   return { service: new MemoryService({ repository }), state };
 }
@@ -51,4 +64,15 @@ test('automatically captures only high-confidence facts', async () => {
 test('parses Russian memory commands', () => {
   assert.deepEqual(parseMemoryCommand('что ты обо мне помнишь'), { type: 'list' });
   assert.deepEqual(parseMemoryCommand('исправь старое -> новое'), { type: 'correct', query: 'старое', content: 'новое' });
+});
+
+test('button-facing memory methods stay owner-scoped through repository IDs and reject secrets', async () => {
+  const { service, state } = harness();
+  const created = await service.remember({ userId: 'user-a', content: 'Я люблю чай' });
+  assert.equal(created.ok, true);
+  assert.equal((await service.remember({ userId: 'user-a', content: 'мой токен abc' })).ok, false);
+  const corrected = await service.correctById({ userId: 'user-a', memoryId: state.memories[0].id, content: 'Я люблю кофе' });
+  assert.equal(corrected.ok, true);
+  assert.equal(state.memories[0].active, false);
+  assert.equal((await service.forgetById({ userId: 'user-a', memoryId: corrected.memory.id })).ok, true);
 });

@@ -270,8 +270,10 @@ class VpnCommandService {
     if (callback.action === 'status') return this._read({ action: 'status', protocol: callback.protocol });
     if (callback.action === 'clients') return this._read({ action: 'clients', protocol: callback.protocol });
     if (callback.action === 'new') {
-      const command = callback.protocol === 'hysteria2' ? '/vpn_hysteria2_issue Имя' : '/vpn_issue Имя';
-      return { answer: `Напиши только имя нового доступа после команды: ${command}`, buttons: backButton(callback.protocol) };
+      return {
+        answer: `Как назвать новый ${PROTOCOLS[callback.protocol].title}-доступ? Например: iPhone Максима`,
+        requestInput: { kind: 'vpn_access_label', context: { protocol: callback.protocol } },
+      };
     }
     if (callback.action === 'restart') return this._create({ action: 'restart', protocol: callback.protocol, arguments: {} }, context);
     if (callback.action === 'client') {
@@ -304,6 +306,16 @@ class VpnCommandService {
     if (command.kind === 'read') return this._read(command);
     if (command.kind === 'change') return this._create(command, context);
     return this._decide(command, context);
+  }
+
+  async openMenu(context) {
+    await this._requireOwner(context.userId);
+    return { answer: 'Выбери VPN-протокол:', buttons: menuButtons() };
+  }
+
+  async requestAction({ action, protocol, arguments: actionArguments = {}, ...context }) {
+    await this._requireOwner(context.userId);
+    return this._create({ action, protocol, arguments: actionArguments }, context);
   }
 }
 
