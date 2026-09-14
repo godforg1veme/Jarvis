@@ -8,6 +8,7 @@ const { registerLifeRoutes } = require('../src/life/lifeRoutes');
 const USER = '11111111-1111-4111-8111-111111111111';
 const DEVICE = '22222222-2222-4222-8222-222222222222';
 const PROJECT = '33333333-3333-4333-8333-333333333333';
+const REMINDER = '44444444-4444-4444-8444-444444444444';
 
 function fixture() {
   const app = buildApp({ config: loadConfig({ NODE_ENV: 'test', JARVIS_LOG_LEVEL: 'silent' }) });
@@ -61,6 +62,18 @@ function fixture() {
       async revoke() { return null; },
       async listShared({ memberUserId }) { calls.push(memberUserId); return [{ grantId: 'safe', resourceType: 'project', permission: 'view_summary', label: 'Life OS', summary: 'Семейный проект', expiresAt: null }]; },
     },
+    reminderRepository: { async list({ userId }) { calls.push(userId); return []; } },
+    reminderService: {
+      async create({ userId, origin, input }) {
+        calls.push(userId);
+        return {
+          id: REMINDER, title: input.title, trigger_at: input.triggerAt, timezone: input.timezone,
+          recurrence: null, delivery_channels: input.deliveryChannels, origin_channel: origin.channel,
+          state: 'scheduled', revision: 1, created_at: new Date(), updated_at: new Date(),
+        };
+      },
+      async reschedule() { return null; }, async cancel() { return null; }, async acknowledge() { return null; },
+    },
   });
   return { app, calls };
 }
@@ -71,6 +84,26 @@ test('Life API requires device auth and derives owner scope from it', async () =
   const response = await app.inject({ method: 'GET', url: '/v1/desktop/life/mission-control', headers: { authorization: 'Bearer valid' } });
   assert.equal(response.statusCode, 200);
   assert.deepEqual(calls, [USER]);
+  await app.close();
+});
+
+test('reminder API derives Desktop destination from auth and rejects injected origin fields', async () => {
+  const { app, calls } = fixture();
+  const headers = { authorization: 'Bearer valid' };
+  const payload = {
+    requestId: '55555555-5555-4555-8555-555555555555', title: 'Продолжить Life OS',
+    triggerAt: '2026-09-15T15:00:00Z', timezone: 'Europe/Moscow', deliveryChannels: ['desktop'],
+  };
+  const response = await app.inject({ method: 'POST', url: '/v1/desktop/life/reminders', headers, payload });
+  assert.equal(response.statusCode, 201);
+  assert.equal(response.json().reminder.origin, 'desktop');
+  assert.equal(Object.hasOwn(response.json().reminder, 'originDeviceId'), false);
+  assert.equal(calls.at(-1), USER);
+  const injected = await app.inject({
+    method: 'POST', url: '/v1/desktop/life/reminders', headers,
+    payload: { ...payload, requestId: '66666666-6666-4666-8666-666666666666', originDeviceId: 'attacker' },
+  });
+  assert.equal(injected.statusCode, 400);
   await app.close();
 });
 

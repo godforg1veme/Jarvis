@@ -25,11 +25,24 @@ test('migration files are ordered and narrowly named', () => {
     '014_vpn_control.sql',
     '015_telegram_interactions.sql',
     '016_life_os_v2.sql',
+    '017_life_os_reminders.sql',
   ]);
 });
 
+test('reminder migration adds owner-scoped occurrence delivery and acknowledgement', () => {
+  const migration = fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, '017_life_os_reminders.sql'), 'utf8');
+  assert.match(migration, /CREATE TABLE life_reminder_deliveries/);
+  assert.match(migration, /UNIQUE \(user_id, delivery_key\)/);
+  assert.match(migration, /FOREIGN KEY \(user_id, reminder_id\) REFERENCES life_reminders\(user_id, id\)/);
+  assert.match(migration, /'reminder\.acknowledged'/);
+  assert.doesNotMatch(migration, /audio|image|ocr|body|local_path|storage_key|credential|token/i);
+});
+
 test('Life OS v2 migration adds owner-scoped domains without sensitive payload storage', () => {
-  const migration = fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, '016_life_os_v2.sql'), 'utf8');
+  const migration = [
+    fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, '016_life_os_v2.sql'), 'utf8'),
+    fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, '017_life_os_reminders.sql'), 'utf8'),
+  ].join('\n');
   for (const table of [
     'life_people',
     'life_person_relationships',

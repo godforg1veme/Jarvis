@@ -11,6 +11,7 @@ const MESSAGE_TYPES = new Set([
   'command.result',
   'workflow.update',
   'life.proposal',
+  'life.reminder',
   'server.error',
 ]);
 
@@ -80,6 +81,13 @@ function validateRemoteMessage(input) {
     message.payload.explanation = optionalText(payload.explanation, 1000, 'proposal explanation');
     message.payload.risk = ['safe', 'changing'].includes(payload.risk) ? payload.risk : 'safe';
     if (!message.payload.title) throw new Error('proposal title is required');
+  }
+  if (type === 'life.reminder') {
+    message.payload = {
+      reminderId: requiredId(payload.reminderId, 'reminder id'),
+      title: optionalText(payload.title, 300, 'reminder title'),
+    };
+    if (!message.payload.title) throw new Error('reminder title is required');
   }
   if (type === 'command.result' && !isRecord(payload.result)) {
     throw new Error('command result must be an object');

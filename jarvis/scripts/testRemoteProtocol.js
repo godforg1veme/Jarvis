@@ -52,6 +52,15 @@ const lifeProposal = createRemoteMessage('life.proposal', {
 assert.strictEqual(lifeProposal.payload.risk, 'safe');
 assert.throws(() => createRemoteMessage('life.proposal', { proposalId: 'proposal-1', title: '', risk: 'safe' }), /title is required/);
 
+const lifeReminder = createRemoteMessage('life.reminder', {
+  reminderId: 'reminder-1', title: 'Продолжить Life OS',
+});
+assert.strictEqual(lifeReminder.payload.title, 'Продолжить Life OS');
+assert.throws(() => createRemoteMessage('life.reminder', { reminderId: 'reminder-1', title: '' }), /title is required/);
+assert.deepStrictEqual(createRemoteMessage('life.reminder', {
+  reminderId: 'reminder-1', title: 'Тест', actionArguments: { command: 'hidden' },
+}).payload, { reminderId: 'reminder-1', title: 'Тест' });
+
 assert.throws(() => validateRemoteMessage({ version: 2, type: 'device.heartbeat', payload: {} }), /unsupported/);
 assert.throws(() => createRemoteMessage('device.hello', { deviceId: 'x', token: '' }), /token is required/);
 assert.throws(() => createRemoteMessage('command.execute', {

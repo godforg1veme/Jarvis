@@ -40,6 +40,7 @@ const LIFE_EVENT_TYPES = Object.freeze([
   'reminder.created',
   'reminder.rescheduled',
   'reminder.cancelled',
+  'reminder.acknowledged',
   'reminder.delivered',
   'reminder.delivery_failed',
   'reminder.outcome_unknown',

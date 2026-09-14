@@ -69,6 +69,10 @@ test('reminder schemas validate recurrence, origins, and delivery bounds', () =>
     title: 'Run', triggerAt: '2026-09-15T15:00:00.000Z', timezone: 'UTC',
     deliveryChannels: ['email'], originChannel: 'life_os', idempotencyKey: 'x', actionArguments: { command: 'rm' },
   }));
+  assert.throws(() => createReminderSchema.parse({
+    title: 'Invalid timezone', triggerAt: '2026-09-15T15:00:00Z', timezone: 'Mars/Olympus',
+    deliveryChannels: ['desktop'], originChannel: 'desktop', originDeviceId: DEVICE_ID, idempotencyKey: 'timezone-invalid',
+  }));
 });
 
 test('recovery and source schemas reject paths, credentials, and arbitrary providers', () => {

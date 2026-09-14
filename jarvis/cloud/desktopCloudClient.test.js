@@ -203,6 +203,32 @@ test('cloud client forwards a validated Life OS proposal to the renderer bridge'
   }
 });
 
+test('cloud client forwards a validated Life OS reminder without executing a local action', async () => {
+  const userDataPath = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-cloud-client-'));
+  try {
+    let socket;
+    const reminders = [];
+    const client = new DesktopCloudClient({
+      userDataPath,
+      safeStorage: fakeSafeStorage(),
+      onLifeReminder: (reminder) => reminders.push(reminder),
+      executeTool: async () => { throw new Error('reminder must not execute a tool'); },
+      WebSocket: class extends HandshakeSocket { constructor(url) { super(url); socket = this; } },
+      fetch: async () => response({ ok: true, device: { id: 'device-a', name: 'Home PC' }, token: 'x'.repeat(43) }, 201),
+    });
+    await client.pair({ serverUrl: 'https://jarvis.example.test', pairingCode: 'JARVIS-ABCD-1234-ABCD-1234' });
+    socket.emit('open');
+    socket.emit('message', { data: JSON.stringify({ version: 1, type: 'device.welcome', payload: { deviceId: 'device-a', status: 'online' } }) });
+    socket.emit('message', { data: JSON.stringify({
+      version: 1, type: 'life.reminder', payload: { reminderId: 'reminder-1', title: 'Продолжить Life OS' },
+    }) });
+    assert.deepEqual(reminders, [{ reminderId: 'reminder-1', title: 'Продолжить Life OS' }]);
+    client.stopSession();
+  } finally {
+    fs.rmSync(userDataPath, { recursive: true, force: true });
+  }
+});
+
 test('cloud client stores a validated Happ artifact outside the repository and removes its secret from the response', async () => {
   const userDataPath = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-cloud-client-'));
   try {

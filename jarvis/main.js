@@ -5,7 +5,7 @@ if (process.env.ELECTRON_RUN_AS_NODE) {
 }
 require('./tools/loadEnv').loadEnvFile();
 
-const { app, BrowserWindow, globalShortcut, ipcMain, session, screen, Tray, Menu, nativeImage, clipboard, desktopCapturer, shell, safeStorage } = require('electron');
+const { app, BrowserWindow, globalShortcut, ipcMain, session, screen, Tray, Menu, nativeImage, clipboard, desktopCapturer, shell, safeStorage, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -1071,6 +1071,13 @@ app.whenReady().then(() => {
     onLifeProposal: (proposal) => {
       sendCloudEvent('life:proposal', proposal);
       broadcastCoreMode('alert', { duration: 2200 });
+    },
+    onLifeReminder: (reminder) => {
+      sendCloudEvent('life:reminder', reminder);
+      broadcastCoreMode('speech', { text: reminder.title, duration: Math.min(8000, Math.max(3000, reminder.title.length * 40)) });
+      try {
+        if (Notification.isSupported()) new Notification({ title: 'Jarvis', body: reminder.title }).show();
+      } catch (_) {}
     },
   });
   cloudVoiceService = new CloudVoiceService({

@@ -54,6 +54,7 @@ class DesktopCloudClient {
     this.onState = typeof options.onState === 'function' ? options.onState : () => {};
     this.onWorkflowUpdate = typeof options.onWorkflowUpdate === 'function' ? options.onWorkflowUpdate : () => {};
     this.onLifeProposal = typeof options.onLifeProposal === 'function' ? options.onLifeProposal : () => {};
+    this.onLifeReminder = typeof options.onLifeReminder === 'function' ? options.onLifeReminder : () => {};
     this.capabilities = options.capabilities || { wakeWord: true, localTts: true, protocolVersion: 1 };
     this.executeRemoteCommand = typeof options.executeRemoteCommand === 'function' ? options.executeRemoteCommand : null;
     this.publicPath = path.join(this.userDataPath, PUBLIC_STATE_FILE);
@@ -452,6 +453,11 @@ class DesktopCloudClient {
           title: message.payload.title,
           explanation: message.payload.explanation,
           risk: message.payload.risk,
+        });
+      } else if (message.type === 'life.reminder') {
+        this.onLifeReminder({
+          reminderId: message.payload.reminderId,
+          title: message.payload.title,
         });
       } else if (message.type === 'server.error') {
         this._emitState({ lastError: message.payload && message.payload.code });

@@ -11,6 +11,9 @@ const recurrenceSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('monthly_date'), day: z.number().int().min(1).max(31), interval: z.number().int().min(1).max(24).default(1) }).strict(),
   z.object({ kind: z.literal('interval'), minutes: z.number().int().min(15).max(525600) }).strict(),
 ]);
+const timezoneSchema = z.string().trim().min(1).max(80).refine((value) => {
+  try { new Intl.DateTimeFormat('en-US', { timeZone: value }).format(new Date(0)); return true; } catch { return false; }
+}, 'invalid IANA timezone');
 
 const createReminderSchema = z.object({
   commitmentId: optionalId,
@@ -18,7 +21,8 @@ const createReminderSchema = z.object({
   personId: optionalId,
   title: boundedText(300),
   triggerAt: timestampSchema,
-  timezone: z.string().trim().min(1).max(80),
+  timezone: timezoneSchema,
+  expiresAt: timestampSchema.nullable().optional(),
   recurrence: recurrenceSchema.nullable().optional(),
   deliveryChannels: z.array(z.enum(['telegram', 'desktop'])).min(1).max(2)
     .refine((items) => new Set(items).size === items.length, 'delivery channels must be unique'),
@@ -33,15 +37,24 @@ const createReminderSchema = z.object({
   if (value.originChannel === 'desktop' && !value.originDeviceId) {
     context.addIssue({ code: 'custom', message: 'Desktop reminder requires origin device', path: ['originDeviceId'] });
   }
+  if (value.deliveryChannels.includes('telegram') && !value.originConversationId) {
+    context.addIssue({ code: 'custom', message: 'Telegram delivery requires an authenticated conversation', path: ['deliveryChannels'] });
+  }
+  if (value.deliveryChannels.includes('desktop') && !value.originDeviceId) {
+    context.addIssue({ code: 'custom', message: 'Desktop delivery requires a paired device', path: ['deliveryChannels'] });
+  }
+  if (value.expiresAt && new Date(value.expiresAt) <= new Date(value.triggerAt)) {
+    context.addIssue({ code: 'custom', message: 'Reminder expiry must follow its trigger', path: ['expiresAt'] });
+  }
 });
 
 const updateReminderSchema = z.object({
   revision: z.number().int().min(1),
   triggerAt: timestampSchema.optional(),
-  timezone: z.string().trim().min(1).max(80).optional(),
+  timezone: timezoneSchema.optional(),
   recurrence: recurrenceSchema.nullable().optional(),
   deliveryChannels: z.array(z.enum(['telegram', 'desktop'])).min(1).max(2).optional(),
   state: z.enum(['acknowledged', 'cancelled']).optional(),
 }).strict().refine((value) => Object.keys(value).some((key) => key !== 'revision'), 'reminder update is empty');
 
-module.exports = { createReminderSchema, recurrenceSchema, updateReminderSchema };
+module.exports = { createReminderSchema, recurrenceSchema, timezoneSchema, updateReminderSchema };

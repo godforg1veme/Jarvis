@@ -128,6 +128,7 @@ function harness(allowedIds = ['101', '202'], devices = null, commandService = n
     ...(options.vpnService ? { vpnService: options.vpnService } : {}),
     ...(options.menuService ? { menuService: options.menuService } : {}),
     ...(options.orchestrator ? { orchestrator: options.orchestrator } : {}),
+    ...(options.lifeReminderService ? { lifeReminderService: options.lifeReminderService } : {}),
   });
   return { service, state, assistantCalls };
 }
@@ -146,6 +147,21 @@ test('deduplicates Telegram updates', async () => {
   assert.equal((await service.handle(update(2, 101, 101, 'hello'))).status, 'answered');
   assert.equal((await service.handle(update(2, 101, 101, 'hello'))).status, 'duplicate');
   assert.equal(state.messages.length, 2);
+});
+
+test('Telegram reminder acknowledgement is bound to the authenticated owner and conversation', async () => {
+  const calls = [];
+  const reminderId = '11111111-1111-4111-8111-111111111111';
+  const { service } = harness(['101'], null, null, {
+    lifeReminderService: {
+      async acknowledgeLatest(input) { calls.push(input); return { id: reminderId }; },
+    },
+  });
+  const result = await service.handleCallback(callbackUpdate(900, 101, 101, `life:reminder:ack:${reminderId}`));
+  assert.equal(result.answer, 'Напоминание отмечено выполненным.');
+  assert.equal(calls[0].userId, 'user-101');
+  assert.equal(calls[0].originConversationId, 'conversation-user-101:101');
+  assert.equal(calls[0].reminderId, reminderId);
 });
 
 test('transcribes an allowed Telegram voice without storing raw audio', async () => {

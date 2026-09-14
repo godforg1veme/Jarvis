@@ -50,6 +50,18 @@ function publicProposal(row) {
   };
 }
 
+function publicReminder(row) {
+  return {
+    id: row.id, commitmentId: row.commitment_id || null, projectId: row.project_id || null,
+    personId: row.person_id || null, title: row.title, triggerAt: iso(row.trigger_at),
+    timezone: row.timezone, recurrence: row.recurrence || null,
+    deliveryChannels: Array.isArray(row.delivery_channels) ? row.delivery_channels.slice(0, 2) : [],
+    state: row.state, origin: row.origin_channel, revision: row.revision,
+    expiresAt: iso(row.expires_at),
+    createdAt: iso(row.created_at), updatedAt: iso(row.updated_at),
+  };
+}
+
 function publicMode(value) {
   if (!value) return null;
   return {
@@ -118,5 +130,5 @@ function lifeError(statusCode, code) {
 module.exports = {
   iso, lifeError, publicArea, publicCommitment, publicEvent, publicFamilyGrant,
   publicMode, publicPerson, publicPersonProjectLink, publicPreference,
-  publicProject, publicProposal, publicRelationship,
+  publicProject, publicProposal, publicRelationship, publicReminder,
 };

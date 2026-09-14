@@ -78,6 +78,10 @@ const { FeedbackAggregator } = require('./life/preferences/feedbackAggregator');
 const { PriorityRepository } = require('./life/priority/priorityRepository');
 const { PriorityEngine } = require('./life/priority/priorityEngine');
 const { ReminderRepository } = require('./life/reminders/reminderRepository');
+const { ReminderService } = require('./life/reminders/reminderService');
+const { ReminderWorker } = require('./life/reminders/reminderWorker');
+const { ReminderDeliveryRouter } = require('./life/reminders/reminderDeliveryRouter');
+const { DesktopReminderTransport, TelegramReminderTransport } = require('./life/reminders/reminderTransports');
 const { RecoveryPlanRepository } = require('./life/recovery/recoveryPlanRepository');
 const { SourceConnectionRepository } = require('./life/sources/sourceConnectionRepository');
 const { CommitmentRepository } = require('./life/commitments/commitmentRepository');
@@ -117,6 +121,7 @@ async function createRuntime(config, overrides = {}) {
   let lifeEventGateway = null;
   let lifeProjectionWorker = null;
   let proactivityWorker = null;
+  let reminderWorker = null;
   if (pool) {
     const answerProvider = overrides.provider || createAnswerProvider(config, {
       onFallback(name, error) {
@@ -146,6 +151,7 @@ async function createRuntime(config, overrides = {}) {
     let lifeFamilyAccessService = null;
     let lifePriorityEngine = null;
     let lifeReminderRepository = null;
+    let lifeReminderService = null;
     let lifeRecoveryRepository = null;
     let lifeSourceRepository = null;
     let lifeCommitmentRepository = null;
@@ -184,6 +190,9 @@ async function createRuntime(config, overrides = {}) {
       });
       lifeCommitmentLifecycleService = overrides.lifeCommitmentLifecycleService || new CommitmentLifecycleService({
         repository: lifeCommitmentRepository, gateway: lifeEventGateway,
+      });
+      lifeReminderService = overrides.lifeReminderService || new ReminderService({
+        repository: lifeReminderRepository, gateway: lifeEventGateway,
       });
     }
     const commandRepository = overrides.commandRepository || new CommandRepository(pool);
@@ -428,6 +437,7 @@ async function createRuntime(config, overrides = {}) {
         proposalService, gateway: lifeEventGateway, modeService: lifeModeService,
         preferenceService: lifePreferenceService, feedbackAggregator: lifeFeedbackAggregator,
         peopleService: lifePeopleService, familyAccessService: lifeFamilyAccessService,
+        reminderService: lifeReminderService, reminderRepository: lifeReminderRepository,
       });
     }
     if (typeof app.register === 'function' && typeof app.get === 'function') {
@@ -477,6 +487,7 @@ async function createRuntime(config, overrides = {}) {
         lifeEventGateway,
         lifeMissionControlService: missionControlService,
         lifeProposalService: proposalService,
+        lifeReminderService,
         menuService,
       });
       bot = createTelegramBot({
@@ -487,6 +498,29 @@ async function createRuntime(config, overrides = {}) {
         voiceMaxBytes: MAX_TELEGRAM_VOICE_BYTES,
         onPollingHealth: (value) => { pollingHealth = value; },
         operationsPanelUrl: menuService.operationsPanelUrl,
+      });
+    }
+    if (config.lifeOsEnabled && config.lifeOsRemindersEnabled) {
+      const reminderRouter = overrides.reminderDeliveryRouter || new ReminderDeliveryRouter({
+        telegram: new TelegramReminderTransport({ bot, conversationRepository }),
+        desktop: new DesktopReminderTransport({ sessionRegistry }),
+      });
+      reminderWorker = overrides.reminderWorker || new ReminderWorker({
+        repository: lifeReminderRepository, router: reminderRouter, gateway: lifeEventGateway,
+        intervalMs: config.lifeOsReminderIntervalMs, batchSize: config.lifeOsReminderBatchSize,
+        logger: app.log,
+        policyProvider: async ({ userId }) => {
+          const [mode, preferences] = await Promise.all([
+            lifeModeService.get({ userId }), lifePreferenceService.list({ userId }),
+          ]);
+          const values = new Map(preferences.map((item) => [item.key, item.value]));
+          return {
+            notificationPolicy: mode.policy.notificationPolicy,
+            deferUntil: mode.expiresAt,
+            quietHours: values.get('notifications.quiet_hours'),
+            maxPerDay: values.get('notifications.max_proactive_per_day'),
+          };
+        },
       });
     }
     operationsRuntime = await (overrides.createOperationsRuntime || createOperationsRuntime)({
@@ -531,6 +565,7 @@ async function createRuntime(config, overrides = {}) {
       if (vpnRecoveryWorker) vpnRecoveryWorker.start();
       if (lifeProjectionWorker) lifeProjectionWorker.start();
       if (config.lifeOsProactivityEnabled && proactivityWorker) proactivityWorker.start();
+      if (config.lifeOsRemindersEnabled && reminderWorker) reminderWorker.start();
       if (bot) void bot.start().catch((error) => app.log.error({ err: error }, 'Telegram polling stopped'));
     },
     async close() {
@@ -540,6 +575,7 @@ async function createRuntime(config, overrides = {}) {
       if (vpnRecoveryWorker) vpnRecoveryWorker.stop();
       if (lifeProjectionWorker) lifeProjectionWorker.stop();
       if (proactivityWorker) proactivityWorker.stop();
+      if (reminderWorker) reminderWorker.stop();
       if (operationsRuntime) await operationsRuntime.close();
       if (bot && (typeof bot.isRunning !== 'function' || bot.isRunning())) await bot.stop();
       await app.close();

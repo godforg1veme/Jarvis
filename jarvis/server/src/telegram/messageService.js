@@ -163,6 +163,7 @@ class TelegramMessageService {
     this.lifeEventGateway = options.lifeEventGateway || null;
     this.lifeMissionControlService = options.lifeMissionControlService || null;
     this.lifeProposalService = options.lifeProposalService || null;
+    this.lifeReminderService = options.lifeReminderService || null;
     this.menuService = options.menuService || null;
   }
 
@@ -265,6 +266,17 @@ class TelegramMessageService {
         userId: user.id, proposalId, originChannel: 'telegram', originConversationId: conversation.id,
       });
       const answer = proposal ? (action === 'confirm' ? 'Предложение подтверждено.' : 'Предложение отклонено.') : 'Предложение недоступно, истекло или относится к другому каналу.';
+      await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: answer });
+      return { status: 'answered', answer };
+    }
+
+    const reminderMatch = /^life:reminder:ack:([a-f0-9-]{36})$/i.exec(input.data);
+    if (reminderMatch) {
+      if (!this.lifeReminderService) return { status: 'ignored' };
+      const reminder = await this.lifeReminderService.acknowledgeLatest({
+        userId: user.id, reminderId: reminderMatch[1], originConversationId: conversation.id,
+      });
+      const answer = reminder ? 'Напоминание отмечено выполненным.' : 'Это напоминание уже недоступно.';
       await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: answer });
       return { status: 'answered', answer };
     }

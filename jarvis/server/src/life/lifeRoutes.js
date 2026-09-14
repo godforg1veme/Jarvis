@@ -6,9 +6,11 @@ const {
   createRelationshipSchema, revokeFamilyGrantSchema, updatePersonSchema,
 } = require('./people/peopleSchemas');
 const { PREFERENCE_KEYS, preferenceMutationSchema, preferenceRevisionSchema } = require('./preferences/lifePreferenceSchemas');
+const { reminderInputSchema } = require('./reminders/reminderService');
+const { recurrenceSchema, timezoneSchema } = require('./reminders/reminderSchemas');
 const {
   lifeError, publicArea, publicCommitment, publicFamilyGrant, publicMode, publicPerson,
-  publicPersonProjectLink, publicPreference, publicProject, publicProposal, publicRelationship,
+  publicPersonProjectLink, publicPreference, publicProject, publicProposal, publicRelationship, publicReminder,
 } = require('./lifePublic');
 
 const revisionSchema = z.object({ revision: z.number().int().min(1) }).strict();
@@ -24,6 +26,15 @@ const missionHideSchema = z.object({
   revision: z.number().int().min(1).nullable().optional(),
   hiddenUntil: z.string().datetime({ offset: true }),
 }).strict().refine((value) => new Date(value.hiddenUntil) > new Date(), 'hiddenUntil must be in the future');
+const reminderQuerySchema = z.object({
+  state: z.enum(['scheduled', 'delivered', 'acknowledged', 'cancelled', 'failed', 'outcome_unknown']).optional(),
+}).strict();
+const reminderRescheduleSchema = z.object({
+  revision: z.number().int().min(1),
+  triggerAt: z.string().datetime({ offset: true }),
+  timezone: timezoneSchema.optional(),
+  recurrence: recurrenceSchema.nullable().optional(),
+}).strict();
 
 function registerLifeRoutes(app, options) {
   const authenticate = options.authenticate;
@@ -40,6 +51,8 @@ function registerLifeRoutes(app, options) {
   const feedbackAggregator = options.feedbackAggregator || null;
   const peopleService = options.peopleService || null;
   const familyAccessService = options.familyAccessService || null;
+  const reminderService = options.reminderService || null;
+  const reminderRepository = options.reminderRepository || null;
   const requireDevice = async (request) => { request.device = await authenticate(request.headers); };
   const checkRead = (device) => limiter.check(`life-read:${device.id}`, { limit: 120, windowMs: 60000 });
   const checkWrite = (device) => limiter.check(`life-write:${device.id}`, { limit: 30, windowMs: 60000 });
@@ -91,6 +104,50 @@ function registerLifeRoutes(app, options) {
     checkRead(request.device);
     return { ok: true, missionControl: await missionControlService.get({ userId: request.device.user_id }) };
   });
+
+  app.get('/v1/desktop/life/reminders', { preHandler: requireDevice }, async (request) => {
+    checkRead(request.device);
+    const query = reminderQuerySchema.parse(request.query || {});
+    const states = query.state ? [query.state] : ['scheduled', 'delivered', 'outcome_unknown', 'failed'];
+    const reminders = await reminderRepository.list({ userId: request.device.user_id, states, limit: 100 });
+    return { ok: true, reminders: reminders.map(publicReminder) };
+  });
+
+  app.post('/v1/desktop/life/reminders', { preHandler: requireDevice, bodyLimit: 8192 }, async (request, reply) => {
+    checkWrite(request.device);
+    const reminder = await reminderService.create({
+      userId: request.device.user_id,
+      origin: { channel: 'desktop', deviceId: request.device.id },
+      input: reminderInputSchema.parse(request.body),
+    });
+    if (!reminder) throw lifeError(404, 'LIFE_SCOPE_NOT_FOUND');
+    reply.code(201);
+    return { ok: true, reminder: publicReminder(reminder) };
+  });
+
+  app.patch('/v1/desktop/life/reminders/:reminderId', { preHandler: requireDevice, bodyLimit: 4096 }, async (request) => {
+    checkWrite(request.device);
+    const input = reminderRescheduleSchema.parse(request.body);
+    const reminder = await reminderService.reschedule({
+      userId: request.device.user_id, reminderId: id(request.params.reminderId),
+      sourceDeviceId: request.device.id, ...input,
+    });
+    if (!reminder) throw lifeError(409, 'LIFE_REVISION_CONFLICT');
+    return { ok: true, reminder: publicReminder(reminder) };
+  });
+
+  for (const [action, method] of [['cancel', 'cancel'], ['acknowledge', 'acknowledge']]) {
+    app.post(`/v1/desktop/life/reminders/:reminderId/${action}`, { preHandler: requireDevice, bodyLimit: 1024 }, async (request) => {
+      checkWrite(request.device);
+      const input = revisionSchema.parse(request.body || {});
+      const reminder = await reminderService[method]({
+        userId: request.device.user_id, reminderId: id(request.params.reminderId),
+        revision: input.revision, sourceDeviceId: request.device.id,
+      });
+      if (!reminder) throw lifeError(409, 'LIFE_REVISION_CONFLICT');
+      return { ok: true, reminder: publicReminder(reminder) };
+    });
+  }
 
   const missionIntent = (method, parse) => async (request) => {
     checkWrite(request.device);
