@@ -1,0 +1,3 @@
+const u = require('./parserUtils');
+function parse(item) { const occurredAt = u.timestamp(item.occurredAt); const deviceId = u.text(item.deviceId, 128, 'device'); return u.result('smart_home', item.id, occurredAt, `Умный дом: ${u.text(item.deviceClass, 80, 'class')} — ${u.text(item.state, 120, 'state')}`, { deviceId, deviceClass: u.text(item.deviceClass, 80, 'class'), previousState: u.optionalText(item.previousState, 120), state: u.text(item.state, 120, 'state'), severity: u.text(item.severity, 20, 'severity'), homeArea: u.optionalText(item.homeArea, 120), occurredAt }); }
+module.exports = { parse };

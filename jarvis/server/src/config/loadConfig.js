@@ -80,6 +80,7 @@ const baseSchema = z.object({
   lifeOsRemindersEnabled: z.boolean(),
   lifeOsReminderIntervalMs: z.number().int().min(250).max(60000),
   lifeOsReminderBatchSize: z.number().int().min(1).max(50),
+  lifeOsFixtureSourcesEnabled: z.boolean(),
   operationsEnabled: z.boolean(),
   operationsHostKey: z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/),
   operationsHostLabel: z.string().min(1).max(100),
@@ -241,6 +242,7 @@ function loadConfig(env = process.env) {
     lifeOsRemindersEnabled: parseBoolean(env.JARVIS_LIFE_OS_REMINDERS_ENABLED),
     lifeOsReminderIntervalMs: Number(env.JARVIS_LIFE_OS_REMINDER_INTERVAL_MS || 5000),
     lifeOsReminderBatchSize: Number(env.JARVIS_LIFE_OS_REMINDER_BATCH_SIZE || 10),
+    lifeOsFixtureSourcesEnabled: parseBoolean(env.JARVIS_LIFE_OS_FIXTURE_SOURCES_ENABLED),
     operationsEnabled: parseBoolean(env.JARVIS_OPERATIONS_ENABLED),
     operationsHostKey: String(env.JARVIS_OPERATIONS_HOST_KEY || 'vps').trim(),
     operationsHostLabel: String(env.JARVIS_OPERATIONS_HOST_LABEL || 'Jarvis VPS').trim(),
@@ -269,6 +271,7 @@ function loadConfig(env = process.env) {
   if (config.lifeOsRemindersEnabled && !config.lifeOsEnabled) {
     throw new Error('JARVIS_LIFE_OS_ENABLED is required when Life OS reminders are enabled');
   }
+  if (config.lifeOsFixtureSourcesEnabled && !config.lifeOsEnabled) throw new Error('JARVIS_LIFE_OS_FIXTURE_SOURCES_ENABLED requires JARVIS_LIFE_OS_ENABLED');
   if (config.operationsEnabled) {
     if (!config.operationsPublicOrigin) throw new Error('JARVIS_OPERATIONS_PUBLIC_ORIGIN is required when operations are enabled');
     const operationsUrl = new URL(config.operationsPublicOrigin);

@@ -1,0 +1,3 @@
+const u = require('./parserUtils');
+function parse(item) { const subject = u.text(item.subject, 300, 'subject'); const receivedAt = u.timestamp(item.receivedAt); return u.result('email', item.id, receivedAt, `Письмо: ${subject}`, { messageRef: u.hashRef(item.id), threadRef: u.hashRef(item.threadId || item.id), subject, senderLabel: u.text(item.senderLabel, 160, 'sender'), receivedAt, attachments: u.list(item.attachments || [], 20, (value) => ({ name: u.text(value.name, 255, 'attachment'), mediaType: u.optionalText(value.mediaType, 120) })), candidateIntent: u.optionalText(item.candidateIntent, 80) }); }
+module.exports = { parse };

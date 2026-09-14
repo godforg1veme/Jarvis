@@ -80,6 +80,12 @@ function fixture() {
       async get({ userId }) { calls.push(userId); return { id: PLAN, projectId: PROJECT, status: 'ready', revision: 1, steps: [] }; },
       async propose({ userId }) { calls.push(userId); return { plan: { id: PLAN, projectId: PROJECT, status: 'awaiting_confirmation', revision: 2, steps: [] }, proposalId: REMINDER }; },
     },
+    sourceRepository: {
+      async list({ userId }) { calls.push(userId); return []; },
+      async create({ userId, ...input }) { calls.push(userId); return { id: PLAN, adapter_type: input.adapterType, display_name: input.displayName, enabled: input.enabled, selected_scope: input.selectedScope, privacy_policy_version: input.privacyPolicyVersion, configuration_metadata: input.configurationMetadata, health_status: 'unconfigured', revision: 1 }; },
+      async update() { return null; },
+    },
+    sourceSyncService: { async sync({ userId }) { calls.push(userId); return { status: 'fixture_disabled', accepted: 0 }; } },
   });
   return { app, calls };
 }
@@ -214,6 +220,21 @@ test('recovery routes derive owner and Desktop origin while rejecting injected a
   const proposed = await app.inject({ method: 'POST', url: `/v1/desktop/life/recovery-plans/${PLAN}/propose`, headers, payload: { revision: 1 } });
   assert.equal(proposed.statusCode, 200);
   assert.equal(proposed.json().proposalId, REMINDER);
+  assert.deepEqual(calls.slice(-2), [USER, USER]);
+  await app.close();
+});
+
+test('source routes expose fixture status and reject credential-shaped configuration', async () => {
+  const { app, calls } = fixture(); const headers = { authorization: 'Bearer valid' };
+  const created = await app.inject({ method: 'POST', url: '/v1/desktop/life/sources', headers,
+    payload: { adapterType: 'calendar', displayName: 'Calendar fixture', enabled: false, selectedScope: {}, configurationMetadata: {} } });
+  assert.equal(created.statusCode, 201);
+  assert.equal(created.json().source.transport, 'fixture_only');
+  const secret = await app.inject({ method: 'POST', url: '/v1/desktop/life/sources', headers,
+    payload: { adapterType: 'email', displayName: 'bad', configurationMetadata: { accessToken: 'x' } } });
+  assert.equal(secret.statusCode, 400);
+  const sync = await app.inject({ method: 'POST', url: `/v1/desktop/life/sources/${PLAN}/sync`, headers, payload: {} });
+  assert.equal(sync.json().result.status, 'fixture_disabled');
   assert.deepEqual(calls.slice(-2), [USER, USER]);
   await app.close();
 });

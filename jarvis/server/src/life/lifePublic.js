@@ -120,6 +120,14 @@ function publicFamilyGrant(row) {
   };
 }
 
+function publicSourceConnection(row) {
+  return { id: row.id, type: row.adapter_type, displayName: row.display_name, enabled: row.enabled,
+    selectedScope: row.selected_scope || {}, privacyPolicyVersion: row.privacy_policy_version,
+    configurationMetadata: row.configuration_metadata || {}, health: row.health_status,
+    lastSuccessfulSyncAt: iso(row.last_successful_sync_at), lastFailureCode: row.last_failure_code || null,
+    revision: row.revision, transport: 'fixture_only' };
+}
+
 function lifeError(statusCode, code) {
   const error = new Error(code);
   error.statusCode = statusCode;
@@ -131,4 +139,5 @@ module.exports = {
   iso, lifeError, publicArea, publicCommitment, publicEvent, publicFamilyGrant,
   publicMode, publicPerson, publicPersonProjectLink, publicPreference,
   publicProject, publicProposal, publicRelationship, publicReminder,
+  publicSourceConnection,
 };

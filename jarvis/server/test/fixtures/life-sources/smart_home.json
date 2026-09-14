@@ -1,0 +1,1 @@
+{"id":"home-1","deviceId":"sensor-kitchen","deviceClass":"leak_sensor","previousState":"dry","state":"water_detected","severity":"critical","homeArea":"Кухня","occurredAt":"2026-09-14T08:00:00Z"}

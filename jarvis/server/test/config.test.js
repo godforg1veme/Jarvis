@@ -17,6 +17,7 @@ test('loads safe development defaults', () => {
   assert.equal(config.lifeOsRemindersEnabled, false);
   assert.equal(config.lifeOsReminderIntervalMs, 5000);
   assert.equal(config.lifeOsReminderBatchSize, 10);
+  assert.equal(config.lifeOsFixtureSourcesEnabled, false);
 });
 
 test('keeps Life OS ingestion, enrichment, and proactivity independently opt-in', () => {
@@ -30,6 +31,7 @@ test('keeps Life OS ingestion, enrichment, and proactivity independently opt-in'
     JARVIS_LIFE_OS_REMINDERS_ENABLED: 'true',
     JARVIS_LIFE_OS_REMINDER_INTERVAL_MS: '1250',
     JARVIS_LIFE_OS_REMINDER_BATCH_SIZE: '12',
+    JARVIS_LIFE_OS_FIXTURE_SOURCES_ENABLED: 'true',
   });
   assert.equal(config.lifeOsEnabled, true);
   assert.equal(config.lifeOsContextEnabled, true);
@@ -40,10 +42,12 @@ test('keeps Life OS ingestion, enrichment, and proactivity independently opt-in'
   assert.equal(config.lifeOsRemindersEnabled, true);
   assert.equal(config.lifeOsReminderIntervalMs, 1250);
   assert.equal(config.lifeOsReminderBatchSize, 12);
+  assert.equal(config.lifeOsFixtureSourcesEnabled, true);
   assert.throws(() => loadConfig({ JARVIS_LIFE_OS_WORKER_INTERVAL_MS: '50' }));
   assert.throws(() => loadConfig({ JARVIS_LIFE_OS_CONTEXT_DEADLINE_MS: '10' }));
   assert.throws(() => loadConfig({ JARVIS_LIFE_OS_CONTEXT_ENABLED: 'true' }), /LIFE_OS_ENABLED/);
   assert.throws(() => loadConfig({ JARVIS_LIFE_OS_REMINDERS_ENABLED: 'true' }), /LIFE_OS_ENABLED/);
+  assert.throws(() => loadConfig({ JARVIS_LIFE_OS_FIXTURE_SOURCES_ENABLED: 'true' }), /LIFE_OS_ENABLED/);
   assert.throws(() => loadConfig({ JARVIS_LIFE_OS_REMINDER_BATCH_SIZE: '100' }));
 });
 

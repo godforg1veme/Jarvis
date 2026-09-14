@@ -107,6 +107,26 @@ class SourceConnectionRepository {
     `, [userId, connectionId, claimToken, boundedCursor, adapterSchemaVersion]);
     return result.rows[0] || null;
   }
+
+  async releaseCursor({ userId, connectionId, claimToken }) {
+    const result = await this.pool.query(`
+      UPDATE life_source_cursors SET claim_token = NULL, claimed_at = NULL, updated_at = now()
+      WHERE user_id = $1 AND connection_id = $2 AND claim_token = $3 RETURNING id
+    `, [userId, connectionId, claimToken]);
+    return result.rowCount === 1;
+  }
+
+  async recordHealth({ userId, connectionId, status, failureCode = null }) {
+    if (!['healthy', 'stale', 'failed', 'disabled'].includes(status)) throw new Error('invalid source health');
+    const result = await this.pool.query(`
+      UPDATE life_source_connections SET health_status = $3,
+        last_failure_code = $4,
+        last_successful_sync_at = CASE WHEN $3 = 'healthy' THEN now() ELSE last_successful_sync_at END,
+        updated_at = now()
+      WHERE id = $1 AND user_id = $2 RETURNING id
+    `, [connectionId, userId, status, failureCode]);
+    return result.rowCount === 1;
+  }
 }
 
 function validateCursor(value) {

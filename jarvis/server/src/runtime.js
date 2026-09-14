@@ -86,6 +86,8 @@ const { DesktopReminderTransport, TelegramReminderTransport } = require('./life/
 const { RecoveryPlanRepository } = require('./life/recovery/recoveryPlanRepository');
 const { RecoveryPlanService } = require('./life/recovery/recoveryPlanService');
 const { SourceConnectionRepository } = require('./life/sources/sourceConnectionRepository');
+const { SourceSyncService } = require('./life/sources/sourceSyncService');
+const { createFixtureSourceRegistry } = require('./life/sources/fixtureSourceRegistry');
 const { CommitmentRepository } = require('./life/commitments/commitmentRepository');
 const { CommitmentLifecycleService } = require('./life/commitments/commitmentLifecycleService');
 const { PeopleRepository } = require('./life/people/peopleRepository');
@@ -158,6 +160,7 @@ async function createRuntime(config, overrides = {}) {
     let lifeSourceRepository = null;
     let lifeCommitmentRepository = null;
     let lifeCommitmentLifecycleService = null;
+    let lifeSourceSyncService = null;
     if (config.lifeOsEnabled) {
       lifeEventRepository = overrides.lifeEventRepository || new LifeEventRepository(pool);
       lifeProjectionRepository = overrides.lifeProjectionRepository || new LifeProjectionRepository(pool);
@@ -174,6 +177,12 @@ async function createRuntime(config, overrides = {}) {
         repository: lifeEventRepository,
         enabled: true,
         logger: app.log,
+      });
+      lifeSourceSyncService = overrides.lifeSourceSyncService || new SourceSyncService({
+        repository: lifeSourceRepository,
+        registry: overrides.lifeSourceRegistry || createFixtureSourceRegistry(overrides.lifeSourceFixturePages || {}),
+        gateway: lifeEventGateway,
+        enabled: config.lifeOsFixtureSourcesEnabled,
       });
       lifeModeService = overrides.lifeModeService || new LifeModeService({
         repository: lifeModeRepository, gateway: lifeEventGateway,
@@ -471,6 +480,7 @@ async function createRuntime(config, overrides = {}) {
         peopleService: lifePeopleService, familyAccessService: lifeFamilyAccessService,
         reminderService: lifeReminderService, reminderRepository: lifeReminderRepository,
         recoveryPlanService,
+        sourceRepository: lifeSourceRepository, sourceSyncService: lifeSourceSyncService,
       });
     }
     if (typeof app.register === 'function' && typeof app.get === 'function') {

@@ -11,7 +11,9 @@ const { recurrenceSchema, timezoneSchema } = require('./reminders/reminderSchema
 const {
   lifeError, publicArea, publicCommitment, publicFamilyGrant, publicMode, publicPerson,
   publicPersonProjectLink, publicPreference, publicProject, publicProposal, publicRelationship, publicReminder,
+  publicSourceConnection,
 } = require('./lifePublic');
+const { createSourceConnectionSchema, updateSourceConnectionSchema } = require('./sources/sourceSchemas');
 
 const revisionSchema = z.object({ revision: z.number().int().min(1) }).strict();
 const commitmentUpdateSchema = z.object({ revision: z.number().int().min(1), status: z.enum(['completed', 'dismissed']) }).strict();
@@ -55,6 +57,8 @@ function registerLifeRoutes(app, options) {
   const reminderService = options.reminderService || null;
   const reminderRepository = options.reminderRepository || null;
   const recoveryPlanService = options.recoveryPlanService || null;
+  const sourceRepository = options.sourceRepository || null;
+  const sourceSyncService = options.sourceSyncService || null;
   const requireDevice = async (request) => { request.device = await authenticate(request.headers); };
   const checkRead = (device) => limiter.check(`life-read:${device.id}`, { limit: 120, windowMs: 60000 });
   const checkWrite = (device) => limiter.check(`life-write:${device.id}`, { limit: 30, windowMs: 60000 });
@@ -126,6 +130,31 @@ function registerLifeRoutes(app, options) {
     const result = await recoveryPlanService.propose({ userId: request.device.user_id, planId: id(request.params.planId), revision: input.revision });
     if (!result) throw lifeError(409, 'LIFE_RECOVERY_CONTEXT_CONFLICT');
     return { ok: true, ...result };
+  });
+
+  app.get('/v1/desktop/life/sources', { preHandler: requireDevice }, async (request) => {
+    checkRead(request.device);
+    return { ok: true, sources: (await sourceRepository.list({ userId: request.device.user_id })).map(publicSourceConnection) };
+  });
+
+  app.post('/v1/desktop/life/sources', { preHandler: requireDevice, bodyLimit: 12 * 1024 }, async (request, reply) => {
+    checkWrite(request.device);
+    const source = await sourceRepository.create({ userId: request.device.user_id, ...createSourceConnectionSchema.parse(request.body || {}) });
+    reply.code(201);
+    return { ok: true, source: publicSourceConnection(source) };
+  });
+
+  app.patch('/v1/desktop/life/sources/:sourceId', { preHandler: requireDevice, bodyLimit: 12 * 1024 }, async (request) => {
+    checkWrite(request.device);
+    const source = await sourceRepository.update({ userId: request.device.user_id, connectionId: id(request.params.sourceId), ...updateSourceConnectionSchema.parse(request.body || {}) });
+    if (!source) throw lifeError(409, 'LIFE_REVISION_CONFLICT');
+    return { ok: true, source: publicSourceConnection(source) };
+  });
+
+  app.post('/v1/desktop/life/sources/:sourceId/sync', { preHandler: requireDevice, bodyLimit: 1024 }, async (request) => {
+    checkWrite(request.device);
+    const result = await sourceSyncService.sync({ userId: request.device.user_id, connectionId: id(request.params.sourceId) });
+    return { ok: true, result };
   });
 
   app.get('/v1/desktop/life/mission-control', { preHandler: requireDevice }, async (request) => {
