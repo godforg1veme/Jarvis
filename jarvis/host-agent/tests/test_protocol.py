@@ -46,6 +46,10 @@ class ProtocolTests(unittest.TestCase):
             validate_request(request(operation="vpn.client.revoke", arguments={"clientId": "not-an-id"}))
         hysteria = validate_request(request(operation="vpn.hysteria2.client.issue", arguments={"label": "My iPhone"}))
         self.assertEqual(hysteria["arguments"], {"label": "My iPhone"})
+        hysteria_cyrillic = validate_request(request(operation="vpn.hysteria2.client.issue", arguments={"label": "сеня"}))
+        self.assertEqual(hysteria_cyrillic["arguments"], {"label": "сеня"})
+        vpn_cyrillic = validate_request(request(operation="vpn.client.issue", arguments={"label": "iphone меня"}))
+        self.assertEqual(vpn_cyrillic["arguments"], {"label": "iphone меня"})
         self.assertEqual(validate_request(request(operation="vpn.hysteria2.status", arguments={}))["arguments"], {})
         with self.assertRaises(ProtocolError):
             validate_request(request(operation="vpn.hysteria2.restart", arguments={"port": 53}))

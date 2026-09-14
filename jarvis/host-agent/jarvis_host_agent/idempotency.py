@@ -14,7 +14,7 @@ from .protocol import ProtocolError
 
 
 def canonical_json(value: Any) -> str:
-    return json.dumps(value, separators=(",", ":"), sort_keys=True, ensure_ascii=True)
+    return json.dumps(value, separators=(",", ":"), sort_keys=True, ensure_ascii=False)
 
 
 def request_mac(secret: bytes, request: dict[str, Any]) -> str:

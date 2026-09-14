@@ -34,6 +34,22 @@ class IdempotencyTests(unittest.TestCase):
             self.assertEqual(journal.get_response(request["requestId"]), response)
             self.assertIsNone(journal.get_response("11111111-1111-4111-8111-111111111111"))
 
+    def test_canonical_json_preserves_utf8_cyrillic_characters(self):
+        from jarvis_host_agent.idempotency import canonical_json, request_mac
+        req = {
+            "version": 1,
+            "requestId": "cfc576c3-bb12-4557-8239-8f5c059f5dc4",
+            "operation": "vpn.hysteria2.client.issue",
+            "arguments": {"label": "сеня"},
+            "sentAt": "2026-09-14T11:51:36.180Z",
+        }
+        serialized = canonical_json(req)
+        self.assertIn('"label":"сеня"', serialized)
+        self.assertNotIn('\\u', serialized)
+        mac = request_mac(b"secret-key-at-least-32-chars-long!", req)
+        self.assertIsInstance(mac, str)
+        self.assertEqual(len(mac), 64)
+
 
 if __name__ == "__main__":
     unittest.main()

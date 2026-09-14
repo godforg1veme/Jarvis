@@ -34,3 +34,38 @@ test('Host Agent client sends authenticated bounded envelopes and validates the 
   const response = await client.request(request);
   assert.equal(response.result.state, 'succeeded');
 });
+
+test('Host Agent client correctly signs requests containing Cyrillic arguments', async () => {
+  const hysteriaRequest = {
+    version: 1,
+    requestId: 'cfc576c3-bb12-4557-8239-8f5c059f5dc4',
+    operation: 'vpn.hysteria2.client.issue',
+    arguments: { label: 'сеня' },
+    sentAt: '2026-09-14T11:51:36.180Z',
+  };
+  const socket = new EventEmitter();
+  socket.setEncoding = () => {};
+  socket.destroy = () => {};
+  socket.end = (payload) => {
+    const parsed = JSON.parse(payload.trim());
+    assert.equal(parsed.request.arguments.label, 'сеня');
+    assert.match(parsed.auth, /^[a-f0-9]{64}$/);
+    queueMicrotask(() => {
+      socket.emit('data', JSON.stringify({
+        version: 1, requestId: hysteriaRequest.requestId, operation: 'vpn.hysteria2.client.issue',
+        receivedAt: hysteriaRequest.sentAt, completedAt: hysteriaRequest.sentAt,
+        result: { state: 'succeeded', data: { client: { id: 'vpn-0123456789ab', label: 'сеня' } } },
+      }));
+      socket.emit('end');
+    });
+  };
+  const client = new HostAgentClient({
+    socketPath: '/run/test.sock',
+    authenticatorPath: '/run/auth',
+    readFile: () => 'a'.repeat(32),
+    connect: () => { queueMicrotask(() => socket.emit('connect')); return socket; },
+  });
+  const response = await client.request(hysteriaRequest);
+  assert.equal(response.result.state, 'succeeded');
+  assert.equal(response.result.data.client.label, 'сеня');
+});

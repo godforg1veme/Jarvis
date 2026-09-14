@@ -64,7 +64,7 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter, con
             payload = journal.put(request, response_for(request, execute(config, request["operation"], request["arguments"])))
     except (UnicodeError, ValueError, ProtocolError, asyncio.TimeoutError):
         payload = {"version": 1, "requestId": "00000000-0000-4000-8000-000000000000", "operation": "host.snapshot", "receivedAt": utc_now(), "completedAt": utc_now(), "result": {"state": "failed", "errorCode": "REQUEST_REJECTED"}}
-    writer.write(json.dumps(payload, separators=(",", ":")).encode("utf-8") + b"\n")
+    writer.write(json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8") + b"\n")
     await writer.drain()
     writer.close()
     await writer.wait_closed()
