@@ -21,3 +21,18 @@ test('due commitments create one evidence-backed actionable proposal and never e
   assert.equal(proposals[0].actionName, 'life.commitment.reschedule');
   assert.deepEqual(proposals[0].evidenceEventIds, [ID]);
 });
+
+test('delivered reminder resolves its owner-scoped commitment before proposing workspace preparation', async () => {
+  const calls = [];
+  const worker = new ProactivityWorker({
+    reminderRepository: { async get(input) { calls.push(input); return { commitment_id: ID }; } },
+    commitmentRepository: { async get(input) { calls.push(input); return { id: ID, revision: 1, title: 'Life OS', due_at: '2026-09-13T11:00:00Z', project_id: ID }; } },
+    projectionRepository: { async getProject(input) { calls.push(input); return { id: ID, name: 'Life OS', status: 'active' }; } },
+    proposalService: { async create(input) { return { id: ID, ...input }; } }, manifest: createActionManifest(),
+    now: () => new Date('2026-09-13T10:00:00Z'),
+  });
+  const rows = await worker.evaluateEvent({ id: ID, user_id: ID, event_type: 'reminder.delivered', source_channel: 'desktop', source_device_id: ID,
+    structured_data: { reminderId: ID, conversationId: ID }, confidence: 1 });
+  assert.equal(rows[0].actionName, 'workspace.prepare');
+  assert.equal(calls.every((input) => input.userId === ID), true);
+});

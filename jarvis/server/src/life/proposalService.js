@@ -6,6 +6,7 @@ class ProposalService {
     this.gateway = options.gateway;
     this.orchestrator = options.orchestrator || null;
     this.manifest = options.manifest || null;
+    this.recoveryPlanService = options.recoveryPlanService || null;
     this.now = options.now || (() => new Date());
   }
 
@@ -74,10 +75,18 @@ class ProposalService {
         originChannel, originDeviceId, text: confirmed.title,
         actionName: confirmed.action_name, actionArguments: confirmed.action_arguments || {},
       });
-      return this.repository.transitionProposal({
+      const terminalStatus = result.pending ? 'executing'
+        : result.status === 'outcome_unknown' ? 'outcome_unknown'
+          : result.status === 'failed' ? 'failed' : 'completed';
+      const updated = await this.repository.transitionProposal({
         userId, proposalId, revision: confirmed.revision, fromStatuses: ['confirmed'],
-        status: result.pending ? 'executing' : 'completed', workflowId: result.workflowId || null,
+        status: terminalStatus, workflowId: result.workflowId || null,
       });
+      const planId = confirmed.action_arguments && confirmed.action_arguments.recoveryPlanId;
+      if (updated && !result.pending && planId && this.recoveryPlanService) await this.recoveryPlanService.applyWorkflowResult({
+        userId, planId, status: result.partial === true ? 'partial' : result.status || 'succeeded',
+      });
+      return updated;
     } catch (_) {
       return this.repository.transitionProposal({
         userId, proposalId, revision: confirmed.revision, fromStatuses: ['confirmed'], status: 'failed',
@@ -100,6 +109,8 @@ class ProposalService {
       sourceDeviceId: originDeviceId, summary: `Отклонено предложение: ${dismissed.title}`,
       structuredData: { proposalId, state: 'dismissed' },
     });
+    const planId = dismissed?.action_arguments && dismissed.action_arguments.recoveryPlanId;
+    if (planId && this.recoveryPlanService) await this.recoveryPlanService.cancel({ userId, planId });
     return dismissed;
   }
 
@@ -108,12 +119,18 @@ class ProposalService {
     if (!proposalId || !['succeeded', 'failed', 'outcome_unknown'].includes(workflow.status)) return null;
     const proposal = await this.repository.getProposal({ userId: workflow.user_id, proposalId });
     if (!proposal || proposal.workflow_id !== workflow.id || !['confirmed', 'executing'].includes(proposal.status)) return null;
-    return this.repository.transitionProposal({
+    const updated = await this.repository.transitionProposal({
       userId: workflow.user_id, proposalId, revision: proposal.revision,
       fromStatuses: ['confirmed', 'executing'],
       status: workflow.status === 'succeeded' ? 'completed' : workflow.status === 'failed' ? 'failed' : 'outcome_unknown',
       workflowId: workflow.id,
     });
+    const planId = proposal.action_arguments && proposal.action_arguments.recoveryPlanId;
+    if (updated && planId && this.recoveryPlanService) await this.recoveryPlanService.applyWorkflowResult({
+      userId: workflow.user_id, planId,
+      status: workflow.state?.partialResult === true ? 'partial' : workflow.status,
+    });
+    return updated;
   }
 }
 

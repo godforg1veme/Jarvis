@@ -187,6 +187,32 @@ test('a failed Desktop tool never exposes its raw system error to the user', asy
   assert.equal(result.answer.includes('private.ps1'), false);
 });
 
+test('an uncertain Desktop result becomes outcome_unknown and is never replanned', async () => {
+  const { orchestrator, repository, executions } = createHarness([
+    { kind: 'tool_call', action: 'window.list', args: {} },
+  ], {
+    devices: [{ id: deviceId, name: 'Основной ПК', status: 'online', capabilities: { actions: ['window.list'] } }],
+    terminals: { 'window.list': { status: 'failed', error_code: 'EXECUTION_UNKNOWN', result: { ok: false, executionUnknown: true } } },
+  });
+  const result = await orchestrator.handle({ userId, conversationId, originChannel: 'desktop', originDeviceId: deviceId, text: 'Какие окна открыты?', history: [] });
+  assert.match(result.answer, /не буду запускать его повторно/);
+  assert.equal([...repository.workflows.values()][0].status, 'outcome_unknown');
+  assert.equal(executions.length, 1);
+});
+
+test('declared workspace preparation completes after one origin confirmation without planner continuation', async () => {
+  const devices = [{ id: deviceId, name: 'Основной ПК', status: 'online', capabilities: { actions: ['workspace.prepare'] } }];
+  const { orchestrator, repository, executions } = createHarness([], { devices, terminals: {
+    'workspace.prepare': { status: 'succeeded', result: { ok: true, action: 'workspace.prepare', steps: [{ type: 'application', label: 'VS Code', status: 'completed' }] } },
+  } });
+  const result = await orchestrator.executeDeclaredProposal({ userId, conversationId, originChannel: 'desktop', originDeviceId: deviceId,
+    proposalId: '44444444-4444-4444-8444-444444444444', text: 'Подготовить Life OS', actionName: 'workspace.prepare',
+    actionArguments: { projectId: '55555555-5555-4555-8555-555555555555', capabilityClasses: ['applications'] } });
+  assert.equal(result.status, 'succeeded');
+  assert.equal(executions.length, 1);
+  assert.equal([...repository.workflows.values()][0].status, 'succeeded');
+});
+
 test('APP_NOT_FOUND error code returns a clear public message', async () => {
   const { orchestrator } = createHarness([
     { kind: 'tool_call', action: 'app.resolve', args: { query: 'несуществующее' } },

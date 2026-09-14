@@ -197,7 +197,9 @@ class ReminderWorker {
       userId: reminder.user_id, eventType, occurredAt: this.now(), sourceChannel: 'reminder',
       sourceRef: reminder.occurrence_key, deduplicationKey: `${eventType}:${reminder.occurrence_key}`,
       summary: eventType === 'reminder.delivered' ? 'Напоминание доставлено' : 'Статус доставки напоминания требует внимания',
-      structuredData: { reminderId: reminder.id, occurrenceKey: reminder.occurrence_key },
+      structuredData: { reminderId: reminder.id, occurrenceKey: reminder.occurrence_key,
+        ...(reminder.commitment_id ? { commitmentId: reminder.commitment_id } : {}),
+        ...(reminder.project_id ? { projectId: reminder.project_id } : {}) },
       trustLevel: 'trusted', privacyClass: 'personal',
     });
   }

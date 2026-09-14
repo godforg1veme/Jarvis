@@ -84,6 +84,7 @@ const { ReminderWorker } = require('./life/reminders/reminderWorker');
 const { ReminderDeliveryRouter } = require('./life/reminders/reminderDeliveryRouter');
 const { DesktopReminderTransport, TelegramReminderTransport } = require('./life/reminders/reminderTransports');
 const { RecoveryPlanRepository } = require('./life/recovery/recoveryPlanRepository');
+const { RecoveryPlanService } = require('./life/recovery/recoveryPlanService');
 const { SourceConnectionRepository } = require('./life/sources/sourceConnectionRepository');
 const { CommitmentRepository } = require('./life/commitments/commitmentRepository');
 const { CommitmentLifecycleService } = require('./life/commitments/commitmentLifecycleService');
@@ -251,6 +252,7 @@ async function createRuntime(config, overrides = {}) {
     let timelineService = null;
     let contextRecoveryService = null;
     let missionControlService = null;
+    let recoveryPlanService = null;
     if (config.lifeOsEnabled) {
       proposalService = overrides.proposalService || new ProposalService({
         repository: lifeProjectionRepository, gateway: lifeEventGateway, orchestrator, manifest: actionManifest,
@@ -271,6 +273,8 @@ async function createRuntime(config, overrides = {}) {
       });
       const proactivity = new ProactivityWorker({
         repository: lifeProjectionRepository, eventRepository: lifeEventRepository,
+        projectionRepository: lifeProjectionRepository, reminderRepository: lifeReminderRepository,
+        commitmentRepository: lifeCommitmentRepository,
         proposalService, manifest: actionManifest,
         proactivityRepository: overrides.proactivityRepository || new ProactivityRepository(pool),
         intervalMs: Math.max(config.lifeOsWorkerIntervalMs * 15, 30000), logger: app.log,
@@ -329,6 +333,12 @@ async function createRuntime(config, overrides = {}) {
       projectService = new LifeProjectService({ repository: lifeProjectionRepository, gateway: lifeEventGateway });
       timelineService = new TimelineService({ repository: lifeProjectionRepository });
       contextRecoveryService = new ContextRecoveryService({ repository: lifeProjectionRepository, deviceRepository });
+      recoveryPlanService = overrides.recoveryPlanService || new RecoveryPlanService({
+        repository: lifeRecoveryRepository, contextService: contextRecoveryService,
+        conversationRepository, proposalService, gateway: lifeEventGateway,
+      });
+      contextRecoveryService.recoveryPlanService = recoveryPlanService;
+      proposalService.recoveryPlanService = recoveryPlanService;
       missionControlService = overrides.missionControlService || new MissionControlService({
         repository: lifeProjectionRepository, deviceRepository,
         priorityRepository: lifePriorityRepository, priorityEngine: lifePriorityEngine,
@@ -460,6 +470,7 @@ async function createRuntime(config, overrides = {}) {
         preferenceService: lifePreferenceService, feedbackAggregator: lifeFeedbackAggregator,
         peopleService: lifePeopleService, familyAccessService: lifeFamilyAccessService,
         reminderService: lifeReminderService, reminderRepository: lifeReminderRepository,
+        recoveryPlanService,
       });
     }
     if (typeof app.register === 'function' && typeof app.get === 'function') {

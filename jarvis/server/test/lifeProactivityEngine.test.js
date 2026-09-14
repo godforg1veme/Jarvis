@@ -65,3 +65,15 @@ test('event conversion accepts family data only with a trusted resolved grant', 
   assert.equal(engine.signalFromEvent(family, {}) , null);
   assert.equal(engine.signalFromEvent(family, { authorizedFamilyGrant: true }).authorizedGrant, true);
 });
+
+test('a delivered project reminder proposes workspace preparation rather than another reminder', async () => {
+  const proposals = [];
+  const rule = DEFAULT_RULES.find((item) => item.id === 'commitment.approaching');
+  const engine = new ProactivityEngine({ rules: [rule], manifest: createActionManifest(), now: () => NOW,
+    proposalService: { async create(input) { proposals.push(input); return input; } } });
+  const commitment = { id: RESOURCE, revision: 1, title: 'Продолжить Life OS', due_at: '2026-09-14T11:00:00Z', project_id: DEVICE };
+  const signal = engine.signalFromEvent(event({ event_type: 'reminder.delivered' }), { commitment });
+  await engine.evaluate(signal);
+  assert.equal(proposals[0].actionName, 'workspace.prepare');
+  assert.equal(proposals[0].actionArguments.projectId, DEVICE);
+});

@@ -8,7 +8,7 @@ const MAX_STEPS = 4;
 const FAST_RESULT_WAIT_MS = 1;
 const POSITIVE_CONFIRMATION = /^(?:да|ок|okay|подтверждаю|подтвердить|выполняй|делай|yes)[.!\s]*$/iu;
 const NEGATIVE_CONFIRMATION = /^(?:нет|не надо|отмена|отмени|отклонить|cancel|no)[.!\s]*$/iu;
-const TERMINAL_AFTER_SUCCESS = new Set(['file.open', 'file.open_folder', 'file.reveal', 'app.launch']);
+const TERMINAL_AFTER_SUCCESS = new Set(['file.open', 'file.open_folder', 'file.reveal', 'app.launch', 'workspace.prepare']);
 const OPEN_INTENT = /(?:^|\s)(?:открой|открыть|запусти|запустить|open|launch)(?:\s|$)/iu;
 const REVEAL_INTENT = /(?:покажи|показать|проводник|где\s+(?:лежит|находится)|расположен|reveal|show\s+in\s+(?:explorer|folder))/iu;
 const DEVICE_ACTION_INTENT = /(?:(?:^|\s)(?:найди|найти|поищи|поиск|открой|открыть|покажи|показать|посмотри|взгляни|запусти|запустить|закрой|закрыть|удали|удалить|удаляй|перемести|перенеси|переместить|переименуй|переименовать|создай|создать|скопируй|копировать|сфокусируй|разверни|восстанови|расположи|выполни|сделай|команда|find|search|open|reveal|show|look|launch|close|delete|remove|move|rename|create|copy|focus|restore|resize|layout|execute)(?:\s|$)|что\s+(?:ты\s+)?видишь|что\s+(?:сейчас\s+)?на\s+(?:камере|экране|мониторе)|(?:какие|перечисли|покажи)\s+окна(?:\s|[?.!,]|$)|что\s+(?:сейчас\s+)?открыто\s+(?:на|в)\s+(?:пк|компьютере)(?:\s|[?.!,]|$)|что\s+(?:лежит|находится)\s+в\s+папке(?:\s|[?.!,]|$)|[a-z]:[\\/])/iu;
@@ -476,6 +476,15 @@ class ActionOrchestrator {
 
   async _continueFromTerminal({ input, workflow, command }) {
     const safeResult = sanitizeToolResult(command.result || { ok: command.status === 'succeeded' });
+    if (safeResult.executionUnknown === true) {
+      if (command.action_run_id) await this.repository.completeRun({
+        userId: input.userId, runId: command.action_run_id, status: 'outcome_unknown', result: safeResult,
+      });
+      const unknown = await this._update(workflow, 'outcome_unknown', {
+        ...workflow.state, pendingCommandId: null, outcomeUnknown: true,
+      }, false, true);
+      return { handled: true, status: 'outcome_unknown', answer: 'Результат действия неизвестен. Я не буду запускать его повторно до сверки состояния.', workflowId: unknown.id };
+    }
     if (command.action_run_id) {
       await this.repository.completeRun({
         userId: input.userId,
@@ -504,7 +513,7 @@ class ActionOrchestrator {
     const latestToolResult = toolResults.at(-1);
     if (TERMINAL_AFTER_SUCCESS.has(command.action)) {
       const completed = await this._update(active, 'succeeded', active.state, false, true);
-      return { handled: true, answer: repeatedSuccessText(latestToolResult), workflowId: completed.id };
+      return { handled: true, status: 'succeeded', answer: repeatedSuccessText(latestToolResult), workflowId: completed.id };
     }
     if (command.action === 'file.search') {
       const continuation = fileSearchContinuation(active, safeResult);
@@ -549,8 +558,9 @@ class ActionOrchestrator {
       ...workflow.state,
       pendingCommandId: null,
       failureCode: command?.error_code || 'TOOL_EXECUTION_FAILED',
+      ...(command?.result?.partial === true ? { partialResult: true } : {}),
     }, incrementStep, true, targetId);
-    return { handled: true, answer: terminalText(command), workflowId: failed.id };
+    return { handled: true, status: 'failed', partial: command?.result?.partial === true, answer: terminalText(command), workflowId: failed.id };
   }
 
   async _update(workflow, status, state, incrementStep = false, completed = false, targetId = undefined) {

@@ -4,6 +4,9 @@ class ProactivityWorker {
   constructor(options = {}) {
     this.repository = options.repository;
     this.eventRepository = options.eventRepository;
+    this.reminderRepository = options.reminderRepository || null;
+    this.commitmentRepository = options.commitmentRepository || null;
+    this.projectionRepository = options.projectionRepository || options.repository;
     this.engine = options.engine || new ProactivityEngine({ ...options, repository: options.proactivityRepository || null });
     this.policyProvider = options.policyProvider || (async () => ({}));
     this.intervalMs = Math.min(Math.max(Number(options.intervalMs) || 60000, 1000), 3600000);
@@ -14,6 +17,14 @@ class ProactivityWorker {
   }
 
   async evaluateEvent(event, linked = null) {
+    if (event.event_type === 'reminder.delivered' && !linked?.commitment && this.reminderRepository && this.commitmentRepository) {
+      const reminderId = event.structured_data?.reminderId;
+      const reminder = reminderId ? await this.reminderRepository.get({ userId: event.user_id, reminderId }) : null;
+      const commitment = reminder?.commitment_id ? await this.commitmentRepository.get({ userId: event.user_id, commitmentId: reminder.commitment_id }) : null;
+      const project = commitment?.project_id && this.projectionRepository?.getProject
+        ? await this.projectionRepository.getProject({ userId: event.user_id, projectId: commitment.project_id }) : null;
+      linked = { ...(linked || {}), commitment, project: linked?.project || project };
+    }
     const signal = this.engine.signalFromEvent(event, linked);
     if (!signal) return [];
     return this.engine.evaluate(signal, await this.policyProvider({ userId: event.user_id }));

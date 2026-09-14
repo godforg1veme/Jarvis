@@ -50,7 +50,7 @@ function actionsFor(signal) {
       commitmentId: commitment.id, revision: commitment.revision,
       dueAt: newDue.toISOString(), dueWindowEndAt: newDue.toISOString(),
     } : {},
-    prepareWorkspace: project?.id ? { projectId: project.id } : {},
+    prepareWorkspace: project?.id || commitment?.project_id ? { projectId: project?.id || commitment.project_id, capabilityClasses: ['applications', 'files'] } : {},
     showDocuments: project?.id ? { projectId: project.id } : {},
     requestDeviceStatus: signal.deviceId ? { deviceId: signal.deviceId } : {},
     createTask: eventId ? {
@@ -129,6 +129,7 @@ class ProactivityEngine {
     const data = event.structured_data || {};
     const base = { event, project: linked?.project || null, person: linked?.person || null, confidence: event.confidence };
     if (event.event_type === 'document.ingested' && linked?.project) return { ...base, kind: 'project_document' };
+    if (event.event_type === 'reminder.delivered' && linked?.commitment) return { ...base, kind: 'commitment', commitment: linked.commitment };
     if (['workflow.failed', 'workflow.outcome_unknown'].includes(event.event_type)) return { ...base, kind: 'workflow_issue', workflowStatus: event.event_type.endsWith('failed') ? 'failed' : 'outcome_unknown', workflowId: data.workflowId };
     if (event.event_type === 'device.state_changed') return { ...base, kind: 'device_change', deviceId: data.deviceId || event.source_device_id, deviceState: data.state };
     if (event.source_channel === 'smart_home' && ['trusted', 'user'].includes(event.trust_level)) return { ...base, kind: 'smart_home', deviceId: data.deviceId, severity: data.severity };

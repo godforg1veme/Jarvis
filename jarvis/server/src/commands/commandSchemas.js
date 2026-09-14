@@ -34,6 +34,7 @@ const ACTION_POLICIES = Object.freeze({
   'window.move': POLICY.CONFIRM,
   'window.resize': POLICY.CONFIRM,
   'window.layout': POLICY.CONFIRM,
+  'workspace.prepare': POLICY.CONFIRM,
   'file.permanent_delete': POLICY.STRONG,
   'file.move_batch': POLICY.STRONG,
   'file.copy_batch': POLICY.STRONG,
@@ -80,6 +81,7 @@ const ACTION_ARG_KEYS = Object.freeze({
   'window.resize': ['hwnd', 'x', 'y', 'width', 'height'],
   'window.layout': ['items', 'hwnds', 'layout'],
   'vision.capture': ['prompt', 'target'],
+  'workspace.prepare': ['projectId', 'recoveryPlanId', 'capabilityClasses'],
 });
 
 const commandInputSchema = z.object({
@@ -159,6 +161,13 @@ function validateActionArgs(action, input = {}) {
     requireText(args, ['prompt'], 'vision prompt', 4000);
     if (!['camera', 'screen', 'all'].includes(String(args.target || 'all'))) throw new Error('vision target is invalid');
     args.target = String(args.target || 'all');
+  }
+  if (action === 'workspace.prepare') {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(args.projectId || ''))) throw new Error('workspace projectId is invalid');
+    if (args.recoveryPlanId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(args.recoveryPlanId))) throw new Error('workspace recoveryPlanId is invalid');
+    const classes = args.capabilityClasses || ['applications', 'files'];
+    if (!Array.isArray(classes) || classes.length < 1 || classes.length > 3 || classes.some((item) => !['applications', 'files', 'windows'].includes(item))) throw new Error('workspace capabilityClasses are invalid');
+    args.capabilityClasses = [...new Set(classes)];
   }
   return args;
 }

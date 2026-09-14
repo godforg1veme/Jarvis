@@ -1,6 +1,7 @@
 const path = require('path');
 
 const DEFAULT_BUNDLED_DATA_DIR = path.resolve(__dirname, 'data');
+const WORKSPACE_REGISTRY_FILE = 'workspaces.local.json';
 
 function getElectronApp() {
   try {
@@ -41,6 +42,7 @@ function getWritableDataPath(filePath, options = {}) {
 
 module.exports = {
   DEFAULT_BUNDLED_DATA_DIR,
+  WORKSPACE_REGISTRY_FILE,
   getWritableDataPath,
   isPathContained,
 };

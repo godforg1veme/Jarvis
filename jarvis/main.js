@@ -13,6 +13,10 @@ const { getWritableDataPath } = require('./runtimeDataPath');
 const { buildWindowsAutoStartSettings } = require('./startup/windowsAutoStart');
 const appIndexer = require('./tools/appIndexer');
 const { AppRecoveryService } = require('./tools/appRecoveryService');
+const appResolver = require('./tools/appResolver');
+const launchApp = require('./tools/launchApp');
+const { WorkspaceRegistry } = require('./tools/workspaceRegistry');
+const { WorkspacePreparationService } = require('./tools/workspacePreparationService');
 const { setupVoiceIpc } = require('./voice/voiceIpc');
 const { VoiceService } = require('./voice/voiceService');
 const { VoiceLabController } = require('./voice/voiceLabController');
@@ -64,6 +68,7 @@ let activeAgentTaskId = null;
 let lastExternalForegroundHwnd = null;
 let suppressNextDesktopAgentExit = false;
 let appRecoveryService = null;
+let workspacePreparationService = null;
 let desktopCloudClient = null;
 let cloudVoiceService = null;
 let cloudTransport = null;
@@ -96,6 +101,13 @@ function getAppRecoveryService() {
     });
   }
   return appRecoveryService;
+}
+
+function getWorkspacePreparationService() {
+  if (!workspacePreparationService) workspacePreparationService = new WorkspacePreparationService({
+    registry: new WorkspaceRegistry(), appResolver, launchApp, shell,
+  });
+  return workspacePreparationService;
 }
 
 function isTrustedMainRenderer(event) {
@@ -1027,6 +1039,7 @@ app.whenReady().then(() => {
           resolveAppCandidate: resolveRemoteAppCandidate,
           resolveFileCandidate: resolveRemoteFileCandidate,
           appRecoveryService: getAppRecoveryService(),
+          workspacePreparationService: getWorkspacePreparationService(),
           ...executionOptions,
         });
         if (request?.action === 'file.search') return registerRemoteFileSearch(result);

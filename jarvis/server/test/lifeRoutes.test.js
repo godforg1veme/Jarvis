@@ -9,6 +9,7 @@ const USER = '11111111-1111-4111-8111-111111111111';
 const DEVICE = '22222222-2222-4222-8222-222222222222';
 const PROJECT = '33333333-3333-4333-8333-333333333333';
 const REMINDER = '44444444-4444-4444-8444-444444444444';
+const PLAN = '55555555-5555-4555-8555-555555555555';
 
 function fixture() {
   const app = buildApp({ config: loadConfig({ NODE_ENV: 'test', JARVIS_LOG_LEVEL: 'silent' }) });
@@ -73,6 +74,11 @@ function fixture() {
         };
       },
       async reschedule() { return null; }, async cancel() { return null; }, async acknowledge() { return null; },
+    },
+    recoveryPlanService: {
+      async createPreview(input) { calls.push(input.userId); return { id: PLAN, projectId: input.projectId, status: 'ready', revision: 1, steps: [] }; },
+      async get({ userId }) { calls.push(userId); return { id: PLAN, projectId: PROJECT, status: 'ready', revision: 1, steps: [] }; },
+      async propose({ userId }) { calls.push(userId); return { plan: { id: PLAN, projectId: PROJECT, status: 'awaiting_confirmation', revision: 2, steps: [] }, proposalId: REMINDER }; },
     },
   });
   return { app, calls };
@@ -193,5 +199,21 @@ test('mission pin derives project owner from device authentication', async () =>
   assert.equal(response.json().priority.projectId, PROJECT);
   assert.equal(response.json().priority.pinned, true);
   assert.deepEqual(calls, [USER]);
+  await app.close();
+});
+
+test('recovery routes derive owner and Desktop origin while rejecting injected action data', async () => {
+  const { app, calls } = fixture();
+  const headers = { authorization: 'Bearer valid' };
+  const created = await app.inject({ method: 'POST', url: `/v1/desktop/life/projects/${PROJECT}/recovery-plans`, headers, payload: { sourceContextRevision: 1 } });
+  assert.equal(created.statusCode, 201);
+  assert.equal(created.json().plan.status, 'ready');
+  const injected = await app.inject({ method: 'POST', url: `/v1/desktop/life/projects/${PROJECT}/recovery-plans`, headers,
+    payload: { sourceContextRevision: 1, actionArguments: { shell: 'whoami' } } });
+  assert.equal(injected.statusCode, 400);
+  const proposed = await app.inject({ method: 'POST', url: `/v1/desktop/life/recovery-plans/${PLAN}/propose`, headers, payload: { revision: 1 } });
+  assert.equal(proposed.statusCode, 200);
+  assert.equal(proposed.json().proposalId, REMINDER);
+  assert.deepEqual(calls.slice(-2), [USER, USER]);
   await app.close();
 });

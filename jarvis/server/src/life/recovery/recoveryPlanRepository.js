@@ -97,6 +97,28 @@ class RecoveryPlanRepository {
     `, [planId, userId, revision, from, status]);
     return result.rows[0] || null;
   }
+
+  async completeFromWorkflow({ userId, planId, revision, status, resultSummary }) {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const plan = await client.query(`
+        UPDATE life_recovery_plans SET status = $4, revision = revision + 1, updated_at = now()
+        WHERE id = $1 AND user_id = $2 AND revision = $3
+          AND status = ANY($5::text[])
+        RETURNING *
+      `, [planId, userId, revision, status, ['awaiting_confirmation', 'executing']]);
+      if (!plan.rows[0]) { await client.query('ROLLBACK'); return null; }
+      await client.query(`
+        UPDATE life_recovery_steps SET status = $3, result_summary = $4,
+          revision = revision + 1, updated_at = now()
+        WHERE plan_id = $1 AND user_id = $2 AND action_name IS NOT NULL
+      `, [planId, userId, status === 'completed' ? 'completed' : status === 'outcome_unknown' ? 'outcome_unknown' : 'failed', String(resultSummary || '').slice(0, 1000)]);
+      await client.query('COMMIT');
+      return this.get({ userId, planId });
+    } catch (error) { await client.query('ROLLBACK'); throw error; }
+    finally { client.release(); }
+  }
 }
 
 module.exports = { RecoveryPlanRepository };

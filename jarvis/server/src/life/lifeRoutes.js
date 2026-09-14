@@ -35,6 +35,7 @@ const reminderRescheduleSchema = z.object({
   timezone: timezoneSchema.optional(),
   recurrence: recurrenceSchema.nullable().optional(),
 }).strict();
+const recoveryCreateSchema = z.object({ sourceContextRevision: z.number().int().min(0) }).strict();
 
 function registerLifeRoutes(app, options) {
   const authenticate = options.authenticate;
@@ -53,6 +54,7 @@ function registerLifeRoutes(app, options) {
   const familyAccessService = options.familyAccessService || null;
   const reminderService = options.reminderService || null;
   const reminderRepository = options.reminderRepository || null;
+  const recoveryPlanService = options.recoveryPlanService || null;
   const requireDevice = async (request) => { request.device = await authenticate(request.headers); };
   const checkRead = (device) => limiter.check(`life-read:${device.id}`, { limit: 120, windowMs: 60000 });
   const checkWrite = (device) => limiter.check(`life-write:${device.id}`, { limit: 30, windowMs: 60000 });
@@ -98,6 +100,32 @@ function registerLifeRoutes(app, options) {
     const context = await contextService.recover({ userId: request.device.user_id, projectId: id(request.params.projectId) });
     if (!context) throw lifeError(404, 'LIFE_SCOPE_NOT_FOUND');
     return { ok: true, context };
+  });
+
+  app.post('/v1/desktop/life/projects/:projectId/recovery-plans', { preHandler: requireDevice, bodyLimit: 1024 }, async (request, reply) => {
+    checkWrite(request.device);
+    const input = recoveryCreateSchema.parse(request.body || {});
+    const plan = await recoveryPlanService.createPreview({ userId: request.device.user_id,
+      projectId: id(request.params.projectId), sourceContextRevision: input.sourceContextRevision,
+      originChannel: 'desktop', originDeviceId: request.device.id });
+    if (!plan) throw lifeError(409, 'LIFE_RECOVERY_CONTEXT_CONFLICT');
+    reply.code(201);
+    return { ok: true, plan };
+  });
+
+  app.get('/v1/desktop/life/recovery-plans/:planId', { preHandler: requireDevice }, async (request) => {
+    checkRead(request.device);
+    const plan = await recoveryPlanService.get({ userId: request.device.user_id, planId: id(request.params.planId) });
+    if (!plan) throw lifeError(404, 'LIFE_SCOPE_NOT_FOUND');
+    return { ok: true, plan };
+  });
+
+  app.post('/v1/desktop/life/recovery-plans/:planId/propose', { preHandler: requireDevice, bodyLimit: 1024 }, async (request) => {
+    checkWrite(request.device);
+    const input = revisionSchema.parse(request.body || {});
+    const result = await recoveryPlanService.propose({ userId: request.device.user_id, planId: id(request.params.planId), revision: input.revision });
+    if (!result) throw lifeError(409, 'LIFE_RECOVERY_CONTEXT_CONFLICT');
+    return { ok: true, ...result };
   });
 
   app.get('/v1/desktop/life/mission-control', { preHandler: requireDevice }, async (request) => {

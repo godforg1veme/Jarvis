@@ -1,6 +1,6 @@
 const assert = require('assert');
 const path = require('path');
-const { getWritableDataPath, isPathContained } = require('../runtimeDataPath');
+const { getWritableDataPath, isPathContained, WORKSPACE_REGISTRY_FILE } = require('../runtimeDataPath');
 
 const bundledDataDir = path.resolve('C:/Program Files/Jarvis Desktop/resources/app/data');
 const userDataDir = path.resolve('C:/Users/Tester/AppData/Roaming/jarvis');
@@ -25,6 +25,7 @@ assert.strictEqual(
   getWritableDataPath(historyPath, { app: { ...packagedApp, isPackaged: false }, bundledDataDir }),
   historyPath,
 );
+assert.strictEqual(WORKSPACE_REGISTRY_FILE, 'workspaces.local.json');
 assert.strictEqual(
   getWritableDataPath(historyPath, { app: packagedApp, bundledDataDir }),
   path.join(userDataDir, 'data', 'history.json'),

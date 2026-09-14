@@ -534,6 +534,10 @@ async function executeToolRequest(request, options = {}) {
     if (['app.resolve', 'app.launch', 'app.close'].includes(action)) {
       return await executeAppAction(action, args, options);
     }
+    if (action === 'workspace.prepare') {
+      if (!options.workspacePreparationService) throw new Error('workspace preparation service is unavailable');
+      return await options.workspacePreparationService.prepare(args);
+    }
 
     return {
       ok: false,

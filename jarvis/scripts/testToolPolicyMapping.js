@@ -15,6 +15,7 @@ assert.strictEqual(categoryForPolicy(POLICY.STRONG), USER_ACTION_CATEGORY.CHANGI
 assert.strictEqual(categoryForAction('file.search'), USER_ACTION_CATEGORY.SAFE);
 assert.strictEqual(categoryForAction('file.copy'), USER_ACTION_CATEGORY.CHANGING);
 assert.strictEqual(categoryForAction('file.copy', { overwrite: true }), USER_ACTION_CATEGORY.CHANGING);
+assert.strictEqual(categoryForAction('workspace.prepare'), USER_ACTION_CATEGORY.CHANGING);
 assert.strictEqual(categoryForAction('unknown.action'), '');
 assert.deepStrictEqual(desktopArgKeys, serverArgKeys);
 const vision = validateCommandInput({
@@ -28,5 +29,8 @@ assert.throws(() => validateCommandInput({
   action: 'vision.capture',
   args: { prompt: 'Запусти камеру', target: 'camera', startLease: true },
 }), /unknown argument/);
+const workspace = validateCommandInput({ deviceId: '11111111-1111-4111-8111-111111111111', action: 'workspace.prepare',
+  args: { projectId: '22222222-2222-4222-8222-222222222222', capabilityClasses: ['applications', 'files'] } });
+assert.strictEqual(workspace.policy, 'requires_confirmation');
 
 console.log('[testToolPolicyMapping] tool policy mapping tests passed');

@@ -35,6 +35,7 @@ const ACTION_POLICIES = Object.freeze({
   'window.move': POLICY.CONFIRM,
   'window.resize': POLICY.CONFIRM,
   'window.layout': POLICY.CONFIRM,
+  'workspace.prepare': POLICY.CONFIRM,
 
   'file.permanent_delete': POLICY.STRONG,
   'file.move_batch': POLICY.STRONG,

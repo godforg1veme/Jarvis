@@ -24,7 +24,8 @@ const schemas = Object.freeze({
   'project.show_documents': z.object({ projectId: id }).strict(),
   'device.status.request': z.object({ deviceId: id }).strict(),
   'workflow.continue': z.object({ workflowId: id }).strict(),
-  'workspace.prepare': z.object({ projectId: id, recoveryPlanId: id.optional() }).strict(),
+  'workspace.prepare': z.object({ projectId: id, recoveryPlanId: id.optional(),
+    capabilityClasses: z.array(z.enum(['applications', 'files', 'windows'])).min(1).max(3).optional() }).strict(),
 });
 
 function validateLifeActionArgs(action, input) {

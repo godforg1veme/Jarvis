@@ -28,6 +28,14 @@ async function run() {
   assert.strictEqual(policyForAction('file.copy', { overwrite: true }), POLICY.STRONG);
   assert.strictEqual(policyForAction('file.overwrite'), '');
   assert.throws(() => validateToolRequest({ action: 'file.nope', args: {} }), /unknown tool action/);
+  const workspaceBlocked = await executeToolRequest({ action: 'workspace.prepare', args: {
+    projectId: '11111111-1111-4111-8111-111111111111', capabilityClasses: ['applications'],
+  } }, { workspacePreparationService: { async prepare() { throw new Error('must not run'); } } });
+  assert.strictEqual(workspaceBlocked.requiresConfirmation, true);
+  const workspacePrepared = await executeToolRequest({ action: 'workspace.prepare', args: {
+    projectId: '11111111-1111-4111-8111-111111111111', capabilityClasses: ['applications'],
+  } }, { confirmed: true, workspacePreparationService: { async prepare() { return { ok: true, action: 'workspace.prepare', steps: [] }; } } });
+  assert.strictEqual(workspacePrepared.ok, true);
   assert.throws(() => validateToolRequest({ action: 'file.copy', args: { overwrite: 'true' } }), /overwrite must be a boolean/);
   assert.throws(() => validateToolRequest({ action: 'window.list', args: { deviceId: 'model-invented' } }), /unknown argument/);
 

@@ -4,6 +4,7 @@ class ContextRecoveryService {
   constructor(options = {}) {
     this.repository = options.repository;
     this.deviceRepository = options.deviceRepository || null;
+    this.recoveryPlanService = options.recoveryPlanService || null;
   }
 
   async recover({ userId, projectId }) {
@@ -30,6 +31,11 @@ class ContextRecoveryService {
       continuation: publicEvents[0] ? { eventId: publicEvents[0].id, summary: publicEvents[0].summary, occurredAt: publicEvents[0].occurredAt } : null,
       suggestedNextSteps: proposals.slice(0, 3).map((proposal) => ({ proposalId: proposal.id, title: proposal.title, explanation: proposal.explanation })),
     };
+  }
+
+  async prepare(input) {
+    if (!this.recoveryPlanService) return null;
+    return this.recoveryPlanService.createPreview(input);
   }
 }
 
