@@ -172,7 +172,10 @@ See `docs/README.md` for current implementation status and historical records.
   must preserve them together.
 - Hysteria2 v2.12.2 is deployed as an isolated fallback on the second address,
   `87.120.187.109:443/udp`, with the DNS-only hostname `vpn.rilora.ru`, strict
-  ACME TLS, userpass authentication, and Salamander obfuscation. Xray retains
+  ACME TLS, dynamic HTTP authentication via Host Agent (`127.0.0.1:3211/vpn/hysteria2/auth`),
+  and Salamander obfuscation. Key issuance, rotation, and revocation update
+  `hysteria2-state.json` without restarting `hysteria-server.service`, preserving
+  active QUIC streams and game sessions with zero downtime. Xray retains
   TCP 443/8443. Operations monitors `hysteria-server.service` separately, and
   rollback may remove only Hysteria2 plus its exact UDP 443 and ACME TCP 80
   firewall rules.
@@ -184,6 +187,8 @@ See `docs/README.md` for current implementation status and historical records.
   a 1-click HTML redirect bridge to the `happ://routing/onadd/...` deeplink, avoiding
   Telegram Bot API deep link URL limitations and Base64 chat pollution. The routing
   profile contains only public routing/DNS rules and zero credentials or tokens.
+  The Telegram bot `/vpn` menu exposes the profile directly in the Hysteria 2 tab
+  alongside a 2-step setup guide.
 - PostgreSQL must never be published publicly.
 - The DE-4 runs the private `gigaam-asr` service for Russian server ASR with a
   four-CPU/8-GiB cap and no host port. Its observed steady-state RSS is about
