@@ -6,6 +6,15 @@ future-tense wording does not override the current architecture in `AGENTS.md`.
 
 Status snapshot: 2026-09-14.
 
+Happ VPN domestic RU split-routing update, 2026-09-14: domestic Russian traffic
+(Gosuslugi, banks, marketplaces, .ru/.su domains) routes directly via the physical
+client IP, while Hysteria 2 handles international and blocked traffic. Yandex DNS
+`77.88.8.8` with `IPIfNonMatch` prevents domestic resolution failures. Telegram
+bot provides `🇷🇺 Обход РФ` (/vpn_routing) with a 1-click web activation endpoint
+`https://jarvis.rilora.ru/happ-routing`, bypassing Telegram's custom deep link
+restrictions without raw Base64 clutter. Deployed, verified on VPS, and covered
+by 357 server tests. See `updates/2026-09-14-happ-vpn-ru-routing.md`.
+
 Telegram navigation update, 2026-09-14: button-first control is implemented
 and covered by the full server suite. The server image and migration 015 are
 deployed on the VPS; preflight, Compose health, public HTTPS smoke, and migration
@@ -95,7 +104,10 @@ attachment ingestion.
 | `AGENTS.md` | Authoritative runtime, safety, code, and verification rules |
 | `deploy/README.md` | Current Ubuntu 24.04 and Cloudflare Tunnel operations |
 | `updates/2026-09-01-cloud-desktop-memory-rollout.md` | Итог текущего развёртывания Desktop, памяти, устройств и известных ограничений |
+| `updates/2026-09-14-telegram-button-navigation.md` | Production rollout record for button-first navigation in Telegram |
 | `updates/2026-09-14-telegram-memory-gallery-vpn-fix.md` | Production rollout record for the VPN owner-context fix and unified Telegram memory gallery |
+| `updates/2026-09-14-hysteria2-fallback-rollout.md` | Production rollout record for isolated Hysteria2 service |
+| `updates/2026-09-14-happ-vpn-ru-routing.md` | Production rollout record for Happ domestic RU split-routing and 1-click web activation |
 | `CLAUDE.md`, `gemini.md` | Thin pointers to the authoritative agent context |
 | This file | Status and supersession index |
 

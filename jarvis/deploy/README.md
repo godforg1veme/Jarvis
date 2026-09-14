@@ -210,6 +210,19 @@ URI is protected at `/etc/jarvis-vpn/hysteria2-bootstrap-client.txt`; deliver it
 through the owner-only Telegram artifact path and remove that bootstrap file
 after acceptance. Never print it in a terminal, log, issue, or chat.
 
+### Happ domestic RU split-routing and web activation
+
+To direct Russian services (Gosuslugi, banks, marketplaces, domestic media, `.ru`/`.su` domains)
+through the device's physical IP without going through the VPN, while keeping international
+and blocked resources routed through Hysteria 2:
+- the owner taps `🇷🇺 Обход РФ` or sends `/vpn_routing` in Telegram;
+- the server provides a 1-click web activation endpoint at `https://jarvis.rilora.ru/happ-routing`
+  which redirects to the `happ://routing/onadd/...` deeplink;
+- the routing profile configures Yandex DNS `77.88.8.8` with `IPIfNonMatch` for Russian domains
+  and direct routing for `geosite:category-ru`, `geosite:ru`, `geoip:ru`, `domain:ru`, `domain:su`,
+  and private LANs (`geoip:private`), falling back to `proxy` for everything else.
+
+
 ## Model configuration
 
 The production model is selected through environment variables. The current
