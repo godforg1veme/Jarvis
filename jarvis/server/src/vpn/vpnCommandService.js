@@ -311,7 +311,10 @@ class VpnCommandService {
       return {
         answer: buildRoutingSummary(),
         artifact: buildRoutingArtifact(),
-        buttons: protocolButtons(callback.protocol || 'hysteria2'),
+        buttons: [
+          [{ text: '🚀 Активировать в Happ (1 клик)', url: 'https://jarvis.rilora.ru/happ-routing' }],
+          ...protocolButtons(callback.protocol || 'hysteria2'),
+        ],
       };
     }
     if (callback.action === 'menu') return callback.protocol ? { answer: `Управление ${PROTOCOLS[callback.protocol].title}:`, buttons: protocolButtons(callback.protocol) } : { answer: 'Выбери VPN-протокол:', buttons: menuButtons() };
@@ -355,7 +358,10 @@ class VpnCommandService {
       return {
         answer: buildRoutingSummary(),
         artifact: buildRoutingArtifact(),
-        buttons: protocolButtons(command.protocol || 'hysteria2'),
+        buttons: [
+          [{ text: '🚀 Активировать в Happ (1 клик)', url: 'https://jarvis.rilora.ru/happ-routing' }],
+          ...protocolButtons(command.protocol || 'hysteria2'),
+        ],
       };
     }
     if (command.kind === 'invalid') return { answer: 'Открой /vpn и используй кнопки.', buttons: menuButtons() };

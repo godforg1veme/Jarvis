@@ -141,14 +141,15 @@ test('routing command and callback return split-tunneling summary and artifact',
   const context = { userId: USER_ID, conversationId: 'conversation', originChannel: 'telegram' };
   const viaCommand = await service.handle({ ...context, text: '/vpn_routing' });
   assert.match(viaCommand.answer, /Раздельная маршрутизация/);
-  assert.ok(viaCommand.answer.includes('happ://routing/onadd/'));
+  assert.ok(viaCommand.answer.includes('https://jarvis.rilora.ru/happ-routing'));
   assert.equal(viaCommand.artifact.kind, 'happ-routing');
   assert.equal(viaCommand.artifact.filename, 'jarvis-ru-direct-routing.json');
-  assert.ok(viaCommand.buttons.flat().some((b) => b.data === 'vpn:h:routing'));
+  assert.ok(viaCommand.buttons.flat().some((b) => b.url === 'https://jarvis.rilora.ru/happ-routing'));
 
   const viaCallback = await service.handleCallback({ ...context, data: 'vpn:h:routing' });
   assert.match(viaCallback.answer, /Раздельная маршрутизация/);
   assert.equal(viaCallback.artifact.kind, 'happ-routing');
+  assert.ok(viaCallback.buttons.flat().some((b) => b.url === 'https://jarvis.rilora.ru/happ-routing'));
 });
 
 test('formatConnectionAnswer generates 1-click Happ instructions and code block for keys', () => {

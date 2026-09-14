@@ -9,6 +9,7 @@ const {
   buildHysteriaAclBlock,
   buildHysteriaClientYaml,
   buildRoutingArtifact,
+  buildRoutingHtmlPage,
   buildRoutingSummary,
 } = require('../src/vpn/vpnRoutingService');
 
@@ -70,12 +71,19 @@ test('buildHysteriaAclBlock and YAML contain direct rules for RU domains and IPs
   assert.ok(yaml.includes('direct(geosite:ru)'));
 });
 
-test('buildRoutingSummary produces Telegram-ready HTML instructions with deeplink', () => {
+test('buildRoutingSummary produces Telegram-ready instructions with public routing link', () => {
   const summary = buildRoutingSummary();
-  assert.ok(summary.includes('happ://routing/onadd/'));
+  assert.ok(summary.includes('https://jarvis.rilora.ru/happ-routing'));
   assert.ok(summary.includes('Госуслуги'));
-  assert.ok(summary.includes('77.88.8.8'));
-  assert.ok(summary.includes('IPIfNonMatch'));
+  assert.ok(summary.includes('Пошаговая инструкция'));
+});
+
+test('buildRoutingHtmlPage generates valid HTML landing page with deeplink redirect', () => {
+  const html = buildRoutingHtmlPage();
+  assert.ok(html.includes('<!DOCTYPE html>'));
+  assert.ok(html.includes('happ://routing/onadd/'));
+  assert.ok(html.includes('Jarvis RU Direct'));
+  assert.ok(html.includes('http-equiv="refresh"'));
 });
 
 test('buildRoutingArtifact creates valid JSON file artifact', () => {

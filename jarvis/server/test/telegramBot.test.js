@@ -73,10 +73,13 @@ test('renders persistent bottom navigation separately from inline buttons', asyn
   );
 });
 
-test('allows only the exact configured Operations panel URL', () => {
+test('allows only the exact configured Operations panel URL or public routing URL', () => {
   const expected = 'https://ops.example.test/ops/';
   assert.deepEqual(vpnReplyMarkup([[{ text: 'Открыть', url: expected }]], { operationsPanelUrl: expected }), {
     inline_keyboard: [[{ text: 'Открыть', url: expected }]],
+  });
+  assert.deepEqual(vpnReplyMarkup([[{ text: 'Активировать', url: 'https://jarvis.rilora.ru/happ-routing' }]]), {
+    inline_keyboard: [[{ text: 'Активировать', url: 'https://jarvis.rilora.ru/happ-routing' }]],
   });
   assert.throws(() => vpnReplyMarkup([[{ text: 'Подмена', url: 'https://evil.example/ops/' }]], { operationsPanelUrl: expected }), /invalid VPN button/);
   assert.throws(() => vpnReplyMarkup([[{ text: 'JS', url: 'javascript:alert(1)' }]], { operationsPanelUrl: expected }), /invalid VPN button/);

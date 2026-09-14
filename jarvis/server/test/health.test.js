@@ -44,3 +44,13 @@ test('logger redacts every configured model-provider key', () => {
   assert.ok(options.redact.paths.includes('embeddingApiKey'));
   assert.ok(options.redact.paths.includes('*.embeddingApiKey'));
 });
+
+test('happ-routing endpoint delivers HTML landing page with deeplink', async (t) => {
+  const app = buildApp({ config: testConfig() });
+  t.after(() => app.close());
+  const response = await app.inject({ method: 'GET', url: '/happ-routing' });
+  assert.equal(response.statusCode, 200);
+  assert.match(response.headers['content-type'], /text\/html/);
+  assert.ok(response.body.includes('happ://routing/onadd/'));
+  assert.ok(response.body.includes('Jarvis RU Direct'));
+});

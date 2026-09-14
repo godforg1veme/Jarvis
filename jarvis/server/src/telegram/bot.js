@@ -15,7 +15,9 @@ function vpnReplyMarkup(buttons, options = {}) {
         const data = String(button?.data || '');
         const url = String(button?.url || '');
         const validCallback = data && !url && Buffer.byteLength(data, 'utf8') <= 64 && TELEGRAM_CALLBACK_RE.test(data);
-        const validUrl = url && !data && options.operationsPanelUrl && url === options.operationsPanelUrl;
+        const validOperationsUrl = url && !data && options.operationsPanelUrl && url === options.operationsPanelUrl;
+        const validRoutingUrl = url && !data && (url === 'https://jarvis.rilora.ru/happ-routing' || (options.routingUrl && url === options.routingUrl));
+        const validUrl = validOperationsUrl || validRoutingUrl;
         if (text.length < 1 || text.length > 64 || (!validCallback && !validUrl)) {
           throw new Error('invalid VPN button');
         }

@@ -1,4 +1,5 @@
 const Fastify = require('fastify');
+const { buildRoutingHtmlPage } = require('./vpn/vpnRoutingService');
 
 function loggerOptions(config) {
   if (config.logLevel === 'silent') return false;
@@ -62,6 +63,9 @@ function buildApp(options = {}) {
   });
 
   app.get('/health/live', async () => ({ ok: true, service: 'jarvis-family-server' }));
+  app.get('/happ-routing', async (request, reply) => {
+    reply.type('text/html; charset=utf-8').send(buildRoutingHtmlPage());
+  });
   app.get('/health/ready', async (request, reply) => {
     const checks = [];
     for (const check of readinessChecks) {

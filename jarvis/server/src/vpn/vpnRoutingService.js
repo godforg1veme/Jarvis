@@ -99,30 +99,92 @@ function buildHysteriaClientYaml(options = {}) {
   return lines.join('\n') + '\n';
 }
 
-function buildRoutingSummary(options = {}) {
+function buildRoutingHtmlPage(options = {}) {
   const deeplink = buildHappRoutingDeeplink(options);
+  return `<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Активация маршрутизации Happ — Jarvis</title>
+  <meta http-equiv="refresh" content="0; url=${deeplink}">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
+    }
+    .card {
+      background: #1e293b;
+      padding: 36px 24px;
+      border-radius: 20px;
+      max-width: 440px;
+      width: 100%;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.4);
+      border: 1px solid #334155;
+    }
+    .icon { font-size: 48px; margin-bottom: 16px; }
+    h1 { font-size: 22px; margin: 0 0 12px; font-weight: 700; }
+    p { font-size: 15px; color: #94a3b8; line-height: 1.5; margin: 0 0 28px; }
+    .btn {
+      display: block;
+      background: #2563eb;
+      color: #ffffff;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 17px;
+      padding: 16px 24px;
+      border-radius: 12px;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .btn:active { transform: scale(0.98); }
+    .hint { margin-top: 18px; font-size: 13px; color: #64748b; line-height: 1.4; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">🌐</div>
+    <h1>Jarvis RU Direct</h1>
+    <p>Открываем приложение <b>Happ</b> для автоматической активации раздельной маршрутизации (Обход РФ)...</p>
+    <a class="btn" href="${deeplink}">Открыть в Happ</a>
+    <div class="hint">Если появится диалог Safari/браузера, нажмите <b>«Открыть»</b>.</div>
+  </div>
+  <script>
+    setTimeout(function() {
+      window.location.href = ${JSON.stringify(deeplink)};
+    }, 150);
+  </script>
+</body>
+</html>`;
+}
+
+function buildRoutingSummary(options = {}) {
+  const publicUrl = options.publicRoutingUrl || 'https://jarvis.rilora.ru/happ-routing';
   return [
     '🌐 **Раздельная маршрутизация (Обход РФ)**',
     '',
-    'Все российские ресурсы (Госуслуги, банки, маркетплейсы, сайты .ru/.рф) идут **напрямую через ваш домашний/мобильный IP** с максимальной скоростью без блокировок.',
-    'Все зарубежные и заблокированные ресурсы идут **через Hysteria 2**.',
-    'Включать/выключать VPN для отдельных сайтов не нужно — всё работает автоматически.',
+    'Позволяет **не отключать VPN**: Госуслуги, банки (Сбер, Т-Банк, ВТБ), маркетплейсы и все сайты `.ru` открываются **напрямую** с вашего домашнего/мобильного IP, а заблокированные ресурсы и YouTube — **через Hysteria 2**.',
     '',
-    '📱 **Активация в приложении Happ:**',
-    '1. **В 1 клик через браузер (iPhone / iPad / Mac):**',
-    '   Нажмите на ссылку ниже (она скопируется), вставьте в адресную строку Safari и перейдите — Happ откроется и автоматически применит профиль:',
-    `   \`${deeplink}\``,
+    '🚀 **Активация в Happ за 1 клик:**',
+    `👉 **[Нажмите сюда для активации в Happ](${publicUrl})**`,
     '',
-    '2. **Через файл (ПК / Android):**',
-    '   Сохраните прикреплённый файл `jarvis-ru-direct-routing.json` → в приложении Happ: Настройки → Маршрутизация → «+» (или Импорт) → выберите этот файл.',
+    '📋 **Пошаговая инструкция:**',
+    '1. **Нажмите на ссылку выше** (или кнопку «🚀 Активировать в Happ» под сообщением) — откроется браузер.',
+    '2. В появившемся окне браузера нажмите **«Открыть»** для перехода в приложение Happ.',
+    '3. Happ откроется и покажет диалог импорта — нажмите **«Добавить»**!',
     '',
-    '💡 *После применения профиля «Jarvis RU Direct» он автоматически действует для всех подключений.*',
+    '📁 **Альтернатива (если ссылка не открылась):**',
+    'К сообщению прикреплён файл `jarvis-ru-direct-routing.json`. В приложении Happ: **Настройки → Маршрутизация → «+»** → выберите этот файл.',
     '',
-    '⚙️ **Параметры маршрутизации:**',
-    '• Direct Sites: `geosite:category-gov-ru, geosite:ru, domain:ru, domain:su, domain:xn--p1ai`',
-    '• Direct IP: `geoip:ru, geoip:private`',
-    '• Domestic DNS: `77.88.8.8` (Яндекс DNS)',
-    '• Domain Strategy: `IPIfNonMatch`',
+    '💡 *Настройка выполняется всего один раз — после этого правило «Jarvis RU Direct» действует автоматически для всех подключений.*',
   ].join('\n');
 }
 
@@ -145,5 +207,6 @@ module.exports = {
   buildHysteriaAclBlock,
   buildHysteriaClientYaml,
   buildRoutingArtifact,
+  buildRoutingHtmlPage,
   buildRoutingSummary,
 };
