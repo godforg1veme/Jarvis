@@ -11,6 +11,7 @@ const { MAX_TELEGRAM_VOICE_BYTES, TelegramMessageService } = require('./telegram
 const { TelegramUpdateRepository } = require('./telegram/telegramUpdateRepository');
 const { TelegramInteractionRepository } = require('./telegram/telegramInteractionRepository');
 const { TelegramMenuService } = require('./telegram/telegramMenuService');
+const { TelegramLifeOsService } = require('./telegram/telegramLifeOsService');
 const { TelegramMemoryGalleryRepository } = require('./telegram/telegramMemoryGalleryRepository');
 const { TelegramMemoryGalleryService } = require('./telegram/telegramMemoryGalleryService');
 const { UserRepository } = require('./users/userRepository');
@@ -501,13 +502,33 @@ async function createRuntime(config, overrides = {}) {
         knowledgeService,
         visualMemoryService,
       });
+      const telegramInteractions = overrides.telegramInteractionRepository || new TelegramInteractionRepository(pool);
+      const telegramLifeOsService = config.lifeOsEnabled ? new TelegramLifeOsService({
+        interactions: telegramInteractions,
+        repository: lifeProjectionRepository,
+        missionControlService,
+        timelineService,
+        projectService,
+        contextService: contextRecoveryService,
+        recoveryPlanService,
+        proposalService,
+        modeService: lifeModeService,
+        preferenceService: lifePreferenceService,
+        peopleService: lifePeopleService,
+        familyAccessService: lifeFamilyAccessService,
+        reminderService: lifeReminderService,
+        reminderRepository: lifeReminderRepository,
+        sourceRepository: lifeSourceRepository,
+        sourceSyncService: lifeSourceSyncService,
+      }) : null;
       const menuService = new TelegramMenuService({
-        interactions: overrides.telegramInteractionRepository || new TelegramInteractionRepository(pool),
+        interactions: telegramInteractions,
         deviceService,
         memoryService,
         knowledgeService,
         vpnService,
         lifeMissionControlService: missionControlService,
+        lifeOsService: telegramLifeOsService,
         memoryGalleryService,
         ownerTelegramId: config.operationsOwnerTelegramId,
         operationsEnabled: config.operationsEnabled,

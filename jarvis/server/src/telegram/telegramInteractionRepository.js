@@ -1,4 +1,5 @@
 const crypto = require('node:crypto');
+const { FAMILY_PERMISSIONS, FAMILY_RESOURCE_TYPES } = require('../life/people/peopleSchemas');
 
 const INTERACTION_TTL_MS = 10 * 60 * 1000;
 const UUID_RE = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
@@ -8,6 +9,19 @@ const KINDS = new Set([
   'device_instruction',
   'memory_add',
   'memory_correct_replacement',
+  'life_project_create',
+  'life_project_update',
+  'life_person_create',
+  'life_person_update',
+  'life_relationship_create',
+  'life_project_link_create',
+  'life_family_grant_create',
+  'life_family_grant_confirm',
+  'life_reminder_create',
+  'life_reminder_reschedule',
+  'life_source_create',
+  'life_source_update',
+  'life_preference_set',
 ]);
 
 function validateContext(kind, value) {
@@ -24,6 +38,31 @@ function validateContext(kind, value) {
   if (kind === 'memory_correct_replacement') {
     if (keys.length !== 1 || !UUID_RE.test(String(context.memoryId || ''))) throw new Error('invalid Telegram interaction context');
     return { memoryId: String(context.memoryId).toLowerCase() };
+  }
+  if (kind === 'life_preference_set') {
+    if (keys.some((key) => !['key', 'revision'].includes(key)) || typeof context.key !== 'string'
+      || context.key.length > 80 || (context.revision !== null && context.revision !== undefined && !Number.isInteger(context.revision))) {
+      throw new Error('invalid Telegram interaction context');
+    }
+    return { key: context.key, revision: context.revision ?? null };
+  }
+  if (['life_project_update', 'life_person_update', 'life_reminder_reschedule', 'life_source_update'].includes(kind)) {
+    if (keys.length !== 2 || !UUID_RE.test(String(context.targetId || ''))
+      || !Number.isInteger(context.revision) || context.revision < 1) {
+      throw new Error('invalid Telegram interaction context');
+    }
+    return { targetId: String(context.targetId).toLowerCase(), revision: context.revision };
+  }
+  if (kind === 'life_family_grant_confirm') {
+    if (keys.length !== 4 || !UUID_RE.test(String(context.memberUserId || ''))
+      || !UUID_RE.test(String(context.resourceId || ''))
+      || !FAMILY_RESOURCE_TYPES.includes(context.resourceType) || !FAMILY_PERMISSIONS.includes(context.permission)) {
+      throw new Error('invalid Telegram interaction context');
+    }
+    return {
+      memberUserId: String(context.memberUserId).toLowerCase(), resourceType: context.resourceType,
+      resourceId: String(context.resourceId).toLowerCase(), permission: context.permission,
+    };
   }
   if (keys.length !== 0) throw new Error('invalid Telegram interaction context');
   return {};

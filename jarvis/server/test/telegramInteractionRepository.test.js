@@ -14,6 +14,20 @@ test('accepts only closed bounded Telegram interaction contexts', () => {
   assert.throws(() => validateContext('memory_add', { secret: 'value' }), /invalid/);
 });
 
+test('accepts bounded Life OS flows and preference context only', () => {
+  assert.deepEqual(validateContext('life_project_create', {}), {});
+  assert.deepEqual(validateContext('life_project_update', { targetId: DEVICE_ID, revision: 3 }), { targetId: DEVICE_ID, revision: 3 });
+  assert.deepEqual(validateContext('life_preference_set', { key: 'response.style', revision: 2 }), { key: 'response.style', revision: 2 });
+  assert.deepEqual(validateContext('life_family_grant_confirm', {
+    memberUserId: USER_ID, resourceType: 'project', resourceId: DEVICE_ID, permission: 'view_summary',
+  }), { memberUserId: USER_ID, resourceType: 'project', resourceId: DEVICE_ID, permission: 'view_summary' });
+  assert.throws(() => validateContext('life_preference_set', { key: 'response.style', revision: 2, value: 'secret' }), /invalid/);
+  assert.throws(() => validateContext('life_project_update', { targetId: DEVICE_ID, revision: 0 }), /invalid/);
+  assert.throws(() => validateContext('life_family_grant_confirm', {
+    memberUserId: USER_ID, resourceType: 'project', resourceId: DEVICE_ID, permission: 'admin',
+  }), /invalid/);
+});
+
 test('interaction ownership and chat identity are validated before SQL', () => {
   assert.deepEqual(validateInteraction({
     userId: USER_ID, conversationId: CONVERSATION_ID, chatId: '-123', kind: 'memory_add', context: {},

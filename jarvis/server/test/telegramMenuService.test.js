@@ -135,3 +135,27 @@ test('documents and device mutations stay behind owner-scoped inline confirmatio
   await service.handleCallback(`dev:revoke:${DEVICE_ID}`, context);
   assert.equal(calls.some(([name]) => name === 'revoke'), true);
 });
+
+test('guided Life OS input is consumed before any domain mutation', async () => {
+  const order = [];
+  const { service, context, calls } = harness({
+    lifeOsService: {
+      async handlePendingText(value, receivedContext, interaction) {
+        order.push('mutate');
+        assert.equal(value, 'Проект | Описание');
+        assert.equal(receivedContext.user.id, USER_ID);
+        assert.equal(interaction.kind, 'life_project_create');
+        return { answer: 'Life OS обновлён.' };
+      },
+    },
+  });
+  await service.interactions.begin({
+    userId: USER_ID, conversationId: CONVERSATION_ID, chatId: '101', kind: 'life_project_create', context: {},
+  });
+  const originalConsume = service.interactions.consume.bind(service.interactions);
+  service.interactions.consume = async (input) => { order.push('consume'); return originalConsume(input); };
+  const result = await service.handlePendingText('Проект | Описание', context);
+  assert.equal(result.answer, 'Life OS обновлён.');
+  assert.deepEqual(order, ['consume', 'mutate']);
+  assert.equal(calls.filter(([name]) => name === 'consume').length, 1);
+});

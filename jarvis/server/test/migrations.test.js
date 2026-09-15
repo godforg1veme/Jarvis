@@ -27,7 +27,21 @@ test('migration files are ordered and narrowly named', () => {
     '016_life_os_v2.sql',
     '017_life_os_reminders.sql',
     '018_life_os_proactivity_actions.sql',
+    '019_telegram_life_os_interactions.sql',
   ]);
+});
+
+test('Telegram Life OS migration adds only closed guided interaction kinds', () => {
+  const migration = fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, '019_telegram_life_os_interactions.sql'), 'utf8');
+  for (const kind of [
+    'life_project_create', 'life_project_update', 'life_person_create', 'life_person_update',
+    'life_relationship_create', 'life_project_link_create', 'life_family_grant_create',
+    'life_family_grant_confirm', 'life_reminder_create', 'life_reminder_reschedule',
+    'life_source_create', 'life_source_update', 'life_preference_set',
+  ]) {
+    assert.match(migration, new RegExp(`'${kind}'`));
+  }
+  assert.doesNotMatch(migration, /DELETE|TRUNCATE|DROP TABLE/i);
 });
 
 test('proactivity action migration preserves uncertain outcomes without retry coercion', () => {

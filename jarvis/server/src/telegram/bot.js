@@ -1,5 +1,6 @@
 const { Bot, InputFile } = require('grammy');
 const { sendTelegramText, splitTelegramText } = require('./telegramFormatting');
+const { isLifeCallback } = require('./telegramLifeOsService');
 
 const VPN_CALLBACK_RE = /^vpn:(?:menu|status|clients|new|restart|routing|pc|p:[vh]|[vh]:(?:menu|status|clients|new|restart|routing|pc|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12})|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12}|(?:confirm|reject):[a-f0-9-]{36})$/i;
 const TELEGRAM_CALLBACK_RE = /^(?:vpn:(?:menu|status|clients|new|restart|routing|pc|p:[vh]|[vh]:(?:menu|status|clients|new|restart|routing|pc|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12})|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12}|(?:confirm|reject):[a-f0-9-]{36})|cmd:(?:confirm|reject):[a-f0-9-]{36}|life:(?:confirm|dismiss):[a-f0-9-]{36}|mem:(?:menu|list|add|correct|forget|(?:edit|forget_prompt|forget_confirm):[a-f0-9-]{36})|doc:(?:menu|add|cancel|(?:del_prompt|delete):[a-f0-9-]{36})|dev:(?:menu|list|pair|cancel|(?:(?:select|task|revoke_prompt|revoke):[a-f0-9-]{36}))|flow:cancel:[a-f0-9-]{36}|gallery:(?:(?:page|keep):[0-9]{1,4}|(?:open|delete):[dv]:[a-f0-9-]{36}:[0-9]{1,4}))$/i;
@@ -14,7 +15,7 @@ function vpnReplyMarkup(buttons, options = {}) {
         const text = String(button?.text || '');
         const data = String(button?.data || '');
         const url = String(button?.url || '');
-        const validCallback = data && !url && Buffer.byteLength(data, 'utf8') <= 64 && TELEGRAM_CALLBACK_RE.test(data);
+        const validCallback = data && !url && Buffer.byteLength(data, 'utf8') <= 64 && (TELEGRAM_CALLBACK_RE.test(data) || isLifeCallback(data));
         const validOperationsUrl = url && !data && options.operationsPanelUrl && url === options.operationsPanelUrl;
         const validRoutingUrl = url && !data && (url === 'https://jarvis.rilora.ru/happ-routing' || (options.routingUrl && url === options.routingUrl));
         const validUrl = validOperationsUrl || validRoutingUrl;
@@ -143,7 +144,7 @@ function createTelegramBot(options) {
 
   bot.on('callback_query:data', async (ctx, next) => {
     const data = String(ctx.callbackQuery?.data || '');
-    if (!TELEGRAM_CALLBACK_RE.test(data)) return next();
+    if (!TELEGRAM_CALLBACK_RE.test(data) && !isLifeCallback(data)) return next();
     await ctx.answerCallbackQuery().catch(() => {});
     const result = typeof messageService.handleCallback === 'function'
       ? await messageService.handleCallback(ctx.update)

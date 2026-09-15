@@ -38,6 +38,7 @@ class TelegramMenuService {
     this.knowledgeService = options.knowledgeService || null;
     this.vpnService = options.vpnService || null;
     this.lifeMissionControlService = options.lifeMissionControlService || null;
+    this.lifeOsService = options.lifeOsService || null;
     this.memoryGalleryService = options.memoryGalleryService || null;
     this.ownerTelegramId = String(options.ownerTelegramId || '0');
     this.operationsEnabled = options.operationsEnabled === true;
@@ -87,7 +88,7 @@ class TelegramMenuService {
     if (action === 'memory') return this.memoryService ? this._memoryHome(context) : { answer: 'Память сейчас недоступна.' };
     if (action === 'documents') return this._documents(context);
     if (action === 'devices') return { answer: 'Управление компьютерами:', buttons: deviceMenu() };
-    if (action === 'life') return this._life(context);
+    if (action === 'life') return this.lifeOsService ? this.lifeOsService.home(context) : this._life(context);
     if (action === 'vpn') {
       if (!this.owner(context) || !this.vpnService) return { answer: 'Управление VPN недоступно.' };
       return this.vpnService.openMenu(context);
@@ -181,6 +182,12 @@ class TelegramMenuService {
       return this.memoryGalleryService
         ? this.memoryGalleryService.handleCallback(data, context)
         : { answer: 'Файлы и кадры сейчас недоступны.', buttons: memoryMenu() };
+    }
+
+    if (data.startsWith('life:') && this.lifeOsService) {
+      if (!/^life:h:apply:/i.test(data)) await this._cancel(context);
+      const result = await this.lifeOsService.handleCallback(data, context);
+      if (result) return result;
     }
 
     if (/^(?:mem|doc|dev|life):/.test(data) || /^vpn:(?!confirm:|reject:)/.test(data)) {
@@ -285,6 +292,18 @@ class TelegramMenuService {
     const interaction = active.interaction;
     const value = String(text || '').trim();
     if (!value) return { answer: 'Напиши значение обычным текстом.', buttons: interactionCancel(interaction.id) };
+
+    if (interaction.kind.startsWith('life_') && this.lifeOsService) {
+      try {
+        const consumed = await this.interactions.consume({ id: interaction.id, userId: context.user.id, conversationId: context.conversation.id, chatId: context.chatId });
+        if (!consumed) return { answer: 'Этот запрос уже недоступен.' };
+        const result = await this.lifeOsService.handlePendingText(value, context, interaction);
+        if (!result) return null;
+        return result;
+      } catch (_) {
+        return { answer: 'Не удалось применить значение. Проверь формат и открой нужный раздел снова.' };
+      }
+    }
 
     if (interaction.kind === 'vpn_access_label') {
       try {
