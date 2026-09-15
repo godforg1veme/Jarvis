@@ -14,6 +14,7 @@ const { registerOperationsStatic } = require('./operationsStatic');
 const { SseHub } = require('./sseHub');
 const { IncidentEngine } = require('./incidents/incidentEngine');
 const { IncidentNotifier } = require('./incidents/incidentNotifier');
+const { VpnIncidentAdapter } = require('./incidents/vpnIncidentAdapter');
 const { RollupWorker } = require('./collectors/rollupWorker');
 const { RetentionWorker } = require('./collectors/retentionWorker');
 const { OperationRepository } = require('./repositories/operationRepository');
@@ -32,11 +33,13 @@ async function createOperationsRuntime({ config, pool, logger, app, getBot, getP
   const sseHub = overrides.sseHub || new SseHub();
   const incidentNotifier = overrides.incidentNotifier || new IncidentNotifier({ getBot, ownerTelegramId: config.operationsOwnerTelegramId, panelOrigin: config.operationsPublicOrigin, logger });
   const incidentEngine = overrides.incidentEngine || new IncidentEngine({ repository, hostId: host.id, notifier: incidentNotifier });
+  const vpnIncidentAdapter = overrides.vpnIncidentAdapter || new VpnIncidentAdapter({ repository, incidentEngine, hostId: host.id });
   const collector = overrides.collector || new CollectorWorker({
     client, repository, hostId: host.id, intervalMs: config.operationsPollIntervalMs, logger,
     onSnapshot: (payload) => sseHub.publish('snapshot', payload),
     onEvent: (payload) => sseHub.publish('event', payload),
     incidentEngine,
+    vpnIncidentAdapter,
   });
   const rollupWorker = overrides.rollupWorker || new RollupWorker({ repository, logger });
   const retentionWorker = overrides.retentionWorker || new RetentionWorker({ repository, logger, incidentEngine });

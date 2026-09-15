@@ -79,7 +79,9 @@ class ActionsTests(unittest.TestCase):
 
         response = execute(self.config, "vpn.health.snapshot", {})
         self.assertEqual(response["state"], "succeeded")
-        self.assertEqual(response["data"], {
+        diagnosis = response["data"]["diagnosis"]
+        raw_snapshot = {key: value for key, value in response["data"].items() if key != "diagnosis"}
+        self.assertEqual(raw_snapshot, {
             "host": "healthy",
             "network": {
                 "dns": "healthy",
@@ -101,6 +103,11 @@ class ActionsTests(unittest.TestCase):
                 "protocolProbe": "unknown",
             },
         })
+        self.assertEqual(diagnosis["state"], "healthy")
+        self.assertIsNone(diagnosis["primary"])
+        self.assertEqual([item["code"] for item in diagnosis["secondarySignals"]], [
+            "XRAY_PROTOCOL_UNVERIFIED", "HYSTERIA2_PROTOCOL_UNVERIFIED",
+        ])
         # Check no secret substrings appear anywhere in the result
         response_str = str(response)
         self.assertNotIn("password", response_str)

@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const { IncidentEngine } = require('../src/operations/incidents/incidentEngine');
+const { OperationsRepository } = require('../src/operations/repositories/operationsRepository');
 
 test('a failed notification is retried without repeating service actions', async () => {
   let deliveries = 0; let marked = 0;
@@ -40,4 +41,24 @@ test('systemd failed opens immediately and recovery resolves silently', async ()
   await engine.observe({ ...base, sourceState: 'failed', healthState: 'unavailable' });
   await engine.observe({ ...base, sourceState: 'active', healthState: 'healthy' });
   assert.deepEqual(calls, ['open', 'resolve']);
+});
+
+test('classified incident preserves supplied severity and bounded detail', async () => {
+  const opened = [];
+  const engine = new IncidentEngine({ hostId: 'host-1', repository: {
+    async openOrUpdateIncident(input) { opened.push(input); return { id: 'vpn-incident', opened: true }; },
+  } });
+  await engine.observeClassified({ serviceId: 'xray-service', serviceKey: 'xray', failureKind: 'vpn.xray.listener_failure',
+    severity: 'error', summary: 'Xray listener unavailable', technicalDetail: '{"version":1}' });
+  assert.equal(opened[0].severity, 'error');
+  assert.equal(opened[0].technicalDetail, '{"version":1}');
+});
+
+test('repository resolves only classified VPN incidents and preserves the current kind', async () => {
+  const calls = [];
+  const repository = new OperationsRepository({ async query(sql, parameters) { calls.push({ sql, parameters }); return { rows: [] }; } });
+  await repository.resolveClassifiedVpnIncidents({ hostId: 'host-1', exceptFailureKind: 'vpn.xray.service_failure' });
+  assert.match(calls[0].sql, /failure_kind LIKE 'vpn\.%'/);
+  assert.match(calls[0].sql, /failure_kind<>\$2/);
+  assert.deepEqual(calls[0].parameters, ['host-1', 'vpn.xray.service_failure']);
 });

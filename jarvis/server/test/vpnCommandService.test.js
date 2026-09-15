@@ -6,6 +6,19 @@ const USER_ID = '11111111-1111-4111-8111-111111111111';
 const DEVICE_ID = '22222222-2222-4222-8222-222222222222';
 const REQUEST_ID = '33333333-3333-4333-8333-333333333333';
 
+function defaultHealthData() {
+  return {
+    host: 'healthy',
+    network: { dns: 'healthy', outbound: 'healthy' },
+    xray: { service: 'healthy', config: 'healthy', listener: 'healthy', protocolProbe: 'unknown' },
+    hysteria2: { service: 'healthy', config: 'healthy', listener: 'healthy', auth: 'healthy', authEndpoint: 'healthy', authCredentialProbe: 'healthy', protocolProbe: 'unknown' },
+    diagnosis: { version: 1, state: 'healthy', primary: null, secondarySignals: [
+      { code: 'XRAY_PROTOCOL_UNVERIFIED', severity: 'info' },
+      { code: 'HYSTERIA2_PROTOCOL_UNVERIFIED', severity: 'info' },
+    ] },
+  };
+}
+
 function harness(options = {}) {
   const records = new Map();
   const calls = [];
@@ -31,20 +44,7 @@ function harness(options = {}) {
       return {
         result: {
           state: 'succeeded',
-          data: {
-            host: 'healthy',
-            network: { dns: 'healthy', outbound: 'healthy' },
-            xray: { service: 'healthy', config: 'healthy', listener: 'healthy', protocolProbe: 'unknown' },
-            hysteria2: {
-              service: 'healthy',
-              config: 'healthy',
-              listener: 'healthy',
-              auth: 'healthy',
-              authEndpoint: 'healthy',
-              authCredentialProbe: 'healthy',
-              protocolProbe: 'unknown',
-            },
-          },
+          data: options.healthData || defaultHealthData(),
         },
       };
     }
@@ -271,6 +271,8 @@ test('health snapshot command and callback return structured overview without se
   assert.match(commandResult.answer, /Эндпоинт auth: ✅ OK/);
   assert.match(commandResult.answer, /Проверка ключа: ✅ OK/);
   assert.match(commandResult.answer, /Протокол \(Probe\): ❓ Неизвестно \(требуется внешний узел\)/);
+  assert.match(commandResult.answer, /Активных VPN-инцидентов нет/);
+  assert.match(commandResult.answer, /Автоматический ремонт: отключён/);
 
   const callbackResult = await service.handleCallback({ ...context, data: 'vpn:health' });
   assert.match(callbackResult.answer, /Health Snapshot/);
@@ -280,4 +282,25 @@ test('health snapshot command and callback return structured overview without se
   assert.ok(snapshotReq);
 });
 
+test('health snapshot renders only closed incident language and rejects malformed diagnosis', async () => {
+  const incident = defaultHealthData();
+  incident.hysteria2.auth = 'unavailable';
+  incident.hysteria2.authEndpoint = 'unavailable';
+  incident.hysteria2.authCredentialProbe = 'unavailable';
+  incident.diagnosis = { version: 1, state: 'incident', primary: {
+    code: 'HYSTERIA2_AUTH_ENDPOINT_FAILURE', failureKind: 'vpn.hysteria2.auth_endpoint_failure', severity: 'error',
+    scope: 'hysteria2', confidence: 'high', likelyCause: 'host_agent_auth_dependency',
+    evidence: [{ path: 'hysteria2.service', status: 'healthy' }, { path: 'hysteria2.authEndpoint', status: 'unavailable' }],
+    safeNextChecks: ['host_agent_status', 'hysteria_auth_endpoint_probe'],
+  }, secondarySignals: defaultHealthData().diagnosis.secondarySignals };
+  const rendered = await harness({ healthData: incident }).service.handle({ userId: USER_ID, conversationId: 'conversation', originChannel: 'telegram', text: '/vpn_health' });
+  assert.match(rendered.answer, /HYSTERIA2_AUTH_ENDPOINT_FAILURE/);
+  assert.match(rendered.answer, /локальная auth-зависимость Host Agent/);
+  assert.doesNotMatch(rendered.answer, /password|privateKey|vless:\/\/|hy2:\/\//i);
 
+  const malformed = defaultHealthData();
+  malformed.diagnosis.prompt = 'vless://secret';
+  const rejected = await harness({ healthData: malformed }).service.handle({ userId: USER_ID, conversationId: 'conversation', originChannel: 'telegram', text: '/vpn_health' });
+  assert.equal(rejected.answer, 'Диагностика VPN вернула некорректные данные.');
+  assert.doesNotMatch(rejected.answer, /secret/);
+});

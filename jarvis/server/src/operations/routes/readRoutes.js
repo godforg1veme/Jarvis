@@ -1,6 +1,7 @@
 const crypto = require('node:crypto');
 const { z } = require('zod');
 const { normalizeOperationalLogs } = require('../collectors/logCollector');
+const { parseVpnHealth } = require('../../vpn/vpnHealthSchema');
 
 const serviceParamsSchema = z.object({ id: z.string().regex(/^(?:host|[a-z][a-z0-9_-]{0,63})$/) }).strict();
 const listQuerySchema = z.object({ limit: z.coerce.number().int().min(1).max(200).default(50) }).strict();
@@ -33,7 +34,7 @@ function registerReadRoutes(app, { repository, hostId, requireSession, client, s
   app.get('/ops/api/vpn/health', { preHandler: requireSession }, async () => {
     const response = await agentRequest(client, 'vpn.health.snapshot');
     if (response.result.state !== 'succeeded') return { ok: false, code: response.result.errorCode || 'VPN_HEALTH_UNAVAILABLE' };
-    return { ok: true, health: response.result.data };
+    return { ok: true, health: parseVpnHealth(response.result.data) };
   });
   app.get('/ops/api/checks', { preHandler: requireSession }, async () => ({ ok: true, checks: await repository.healthChecks(hostId) }));
   app.get('/ops/api/overview', { preHandler: requireSession }, async () => ({ ok: true, overview: await repository.overview(hostId) }));

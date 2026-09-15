@@ -240,6 +240,15 @@ class OperationsRepository {
     return result.rows;
   }
 
+  async resolveClassifiedVpnIncidents({ hostId, exceptFailureKind = null }) {
+    const result = await this.pool.query(`
+      UPDATE ops_incidents SET state='resolved',resolved_at=now(),last_observed_at=now()
+      WHERE host_id=$1 AND state='open' AND failure_kind LIKE 'vpn.%'
+        AND ($2::text IS NULL OR failure_kind<>$2) RETURNING id
+    `, [hostId, exceptFailureKind]);
+    return result.rows;
+  }
+
   async claimIncidentNotification(id) {
     const result = await this.pool.query(`
       UPDATE ops_incidents SET notification_attempts=notification_attempts+1,

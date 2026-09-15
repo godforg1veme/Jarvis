@@ -17,6 +17,7 @@ from .protocol import ProtocolError
 from .hysteria_vpn_manager import HysteriaVpnManager
 from .vpn_manager import XrayVpnManager
 from .network_probes import probe_dns, probe_outbound_https
+from .vpn_incident_classifier import classify_vpn_incident
 
 MAX_OUTPUT_BYTES = 32 * 1024
 
@@ -133,7 +134,7 @@ def _vpn_health_snapshot(
     ss_tcp_out = ss_tcp.get("data", {}).get("output", "") if ss_tcp.get("state") == "succeeded" else ""
     xray = XrayVpnManager(run=run).health_snapshot(listener_tcp_output=ss_tcp_out)
     hysteria2 = HysteriaVpnManager(run=run).health_snapshot(listener_tcp_output=ss_tcp_out)
-    return {
+    snapshot = {
         "host": _host_health(),
         "network": {
             "dns": dns_probe(),
@@ -142,6 +143,7 @@ def _vpn_health_snapshot(
         "xray": xray,
         "hysteria2": hysteria2,
     }
+    return {**snapshot, "diagnosis": classify_vpn_incident(snapshot)}
 
 
 def execute(config: HostAgentConfig, operation: str, arguments: dict[str, Any]) -> dict[str, Any]:

@@ -9,6 +9,7 @@ const SERVICE_CATALOG = Object.freeze({
   hysteria2: Object.freeze({ displayName: 'Hysteria2 VPN', serviceType: 'systemd' }),
   'telegram-parser': Object.freeze({ displayName: 'Telegram Parser', serviceType: 'parser' }),
 });
+const CLASSIFIED_VPN_KEYS = new Set(['xray', 'hysteria2']);
 
 const serviceSnapshotSchema = z.object({
   services: z.array(z.object({
@@ -72,6 +73,7 @@ class CollectorWorker {
     this.onSnapshot = options.onSnapshot || (() => {});
     this.onEvent = options.onEvent || (() => {});
     this.incidentEngine = options.incidentEngine || null;
+    this.vpnIncidentAdapter = options.vpnIncidentAdapter || null;
     this.lastStates = new Map();
     this.timer = null;
     this.running = false;
@@ -85,7 +87,7 @@ class CollectorWorker {
     await Promise.all(Object.entries(SERVICE_CATALOG).map(async ([serviceKey, definition]) => {
       const saved = await this.repository.upsertService({ hostId: this.hostId, serviceKey, ...definition, sourceState: 'unavailable', healthState: 'unavailable' });
       const normalized = { ...definition, ...saved, serviceKey, sourceState: 'unavailable', healthState: 'unavailable' };
-      if (this.incidentEngine) await this.incidentEngine.observe(normalized);
+      if (this.incidentEngine && !CLASSIFIED_VPN_KEYS.has(serviceKey)) await this.incidentEngine.observe(normalized);
       await this.recordStateChange(normalized);
     }));
   }
@@ -104,7 +106,7 @@ class CollectorWorker {
         healthState: service ? service.healthState : 'unavailable',
       }).then(async (saved) => {
         const normalized = { ...definition, ...saved, serviceKey, sourceState: service ? service.sourceState : 'unavailable', healthState: service ? service.healthState : 'unavailable' };
-        if (this.incidentEngine) await this.incidentEngine.observe(normalized);
+        if (this.incidentEngine && !CLASSIFIED_VPN_KEYS.has(serviceKey)) await this.incidentEngine.observe(normalized);
         await this.recordStateChange(normalized);
         return saved;
       });
@@ -141,7 +143,6 @@ class CollectorWorker {
       healthState: healthy ? 'healthy' : status.serviceState === 'active' ? 'degraded' : 'unavailable',
     });
     const normalized = { ...definition, ...saved, serviceKey, sourceState: status.serviceState, healthState: healthy ? 'healthy' : status.serviceState === 'active' ? 'degraded' : 'unavailable' };
-    if (this.incidentEngine) await this.incidentEngine.observe(normalized);
     await this.repository.recordMetricSamples({
       hostId: this.hostId, serviceId: saved.id, sampledAt: new Date(),
       metrics: { vpn_client_count: status.clientCount, vpn_config_valid: status.configValid ? 1 : 0, vpn_listener_ready: status.listenerReady ? 1 : 0 },
@@ -150,6 +151,16 @@ class CollectorWorker {
   async collectVpn() {
     await this.collectVpnProtocol('xray', 'vpn.status');
     await this.collectVpnProtocol('hysteria2', 'vpn.hysteria2.status');
+    if (this.vpnIncidentAdapter) {
+      try {
+        const response = await this.request('vpn.health.snapshot');
+        if (response.result.state !== 'succeeded' || !response.result.data) throw new Error('VPN health snapshot unavailable');
+        await this.vpnIncidentAdapter.observe(response.result.data);
+      } catch (error) {
+        await this.vpnIncidentAdapter.observeUnavailable();
+        throw error;
+      }
+    }
   }
   async collectBackup() {
     if (typeof this.repository.recordBackupResult !== 'function') return;

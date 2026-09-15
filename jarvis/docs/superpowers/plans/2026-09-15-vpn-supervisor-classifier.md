@@ -172,7 +172,9 @@ Set-Location ..
    `technical_detail` field. Do not add a database or migration in this
    milestone.
 6. Extend VPN collection to request `vpn.health.snapshot` once per cycle and
-   feed its parsed diagnosis to the adapter.
+   feed its parsed diagnosis to the adapter. A failed request or rejected
+   payload must produce a debounced, bounded `vpn.health_unavailable` incident
+   instead of disappearing into logs.
 7. Preserve `vpn.status` and `vpn.hysteria2.status` collection for client-count
    and readiness metrics, but stop those generic paths from opening competing
    VPN incidents. Service inventory and state-change events remain intact.

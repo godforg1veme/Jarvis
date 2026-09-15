@@ -1,11 +1,28 @@
 const crypto = require('node:crypto');
 const { buildRoutingArtifact, buildRoutingSummary } = require('./vpnRoutingService');
+const { parseVpnHealth } = require('./vpnHealthSchema');
 
 const CONFIRMATION_TTL_MS = 60 * 1000;
 const REQUEST_ID_RE = /^[a-f0-9-]{36}$/i;
 const CLIENT_ID_RE = /^vpn-[a-f0-9]{12}$/;
 const LABEL_RE = /^[A-Za-zА-Яа-яЁё0-9_. -]{1,40}$/;
 const PROTOCOLS = Object.freeze({ vless: { code: 'v', title: 'VLESS' }, hysteria2: { code: 'h', title: 'Hysteria2' } });
+const VPN_SEVERITY_LABELS = Object.freeze({ info: 'информация', warning: 'предупреждение', error: 'ошибка', critical: 'критическая' });
+const VPN_SCOPE_LABELS = Object.freeze({ host: 'VPS', xray: 'Xray', hysteria2: 'Hysteria2', multi: 'оба VPN-стека' });
+const VPN_CAUSE_LABELS = Object.freeze({
+  snapshot_contract: 'некорректный снимок состояния', host_probe: 'состояние VPS', host_dns: 'DNS хоста', host_outbound: 'исходящая сеть хоста',
+  xray_config: 'конфигурация Xray', xray_service: 'служба Xray', xray_listener: 'TCP listener Xray',
+  hysteria2_config: 'конфигурация Hysteria2', hysteria2_service: 'служба Hysteria2', hysteria2_listener: 'UDP listener Hysteria2',
+  host_agent_auth_dependency: 'локальная auth-зависимость Host Agent', hysteria_auth_credential: 'проверка Hysteria2 credential',
+  multi_stack_local_failure: 'одновременный локальный сбой двух VPN-стеков', insufficient_evidence: 'недостаточно подтверждённых данных',
+});
+const VPN_CHECK_LABELS = Object.freeze({
+  host_resources: 'проверить ресурсы VPS', host_dns_probe: 'повторить DNS probe', host_outbound_probe: 'повторить HTTPS probe',
+  xray_config_test: 'проверить конфигурацию Xray', xray_service_status: 'проверить службу Xray', xray_listener_probe: 'проверить TCP listener Xray',
+  hysteria2_config_test: 'проверить конфигурацию Hysteria2', hysteria2_service_status: 'проверить службу Hysteria2', hysteria2_listener_probe: 'проверить UDP listener Hysteria2',
+  host_agent_status: 'проверить Host Agent', hysteria_auth_endpoint_probe: 'повторить auth endpoint probe',
+  hysteria_auth_credential_probe: 'повторить credential probe', vpn_snapshot_repeat: 'повторить снимок состояния',
+});
 
 function publicError(code) {
   const error = new Error(code);
@@ -318,7 +335,8 @@ class VpnCommandService {
     if (command.action === 'health') {
       const response = await this._request('vpn.health.snapshot', {});
       if (response.result.state !== 'succeeded') return { answer: 'Диагностика VPN временно недоступна.', buttons: menuButtons() };
-      const data = response.result.data || {};
+      let data;
+      try { data = parseVpnHealth(response.result.data); } catch (_) { return { answer: 'Диагностика VPN вернула некорректные данные.', buttons: menuButtons() }; }
       const format = (state) => (
         state === 'healthy' ? '✅ OK' :
         state === 'degraded' ? '⚠️ Degraded' :
@@ -350,6 +368,16 @@ class VpnCommandService {
         ...(hy2.authEndpoint ? [`  - Эндпоинт auth: ${format(hy2.authEndpoint)}`] : []),
         ...(hy2.authCredentialProbe ? [`  - Проверка ключа: ${format(hy2.authCredentialProbe)}`] : []),
         ...(hy2.protocolProbe ? [`• Протокол (Probe): ${format(hy2.protocolProbe)}`] : []),
+        '',
+        ...(data.diagnosis.primary ? [
+          `🚨 **Инцидент:** ${data.diagnosis.primary.code}`,
+          `• Уровень: ${VPN_SEVERITY_LABELS[data.diagnosis.primary.severity]}`,
+          `• Затронуто: ${VPN_SCOPE_LABELS[data.diagnosis.primary.scope]}`,
+          `• Причина: ${VPN_CAUSE_LABELS[data.diagnosis.primary.likelyCause]}`,
+          `• Уверенность: ${data.diagnosis.primary.confidence}`,
+          `• Следующие проверки: ${data.diagnosis.primary.safeNextChecks.map((check) => VPN_CHECK_LABELS[check]).join(', ')}`,
+        ] : ['✅ **Активных VPN-инцидентов нет.**']),
+        '🤖 Автоматический ремонт: отключён на этом этапе.',
       ].join('\n');
       return { answer, buttons: menuButtons() };
     }

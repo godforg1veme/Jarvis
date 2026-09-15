@@ -25,6 +25,19 @@ class IncidentEngine {
       severity: immediate ? 'critical' : 'error', summary: service.summary || incidentSummary(service, kind),
       technicalDetail: `${service.sourceState}/${service.healthState}`,
     });
+    await this.notify(incident, service);
+    return incident;
+  }
+
+  async observeClassified({ serviceId = null, serviceKey, failureKind, severity, summary, technicalDetail }) {
+    const incident = await this.repository.openOrUpdateIncident({
+      hostId: this.hostId, serviceId, failureKind, severity, summary, technicalDetail,
+    });
+    await this.notify(incident, { id: serviceId, serviceKey, displayName: summary });
+    return incident;
+  }
+
+  async notify(incident, service) {
     if (incident && this.notifier) {
       const durable = typeof this.repository.claimIncidentNotification === 'function';
       const claimed = durable ? await this.repository.claimIncidentNotification(incident.id) : incident.opened;
