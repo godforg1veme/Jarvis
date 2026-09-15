@@ -207,7 +207,8 @@ See `docs/README.md` for current implementation status and historical records.
 - `server/src/vpn/vpnRoutingService.js` provides domestic Russian split-routing
   rules for Happ. Russian services (`geosite:category-ru`, `geoip:ru`, `.ru`,
   `.su`) route directly via physical client IP using Yandex DNS `77.88.8.8` with
-  `IPIfNonMatch`; all remaining traffic routes via VPN (Hysteria 2). A dedicated
+  `IPIfNonMatch`; all remaining traffic routes via the active Happ VPN profile
+  (Hysteria 2 or VLESS). A dedicated
   public endpoint `GET /happ-routing` (`https://jarvis.rilora.ru/happ-routing`) serves
   a 1-click HTML redirect bridge to the `happ://routing/onadd/...` deeplink, avoiding
   Telegram Bot API deep link URL limitations and Base64 chat pollution. The routing

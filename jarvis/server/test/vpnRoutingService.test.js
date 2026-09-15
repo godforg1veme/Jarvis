@@ -13,10 +13,10 @@ const {
   buildRoutingSummary,
 } = require('../src/vpn/vpnRoutingService');
 
-test('buildHappRoutingProfile generates valid Happ schema with RU direct rules', () => {
+test('buildHappRoutingProfile proxies by default while preserving RU direct rules', () => {
   const profile = buildHappRoutingProfile();
   assert.equal(profile.Name, DEFAULT_ROUTING_NAME);
-  assert.equal(profile.GlobalProxy, 'false');
+  assert.equal(profile.GlobalProxy, 'true');
   assert.equal(profile.DomainStrategy, 'IPIfNonMatch');
   assert.equal(profile.DomesticDNSIP, '77.88.8.8');
   assert.equal(profile.DomesticDNSType, 'DoU');

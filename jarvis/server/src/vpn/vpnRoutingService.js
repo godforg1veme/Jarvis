@@ -126,7 +126,9 @@ const BLOCK_SITES = Object.freeze([]);
 function buildHappRoutingProfile(options = {}) {
   return {
     Name: options.name || DEFAULT_ROUTING_NAME,
-    GlobalProxy: 'false',
+    // Explicit domestic rules stay direct; every unmatched destination uses
+    // the active Happ VPN profile.
+    GlobalProxy: 'true',
     RemoteDNSType: options.remoteDnsType || 'DoH',
     RemoteDNSDomain: options.remoteDnsDomain || 'https://cloudflare-dns.com/dns-query',
     RemoteDNSIP: options.remoteDnsIp || '1.1.1.1',

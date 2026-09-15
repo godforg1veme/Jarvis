@@ -6,6 +6,13 @@ future-tense wording does not override the current architecture in `AGENTS.md`.
 
 Status snapshot: 2026-09-15.
 
+Happ VPN routing default-proxy correction, 2026-09-15: the `Jarvis RU Direct`
+profile now keeps only its explicit Russian domain/IP rules direct and routes
+every unmatched destination through the active Happ VPN profile (Hysteria 2 or
+VLESS). This corrects the prior `GlobalProxy: false` fallback, which allowed
+unmatched app IP traffic to bypass the tunnel. Deployment and live iPhone
+acceptance are tracked separately.
+
 Telegram Life OS parity update, 2026-09-15: `🎯 Life OS` now opens a native
 11-section inline-button hierarchy over the existing owner-scoped Life OS v2
 services. Closed callbacks, revision-aware guided input, recursive button
