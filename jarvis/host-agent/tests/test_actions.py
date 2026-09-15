@@ -54,6 +54,39 @@ class ActionsTests(unittest.TestCase):
         self.assertNotIn("output", response["data"])
 
     @patch("jarvis_host_agent.actions._run")
+    @patch("jarvis_host_agent.actions.XrayVpnManager.health_snapshot")
+    @patch("jarvis_host_agent.actions.HysteriaVpnManager.health_snapshot")
+    @patch("jarvis_host_agent.actions._host_health")
+    def test_vpn_health_snapshot_returns_structured_status_without_secrets(self, host_health, hy2_snapshot, xray_snapshot, run):
+        host_health.return_value = "healthy"
+        xray_snapshot.return_value = {"service": "healthy", "config": "healthy", "listener": "healthy"}
+        hy2_snapshot.return_value = {"service": "healthy", "config": "healthy", "listener": "healthy", "auth": "healthy"}
+        run.return_value = {"state": "succeeded", "data": {"output": "LISTEN 0 128 127.0.0.1:3211 0.0.0.0:*\n"}}
+
+        response = execute(self.config, "vpn.health.snapshot", {})
+        self.assertEqual(response["state"], "succeeded")
+        self.assertEqual(response["data"], {
+            "host": "healthy",
+            "xray": {
+                "service": "healthy",
+                "config": "healthy",
+                "listener": "healthy",
+            },
+            "hysteria2": {
+                "service": "healthy",
+                "config": "healthy",
+                "listener": "healthy",
+                "auth": "healthy",
+            },
+        })
+        # Check no secret substrings appear anywhere in the result
+        response_str = str(response)
+        self.assertNotIn("password", response_str)
+        self.assertNotIn("privateKey", response_str)
+        self.assertNotIn("vless://", response_str)
+        self.assertNotIn("hy2://", response_str)
+
+    @patch("jarvis_host_agent.actions._run")
     def test_observed_service_with_empty_actions_cannot_be_changed(self, run):
         response = execute(self.config, "service.restart", {"serviceId": "jarvis-server"})
         self.assertEqual(response, {"state": "failed", "errorCode": "SERVICE_ACTION_UNDECLARED"})

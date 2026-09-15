@@ -51,6 +51,9 @@ class ProtocolTests(unittest.TestCase):
         vpn_cyrillic = validate_request(request(operation="vpn.client.issue", arguments={"label": "iphone меня"}))
         self.assertEqual(vpn_cyrillic["arguments"], {"label": "iphone меня"})
         self.assertEqual(validate_request(request(operation="vpn.hysteria2.status", arguments={}))["arguments"], {})
+        self.assertEqual(validate_request(request(operation="vpn.health.snapshot", arguments={}))["arguments"], {})
+        with self.assertRaises(ProtocolError):
+            validate_request(request(operation="vpn.health.snapshot", arguments={"extra": 1}))
         with self.assertRaises(ProtocolError):
             validate_request(request(operation="vpn.hysteria2.restart", arguments={"port": 53}))
 

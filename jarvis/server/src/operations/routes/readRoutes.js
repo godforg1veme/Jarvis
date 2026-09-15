@@ -30,6 +30,11 @@ function registerReadRoutes(app, { repository, hostId, requireSession, client, s
     const inventory = z.object({ items: z.array(z.object({ name: z.string().max(160), type: z.enum(['docker', 'systemd']), state: z.string().max(40) }).strict()).max(100), unavailable: z.array(z.enum(['docker', 'systemd'])).max(2) }).strict().parse(response.result.data);
     return { ok: true, inventory };
   });
+  app.get('/ops/api/vpn/health', { preHandler: requireSession }, async () => {
+    const response = await agentRequest(client, 'vpn.health.snapshot');
+    if (response.result.state !== 'succeeded') return { ok: false, code: response.result.errorCode || 'VPN_HEALTH_UNAVAILABLE' };
+    return { ok: true, health: response.result.data };
+  });
   app.get('/ops/api/checks', { preHandler: requireSession }, async () => ({ ok: true, checks: await repository.healthChecks(hostId) }));
   app.get('/ops/api/overview', { preHandler: requireSession }, async () => ({ ok: true, overview: await repository.overview(hostId) }));
   app.get('/ops/api/services', { preHandler: requireSession }, async () => ({ ok: true, services: await repository.listServices(hostId) }));

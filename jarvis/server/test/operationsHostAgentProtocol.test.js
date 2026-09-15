@@ -43,6 +43,9 @@ test('Host Agent protocol validates VPN operations without accepting config or s
   const hysteria = validateRequest({ ...issue, operation: 'vpn.hysteria2.client.issue', arguments: { label: 'My iPhone' } });
   assert.deepEqual(hysteria.arguments, { label: 'My iPhone' });
   assert.throws(() => validateRequest({ ...hysteria, operation: 'vpn.hysteria2.restart', arguments: { port: 53 } }), /invalid/i);
+  const health = validateRequest({ version: 1, requestId: REQUEST_ID, operation: 'vpn.health.snapshot', arguments: {}, sentAt: NOW });
+  assert.deepEqual(health.arguments, {});
+  assert.throws(() => validateRequest({ ...health, arguments: { extra: true } }), /invalid/i);
 });
 
 test('Host Agent protocol rejects malformed, oversized, and mismatched envelopes', () => {

@@ -23,6 +23,7 @@ function parseVpnCommand(text) {
   const value = String(text || '').trim();
   let match;
   if (/^\/vpn$/i.test(value)) return { kind: 'menu' };
+  if (/^\/vpn_(health|snapshot)$/i.test(value)) return { kind: 'read', action: 'health', protocol: 'both', arguments: {} };
   if (/^\/vpn_status$/i.test(value)) return { kind: 'read', action: 'status', protocol: 'vless', arguments: {} };
   if (/^\/vpn_clients$/i.test(value)) return { kind: 'read', action: 'clients', protocol: 'vless', arguments: {} };
   if ((match = /^\/vpn_(hysteria2|hysteria|hy2)_(status|clients)$/i.exec(value))) {
@@ -61,6 +62,7 @@ function parseVpnCallback(value) {
   if (['vpn:menu', 'vpn:status', 'vpn:clients', 'vpn:new', 'vpn:restart', 'vpn:routing', 'vpn:pc'].includes(data)) {
     return { action: data.slice(4), ...(data === 'vpn:menu' || data === 'vpn:routing' || data === 'vpn:pc' ? {} : { protocol: 'vless' }) };
   }
+  if (data === 'vpn:health') return { action: 'health', protocol: 'both' };
   match = /^vpn:(client|export|rotate|revoke):(vpn-[a-f0-9]{12})$/.exec(data);
   if (match) return { action: match[1], protocol: 'vless', clientId: match[2] };
   match = /^vpn:(confirm|reject):([a-f0-9-]{36})$/i.exec(data);
@@ -72,6 +74,7 @@ function menuButtons() {
   return [
     [{ text: '⚡ Hysteria2 — рекомендуется', data: 'vpn:p:h' }],
     [{ text: '🛡 VLESS — резерв', data: 'vpn:p:v' }],
+    [{ text: '🏥 Диагностика (Health Snapshot)', data: 'vpn:health' }],
   ];
 }
 
@@ -312,6 +315,30 @@ class VpnCommandService {
   }
 
   async _read(command) {
+    if (command.action === 'health') {
+      const response = await this._request('vpn.health.snapshot', {});
+      if (response.result.state !== 'succeeded') return { answer: 'Диагностика VPN временно недоступна.', buttons: menuButtons() };
+      const data = response.result.data || {};
+      const format = (state) => (state === 'healthy' ? '✅ OK' : state === 'degraded' ? '⚠️ Degraded' : '❌ Ошибка');
+      const xray = data.xray || {};
+      const hy2 = data.hysteria2 || {};
+      const answer = [
+        '🏥 **Диагностика VPN (Health Snapshot):**',
+        `🖥 Хост VPS: ${format(data.host)}`,
+        '',
+        '🛡 **VLESS (Xray):**',
+        `• Служба: ${format(xray.service)}`,
+        `• Конфигурация: ${format(xray.config)}`,
+        `• Порт: ${format(xray.listener)}`,
+        '',
+        '⚡ **Hysteria 2:**',
+        `• Служба: ${format(hy2.service)}`,
+        `• Конфигурация: ${format(hy2.config)}`,
+        `• Порт: ${format(hy2.listener)}`,
+        `• Авторизация: ${format(hy2.auth)}`,
+      ].join('\n');
+      return { answer, buttons: menuButtons() };
+    }
     const protocol = normalizeProtocol(command.protocol);
     const title = PROTOCOLS[protocol].title;
     if (command.action === 'status') {
@@ -443,6 +470,7 @@ class VpnCommandService {
     }
     if (callback.action === 'menu') return callback.protocol ? { answer: renderProtocolGreeting(callback.protocol), buttons: protocolButtons(callback.protocol) } : { answer: 'Выбери VPN-протокол:', buttons: menuButtons() };
     if (callback.action === 'protocol') return { answer: renderProtocolGreeting(callback.protocol), buttons: protocolButtons(callback.protocol) };
+    if (callback.action === 'health') return this._read({ action: 'health', protocol: 'both' });
     if (callback.action === 'status') return this._read({ action: 'status', protocol: callback.protocol });
     if (callback.action === 'clients') return this._read({ action: 'clients', protocol: callback.protocol });
     if (callback.action === 'new') {

@@ -44,6 +44,7 @@ OPERATIONS = frozenset((
     "vpn.hysteria2.client.rotate",
     "vpn.hysteria2.client.export",
     "vpn.hysteria2.restart",
+    "vpn.health.snapshot",
 ))
 
 VPN_CLIENT_ID_RE = re.compile(r"^vpn-[a-f0-9]{12}$")
@@ -92,7 +93,7 @@ def _service_id(value: Any) -> str:
 
 def validate_arguments(operation: str, value: Any) -> dict[str, Any]:
     args = _require_mapping(value, "arguments")
-    if operation in {"host.snapshot", "inventory.snapshot", "services.snapshot", "backup.status", "backup.run", "parser.snapshot", "vpn.status", "vpn.clients.list", "vpn.restart", "vpn.hysteria2.status", "vpn.hysteria2.clients.list", "vpn.hysteria2.restart"}:
+    if operation in {"host.snapshot", "inventory.snapshot", "services.snapshot", "backup.status", "backup.run", "parser.snapshot", "vpn.status", "vpn.clients.list", "vpn.restart", "vpn.hysteria2.status", "vpn.hysteria2.clients.list", "vpn.hysteria2.restart", "vpn.health.snapshot"}:
         _no_extra(args, set(), "arguments")
         return {}
     if operation in {"service.start", "service.stop", "service.restart"}:

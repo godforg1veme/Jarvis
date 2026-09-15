@@ -282,6 +282,32 @@ class XrayVpnManager:
         except VpnManagerError:
             return {"serviceState": "unavailable", "configValid": False, "listenerReady": False, "clientCount": 0}
 
+    def health_snapshot(self, listener_tcp_output: str | None = None) -> dict[str, str]:
+        try:
+            state = self._read_state()
+            active = self.run(["/usr/bin/systemctl", "is-active", self.service], timeout=15)
+            checked = self.run([self.xray_bin, "run", "-test", "-c", str(self.config_path)], timeout=30)
+            ports = [state["port"]] + ([state["alternativePort"]] if state.get("alternativePort") else [])
+            if listener_tcp_output is None:
+                listener = self.run(["/usr/bin/ss", "-lnt"], timeout=15)
+                listener_tcp_output = listener.get("data", {}).get("output", "") if listener.get("state") == "succeeded" else ""
+            active_out = active.get("data", {}).get("output", "").strip() if active.get("state") == "succeeded" else ""
+            if active_out == "active":
+                service_health = "healthy"
+            elif active_out in {"activating", "reloading"}:
+                service_health = "degraded"
+            else:
+                service_health = "unavailable"
+            config_health = "healthy" if checked.get("state") == "succeeded" else "unavailable"
+            listener_health = "healthy" if all(f":{port}" in listener_tcp_output for port in ports) else "unavailable"
+            return {
+                "service": service_health,
+                "config": config_health,
+                "listener": listener_health,
+            }
+        except (VpnManagerError, Exception):
+            return {"service": "unavailable", "config": "unavailable", "listener": "unavailable"}
+
     def clients(self) -> list[dict[str, Any]]:
         return [self._public_client(client) for client in self._read_state()["clients"]]
 

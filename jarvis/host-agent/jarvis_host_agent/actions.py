@@ -8,7 +8,7 @@ import subprocess
 import time
 import threading
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from .config import HostAgentConfig
 from .backup_status import read_backup_status
@@ -109,7 +109,35 @@ def _service_snapshot(service: Any) -> dict[str, Any]:
     return _systemd_snapshot(service) if service.source_type == "systemd" else _docker_snapshot(service)
 
 
+def _host_health() -> str:
+    try:
+        disk = os.statvfs("/")
+        disk_used = 0.0 if disk.f_blocks == 0 else (1 - (disk.f_bavail / disk.f_blocks)) * 100
+        if disk_used >= 95.0:
+            return "degraded"
+        loadavg = Path("/proc/loadavg").read_text(encoding="utf-8").split()[:3]
+        if not loadavg:
+            return "degraded"
+        return "healthy"
+    except (OSError, Exception):
+        return "unavailable"
+
+
+def _vpn_health_snapshot(run: Callable[..., dict[str, Any]] = _run) -> dict[str, Any]:
+    ss_tcp = run(["/usr/bin/ss", "-lnt"], timeout=15)
+    ss_tcp_out = ss_tcp.get("data", {}).get("output", "") if ss_tcp.get("state") == "succeeded" else ""
+    xray = XrayVpnManager(run=run).health_snapshot(listener_tcp_output=ss_tcp_out)
+    hysteria2 = HysteriaVpnManager(run=run).health_snapshot(listener_tcp_output=ss_tcp_out)
+    return {
+        "host": _host_health(),
+        "xray": xray,
+        "hysteria2": hysteria2,
+    }
+
+
 def execute(config: HostAgentConfig, operation: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    if operation == "vpn.health.snapshot":
+        return {"state": "succeeded", "data": _vpn_health_snapshot(_run)}
     if operation.startswith("vpn.hysteria2."):
         return HysteriaVpnManager(run=_run).execute(operation, arguments)
     if operation.startswith("vpn."):

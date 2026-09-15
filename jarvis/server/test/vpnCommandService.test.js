@@ -27,6 +27,18 @@ function harness(options = {}) {
   };
   const client = { async request(input) {
     calls.push(['request', input]);
+    if (input.operation === 'vpn.health.snapshot') {
+      return {
+        result: {
+          state: 'succeeded',
+          data: {
+            host: 'healthy',
+            xray: { service: 'healthy', config: 'healthy', listener: 'healthy' },
+            hysteria2: { service: 'healthy', config: 'healthy', listener: 'healthy', auth: 'healthy' },
+          },
+        },
+      };
+    }
     if (input.operation.endsWith('status')) return { result: { state: 'succeeded', data: { serviceState: 'active', configValid: true, listenerReady: true, clientCount: 1 } } };
     if (input.operation.endsWith('clients.list')) return { result: { state: 'succeeded', data: { clients: [{ id: 'vpn-0123456789ab', label: 'Phone', createdAt: '2026-09-12T00:00:00Z' }] } } };
     const shareUri = input.operation.startsWith('vpn.hysteria2.') ? 'hy2://secret@vpn.example.test:443/?sni=vpn.example.test' : 'vless://secret@example.test:443?security=reality';
@@ -37,6 +49,8 @@ function harness(options = {}) {
 
 test('parses only the closed VPN command set', () => {
   assert.deepEqual(parseVpnCommand('/vpn'), { kind: 'menu' });
+  assert.deepEqual(parseVpnCommand('/vpn_health'), { kind: 'read', action: 'health', protocol: 'both', arguments: {} });
+  assert.deepEqual(parseVpnCommand('/vpn_snapshot'), { kind: 'read', action: 'health', protocol: 'both', arguments: {} });
   assert.deepEqual(parseVpnCommand('/vpn_status'), { kind: 'read', action: 'status', protocol: 'vless', arguments: {} });
   assert.deepEqual(parseVpnCommand('/vpn_issue My Phone'), { kind: 'change', action: 'issue', protocol: 'vless', arguments: { label: 'My Phone' } });
   assert.deepEqual(parseVpnCommand('/vpn_hysteria2_issue My Phone'), { kind: 'change', action: 'issue', protocol: 'hysteria2', arguments: { label: 'My Phone' } });
@@ -55,6 +69,7 @@ test('parses only the closed VPN command set', () => {
 
 test('parses only bounded VPN callback actions', () => {
   assert.deepEqual(parseVpnCallback('vpn:clients'), { action: 'clients', protocol: 'vless' });
+  assert.deepEqual(parseVpnCallback('vpn:health'), { action: 'health', protocol: 'both' });
   assert.deepEqual(parseVpnCallback('vpn:routing'), { action: 'routing' });
   assert.deepEqual(parseVpnCallback('vpn:h:routing'), { action: 'routing', protocol: 'hysteria2' });
   assert.deepEqual(parseVpnCallback('vpn:pc'), { action: 'pc' });
@@ -232,4 +247,23 @@ test('VPN_CLIENT_LABEL_EXISTS failure returns user-friendly guidance and direct 
   assert.ok(decided.buttons.flat().some((b) => b.data === 'vpn:h:clients'));
   assert.ok(decided.buttons.flat().some((b) => b.data === 'vpn:h:new'));
 });
+
+test('health snapshot command and callback return structured overview without secrets', async () => {
+  const { service, calls } = harness();
+  const context = { userId: USER_ID, conversationId: 'conversation', originChannel: 'telegram' };
+  const commandResult = await service.handle({ ...context, text: '/vpn_health' });
+  assert.match(commandResult.answer, /Health Snapshot/);
+  assert.match(commandResult.answer, /Хост VPS: ✅ OK/);
+  assert.match(commandResult.answer, /VLESS \(Xray\):/);
+  assert.match(commandResult.answer, /Hysteria 2:/);
+  assert.match(commandResult.answer, /Авторизация: ✅ OK/);
+
+  const callbackResult = await service.handleCallback({ ...context, data: 'vpn:health' });
+  assert.match(callbackResult.answer, /Health Snapshot/);
+  assert.match(callbackResult.answer, /Хост VPS: ✅ OK/);
+
+  const snapshotReq = calls.find(([type, req]) => type === 'request' && req.operation === 'vpn.health.snapshot');
+  assert.ok(snapshotReq);
+});
+
 

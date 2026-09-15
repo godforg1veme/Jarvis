@@ -42,6 +42,7 @@ const operationArguments = {
   'vpn.hysteria2.client.rotate': z.object({ clientId: z.string().regex(/^vpn-[a-f0-9]{12}$/) }).strict(),
   'vpn.hysteria2.client.export': z.object({ clientId: z.string().regex(/^vpn-[a-f0-9]{12}$/) }).strict(),
   'vpn.hysteria2.restart': z.object({}).strict(),
+  'vpn.health.snapshot': z.object({}).strict(),
 };
 
 const operationNames = Object.keys(operationArguments);
