@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { downloadTelegramAttachment, replyWithChunks, sendResult, splitTelegramText, validatedMedia, validatedReplyKeyboard, vpnReplyMarkup } = require('../src/telegram/bot');
+const { TELEGRAM_CALLBACK_RE, downloadTelegramAttachment, replyWithChunks, sendResult, splitTelegramText, validatedMedia, validatedReplyKeyboard, vpnReplyMarkup } = require('../src/telegram/bot');
 const { formatTelegramHtml } = require('../src/telegram/telegramFormatting');
 
 test('splits long Telegram replies without losing text', () => {
@@ -9,6 +9,12 @@ test('splits long Telegram replies without losing text', () => {
   assert.equal(chunks.length, 2);
   assert.ok(chunks.every((chunk) => chunk.length <= 4000));
   assert.equal(chunks.join(' '), text);
+});
+
+test('accepts only the closed bounded VPN Supervisor callback grammar', () => {
+  assert.equal(TELEGRAM_CALLBACK_RE.test('vpsup:allow:11111111-1111-4111-8111-111111111111'), true);
+  assert.equal(TELEGRAM_CALLBACK_RE.test('vpsup:details:11111111-1111-4111-8111-111111111111'), true);
+  assert.equal(TELEGRAM_CALLBACK_RE.test('vpsup:run:rm -rf /'), false);
 });
 
 test('renders restrained Markdown as safe Telegram HTML', () => {

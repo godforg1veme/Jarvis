@@ -160,6 +160,7 @@ class TelegramMessageService {
     this.asr = options.asr || null;
     this.voiceLimiter = options.voiceLimiter || null;
     this.vpnService = options.vpnService || null;
+    this.vpnSupervisorService = options.vpnSupervisorService || null;
     this.lifeEventGateway = options.lifeEventGateway || null;
     this.lifeMissionControlService = options.lifeMissionControlService || null;
     this.lifeProposalService = options.lifeProposalService || null;
@@ -186,6 +187,17 @@ class TelegramMessageService {
     const user = await this.userRepository.findOrCreateTelegramUser({ telegramUserId: input.telegramUserId, displayName: input.displayName });
     const conversation = await this.conversationRepository.getOrCreate({ userId: user.id, channel: 'telegram', externalChatId: input.chatId });
     const menuContext = telegramMenuContext({ user, conversation, input });
+
+    if (input.data.startsWith('vpsup:')) {
+      if (!this.vpnSupervisorService) return { status: 'ignored' };
+      const result = await this.vpnSupervisorService.handleCallback({
+        data: input.data,
+        telegramUserId: input.telegramUserId,
+      });
+      if (!result) return { status: 'ignored' };
+      await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: result.answer });
+      return { status: 'answered', ...result };
+    }
 
     if (this.menuService) {
       let menuResult;
@@ -581,6 +593,17 @@ class TelegramMessageService {
       kind: voiceTranscript ? 'voice' : 'text',
       text: input.text,
     });
+
+    if (this.vpnSupervisorService) {
+      const supervisorResult = await this.vpnSupervisorService.handleCommand({
+        text: input.text,
+        telegramUserId: input.telegramUserId,
+      });
+      if (supervisorResult) {
+        await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: supervisorResult.answer });
+        return { status: 'answered', ...supervisorResult };
+      }
+    }
 
     const lifeAnswer = await this.lifeCommandReply({ text: input.text, user, conversation });
     if (lifeAnswer) {

@@ -209,6 +209,7 @@ class OperationsRepository {
       `DELETE FROM ops_log_entries WHERE id IN (SELECT id FROM ops_log_entries WHERE observed_at < now()-interval '60 days' ORDER BY id LIMIT 5000)`,
       `DELETE FROM ops_log_entries WHERE id IN (SELECT id FROM (SELECT id,sum(byte_size) OVER (PARTITION BY service_id ORDER BY observed_at DESC,id DESC) AS bytes FROM ops_log_entries) quota WHERE bytes>268435456 ORDER BY id LIMIT 5000)`,
       `DELETE FROM ops_log_entries WHERE id IN (SELECT id FROM (SELECT id,sum(byte_size) OVER (ORDER BY observed_at DESC,id DESC) AS bytes FROM ops_log_entries) quota WHERE bytes>10737418240 ORDER BY id LIMIT 5000)`,
+      `DELETE FROM vpn_supervisor_runs WHERE id IN (SELECT id FROM vpn_supervisor_runs WHERE status IN ('rejected','succeeded','expired','stale','failed') AND completed_at < now()-interval '60 days' ORDER BY completed_at LIMIT 1000)`,
     ];
     const counts = [];
     for (const sql of statements) counts.push((await this.pool.query(sql)).rowCount);

@@ -25,7 +25,7 @@ const { HealthCheckWorker } = require('./collectors/healthCheckWorker');
 const { LogCollector } = require('./collectors/logCollector');
 const { providerByName } = require('../providers/providerFactory');
 
-async function createOperationsRuntime({ config, pool, logger, app, getBot, getPollingHealth, onDeviceRevoked, overrides = {} }) {
+async function createOperationsRuntime({ config, pool, logger, app, getBot, getPollingHealth, onDeviceRevoked, vpnSupervisorService = null, overrides = {} }) {
   if (!config.operationsEnabled) return { enabled: false, async start() {}, async close() {} };
   const repository = overrides.repository || new OperationsRepository(pool);
   const host = await repository.ensureHost({ hostKey: config.operationsHostKey, label: config.operationsHostLabel });
@@ -33,7 +33,13 @@ async function createOperationsRuntime({ config, pool, logger, app, getBot, getP
   const sseHub = overrides.sseHub || new SseHub();
   const incidentNotifier = overrides.incidentNotifier || new IncidentNotifier({ getBot, ownerTelegramId: config.operationsOwnerTelegramId, panelOrigin: config.operationsPublicOrigin, logger });
   const incidentEngine = overrides.incidentEngine || new IncidentEngine({ repository, hostId: host.id, notifier: incidentNotifier });
-  const vpnIncidentAdapter = overrides.vpnIncidentAdapter || new VpnIncidentAdapter({ repository, incidentEngine, hostId: host.id });
+  const vpnIncidentAdapter = overrides.vpnIncidentAdapter || new VpnIncidentAdapter({
+    repository, incidentEngine, hostId: host.id,
+    onIncident: vpnSupervisorService ? async (value) => {
+      try { await vpnSupervisorService.analyzeIncident(value); }
+      catch (_) { if (logger) logger.warn('VPN Supervisor advisory failed'); }
+    } : null,
+  });
   const collector = overrides.collector || new CollectorWorker({
     client, repository, hostId: host.id, intervalMs: config.operationsPollIntervalMs, logger,
     onSnapshot: (payload) => sseHub.publish('snapshot', payload),

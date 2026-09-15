@@ -28,7 +28,17 @@ test('migration files are ordered and narrowly named', () => {
     '017_life_os_reminders.sql',
     '018_life_os_proactivity_actions.sql',
     '019_telegram_life_os_interactions.sql',
+    '020_vpn_supervisor_advisory.sql',
   ]);
+});
+
+test('VPN Supervisor migration stores only bounded workflow metadata', () => {
+  const migration = fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, '020_vpn_supervisor_advisory.sql'), 'utf8');
+  assert.match(migration, /CREATE TABLE vpn_supervisor_runs/);
+  assert.match(migration, /supervisor_acceptance_noop/);
+  assert.match(migration, /octet_length\(safe_metadata::text\) <= 4096/);
+  assert.match(migration, /synthetic = true AND status IN/);
+  assert.doesNotMatch(migration, /raw_log|model_response|prompt_body|credential|private_key|access_token|connection_uri/i);
 });
 
 test('Telegram Life OS migration adds only closed guided interaction kinds', () => {

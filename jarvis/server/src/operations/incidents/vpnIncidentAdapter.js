@@ -20,13 +20,14 @@ const SUMMARY_BY_CODE = Object.freeze({
 const SERVICE_KEY_BY_SCOPE = Object.freeze({ host: 'vpn-host', xray: 'xray', hysteria2: 'hysteria2', multi: 'vpn-multi' });
 
 class VpnIncidentAdapter {
-  constructor({ repository, incidentEngine, hostId, requiredObservations = 3 }) {
+  constructor({ repository, incidentEngine, hostId, requiredObservations = 3, onIncident = null }) {
     this.repository = repository;
     this.incidentEngine = incidentEngine;
     this.hostId = hostId;
     this.requiredObservations = requiredObservations;
     this.pendingKind = null;
     this.pendingCount = 0;
+    this.onIncident = onIncident;
   }
 
   async observe(value) {
@@ -63,6 +64,9 @@ class VpnIncidentAdapter {
       technicalDetail,
     });
     await this.repository.resolveClassifiedVpnIncidents({ hostId: this.hostId, exceptFailureKind: primary.failureKind });
+    if (incident?.opened && this.onIncident) {
+      Promise.resolve(this.onIncident({ incident, health })).catch(() => {});
+    }
     return incident;
   }
 

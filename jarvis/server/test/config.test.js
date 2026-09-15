@@ -18,6 +18,27 @@ test('loads safe development defaults', () => {
   assert.equal(config.lifeOsReminderIntervalMs, 5000);
   assert.equal(config.lifeOsReminderBatchSize, 10);
   assert.equal(config.lifeOsFixtureSourcesEnabled, false);
+  assert.equal(config.vpnSupervisorAcceptanceEnabled, false);
+});
+
+test('VPN Supervisor acceptance requires Operations and a configured model', () => {
+  assert.throws(() => loadConfig({ JARVIS_VPN_SUPERVISOR_ACCEPTANCE_ENABLED: 'true' }), /OPERATIONS_ENABLED/);
+  assert.throws(() => loadConfig({
+    JARVIS_VPN_SUPERVISOR_ACCEPTANCE_ENABLED: 'true',
+    JARVIS_OPERATIONS_ENABLED: 'true',
+    JARVIS_OPERATIONS_PUBLIC_ORIGIN: 'https://jarvis.example.test',
+    JARVIS_OPERATIONS_OWNER_TELEGRAM_ID: '101',
+  }), /configured model provider/);
+  const config = loadConfig({
+    JARVIS_VPN_SUPERVISOR_ACCEPTANCE_ENABLED: 'true',
+    JARVIS_OPERATIONS_ENABLED: 'true',
+    JARVIS_OPERATIONS_PUBLIC_ORIGIN: 'https://jarvis.example.test',
+    JARVIS_OPERATIONS_OWNER_TELEGRAM_ID: '101',
+    JARVIS_MODEL_PROVIDER: 'openrouter',
+    OPENROUTER_API_KEY: 'test-key',
+    OPENROUTER_MODEL: 'test-model',
+  });
+  assert.equal(config.vpnSupervisorAcceptanceEnabled, true);
 });
 
 test('keeps Life OS ingestion, enrichment, and proactivity independently opt-in', () => {

@@ -126,12 +126,29 @@ function harness(allowedIds = ['101', '202'], devices = null, commandService = n
     ...(options.asr ? { asr: options.asr } : {}),
     ...(options.voiceLimiter ? { voiceLimiter: options.voiceLimiter } : {}),
     ...(options.vpnService ? { vpnService: options.vpnService } : {}),
+    ...(options.vpnSupervisorService ? { vpnSupervisorService: options.vpnSupervisorService } : {}),
     ...(options.menuService ? { menuService: options.menuService } : {}),
     ...(options.orchestrator ? { orchestrator: options.orchestrator } : {}),
     ...(options.lifeReminderService ? { lifeReminderService: options.lifeReminderService } : {}),
   });
   return { service, state, assistantCalls };
 }
+
+test('routes the closed VPN Supervisor command and callbacks without invoking the assistant', async () => {
+  const calls = [];
+  const supervisor = {
+    async handleCommand(input) { calls.push(['command', input]); return input.text === '/vpn_supervisor_test' ? { answer: 'proposal', buttons: [[{ text: 'Allow', data: 'vpsup:allow:11111111-1111-4111-8111-111111111111' }]] } : null; },
+    async handleCallback(input) { calls.push(['callback', input]); return { answer: 'completed' }; },
+  };
+  const { service, assistantCalls } = harness(['101'], null, null, { vpnSupervisorService: supervisor });
+  const command = await service.handle(update(880, 101, 101, '/vpn_supervisor_test'));
+  assert.equal(command.answer, 'proposal');
+  const callback = await service.handleCallback(callbackUpdate(881, 101, 101, 'vpsup:allow:11111111-1111-4111-8111-111111111111'));
+  assert.equal(callback.answer, 'completed');
+  assert.equal(assistantCalls.length, 0);
+  assert.equal(calls[0][1].telegramUserId, '101');
+  assert.equal(calls[1][1].telegramUserId, '101');
+});
 
 test('rejects a disallowed identity before persistence', async () => {
   const { service, state } = harness();

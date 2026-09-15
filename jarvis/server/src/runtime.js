@@ -45,6 +45,11 @@ const { ToolIntentPlanner } = require('./orchestrator/toolIntentPlanner');
 const { WorkflowRepository } = require('./orchestrator/workflowRepository');
 const { createRemoteMessage } = require('./devices/remoteProtocol');
 const { createOperationsRuntime } = require('./operations/operationsRuntime');
+const { OperationsRepository } = require('./operations/repositories/operationsRepository');
+const { VpnSupervisorPlanner } = require('./operations/vpnSupervisor/planner');
+const { VpnSupervisorRepository } = require('./operations/vpnSupervisor/repository');
+const { VpnSupervisorService } = require('./operations/vpnSupervisor/service');
+const { VpnEvidenceCollector } = require('./operations/vpnSupervisor/evidenceCollector');
 const { HostAgentClient } = require('./operations/hostAgentClient');
 const { VpnRepository } = require('./vpn/vpnRepository');
 const { VpnCommandService } = require('./vpn/vpnCommandService');
@@ -123,6 +128,7 @@ async function createRuntime(config, overrides = {}) {
   let asr = null;
   let vpnService = null;
   let vpnRecoveryWorker = null;
+  let vpnSupervisorService = null;
   let lifeEventGateway = null;
   let lifeProjectionWorker = null;
   let proactivityWorker = null;
@@ -398,6 +404,18 @@ async function createRuntime(config, overrides = {}) {
         client: vpnHostAgentClient,
         logger: app.log,
       });
+      const supervisorOperationsRepository = overrides.supervisorOperationsRepository || new OperationsRepository(pool);
+      const supervisorPlanner = overrides.vpnSupervisorPlanner || new VpnSupervisorPlanner({ provider: answerProvider });
+      vpnSupervisorService = overrides.vpnSupervisorService || new VpnSupervisorService({
+        repository: overrides.vpnSupervisorRepository || new VpnSupervisorRepository(pool),
+        planner: supervisorPlanner,
+        hostIdProvider: () => supervisorOperationsRepository.ensureHost({ hostKey: config.operationsHostKey, label: config.operationsHostLabel }),
+        ownerTelegramId: config.operationsOwnerTelegramId,
+        acceptanceEnabled: config.vpnSupervisorAcceptanceEnabled,
+        evidenceCollector: new VpnEvidenceCollector({ client: vpnHostAgentClient }),
+        getBot: () => bot,
+        logger: app.log,
+      });
     }
     if (typeof pool.query === 'function') {
       const knowledgeRepository = overrides.knowledgeRepository || new DocumentRepository(pool);
@@ -549,6 +567,7 @@ async function createRuntime(config, overrides = {}) {
         asr: config.telegramVoiceEnabled ? asr : null,
         voiceLimiter: overrides.telegramVoiceLimiter || new FixedWindowRateLimiter(),
         vpnService,
+        vpnSupervisorService,
         lifeEventGateway,
         lifeMissionControlService: missionControlService,
         lifeProposalService: proposalService,
@@ -602,6 +621,7 @@ async function createRuntime(config, overrides = {}) {
         }
       },
       logger: app.log,
+      vpnSupervisorService,
       overrides: overrides.operations || {},
     });
     if (operationsRuntime.enabled && bot && typeof bot.on === 'function') {
@@ -620,6 +640,7 @@ async function createRuntime(config, overrides = {}) {
     orchestrator,
     operationsRuntime,
     vpnService,
+    vpnSupervisorService,
     lifeEventGateway,
     async start() {
       await app.listen({ host: config.host, port: config.port });

@@ -125,3 +125,13 @@ test('three unavailable health snapshots open one bounded Host Agent diagnostic 
   assert.equal(incident.technicalDetail, '{"version":1,"state":"unavailable","source":"vpn.health.snapshot"}');
   assert.equal(notifications.length, 1);
 });
+
+test('new classified incident invokes advisory once without blocking repeated observations', async () => {
+  const base = harness();
+  const advisory = [];
+  base.adapter.onIncident = async (value) => { advisory.push(value); };
+  for (let count = 0; count < 4; count++) await base.adapter.observe(xrayFailure());
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(advisory.length, 1);
+  assert.equal(advisory[0].health.diagnosis.primary.code, 'XRAY_SERVICE_FAILURE');
+});

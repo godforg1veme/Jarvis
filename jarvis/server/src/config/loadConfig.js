@@ -89,6 +89,7 @@ const baseSchema = z.object({
   operationsPollIntervalMs: z.number().int().min(5000).max(300000),
   operationsOwnerTelegramId: z.string().regex(/^\d{1,20}$/),
   operationsPublicOrigin: z.string().max(2048),
+  vpnSupervisorAcceptanceEnabled: z.boolean(),
 });
 
 function validateProvider(config, provider) {
@@ -251,6 +252,7 @@ function loadConfig(env = process.env) {
     operationsPollIntervalMs: Number(env.JARVIS_OPERATIONS_POLL_INTERVAL_MS || 30000),
     operationsOwnerTelegramId: String(env.JARVIS_OPERATIONS_OWNER_TELEGRAM_ID || '0').trim(),
     operationsPublicOrigin: String(env.JARVIS_OPERATIONS_PUBLIC_ORIGIN || '').trim(),
+    vpnSupervisorAcceptanceEnabled: parseBoolean(env.JARVIS_VPN_SUPERVISOR_ACCEPTANCE_ENABLED),
   };
 
   const config = baseSchema.parse(raw);
@@ -278,6 +280,12 @@ function loadConfig(env = process.env) {
     if (config.nodeEnv === 'production' && operationsUrl.protocol !== 'https:') throw new Error('JARVIS_OPERATIONS_PUBLIC_ORIGIN must use HTTPS in production');
     if (operationsUrl.pathname !== '/' || operationsUrl.search || operationsUrl.hash) throw new Error('JARVIS_OPERATIONS_PUBLIC_ORIGIN must be an origin without a path');
     if (config.operationsOwnerTelegramId === '0') throw new Error('JARVIS_OPERATIONS_OWNER_TELEGRAM_ID is required when operations are enabled');
+  }
+  if (config.vpnSupervisorAcceptanceEnabled && !config.operationsEnabled) {
+    throw new Error('JARVIS_OPERATIONS_ENABLED is required for VPN Supervisor acceptance');
+  }
+  if (config.vpnSupervisorAcceptanceEnabled && config.modelProvider === 'echo') {
+    throw new Error('A configured model provider is required for VPN Supervisor acceptance');
   }
   if (config.modelProvider !== 'echo' && config.modelProvider === config.modelFallbackProvider) {
     throw new Error('model fallback provider must differ from the primary provider');
