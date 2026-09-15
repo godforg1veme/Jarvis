@@ -4,7 +4,18 @@ This file is the status authority for project documentation. Specifications and
 plans under `docs/superpowers/` are preserved as decision history; their old
 future-tense wording does not override the current architecture in `AGENTS.md`.
 
-Status snapshot: 2026-09-14.
+Status snapshot: 2026-09-15.
+
+Telegram Life OS parity update, 2026-09-15: `🎯 Life OS` now opens a native
+11-section inline-button hierarchy over the existing owner-scoped Life OS v2
+services. Closed callbacks, revision-aware guided input, recursive button
+coverage, replay protection, and a second confirmation for family sharing are
+implemented. Migration 019 and the server image are production-deployed. The
+complete local suite passed 414/414, the built production image passed 61/61
+focused tests, public health and Operations smoke passed, and VPN/Host Agent
+services remained active without restart. Real owner/member Telegram tap-through
+remains manual acceptance. See
+`updates/2026-09-15-telegram-life-os-parity.md`.
 
 Happ VPN domestic RU split-routing update, 2026-09-14: domestic Russian traffic
 (Gosuslugi, banks, marketplaces, .ru/.su domains) routes directly via the physical
@@ -56,9 +67,10 @@ the complete isolated real-PostgreSQL workflow through Action Orchestrator and
 the real Tool Gateway contract exactly once, closing its linked proposal and
 commitment and updating Timeline/Context Recovery. Authenticated read-only
 requests from the paired Desktop, Compose health, public smoke, and unchanged
-VPN/Host Agent health passed. Live
-external providers, Telegram behavior, and interactive changing recovery remain
-manual acceptance. Details are recorded in
+VPN/Host Agent health passed. The native Telegram Life OS control surface was
+subsequently deployed and is recorded separately above. Live external
+providers, real Telegram client taps, and interactive changing recovery on a
+paired Desktop remain manual acceptance. Details of the v2 foundation are recorded in
 `updates/2026-09-15-jarvis-life-os-v2.md`.
 
 Host Agent HTTP-auth hardening & test sync, 2026-09-15: Hysteria 2 HTTP-auth
@@ -125,6 +137,7 @@ attachment ingestion.
 | `updates/2026-09-14-hysteria2-fallback-rollout.md` | Production rollout record for isolated Hysteria2 service |
 | `updates/2026-09-14-happ-vpn-ru-routing.md` | Production rollout record for Happ domestic RU split-routing and 1-click web activation |
 | `updates/2026-09-15-jarvis-life-os-v2.md` | Implementation, Desktop installation, production rollout, and verification record for Life OS v2 |
+| `updates/2026-09-15-telegram-life-os-parity.md` | Native Telegram Life OS control surface, migration 019, production rollout, and verification record |
 | `VPN_PC_SETUP.md` | Руководство по настройке Hysteria 2 и VLESS на ПК (Windows / macOS) и устранению неполадок |
 | `CLAUDE.md`, `gemini.md` | Thin pointers to the authoritative agent context |
 | This file | Status and supersession index |
@@ -149,6 +162,8 @@ attachment ingestion.
 | `superpowers/plans/2026-09-12-jarvis-life-os-core-v1.md` | Implemented, packaged, installed, and production-verified on 2026-09-13; retained as execution history. |
 | `superpowers/specs/2026-09-14-jarvis-life-os-v2-design.md` | Implemented, locally verified, packaged/installed, and production-deployed on 2026-09-15; the complete real-PostgreSQL workflow and authenticated read-only Desktop API passed. Live providers, Telegram, and interactive changing recovery remain manual. |
 | `superpowers/plans/2026-09-14-jarvis-life-os-v2.md` | Code checkpoints, local checks, Desktop installation, complete real-PostgreSQL workflow acceptance, and production server rollout completed after explicit owner approval; external accounts were not connected. |
+| `superpowers/specs/2026-09-15-telegram-life-os-parity-design.md` | Implemented and production-deployed: native 11-section Telegram hierarchy, closed callbacks, owner/revision/replay boundaries, guided mutations, and confirmed family sharing. Real owner/member client taps remain manual. |
+| `superpowers/plans/2026-09-15-telegram-life-os-parity.md` | Completed with full local regression, production-image callback tests, migration 019, public smoke, and unchanged VPN/Host Agent service health. |
 | `superpowers/plans/2026-09-09-jarvis-vision.md` | Execution plan adapted to the current cloud-brain/local-hands architecture; first camera + two-display + memory slice implemented and locally accepted |
 | `plans/2026-09-01-jarvis-family-cloud-assistant.md` | Active roadmap; Milestones 0–3 are partial, later milestones are not complete |
 | `specs/2026-09-01-jarvis-desktop-cloud-client-design.md` | Implemented and packaged: paired Windows chat, DPAPI device credentials, device-scoped HTTPS/WSS sessions, local wake word, server ASR contract, and NSIS installer. Live VPS configuration and clean-machine acceptance remain operational steps. |

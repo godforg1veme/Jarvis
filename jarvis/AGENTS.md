@@ -42,7 +42,17 @@ See `docs/README.md` for current implementation status and historical records.
 - `server/` is a Node.js 20+, CommonJS, Fastify service.
 - `server/src/telegram/` handles allowlisted Telegram users, update
   deduplication, persistent role-aware bottom navigation, bounded inline
-  controls, PostgreSQL-backed guided text input, and an owner-scoped paginated
+  controls, PostgreSQL-backed guided text input, and a native hierarchical
+  Life OS control surface covering Mission, Timeline, projects, commitments,
+  proposals, reminders, people/relationships/family grants, modes,
+  preferences, sources, and Context Recovery. Life callbacks use a closed
+  grammar under 64 UTF-8 bytes; guided mutations are owner/conversation/chat
+  scoped, revision-aware, and consumed before execution. Family sharing adds
+  a second explicit confirmation and changing recovery continues through the
+  existing origin-bound proposal path. Migration 019 and this Telegram surface
+  were deployed on 2026-09-15; automated production-image button coverage
+  passed, while taps from real owner/member Telegram clients remain manual
+  acceptance. The same subsystem also provides an owner-scoped paginated
   gallery that can transiently deliver uploaded documents and readable retained
   Visual Memory frames before a separate keep/delete choice. Gallery callbacks
   carry only closed source identifiers and bounded page state; bytes, storage
@@ -81,8 +91,9 @@ See `docs/README.md` for current implementation status and historical records.
   once; its verified workflow completed the linked proposal and commitment and
   appeared in Timeline/Context Recovery. Authenticated read-only Desktop
   bootstrap/Mission Control/Timeline requests, Compose health, and public smoke
-  also passed. Live external providers and interactive changing recovery in
-  Desktop/Telegram remain manual acceptance.
+  also passed. The native Telegram Life OS control surface was deployed later
+  the same day; live external providers, real-client Telegram taps, and
+  interactive changing recovery on a paired Desktop remain manual acceptance.
 - The deployed text model is currently configured through OpenRouter. Do not
   hard-code a provider or model into product behavior.
 

@@ -144,7 +144,7 @@ only and must never receive an action capability.
 
 ## Life OS
 
-Migrations `013_life_os_core.sql` and `016`–`018` create the owner-scoped Event
+Migrations `013_life_os_core.sql`, `016`–`018`, and `019` create the owner-scoped Event
 Spine, v2 domains, durable reminders, and uncertain orchestrator outcomes. Life
 OS v2 is deployed as of 2026-09-15; the exact phrase completed the isolated
 PostgreSQL-backed Orchestrator/Tool Gateway workflow exactly once and its
@@ -157,6 +157,15 @@ Enable `JARVIS_LIFE_OS_PROACTIVITY_ENABLED=true` only after the current Desktop
 Mission Control build is installed, because proposals are delivered over the
 validated `life.proposal` WSS message. Model enrichment remains independently
 optional through `JARVIS_LIFE_OS_ENRICHMENT_ENABLED`.
+
+Migration 019 and the native Telegram Life OS adapter were deployed on
+2026-09-15. The production image passed 61 focused Telegram/runtime/migration
+tests after the complete 414-test local server suite. The server, PostgreSQL,
+GigaAM, and Cloudflare containers were healthy; public live/ready smoke and
+`/ops/` passed; Xray, Hysteria2, and Host Agent remained active without restart.
+The first smoke request briefly received 502 while the replacement container
+was still `health: starting`; the bounded readiness retry then passed. Real
+owner/member Telegram tapping remains a separate client acceptance check.
 
 Life OS must never receive raw voice bytes, screen/camera frames, OCR text,
 document bodies, private storage paths, VPN artifacts, or credentials. Changing

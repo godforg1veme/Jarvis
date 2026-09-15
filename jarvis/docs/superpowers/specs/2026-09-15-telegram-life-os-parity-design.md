@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-15
 
-**Status:** Approved direction; implementation pending written-spec review
+**Status:** Implemented and production-deployed on 2026-09-15; real Telegram client acceptance remains manual
 
 ## Objective
 
