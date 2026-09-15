@@ -75,6 +75,11 @@ See `docs/README.md` for current implementation status and historical records.
   Source adapters may store only safe summaries and identifiers; raw audio,
   images, OCR, document bodies, local paths, storage keys, credentials, and
   provider cursors in public output are forbidden by schema.
+  Life OS v2 migrations 016–018 and the server runtime were deployed on
+  2026-09-15. Isolated real-PostgreSQL repository acceptance, authenticated
+  read-only Desktop bootstrap/Mission Control/Timeline requests, Compose health,
+  and public smoke passed. Live external providers and interactive changing
+  recovery in Desktop/Telegram remain manual acceptance.
 - The deployed text model is currently configured through OpenRouter. Do not
   hard-code a provider or model into product behavior.
 

@@ -50,9 +50,12 @@ bounded ordinary-reply context, cautious communication guidance, explainable
 priority, people/family grants, modes/preferences, reminders, recovery plans,
 actionable proactivity, eight fixture-only source adapters, authenticated API,
 and responsive Desktop Mission Control. The current Desktop package was built,
-content-inspected, installed, and launch-smoked on 2026-09-15. Server v2 has not
-been deployed or checked against a real PostgreSQL instance. Core v1 remains
-the production-enabled server baseline. Details are recorded in
+content-inspected, installed, and launch-smoked. Server v2 and migrations
+016–018 were then deployed with explicit owner approval. Isolated real-PostgreSQL
+repository acceptance, authenticated read-only requests from the paired Desktop,
+Compose health, public smoke, and unchanged VPN/Host Agent health passed. Live
+external providers, Telegram behavior, and interactive changing recovery remain
+manual acceptance. Details are recorded in
 `updates/2026-09-15-jarvis-life-os-v2.md`.
 
 Happ VPN update, 2026-09-13: dedicated VLESS + REALITY + XTLS Vision Xray is
@@ -110,7 +113,7 @@ attachment ingestion.
 | `updates/2026-09-14-telegram-memory-gallery-vpn-fix.md` | Production rollout record for the VPN owner-context fix and unified Telegram memory gallery |
 | `updates/2026-09-14-hysteria2-fallback-rollout.md` | Production rollout record for isolated Hysteria2 service |
 | `updates/2026-09-14-happ-vpn-ru-routing.md` | Production rollout record for Happ domestic RU split-routing and 1-click web activation |
-| `updates/2026-09-15-jarvis-life-os-v2.md` | Local implementation and verification record for Life OS v2, including the evidence matrix and outstanding PostgreSQL/live acceptance |
+| `updates/2026-09-15-jarvis-life-os-v2.md` | Implementation, Desktop installation, production rollout, and verification record for Life OS v2 |
 | `VPN_PC_SETUP.md` | Руководство по настройке Hysteria 2 и VLESS на ПК (Windows / macOS) и устранению неполадок |
 | `CLAUDE.md`, `gemini.md` | Thin pointers to the authoritative agent context |
 | This file | Status and supersession index |
@@ -133,8 +136,8 @@ attachment ingestion.
 | `superpowers/plans/2026-09-14-telegram-unified-memory-gallery-vpn-owner-fix.md` | Implemented and production-deployed on 2026-09-14; retained as execution history with manual Telegram acceptance explicitly outstanding. |
 | `superpowers/specs/2026-09-12-jarvis-life-os-core-v1-design.md` | Implemented and production-enabled: owner-scoped Event Spine, projections, Timeline, context recovery, explainable proposals, Telegram commands, and Desktop Mission Control. Optional model enrichment remains disabled. |
 | `superpowers/plans/2026-09-12-jarvis-life-os-core-v1.md` | Implemented, packaged, installed, and production-verified on 2026-09-13; retained as execution history. |
-| `superpowers/specs/2026-09-14-jarvis-life-os-v2-design.md` | Implemented in code and locally verified on 2026-09-15; Desktop package built/installed and launch-smoked. Real PostgreSQL, live connector, Telegram, and production acceptance remain outstanding. |
-| `superpowers/plans/2026-09-14-jarvis-life-os-v2.md` | All code checkpoints and available local checks completed; Desktop package installed after explicit owner request. No v2 server deployment or external account connection was performed. |
+| `superpowers/specs/2026-09-14-jarvis-life-os-v2-design.md` | Implemented, locally verified, packaged/installed, and production-deployed on 2026-09-15; real PostgreSQL and authenticated read-only Desktop API passed. Live providers, Telegram, and interactive changing recovery remain manual. |
+| `superpowers/plans/2026-09-14-jarvis-life-os-v2.md` | Code checkpoints, local checks, Desktop installation, real-PostgreSQL acceptance, and production server rollout completed after explicit owner approval; external accounts were not connected. |
 | `superpowers/plans/2026-09-09-jarvis-vision.md` | Execution plan adapted to the current cloud-brain/local-hands architecture; first camera + two-display + memory slice implemented and locally accepted |
 | `plans/2026-09-01-jarvis-family-cloud-assistant.md` | Active roadmap; Milestones 0–3 are partial, later milestones are not complete |
 | `specs/2026-09-01-jarvis-desktop-cloud-client-design.md` | Implemented and packaged: paired Windows chat, DPAPI device credentials, device-scoped HTTPS/WSS sessions, local wake word, server ASR contract, and NSIS installer. Live VPS configuration and clean-machine acceptance remain operational steps. |

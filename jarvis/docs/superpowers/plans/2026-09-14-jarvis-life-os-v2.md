@@ -8,11 +8,12 @@
 
 > Status update, 2026-09-15: all code checkpoints and available local checks
 > are complete; checkpoint 14 is recorded in
-> `docs/updates/2026-09-15-jarvis-life-os-v2.md`. The real-PostgreSQL portion of
-> checkpoint 12 and deployment/live-provider acceptance remain explicitly
-> outstanding. After a separate explicit owner request, the Desktop package was
-> built, inspected, installed, and launch-smoked; no external service or
-> production server state was changed.
+> `docs/updates/2026-09-15-jarvis-life-os-v2.md`. After separate explicit owner
+> requests, the Desktop package was built, inspected, installed, and
+> launch-smoked, then server v2 and migrations 016–018 were deployed. Isolated
+> real-PostgreSQL repository acceptance and authenticated read-only Desktop API
+> acceptance passed. Live-provider, Telegram, multi-device, and interactive
+> changing-action acceptance remain explicitly outstanding.
 
 ## Objective
 

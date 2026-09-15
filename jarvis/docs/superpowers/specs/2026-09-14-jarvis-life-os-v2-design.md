@@ -7,9 +7,12 @@
 > Implementation update, 2026-09-15: the design is implemented in the local
 > repository and covered by focused, integration, browser, security, and
 > regression tests. After a separate explicit owner request, the Desktop package
-> was built, content-inspected, installed, and launch-smoked. Real PostgreSQL
-> acceptance, live external providers, and production server deployment have
-> not been performed. See `docs/updates/2026-09-15-jarvis-life-os-v2.md` for exact evidence.
+> was built, content-inspected, installed, and launch-smoked. After another
+> explicit owner request, server v2 and migrations 016–018 were deployed;
+> isolated real-PostgreSQL repository acceptance and authenticated read-only
+> Desktop API acceptance passed. Live external providers, Telegram behavior,
+> and interactive changing recovery remain manual. See
+> `docs/updates/2026-09-15-jarvis-life-os-v2.md` for exact evidence.
 
 ## Summary
 
