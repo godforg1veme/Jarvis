@@ -132,7 +132,7 @@ class VpnManagerTests(unittest.TestCase):
 
     def test_health_snapshot_is_structured_and_secret_free(self):
         snapshot = self.manager.health_snapshot()
-        self.assertEqual(snapshot, {"service": "healthy", "config": "healthy", "listener": "healthy"})
+        self.assertEqual(snapshot, {"service": "healthy", "config": "healthy", "listener": "healthy", "protocolProbe": "unknown"})
         self.assertNotIn(PRIVATE_KEY, json.dumps(snapshot))
 
 

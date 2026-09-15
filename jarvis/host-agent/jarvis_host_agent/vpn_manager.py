@@ -304,9 +304,10 @@ class XrayVpnManager:
                 "service": service_health,
                 "config": config_health,
                 "listener": listener_health,
+                "protocolProbe": "unknown",
             }
         except (VpnManagerError, Exception):
-            return {"service": "unavailable", "config": "unavailable", "listener": "unavailable"}
+            return {"service": "unavailable", "config": "unavailable", "listener": "unavailable", "protocolProbe": "unknown"}
 
     def clients(self) -> list[dict[str, Any]]:
         return [self._public_client(client) for client in self._read_state()["clients"]]

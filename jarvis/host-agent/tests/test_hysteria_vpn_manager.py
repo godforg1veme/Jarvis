@@ -1,7 +1,9 @@
 import asyncio
 import json
+import socket
 import tempfile
 import unittest
+import urllib.error
 from pathlib import Path
 
 from jarvis_host_agent.hysteria_vpn_manager import (
@@ -141,9 +143,71 @@ class HysteriaVpnManagerTests(unittest.TestCase):
         self.assertNotIn(base_state()["obfsPassword"], json.dumps(status))
 
     def test_health_snapshot_is_structured_and_secret_free(self):
-        snapshot = self.manager.health_snapshot(listener_tcp_output="LISTEN 0 128 127.0.0.1:3211 0.0.0.0:*\n")
-        self.assertEqual(snapshot, {"service": "healthy", "config": "healthy", "listener": "healthy", "auth": "healthy"})
+        def mock_probe(url, payload, timeout=3.0):
+            return 200, {"ok": False}
+
+        snapshot = self.manager.health_snapshot(auth_probe=mock_probe)
+        self.assertEqual(snapshot, {
+            "service": "healthy",
+            "config": "healthy",
+            "listener": "healthy",
+            "auth": "healthy",
+            "authEndpoint": "healthy",
+            "authCredentialProbe": "unknown",
+            "protocolProbe": "unknown",
+        })
         self.assertNotIn(base_state()["obfsPassword"], json.dumps(snapshot))
+
+    def test_health_snapshot_with_valid_credential_probe(self):
+        self.manager.issue("Phone")
+        def mock_probe(url, payload, timeout=3.0):
+            auth_val = payload.get("auth", "")
+            return 200, {"ok": True if ":" in auth_val else False}
+
+        snapshot = self.manager.health_snapshot(auth_probe=mock_probe)
+        self.assertEqual(snapshot["authEndpoint"], "healthy")
+        self.assertEqual(snapshot["authCredentialProbe"], "healthy")
+        self.assertEqual(snapshot["auth"], "healthy")
+        self.assertEqual(snapshot["protocolProbe"], "unknown")
+        # Ensure password is not in the snapshot
+        state = json.loads(self.state_path.read_text(encoding="utf-8"))
+        self.assertNotIn(state["clients"][0]["password"], json.dumps(snapshot))
+
+    def test_health_snapshot_credential_rejected_is_degraded(self):
+        self.manager.issue("Phone")
+        def mock_probe(url, payload, timeout=3.0):
+            # Endpoint is alive, but credentials check returns ok=False
+            return 200, {"ok": False}
+
+        snapshot = self.manager.health_snapshot(auth_probe=mock_probe)
+        self.assertEqual(snapshot["authEndpoint"], "healthy")
+        self.assertEqual(snapshot["authCredentialProbe"], "degraded")
+        self.assertEqual(snapshot["auth"], "degraded")
+
+    def test_health_snapshot_auth_unavailable_preserves_service_healthy(self):
+        def mock_probe(url, payload, timeout=3.0):
+            raise urllib.error.URLError("Connection refused")
+
+        snapshot = self.manager.health_snapshot(auth_probe=mock_probe)
+        self.assertEqual(snapshot["service"], "healthy")
+        self.assertEqual(snapshot["authEndpoint"], "unavailable")
+        self.assertEqual(snapshot["auth"], "unavailable")
+
+    def test_health_snapshot_auth_timeout(self):
+        def mock_probe(url, payload, timeout=3.0):
+            raise socket.timeout("Timed out")
+
+        snapshot = self.manager.health_snapshot(auth_probe=mock_probe)
+        self.assertEqual(snapshot["authEndpoint"], "unavailable")
+        self.assertEqual(snapshot["auth"], "unavailable")
+
+    def test_health_snapshot_auth_server_error_is_degraded(self):
+        def mock_probe(url, payload, timeout=3.0):
+            return 500, {"ok": False}
+
+        snapshot = self.manager.health_snapshot(auth_probe=mock_probe)
+        self.assertEqual(snapshot["authEndpoint"], "degraded")
+        self.assertEqual(snapshot["auth"], "degraded")
 
     def _send_http_auth(self, request_bytes: bytes, state_path: Path | None = None) -> bytes:
         target_path = state_path or self.state_path

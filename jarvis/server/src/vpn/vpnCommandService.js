@@ -319,23 +319,37 @@ class VpnCommandService {
       const response = await this._request('vpn.health.snapshot', {});
       if (response.result.state !== 'succeeded') return { answer: 'Диагностика VPN временно недоступна.', buttons: menuButtons() };
       const data = response.result.data || {};
-      const format = (state) => (state === 'healthy' ? '✅ OK' : state === 'degraded' ? '⚠️ Degraded' : '❌ Ошибка');
+      const format = (state) => (
+        state === 'healthy' ? '✅ OK' :
+        state === 'degraded' ? '⚠️ Degraded' :
+        state === 'unknown' ? '❓ Неизвестно (требуется внешний узел)' :
+        '❌ Ошибка'
+      );
       const xray = data.xray || {};
       const hy2 = data.hysteria2 || {};
+      const net = data.network;
       const answer = [
         '🏥 **Диагностика VPN (Health Snapshot):**',
         `🖥 Хост VPS: ${format(data.host)}`,
+        ...(net ? [
+          `• DNS: ${format(net.dns)}`,
+          `• Интернет (HTTPS): ${format(net.outbound)}`,
+        ] : []),
         '',
         '🛡 **VLESS (Xray):**',
         `• Служба: ${format(xray.service)}`,
         `• Конфигурация: ${format(xray.config)}`,
         `• Порт: ${format(xray.listener)}`,
+        ...(xray.protocolProbe ? [`• Протокол (Probe): ${format(xray.protocolProbe)}`] : []),
         '',
         '⚡ **Hysteria 2:**',
         `• Служба: ${format(hy2.service)}`,
         `• Конфигурация: ${format(hy2.config)}`,
         `• Порт: ${format(hy2.listener)}`,
         `• Авторизация: ${format(hy2.auth)}`,
+        ...(hy2.authEndpoint ? [`  - Эндпоинт auth: ${format(hy2.authEndpoint)}`] : []),
+        ...(hy2.authCredentialProbe ? [`  - Проверка ключа: ${format(hy2.authCredentialProbe)}`] : []),
+        ...(hy2.protocolProbe ? [`• Протокол (Probe): ${format(hy2.protocolProbe)}`] : []),
       ].join('\n');
       return { answer, buttons: menuButtons() };
     }

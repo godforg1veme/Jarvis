@@ -53,30 +53,52 @@ class ActionsTests(unittest.TestCase):
         self.assertEqual(response["data"]["services"][1]["id"], "telegram-parser")
         self.assertNotIn("output", response["data"])
 
+    @patch("jarvis_host_agent.actions.probe_outbound_https")
+    @patch("jarvis_host_agent.actions.probe_dns")
     @patch("jarvis_host_agent.actions._run")
     @patch("jarvis_host_agent.actions.XrayVpnManager.health_snapshot")
     @patch("jarvis_host_agent.actions.HysteriaVpnManager.health_snapshot")
     @patch("jarvis_host_agent.actions._host_health")
-    def test_vpn_health_snapshot_returns_structured_status_without_secrets(self, host_health, hy2_snapshot, xray_snapshot, run):
+    def test_vpn_health_snapshot_returns_structured_status_without_secrets(
+        self, host_health, hy2_snapshot, xray_snapshot, run, dns_probe, outbound_probe
+    ):
         host_health.return_value = "healthy"
-        xray_snapshot.return_value = {"service": "healthy", "config": "healthy", "listener": "healthy"}
-        hy2_snapshot.return_value = {"service": "healthy", "config": "healthy", "listener": "healthy", "auth": "healthy"}
+        hy2_snapshot.return_value = {
+            "service": "healthy",
+            "config": "healthy",
+            "listener": "healthy",
+            "auth": "healthy",
+            "authEndpoint": "healthy",
+            "authCredentialProbe": "healthy",
+            "protocolProbe": "unknown",
+        }
+        xray_snapshot.return_value = {"service": "healthy", "config": "healthy", "listener": "healthy", "protocolProbe": "unknown"}
         run.return_value = {"state": "succeeded", "data": {"output": "LISTEN 0 128 127.0.0.1:3211 0.0.0.0:*\n"}}
+        dns_probe.return_value = "healthy"
+        outbound_probe.return_value = "healthy"
 
         response = execute(self.config, "vpn.health.snapshot", {})
         self.assertEqual(response["state"], "succeeded")
         self.assertEqual(response["data"], {
             "host": "healthy",
+            "network": {
+                "dns": "healthy",
+                "outbound": "healthy",
+            },
             "xray": {
                 "service": "healthy",
                 "config": "healthy",
                 "listener": "healthy",
+                "protocolProbe": "unknown",
             },
             "hysteria2": {
                 "service": "healthy",
                 "config": "healthy",
                 "listener": "healthy",
                 "auth": "healthy",
+                "authEndpoint": "healthy",
+                "authCredentialProbe": "healthy",
+                "protocolProbe": "unknown",
             },
         })
         # Check no secret substrings appear anywhere in the result

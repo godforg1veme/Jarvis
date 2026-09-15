@@ -33,8 +33,17 @@ function harness(options = {}) {
           state: 'succeeded',
           data: {
             host: 'healthy',
-            xray: { service: 'healthy', config: 'healthy', listener: 'healthy' },
-            hysteria2: { service: 'healthy', config: 'healthy', listener: 'healthy', auth: 'healthy' },
+            network: { dns: 'healthy', outbound: 'healthy' },
+            xray: { service: 'healthy', config: 'healthy', listener: 'healthy', protocolProbe: 'unknown' },
+            hysteria2: {
+              service: 'healthy',
+              config: 'healthy',
+              listener: 'healthy',
+              auth: 'healthy',
+              authEndpoint: 'healthy',
+              authCredentialProbe: 'healthy',
+              protocolProbe: 'unknown',
+            },
           },
         },
       };
@@ -254,9 +263,14 @@ test('health snapshot command and callback return structured overview without se
   const commandResult = await service.handle({ ...context, text: '/vpn_health' });
   assert.match(commandResult.answer, /Health Snapshot/);
   assert.match(commandResult.answer, /Хост VPS: ✅ OK/);
+  assert.match(commandResult.answer, /• DNS: ✅ OK/);
+  assert.match(commandResult.answer, /• Интернет \(HTTPS\): ✅ OK/);
   assert.match(commandResult.answer, /VLESS \(Xray\):/);
   assert.match(commandResult.answer, /Hysteria 2:/);
   assert.match(commandResult.answer, /Авторизация: ✅ OK/);
+  assert.match(commandResult.answer, /Эндпоинт auth: ✅ OK/);
+  assert.match(commandResult.answer, /Проверка ключа: ✅ OK/);
+  assert.match(commandResult.answer, /Протокол \(Probe\): ❓ Неизвестно \(требуется внешний узел\)/);
 
   const callbackResult = await service.handleCallback({ ...context, data: 'vpn:health' });
   assert.match(callbackResult.answer, /Health Snapshot/);

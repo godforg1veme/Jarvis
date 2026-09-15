@@ -10,7 +10,10 @@ import json
 import os
 import re
 import secrets
+import socket
 import tempfile
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import quote
@@ -198,6 +201,30 @@ async def handle_hysteria_auth(reader: asyncio.StreamReader, writer: asyncio.Str
             pass
 
 
+def _default_http_auth_probe(url: str, payload: dict[str, Any], timeout: float = 3.0) -> tuple[int, dict[str, Any]]:
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json", "User-Agent": "Jarvis-Health/1.0"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read(4096).decode("utf-8", "replace")
+            try:
+                data = json.loads(raw) if raw else {}
+            except (ValueError, json.JSONDecodeError):
+                data = {}
+            return getattr(resp, "status", 200), data
+    except urllib.error.HTTPError as exc:
+        try:
+            raw = exc.read(4096).decode("utf-8", "replace")
+            data = json.loads(raw) if raw else {}
+        except Exception:
+            data = {}
+        return exc.code, data
+
+
 class HysteriaVpnManager:
     def __init__(
         self,
@@ -207,6 +234,7 @@ class HysteriaVpnManager:
         hysteria_bin: str = DEFAULT_HYSTERIA_BIN,
         service: str = DEFAULT_SERVICE,
         auth_url: str = DEFAULT_AUTH_URL,
+        auth_probe: Callable[[str, dict[str, Any], float], tuple[int, dict[str, Any]]] | None = None,
     ) -> None:
         self.run = run
         self.state_path = Path(state_path)
@@ -214,6 +242,7 @@ class HysteriaVpnManager:
         self.hysteria_bin = hysteria_bin
         self.service = service
         self.auth_url = auth_url
+        self.auth_probe = auth_probe or _default_http_auth_probe
 
     def _read_state(self) -> dict[str, Any]:
         try:
@@ -324,15 +353,16 @@ class HysteriaVpnManager:
         except VpnManagerError:
             return {"serviceState": "unavailable", "configValid": False, "listenerReady": False, "clientCount": 0}
 
-    def health_snapshot(self, listener_tcp_output: str | None = None) -> dict[str, str]:
+    def health_snapshot(
+        self,
+        listener_tcp_output: str | None = None,
+        auth_probe: Callable[[str, dict[str, Any], float], tuple[int, dict[str, Any]]] | None = None,
+    ) -> dict[str, str]:
         try:
             state = self._read_state()
             active = self.run(["/usr/bin/systemctl", "is-active", self.service], timeout=15)
             listener_udp = self.run(["/usr/bin/ss", "-lun"], timeout=15)
             listener_udp_output = listener_udp.get("data", {}).get("output", "") if listener_udp.get("state") == "succeeded" else ""
-            if listener_tcp_output is None:
-                listener_tcp = self.run(["/usr/bin/ss", "-lnt"], timeout=15)
-                listener_tcp_output = listener_tcp.get("data", {}).get("output", "") if listener_tcp.get("state") == "succeeded" else ""
 
             active_out = active.get("data", {}).get("output", "").strip() if active.get("state") == "succeeded" else ""
             if active_out == "active":
@@ -344,16 +374,77 @@ class HysteriaVpnManager:
 
             config_health = "healthy" if self._config_valid(state) else "unavailable"
             listener_health = "healthy" if f'{state["address"]}:{state["port"]}' in listener_udp_output else "unavailable"
-            auth_health = "healthy" if f":{DEFAULT_AUTH_PORT}" in listener_tcp_output else "unavailable"
+
+            probe_fn = auth_probe or self.auth_probe
+            auth_endpoint_health = "unavailable"
+            try:
+                status, data = probe_fn(self.auth_url, {"auth": ""}, 3.0)
+                if status == 200 and isinstance(data, dict):
+                    auth_endpoint_health = "healthy"
+                elif 400 <= status < 600:
+                    auth_endpoint_health = "degraded"
+                else:
+                    auth_endpoint_health = "degraded"
+            except (urllib.error.URLError, socket.timeout, TimeoutError, OSError):
+                auth_endpoint_health = "unavailable"
+            except Exception:
+                auth_endpoint_health = "unknown"
+
+            auth_credential_health = "unknown"
+            clients = state.get("clients", [])
+            if clients and isinstance(clients, list) and isinstance(clients[0], dict):
+                test_client = clients[0]
+                client_id = str(test_client.get("id", ""))
+                client_password = str(test_client.get("password", ""))
+                if client_id and client_password:
+                    try:
+                        status, data = probe_fn(self.auth_url, {"auth": f"{client_id}:{client_password}"}, 3.0)
+                        if status == 200 and isinstance(data, dict) and data.get("ok") is True:
+                            auth_credential_health = "healthy"
+                        elif status == 200 and isinstance(data, dict) and data.get("ok") is False:
+                            auth_credential_health = "degraded"
+                        elif 400 <= status < 600:
+                            auth_credential_health = "degraded"
+                        else:
+                            auth_credential_health = "degraded"
+                    except (urllib.error.URLError, socket.timeout, TimeoutError, OSError):
+                        auth_credential_health = "unavailable"
+                    except Exception:
+                        auth_credential_health = "unknown"
+                    finally:
+                        del client_id
+                        del client_password
+                        del test_client
+
+            if auth_endpoint_health == "healthy":
+                if auth_credential_health in {"healthy", "unknown"}:
+                    auth_health = "healthy"
+                else:
+                    auth_health = "degraded"
+            elif auth_endpoint_health == "degraded":
+                auth_health = "degraded"
+            else:
+                auth_health = "unavailable"
 
             return {
                 "service": service_health,
                 "config": config_health,
                 "listener": listener_health,
                 "auth": auth_health,
+                "authEndpoint": auth_endpoint_health,
+                "authCredentialProbe": auth_credential_health,
+                "protocolProbe": "unknown",
             }
         except (VpnManagerError, Exception):
-            return {"service": "unavailable", "config": "unavailable", "listener": "unavailable", "auth": "unavailable"}
+            return {
+                "service": "unavailable",
+                "config": "unavailable",
+                "listener": "unavailable",
+                "auth": "unavailable",
+                "authEndpoint": "unavailable",
+                "authCredentialProbe": "unknown",
+                "protocolProbe": "unknown",
+            }
 
     def clients(self) -> list[dict[str, Any]]:
         return [self._public_client(client) for client in self._read_state()["clients"]]

@@ -16,6 +16,7 @@ from .host_metrics import extra_metrics
 from .protocol import ProtocolError
 from .hysteria_vpn_manager import HysteriaVpnManager
 from .vpn_manager import XrayVpnManager
+from .network_probes import probe_dns, probe_outbound_https
 
 MAX_OUTPUT_BYTES = 32 * 1024
 
@@ -123,13 +124,21 @@ def _host_health() -> str:
         return "unavailable"
 
 
-def _vpn_health_snapshot(run: Callable[..., dict[str, Any]] = _run) -> dict[str, Any]:
+def _vpn_health_snapshot(
+    run: Callable[..., dict[str, Any]] = _run,
+    dns_probe: Callable[[], str] = probe_dns,
+    outbound_probe: Callable[[], str] = probe_outbound_https,
+) -> dict[str, Any]:
     ss_tcp = run(["/usr/bin/ss", "-lnt"], timeout=15)
     ss_tcp_out = ss_tcp.get("data", {}).get("output", "") if ss_tcp.get("state") == "succeeded" else ""
     xray = XrayVpnManager(run=run).health_snapshot(listener_tcp_output=ss_tcp_out)
     hysteria2 = HysteriaVpnManager(run=run).health_snapshot(listener_tcp_output=ss_tcp_out)
     return {
         "host": _host_health(),
+        "network": {
+            "dns": dns_probe(),
+            "outbound": outbound_probe(),
+        },
         "xray": xray,
         "hysteria2": hysteria2,
     }
