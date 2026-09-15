@@ -1,4 +1,4 @@
-# VPN Supervisor: deterministic diagnosis and safe autonomy foundation
+# VPN Supervisor: distributed diagnosis and safe autonomy foundation
 
 **Date:** 2026-09-15  
 **Status:** Proposed; pending owner review  
@@ -6,24 +6,47 @@
 
 ## Goal
 
-Build the first reliable layer of a future autonomous VPN Supervisor. The
-immediate result converts `vpn.health.snapshot` into a stable, secret-free
-diagnosis and records it through the existing Operations incident pipeline.
-Later stages may use that diagnosis to select prewritten repair playbooks, but
-must not reinterpret raw logs or execute arbitrary shell.
+Build the first reliable layer of an autonomous, LLM-assisted VPN Supervisor.
+The Supervisor is a central coordinator running with Jarvis on the current VPS.
+It monitors the local VPN services and, later, VPN services on additional
+reachable VPS nodes registered in the same private management network. Each
+node has a narrow local agent that reports health and executes only declared
+operations.
 
-The end state is autonomous recovery even when Jarvis Server, the external
-model provider, or VPS outbound connectivity is unavailable. Autonomy is
-fail-closed: uncertainty, an unverified result, or an unavailable rollback stops
-all further mutations and notifies the owner.
+When a confirmed incident is detected, the central Supervisor calls the
+configured LLM with a versioned system prompt, a VPN diagnostic guide, the
+sanitized diagnosis and bounded incident history, and the closed playbook
+catalog. The model proposes a playbook; deterministic policy validates the
+proposal before any action. The model does not receive arbitrary logs, secrets,
+or shell access.
+
+The immediate milestone converts `vpn.health.snapshot` into a stable,
+secret-free diagnosis and records it through the existing Operations incident
+pipeline. It establishes the contract used by the later LLM and execution
+stages, but does not invoke the model or repair anything yet.
+
+The end state is autonomous recovery of VPN services on every reachable managed
+node. The normal path invokes the LLM. If Jarvis Server or the model provider is
+temporarily unavailable, a node may execute only a small explicitly approved
+set of deterministic emergency playbooks. Autonomy is fail-closed: uncertainty,
+an unverified result, or an unavailable rollback stops all further mutations
+and notifies the owner when a notification channel is available.
+
+Recovering a completely unreachable or powered-off VPS is not part of this
+design. A future milestone may place a coordinator outside the monitored
+failure domain and integrate a hosting-provider recovery API.
 
 ## Product guarantees
 
 - A model never receives shell access and never writes a script at incident
   time. It may select only a versioned playbook and bounded parameters from a
   closed manifest.
-- The local recovery layer can operate without Jarvis Server or an LLM, but
-  only with preinstalled and tested playbooks.
+- The central Supervisor attempts LLM-assisted planning for every confirmed
+  repair-eligible incident. The local recovery layer can operate without Jarvis
+  Server or an LLM only with a much smaller preapproved emergency catalog.
+- Every managed VPS has a stable opaque node ID and declared capabilities. A
+  diagnosis and action are always bound to exactly one node; results from one
+  node can never authorize a mutation on another.
 - A healthy VPN stack is never modified to repair the other stack.
 - Mutations are serialized, idempotent, rate-limited, audited, verified by a
   post-check, and rolled back when the playbook has a proven rollback.
@@ -42,10 +65,17 @@ all further mutations and notifies the owner.
 
 ## Ownership and data flow
 
-The deterministic classifier belongs in the Host Agent Python package so the
-future local controller can reuse it while the cloud is unavailable. It is a
-pure module: validated snapshot in, immutable diagnosis out, with no I/O and no
-side effects.
+The central Supervisor belongs to the existing Operations control plane. It
+owns node inventory, incident correlation, sanitized history, LLM planning,
+policy evaluation, notifications, and durable action orchestration. The current
+VPS uses the existing local Unix-socket Host Agent connection. Additional VPS
+nodes must connect through a mutually authenticated private management channel;
+no Host Agent control port may be exposed directly to the public internet.
+
+The deterministic classifier belongs in the Host Agent Python package so every
+node and the future local emergency controller can reuse it while the central
+Supervisor is unavailable. It is a pure module: validated snapshot in,
+immutable diagnosis out, with no I/O and no side effects.
 
 `vpn.health.snapshot` continues to return the raw bounded fields and adds a
 versioned `diagnosis` object produced from those exact fields. Jarvis Server
@@ -55,12 +85,14 @@ the existing `IncidentEngine`; no parallel incident store or notifier is
 created. Telegram `/vpn_health` renders the same validated diagnosis.
 
 ```text
-Host Agent probes
-  -> strict snapshot
-  -> pure classifier
-  -> snapshot + diagnosis
-  -> Operations adapter
+per-node Host Agent probes
+  -> strict snapshot + node identity binding
+  -> pure deterministic classifier
+  -> central Operations adapter
   -> existing IncidentEngine / OperationsRepository / IncidentNotifier
+  -> LLM planner with system prompt + guide + closed catalog (later milestone)
+  -> deterministic policy gate
+  -> exact-node playbook execution and verification
 ```
 
 The existing generic service collection remains responsible for inventory and
@@ -203,18 +235,24 @@ no repair.
 The following stages are deliberately not implemented now, but the classifier
 contract must support them without redesign:
 
-1. Add read-only diagnostic actions and a closed repair-policy evaluator.
-2. Add a separate local safety controller that imports the classifier and can
-   run without Jarvis Server. It acquires a single recovery lease, enforces
-   cooldown and attempt budgets, and records durable claims.
+1. Add a node registry and per-node health scheduling to Operations. Begin with
+   the current local VPS, then add reachable remote nodes through a private,
+   mutually authenticated channel.
+2. Add read-only diagnostic actions and a closed repair-policy evaluator.
 3. Add versioned playbooks with exact preconditions, action parameters,
-   post-conditions, timeout, rollback, and affected-stack declarations.
-4. Add LLM advisory/dry-run mode. The model sees only the sanitized diagnosis,
-   bounded incident history, and playbook catalog, and returns a schema-checked
-   proposal.
-5. Enable autonomous selection only after replay evaluation against incident
-   fixtures and deliberate fault injection. Deterministic policy remains the
-   final authority.
+   post-conditions, timeout, rollback, affected-node and affected-stack
+   declarations.
+4. Add the central LLM planner in advisory/dry-run mode. Its versioned system
+   prompt and guide explain the supported VPN topologies and diagnosis rules.
+   The model sees only the sanitized diagnosis, bounded incident history, node
+   capabilities, and playbook catalog, and returns a schema-checked proposal.
+5. Add a separate local safety controller that imports the classifier and can
+   use only the emergency playbook subset when Jarvis Server or the LLM is
+   unavailable. It acquires a per-node recovery lease, enforces cooldown and
+   attempt budgets, and records durable claims.
+6. Enable autonomous LLM-selected execution only after replay evaluation
+   against incident fixtures and deliberate fault injection. Deterministic
+   policy remains the final authority.
 
 If a post-check fails, the controller performs only the declared rollback. If
 rollback cannot be proven, the operation result is unknown, or the remaining
@@ -252,6 +290,8 @@ demonstrate classification.
 
 - LLM calls or prompts;
 - automatic restart or repair;
+- remote VPS enrollment or public Host Agent listeners;
+- recovery of a powered-off or wholly unreachable VPS;
 - firewall, DNS, routing, port, or credential mutation;
 - temporary probe clients;
 - arbitrary shell or runtime-generated scripts;
