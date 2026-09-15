@@ -51,9 +51,12 @@ priority, people/family grants, modes/preferences, reminders, recovery plans,
 actionable proactivity, eight fixture-only source adapters, authenticated API,
 and responsive Desktop Mission Control. The current Desktop package was built,
 content-inspected, installed, and launch-smoked. Server v2 and migrations
-016–018 were then deployed with explicit owner approval. Isolated real-PostgreSQL
-repository acceptance, authenticated read-only requests from the paired Desktop,
-Compose health, public smoke, and unchanged VPN/Host Agent health passed. Live
+016–018 were then deployed with explicit owner approval. The exact phrase passed
+the complete isolated real-PostgreSQL workflow through Action Orchestrator and
+the real Tool Gateway contract exactly once, closing its linked proposal and
+commitment and updating Timeline/Context Recovery. Authenticated read-only
+requests from the paired Desktop, Compose health, public smoke, and unchanged
+VPN/Host Agent health passed. Live
 external providers, Telegram behavior, and interactive changing recovery remain
 manual acceptance. Details are recorded in
 `updates/2026-09-15-jarvis-life-os-v2.md`.
@@ -136,8 +139,8 @@ attachment ingestion.
 | `superpowers/plans/2026-09-14-telegram-unified-memory-gallery-vpn-owner-fix.md` | Implemented and production-deployed on 2026-09-14; retained as execution history with manual Telegram acceptance explicitly outstanding. |
 | `superpowers/specs/2026-09-12-jarvis-life-os-core-v1-design.md` | Implemented and production-enabled: owner-scoped Event Spine, projections, Timeline, context recovery, explainable proposals, Telegram commands, and Desktop Mission Control. Optional model enrichment remains disabled. |
 | `superpowers/plans/2026-09-12-jarvis-life-os-core-v1.md` | Implemented, packaged, installed, and production-verified on 2026-09-13; retained as execution history. |
-| `superpowers/specs/2026-09-14-jarvis-life-os-v2-design.md` | Implemented, locally verified, packaged/installed, and production-deployed on 2026-09-15; real PostgreSQL and authenticated read-only Desktop API passed. Live providers, Telegram, and interactive changing recovery remain manual. |
-| `superpowers/plans/2026-09-14-jarvis-life-os-v2.md` | Code checkpoints, local checks, Desktop installation, real-PostgreSQL acceptance, and production server rollout completed after explicit owner approval; external accounts were not connected. |
+| `superpowers/specs/2026-09-14-jarvis-life-os-v2-design.md` | Implemented, locally verified, packaged/installed, and production-deployed on 2026-09-15; the complete real-PostgreSQL workflow and authenticated read-only Desktop API passed. Live providers, Telegram, and interactive changing recovery remain manual. |
+| `superpowers/plans/2026-09-14-jarvis-life-os-v2.md` | Code checkpoints, local checks, Desktop installation, complete real-PostgreSQL workflow acceptance, and production server rollout completed after explicit owner approval; external accounts were not connected. |
 | `superpowers/plans/2026-09-09-jarvis-vision.md` | Execution plan adapted to the current cloud-brain/local-hands architecture; first camera + two-display + memory slice implemented and locally accepted |
 | `plans/2026-09-01-jarvis-family-cloud-assistant.md` | Active roadmap; Milestones 0–3 are partial, later milestones are not complete |
 | `specs/2026-09-01-jarvis-desktop-cloud-client-design.md` | Implemented and packaged: paired Windows chat, DPAPI device credentials, device-scoped HTTPS/WSS sessions, local wake word, server ASR contract, and NSIS installer. Live VPS configuration and clean-machine acceptance remain operational steps. |

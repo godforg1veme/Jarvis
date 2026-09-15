@@ -11,8 +11,9 @@
 > `docs/updates/2026-09-15-jarvis-life-os-v2.md`. After separate explicit owner
 > requests, the Desktop package was built, inspected, installed, and
 > launch-smoked, then server v2 and migrations 016–018 were deployed. Isolated
-> real-PostgreSQL repository acceptance and authenticated read-only Desktop API
-> acceptance passed. Live-provider, Telegram, multi-device, and interactive
+> complete real-PostgreSQL phrase/workflow acceptance through Action Orchestrator
+> and the real Tool Gateway contract, plus authenticated read-only Desktop API
+> acceptance, passed. Live-provider, Telegram, multi-device, and interactive
 > changing-action acceptance remain explicitly outstanding.
 
 ## Objective

@@ -146,9 +146,11 @@ only and must never receive an action capability.
 
 Migrations `013_life_os_core.sql` and `016`–`018` create the owner-scoped Event
 Spine, v2 domains, durable reminders, and uncertain orchestrator outcomes. Life
-OS v2 is deployed as of 2026-09-15; the isolated PostgreSQL acceptance,
-authenticated read-only Desktop bootstrap/Mission Control/Timeline, readiness,
-and public smoke passed. For a new host, roll it out in stages: first set
+OS v2 is deployed as of 2026-09-15; the exact phrase completed the isolated
+PostgreSQL-backed Orchestrator/Tool Gateway workflow exactly once and its
+verified result updated the proposal, commitment, Timeline, and Context
+Recovery. Authenticated read-only Desktop bootstrap/Mission Control/Timeline,
+readiness, and public smoke also passed. For a new host, roll it out in stages: first set
 `JARVIS_LIFE_OS_ENABLED=true` with enrichment and proactivity disabled, rebuild
 `server`, and verify the same gates.
 Enable `JARVIS_LIFE_OS_PROACTIVITY_ENABLED=true` only after the current Desktop

@@ -9,8 +9,9 @@
 > regression tests. After a separate explicit owner request, the Desktop package
 > was built, content-inspected, installed, and launch-smoked. After another
 > explicit owner request, server v2 and migrations 016–018 were deployed;
-> isolated real-PostgreSQL repository acceptance and authenticated read-only
-> Desktop API acceptance passed. Live external providers, Telegram behavior,
+> complete isolated real-PostgreSQL phrase/workflow acceptance through Action
+> Orchestrator and the real Tool Gateway contract, plus authenticated read-only
+> Desktop API acceptance, passed. Live external providers, Telegram behavior,
 > and interactive changing recovery remain manual. See
 > `docs/updates/2026-09-15-jarvis-life-os-v2.md` for exact evidence.
 

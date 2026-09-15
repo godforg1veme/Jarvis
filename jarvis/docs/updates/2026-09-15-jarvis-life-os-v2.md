@@ -12,9 +12,12 @@ active throughout the server-only rollout. Life OS and bounded proactivity are
 enabled; optional model enrichment remains disabled.
 
 The isolated acceptance ran against the real production PostgreSQL engine in a
-unique temporary schema and transaction, then rolled back. It verified v2
-repositories, owner isolation, people/family grants, modes, preferences,
-reminders, recovery plans and a fixture source. A paired installed Desktop then
+unique temporary schema and transaction, then rolled back. The exact phrase
+completed the real repositories, Action Orchestrator, origin confirmation, and
+real Tool Gateway contract exactly once. Its verified workflow completed the
+linked proposal and commitment and became the current trusted Timeline/Context
+Recovery result. It also verified owner isolation, people/family grants, modes,
+preferences, reminders, recovery plans and a fixture source. A paired installed Desktop then
 performed authenticated read-only `bootstrap`, Mission Control and Timeline
 requests without exposing its DPAPI token. The eight external source adapters
 remain provider-neutral fixtures; no external account was connected.
@@ -55,7 +58,7 @@ registry file, or local path.
 | 12 | existing Quantum visual language extended in `renderer/life-os/` | browser test at 1440/390/320, keyboard dialogs, reduced motion, loading/empty/stale/offline/error/conflict/partial states; screenshots inspected | Locally verified; current EXE installed and launch-smoked |
 | 13 | focused CommonJS modules; IPC extracted from `main.js`; runtime and existing repositories remain bounded | diff/packaging inspection and module tests | Implemented |
 | 14 | degraded Life OS/model/projection paths plus Telegram, Voice, Vision, tools, remote protocol, Quantum and Operations regression | server 401/401, cloud 20/20, focused Desktop/Voice/Vision, Operations UI and Host Agent suites | Automatically verified locally; live hardware/multi-device acceptance unchanged |
-| 15 | unit, owner/schema/injection/fallback/replay/origin tests and exact full-loop acceptance | commands and totals below plus isolated real PostgreSQL and authenticated production reads | Automatic/local fixture and real-repository acceptance complete; interactive changing action remains manual |
+| 15 | unit, owner/schema/injection/fallback/replay/origin tests and exact full-loop acceptance | commands and totals below plus complete isolated real-PostgreSQL workflow and authenticated production reads | Automated local and real-PostgreSQL workflow acceptance complete; interactive changing action remains manual |
 | 16 | README, docs index, AGENTS, design/plan status note and this record | `git diff --check` and final documentation audit | Implemented |
 | 17 | one goal executed through checkpoint commits and a final completion audit | repository history from design through end-to-end test | Implemented; external acceptance remains named |
 
@@ -70,8 +73,10 @@ registry file, or local path.
   its Desktop origin, and completed only from a verified Tool Gateway result.
 - Proactivity produces safe and changing proposals; changing actions cannot
   bypass the existing confirmation and orchestration path.
-- The exact message-to-action loop and replay/unknown variants pass in-memory
-  service integration plus a real local Tool Gateway fixture.
+- The exact message-to-action loop passes both in-memory integration and an
+  isolated real-PostgreSQL workflow using Action Orchestrator and the real Tool
+  Gateway contract; replay dispatches nothing twice and unknown outcomes remain
+  non-retriable.
 - All eight connectors share the bounded adapter contract and are labelled
   fixture-only.
 - Existing automated Jarvis regressions pass. PostgreSQL, deployment, public
@@ -84,7 +89,7 @@ registry file, or local path.
 ```powershell
 cd server
 npm test
-# 401 passed, 0 failed
+# 403 passed, 0 failed
 
 cd ..
 node scripts/testLifeOsIpc.js
@@ -121,7 +126,8 @@ node scripts/checkCloudPackageAssets.js
 
 # VPS, inside the candidate/deployed server image against real PostgreSQL
 node test/lifePostgresAcceptance.cjs
-# {"ok":true,"version":2,...,"ownerIsolation":true}
+# {"ok":true,"version":2,...,"workflow":1,"dispatches":1,
+#  "commitmentStatus":"completed","ownerIsolation":true}
 
 JARVIS_ALLOW_LOW_MEMORY=1 bash deploy/scripts/preflight.sh
 bash deploy/scripts/smoke.sh https://jarvis.rilora.ru
@@ -152,9 +158,15 @@ passed, PostgreSQL remained private (`5432/tcp` only), and all Compose services
 plus Xray, Hysteria2 and Host Agent were healthy/active. The server build uses
 `@fastify/static` 10.1.3; `npm ci --omit=dev` reported zero vulnerabilities,
 and the production Operations origin returned its HTML shell with HTTP 200.
+The follow-up server rollout wired verified workflow completion to the linked
+commitment and added project/commitment/proposal IDs to bounded trusted workflow
+events. The complete PostgreSQL workflow acceptance, public smoke, authenticated
+Desktop reads, and unchanged Xray/Hysteria2/Host Agent health passed afterward.
 
 Rollback source was retained on the VPS as
 `.deploy-backups/life-os-v2-predeploy-20260915-0121.tar.gz` with mode 0600.
+An incremental pre-update rollback for the workflow-completion wiring is retained
+as `.deploy-backups/life-workflow-pre-a4688a3.tar.gz`, also with mode 0600.
 
 ## Remaining acceptance
 

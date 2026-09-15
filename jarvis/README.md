@@ -82,8 +82,11 @@ Jarvis — гибридная платформа персонального и �
   credentials и замороженные action arguments не выдаются Life OS UI/Event
   Spine. Локальные автоматические проверки пройдены 2026-09-15; актуальный
   Desktop EXE собран, проверен и установлен локально. Серверная часть v2 и
-  миграции 016–018 развёрнуты 2026-09-15: real-PostgreSQL acceptance,
-  authenticated read-only Desktop API, Compose health и публичный smoke прошли;
+  миграции 016–018 развёрнуты 2026-09-15: точная русская фраза прошла полный
+  real-PostgreSQL цикл через Action Orchestrator и настоящий контракт Tool
+  Gateway ровно один раз; подтверждённый workflow закрыл proposal и commitment
+  и появился в Timeline/Context Recovery. Authenticated read-only Desktop API,
+  Compose health и публичный smoke также прошли;
 - проверяемый серверный ответ о привязанных компьютерах: `/devices` и вопросы
   вида «К какому ПК я привязан?» не зависят от ответа модели.
 - гибридный поиск личной базы знаний: PostgreSQL FTS + production embeddings

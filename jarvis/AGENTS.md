@@ -76,10 +76,13 @@ See `docs/README.md` for current implementation status and historical records.
   images, OCR, document bodies, local paths, storage keys, credentials, and
   provider cursors in public output are forbidden by schema.
   Life OS v2 migrations 016–018 and the server runtime were deployed on
-  2026-09-15. Isolated real-PostgreSQL repository acceptance, authenticated
-  read-only Desktop bootstrap/Mission Control/Timeline requests, Compose health,
-  and public smoke passed. Live external providers and interactive changing
-  recovery in Desktop/Telegram remain manual acceptance.
+  2026-09-15. The exact Russian phrase completed the isolated real-PostgreSQL
+  cycle through Action Orchestrator and the real Tool Gateway contract exactly
+  once; its verified workflow completed the linked proposal and commitment and
+  appeared in Timeline/Context Recovery. Authenticated read-only Desktop
+  bootstrap/Mission Control/Timeline requests, Compose health, and public smoke
+  also passed. Live external providers and interactive changing recovery in
+  Desktop/Telegram remain manual acceptance.
 - The deployed text model is currently configured through OpenRouter. Do not
   hard-code a provider or model into product behavior.
 
