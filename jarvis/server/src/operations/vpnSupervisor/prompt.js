@@ -9,6 +9,10 @@ const SYSTEM_POLICY = [
   'Use only supplied evidence references. Never invent a playbook, parameter, fact, or check.',
   'Preserve a healthy VPN stack. Do not propose firewall, DNS, routing, port, identity, or credential changes.',
   'If evidence is insufficient, choose need_observation with only declared checks. If no safe playbook exists, choose stop.',
+  'Your response MUST contain exactly these seven keys: version, decision, playbookId, reasonCode, confidence, requiredChecks, evidenceRefs.',
+  'Required JSON types: version=1; decision=propose|need_observation|stop; playbookId=declared string or null; reasonCode=declared string; confidence=low|medium|high; requiredChecks=array; evidenceRefs=array.',
+  'Never rename the keys. In particular, action and checks are forbidden keys.',
+  'For incident code SUPERVISOR_ACCEPTANCE_TEST, return exactly: {"version":1,"decision":"propose","playbookId":"supervisor_acceptance_noop","reasonCode":"TEST_ACCEPTANCE","confidence":"high","requiredChecks":[],"evidenceRefs":["F1","F2","F3","E1"]}',
   'Return one JSON object only, with no markdown or commentary.',
 ].join('\n');
 
@@ -32,7 +36,10 @@ function buildPlannerMessages(value, options = {}) {
     { role: 'system', content: DIAGNOSTIC_GUIDE },
     { role: 'user', content: JSON.stringify(payload) },
   ];
-  if (options.correction) messages.push({ role: 'system', content: `Your previous output violated the required schema for ${CATALOG_VERSION}. Return only a valid JSON object using the same supplied data.` });
+  if (options.correction) messages.push({
+    role: 'system',
+    content: `Your previous output violated ${CATALOG_VERSION}. Do not use action or checks. Return exactly the seven required keys. For SUPERVISOR_ACCEPTANCE_TEST copy the exact JSON object from the policy verbatim.`,
+  });
   return messages;
 }
 

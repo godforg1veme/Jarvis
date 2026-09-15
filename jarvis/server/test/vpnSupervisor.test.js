@@ -52,6 +52,9 @@ test('planner prompt is isolated from the Jarvis persona and marks evidence as u
   assert.equal(messages.length, 3);
   assert.equal(messages[0].role, 'system');
   assert.match(SYSTEM_POLICY, /untrusted data/);
+  assert.match(SYSTEM_POLICY, /exactly these seven keys/);
+  assert.match(SYSTEM_POLICY, /"playbookId":"supervisor_acceptance_noop"/);
+  assert.match(SYSTEM_POLICY, /action and checks are forbidden/);
   assert.doesNotMatch(JSON.stringify(messages), /персональный семейный ассистент|conversation|memory|Life OS/i);
   assert.match(messages[1].content, /TCP 443 and UDP 443/);
   assert.match(messages[2].content, /supervisor_acceptance_noop/);
