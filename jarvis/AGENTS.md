@@ -158,6 +158,13 @@ See `docs/README.md` for current implementation status and historical records.
 - Operations checks track actual Telegram poll completion, database migrations,
   stuck jobs, and a configured primary-model probe. The model probe uses only
   a synthetic health message and a PostgreSQL-backed six-hour schedule.
+- The first VPN Supervisor foundation was production-deployed on 2026-09-15.
+  Host Agent deterministically classifies one primary cause from the bounded
+  `vpn.health.snapshot`; Jarvis Server strictly cross-validates that diagnosis,
+  debounces it over three identical observations, and records one correlated
+  `vpn.*` incident. Unknown protocol probes remain informational when all local
+  checks pass. The same closed diagnosis is rendered by Telegram
+  `/vpn_health`. This milestone performs no LLM call and no repair action.
 - Host Agent mutation claims are persisted before execution. An interrupted
   command has an unknown outcome and is reconciled; never retry it under a new
   identifier merely because its connection was lost. Discovery is read-only.

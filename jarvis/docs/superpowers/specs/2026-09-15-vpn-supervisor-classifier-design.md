@@ -1,7 +1,10 @@
 # VPN Supervisor: distributed diagnosis and safe autonomy foundation
 
 **Date:** 2026-09-15  
-**Status:** Approved by owner on 2026-09-15
+**Status:** Implemented and production-deployed on 2026-09-15. The Host Agent
+classifier, strict server validation, debounced incident integration, and
+owner-facing Telegram diagnosis are active. LLM calls and repair execution
+remain intentionally disabled.
 **Scope of this milestone:** dependency model, deterministic classifier, Operations integration, tests, deployment, and production snapshot acceptance. No repair action or LLM invocation is enabled in this milestone.
 
 ## Goal

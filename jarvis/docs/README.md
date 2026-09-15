@@ -6,6 +6,17 @@ future-tense wording does not override the current architecture in `AGENTS.md`.
 
 Status snapshot: 2026-09-15.
 
+VPN Supervisor classifier rollout, 2026-09-15: the current VPS now emits a
+versioned, deterministic and secret-free VPN diagnosis from Host Agent. Jarvis
+Server strictly cross-validates it, debounces three identical observations,
+keeps one causal `vpn.*` incident, and exposes the same closed diagnosis through
+Telegram `/vpn_health`. Local suites passed 79 Host Agent and 430 server tests;
+36 focused tests passed inside the built production image. Public smoke and
+live Xray/Hysteria/Host Agent health passed, and the healthy production snapshot
+opened no false incident. LLM invocation, remote-node enrollment, and repair
+execution remain later milestones. See
+`updates/2026-09-15-vpn-supervisor-classifier.md`.
+
 Happ VPN routing default-proxy correction, 2026-09-15: the `Jarvis RU Direct`
 profile now keeps only its explicit Russian domain/IP rules direct and routes
 every unmatched destination through the active Happ VPN profile (Hysteria 2 or
@@ -145,6 +156,7 @@ attachment ingestion.
 | `updates/2026-09-14-happ-vpn-ru-routing.md` | Production rollout record for Happ domestic RU split-routing and 1-click web activation |
 | `updates/2026-09-15-jarvis-life-os-v2.md` | Implementation, Desktop installation, production rollout, and verification record for Life OS v2 |
 | `updates/2026-09-15-telegram-life-os-parity.md` | Native Telegram Life OS control surface, migration 019, production rollout, and verification record |
+| `updates/2026-09-15-vpn-supervisor-classifier.md` | Deterministic VPN diagnosis, incident integration, E2E fault simulations, and production rollout record |
 | `VPN_PC_SETUP.md` | Руководство по настройке Hysteria 2 и VLESS на ПК (Windows / macOS) и устранению неполадок |
 | `CLAUDE.md`, `gemini.md` | Thin pointers to the authoritative agent context |
 | This file | Status and supersession index |
@@ -171,6 +183,8 @@ attachment ingestion.
 | `superpowers/plans/2026-09-14-jarvis-life-os-v2.md` | Code checkpoints, local checks, Desktop installation, complete real-PostgreSQL workflow acceptance, and production server rollout completed after explicit owner approval; external accounts were not connected. |
 | `superpowers/specs/2026-09-15-telegram-life-os-parity-design.md` | Implemented and production-deployed: native 11-section Telegram hierarchy, closed callbacks, owner/revision/replay boundaries, guided mutations, and confirmed family sharing. Real owner/member client taps remain manual. |
 | `superpowers/plans/2026-09-15-telegram-life-os-parity.md` | Completed with full local regression, production-image callback tests, migration 019, public smoke, and unchanged VPN/Host Agent service health. |
+| `superpowers/specs/2026-09-15-vpn-supervisor-classifier-design.md` | Implemented and production-deployed: deterministic single-cause classification, strict cross-validation, three-observation debounce, and shared Operations/Telegram diagnosis. LLM and repair remain disabled. |
+| `superpowers/plans/2026-09-15-vpn-supervisor-classifier.md` | Completed with simulated fault E2E coverage, full local regression, production-image tests, and live healthy snapshot acceptance. |
 | `superpowers/plans/2026-09-09-jarvis-vision.md` | Execution plan adapted to the current cloud-brain/local-hands architecture; first camera + two-display + memory slice implemented and locally accepted |
 | `plans/2026-09-01-jarvis-family-cloud-assistant.md` | Active roadmap; Milestones 0–3 are partial, later milestones are not complete |
 | `specs/2026-09-01-jarvis-desktop-cloud-client-design.md` | Implemented and packaged: paired Windows chat, DPAPI device credentials, device-scoped HTTPS/WSS sessions, local wake word, server ASR contract, and NSIS installer. Live VPS configuration and clean-machine acceptance remain operational steps. |

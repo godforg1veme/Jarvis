@@ -2,6 +2,11 @@
 
 **Date:** 2026-09-15
 
+**Status:** Completed and production-deployed on 2026-09-15. Local suites passed
+79 Host Agent and 430 server tests; 36 focused tests passed in the built
+production image. Live health, public smoke, and VPN service checks passed.
+No production fault was injected and no repair action is enabled.
+
 **Design:** `docs/superpowers/specs/2026-09-15-vpn-supervisor-classifier-design.md`
 
 **Milestone boundary:** diagnosis and Operations integration only. Do not add
