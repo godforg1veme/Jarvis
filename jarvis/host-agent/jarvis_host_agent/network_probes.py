@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 import socket
 import urllib.error
 import urllib.request
@@ -13,28 +14,33 @@ DEFAULT_DNS_TIMEOUT = 3.0
 DEFAULT_OUTBOUND_TIMEOUT = 5.0
 
 
-def probe_dns(target_host: str = DEFAULT_DNS_TARGET, timeout: float = DEFAULT_DNS_TIMEOUT) -> str:
-    """Probe DNS resolution without executing external binaries.
+def _resolve_dns(target_host: str) -> list[Any]:
+    return socket.getaddrinfo(target_host, 443, family=socket.AF_INET, type=socket.SOCK_STREAM)
 
+
+def probe_dns(target_host: str = DEFAULT_DNS_TARGET, timeout: float = DEFAULT_DNS_TIMEOUT) -> str:
+    """Probe DNS resolution without executing external binaries or modifying global socket state.
+
+    Uses an isolated worker thread with strict future timeout.
     Returns: 'healthy', 'unavailable', or 'unknown'.
     """
     if not target_host or not isinstance(target_host, str):
         return "unknown"
-    original_timeout = socket.getdefaulttimeout()
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
     try:
-        socket.setdefaulttimeout(timeout)
-        addresses = socket.getaddrinfo(target_host, 443, family=socket.AF_INET, type=socket.SOCK_STREAM)
+        future = executor.submit(_resolve_dns, target_host)
+        addresses = future.result(timeout=timeout)
         if addresses and any(addr[4] for addr in addresses):
             return "healthy"
         return "unavailable"
-    except (socket.timeout, TimeoutError):
+    except (concurrent.futures.TimeoutError, TimeoutError):
         return "unavailable"
     except (socket.gaierror, OSError):
         return "unavailable"
     except Exception:
         return "unknown"
     finally:
-        socket.setdefaulttimeout(original_timeout)
+        executor.shutdown(wait=False, cancel_futures=True)
 
 
 def probe_outbound_https(target_url: str = DEFAULT_OUTBOUND_TARGET, timeout: float = DEFAULT_OUTBOUND_TIMEOUT) -> str:

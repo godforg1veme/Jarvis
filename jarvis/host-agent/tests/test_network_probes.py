@@ -14,15 +14,25 @@ class NetworkProbesTests(unittest.TestCase):
         ]
         self.assertEqual(probe_dns("cloudflare.com"), "healthy")
 
-    @patch("socket.getaddrinfo")
-    def test_dns_probe_timeout(self, mock_getaddrinfo):
-        mock_getaddrinfo.side_effect = socket.timeout("timed out")
-        self.assertEqual(probe_dns("cloudflare.com"), "unavailable")
+    @patch("jarvis_host_agent.network_probes._resolve_dns")
+    def test_dns_probe_timeout(self, mock_resolve):
+        import time
+        def slow_resolve(target):
+            time.sleep(1)
+            return []
+        mock_resolve.side_effect = slow_resolve
+        self.assertEqual(probe_dns("cloudflare.com", timeout=0.05), "unavailable")
 
     @patch("socket.getaddrinfo")
     def test_dns_probe_gaierror_unavailable(self, mock_getaddrinfo):
         mock_getaddrinfo.side_effect = socket.gaierror(socket.EAI_NONAME, "Name or service not known")
         self.assertEqual(probe_dns("nonexistent.invalid"), "unavailable")
+
+    def test_dns_probe_does_not_mutate_global_socket_timeout(self):
+        before = socket.getdefaulttimeout()
+        probe_dns("cloudflare.com")
+        after = socket.getdefaulttimeout()
+        self.assertEqual(before, after)
 
     def test_dns_probe_invalid_target(self):
         self.assertEqual(probe_dns(""), "unknown")

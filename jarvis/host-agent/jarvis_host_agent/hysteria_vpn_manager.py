@@ -379,9 +379,9 @@ class HysteriaVpnManager:
             auth_endpoint_health = "unavailable"
             try:
                 status, data = probe_fn(self.auth_url, {"auth": ""}, 3.0)
-                if status == 200 and isinstance(data, dict):
+                if status == 200 and isinstance(data, dict) and data.get("ok") is False:
                     auth_endpoint_health = "healthy"
-                elif 400 <= status < 600:
+                elif 400 <= status < 600 or (status == 200 and isinstance(data, dict)):
                     auth_endpoint_health = "degraded"
                 else:
                     auth_endpoint_health = "degraded"
@@ -399,9 +399,14 @@ class HysteriaVpnManager:
                 if client_id and client_password:
                     try:
                         status, data = probe_fn(self.auth_url, {"auth": f"{client_id}:{client_password}"}, 3.0)
-                        if status == 200 and isinstance(data, dict) and data.get("ok") is True:
+                        if (
+                            status == 200
+                            and isinstance(data, dict)
+                            and data.get("ok") is True
+                            and data.get("id") == client_id
+                        ):
                             auth_credential_health = "healthy"
-                        elif status == 200 and isinstance(data, dict) and data.get("ok") is False:
+                        elif status == 200 and isinstance(data, dict):
                             auth_credential_health = "degraded"
                         elif 400 <= status < 600:
                             auth_credential_health = "degraded"

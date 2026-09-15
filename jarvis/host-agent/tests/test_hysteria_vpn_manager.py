@@ -162,7 +162,9 @@ class HysteriaVpnManagerTests(unittest.TestCase):
         self.manager.issue("Phone")
         def mock_probe(url, payload, timeout=3.0):
             auth_val = payload.get("auth", "")
-            return 200, {"ok": True if ":" in auth_val else False}
+            if ":" in auth_val:
+                return 200, {"ok": True, "id": auth_val.split(":")[0]}
+            return 200, {"ok": False}
 
         snapshot = self.manager.health_snapshot(auth_probe=mock_probe)
         self.assertEqual(snapshot["authEndpoint"], "healthy")
@@ -172,6 +174,41 @@ class HysteriaVpnManagerTests(unittest.TestCase):
         # Ensure password is not in the snapshot
         state = json.loads(self.state_path.read_text(encoding="utf-8"))
         self.assertNotIn(state["clients"][0]["password"], json.dumps(snapshot))
+
+    def test_health_snapshot_credential_always_ok_without_matching_id_is_degraded(self):
+        self.manager.issue("Phone")
+        def mock_probe(url, payload, timeout=3.0):
+            # A faulty or spoofed service always returning ok=True without client ID
+            return 200, {"ok": True}
+
+        snapshot = self.manager.health_snapshot(auth_probe=mock_probe)
+        self.assertEqual(snapshot["authCredentialProbe"], "degraded")
+        self.assertEqual(snapshot["auth"], "degraded")
+
+    def test_health_snapshot_credential_with_wrong_id_is_degraded(self):
+        self.manager.issue("Phone")
+        def mock_probe(url, payload, timeout=3.0):
+            # Returns ok=True but for wrong client ID
+            return 200, {"ok": True, "id": "vpn-mismatched"}
+
+        snapshot = self.manager.health_snapshot(auth_probe=mock_probe)
+        self.assertEqual(snapshot["authCredentialProbe"], "degraded")
+
+    def test_health_snapshot_auth_endpoint_empty_json_is_degraded(self):
+        def mock_probe(url, payload, timeout=3.0):
+            # Returning 200 {} for empty auth is not acceptable
+            return 200, {}
+
+        snapshot = self.manager.health_snapshot(auth_probe=mock_probe)
+        self.assertEqual(snapshot["authEndpoint"], "degraded")
+
+    def test_health_snapshot_auth_endpoint_ok_true_for_empty_auth_is_degraded(self):
+        def mock_probe(url, payload, timeout=3.0):
+            # Empty auth should never return ok=True
+            return 200, {"ok": True}
+
+        snapshot = self.manager.health_snapshot(auth_probe=mock_probe)
+        self.assertEqual(snapshot["authEndpoint"], "degraded")
 
     def test_health_snapshot_credential_rejected_is_degraded(self):
         self.manager.issue("Phone")
