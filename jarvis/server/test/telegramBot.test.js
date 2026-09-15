@@ -54,6 +54,7 @@ test('renders only closed bounded VPN inline buttons on the final reply', async 
   assert.throws(() => vpnReplyMarkup([[{ text: 'Shell', data: 'vpn:shell:whoami' }]]), /invalid VPN button/);
   assert.throws(() => vpnReplyMarkup([[{ text: 'X', data: `vpn:confirm:${'a'.repeat(80)}` }]]), /invalid VPN button/);
   assert.doesNotThrow(() => vpnReplyMarkup([[{ text: 'Hysteria2', data: 'vpn:p:h' }], [{ text: 'Статус', data: 'vpn:h:status' }]]));
+  assert.doesNotThrow(() => vpnReplyMarkup([[{ text: 'Диагностика', data: 'vpn:health' }]]));
   assert.doesNotThrow(() => vpnReplyMarkup([[{ text: 'Экспорт', data: 'vpn:h:export:vpn-0123456789ab' }]]));
   assert.doesNotThrow(() => vpnReplyMarkup([[{ text: 'Память', data: 'mem:edit:33333333-3333-4333-8333-333333333333' }]]));
   assert.doesNotThrow(() => vpnReplyMarkup([[{ text: 'Устройство', data: 'dev:task:33333333-3333-4333-8333-333333333333' }]]));
