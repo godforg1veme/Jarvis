@@ -1,7 +1,7 @@
 # VPN Supervisor: distributed diagnosis and safe autonomy foundation
 
 **Date:** 2026-09-15  
-**Status:** Proposed; pending owner review  
+**Status:** Approved by owner on 2026-09-15
 **Scope of this milestone:** dependency model, deterministic classifier, Operations integration, tests, deployment, and production snapshot acceptance. No repair action or LLM invocation is enabled in this milestone.
 
 ## Goal
