@@ -198,26 +198,28 @@ class PeopleRepository {
 
   async listSharedSummaries({ memberUserId, now = new Date(), limit = 100 }) {
     const result = await this.pool.query(`
-      SELECT grant.id AS grant_id, grant.resource_type, grant.resource_id, grant.permission, grant.expires_at,
+      SELECT family_grant.id AS grant_id, family_grant.resource_type, family_grant.resource_id,
+        family_grant.permission, family_grant.expires_at,
         COALESCE(project.name, area.name, commitment.title, source.display_name) AS label,
         CASE
-          WHEN grant.resource_type = 'project' THEN project.summary
-          WHEN grant.resource_type = 'commitment' THEN concat_ws(' · ', commitment.status, commitment.due_at::text)
+          WHEN family_grant.resource_type = 'project' THEN project.summary
+          WHEN family_grant.resource_type = 'commitment' THEN concat_ws(' · ', commitment.status, commitment.due_at::text)
           ELSE ''
         END AS summary
-      FROM life_family_access_grants grant
-      LEFT JOIN life_projects project ON grant.resource_type = 'project'
-        AND project.user_id = grant.user_id AND project.id = grant.resource_id
-      LEFT JOIN life_areas area ON grant.resource_type = 'area'
-        AND area.user_id = grant.user_id AND area.id = grant.resource_id
-      LEFT JOIN life_commitments commitment ON grant.resource_type = 'commitment'
-        AND commitment.user_id = grant.user_id AND commitment.id = grant.resource_id
-      LEFT JOIN life_source_connections source ON grant.resource_type = 'calendar_source'
-        AND source.user_id = grant.user_id AND source.id = grant.resource_id AND source.adapter_type = 'calendar'
-      WHERE grant.member_user_id = $1 AND grant.permission = 'view_summary'
-        AND grant.revoked_at IS NULL AND grant.starts_at <= $2
-        AND (grant.expires_at IS NULL OR grant.expires_at > $2)
-      ORDER BY grant.updated_at DESC, grant.id DESC LIMIT $3
+      FROM life_family_access_grants family_grant
+      LEFT JOIN life_projects project ON family_grant.resource_type = 'project'
+        AND project.user_id = family_grant.user_id AND project.id = family_grant.resource_id
+      LEFT JOIN life_areas area ON family_grant.resource_type = 'area'
+        AND area.user_id = family_grant.user_id AND area.id = family_grant.resource_id
+      LEFT JOIN life_commitments commitment ON family_grant.resource_type = 'commitment'
+        AND commitment.user_id = family_grant.user_id AND commitment.id = family_grant.resource_id
+      LEFT JOIN life_source_connections source ON family_grant.resource_type = 'calendar_source'
+        AND source.user_id = family_grant.user_id AND source.id = family_grant.resource_id
+        AND source.adapter_type = 'calendar'
+      WHERE family_grant.member_user_id = $1 AND family_grant.permission = 'view_summary'
+        AND family_grant.revoked_at IS NULL AND family_grant.starts_at <= $2
+        AND (family_grant.expires_at IS NULL OR family_grant.expires_at > $2)
+      ORDER BY family_grant.updated_at DESC, family_grant.id DESC LIMIT $3
     `, [memberUserId, now, boundedLimit(limit)]);
     return result.rows;
   }
