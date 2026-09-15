@@ -62,11 +62,16 @@ async function main() {
     await client.query("INSERT INTO devices(id,user_id,name,status,capabilities) VALUES ($1,$2,'Jarvis Desktop','online',$3::jsonb)", [deviceId, userId, JSON.stringify({ actions: ['workspace.prepare'] })]);
     await client.query('INSERT INTO conversations(id,user_id) VALUES ($1,$2)', [conversationId, userId]);
 
-    const scopedQuery = (...args) => client.query(...args);
+    let queryTail = Promise.resolve();
+    const scopedQuery = (...args) => {
+      const result = queryTail.then(() => client.query(...args));
+      queryTail = result.catch(() => {});
+      return result;
+    };
     const transactionQuery = (...args) => {
       const sql = String(args[0] || '').trim().toUpperCase();
       if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') return Promise.resolve({ rows: [], rowCount: 0 });
-      return client.query(...args);
+      return scopedQuery(...args);
     };
     const scopedPool = { query: scopedQuery, connect: async () => ({ query: transactionQuery, release() {} }) };
     const eventRepository = new LifeEventRepository(scopedPool);
@@ -193,7 +198,7 @@ async function main() {
     assert.equal(recoveredAfterAction.continuation.summary, 'Сценарий успешно завершён');
     assert.equal(recoveredAfterAction.verifiedFacts.some((fact) => fact.type === 'workflow.completed'), true);
     const workflowEvents = (await new TimelineService({ repository: projectionRepository }).list({ userId, projectId: project.id, limit: 100 }))
-      .items.filter((item) => item.event_type === 'workflow.completed');
+      .items.filter((item) => item.type === 'workflow.completed');
     assert.equal(workflowEvents.length, 1);
 
     const people = new PeopleRepository(scopedPool);
