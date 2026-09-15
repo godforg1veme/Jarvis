@@ -58,7 +58,13 @@ class CommitmentLifecycleService {
   async completeFromVerifiedAction({ userId, commitmentId, revision, workflowId }) {
     if (!workflowId) return null;
     if (!await this.repository.isWorkflowLinked({ userId, commitmentId, workflowId })) return null;
-    return this.repository.transition({ userId, commitmentId, revision, status: 'completed' });
+    let expectedRevision = revision;
+    if (expectedRevision === undefined || expectedRevision === null) {
+      const commitment = await this.repository.get({ userId, commitmentId });
+      if (!commitment || commitment.status !== 'open') return null;
+      expectedRevision = commitment.revision;
+    }
+    return this.repository.transition({ userId, commitmentId, revision: expectedRevision, status: 'completed' });
   }
 }
 

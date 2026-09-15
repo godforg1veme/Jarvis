@@ -94,3 +94,16 @@ test('verified workflow completion requires an existing owner-scoped commitment 
   assert.ok(await service.completeFromVerifiedAction({ userId: USER, commitmentId: COMMITMENT, revision: 1, workflowId: WORKFLOW }));
   assert.equal(transitions, 1);
 });
+
+test('verified completion resolves the current owner-scoped revision when omitted', async () => {
+  const calls = [];
+  const repository = {
+    async isWorkflowLinked(input) { calls.push(input); return true; },
+    async get(input) { calls.push(input); return { id: COMMITMENT, status: 'open', revision: 7 }; },
+    async transition(input) { calls.push(input); return { id: COMMITMENT, status: 'completed', revision: 8 }; },
+  };
+  const service = new CommitmentLifecycleService({ repository });
+  const result = await service.completeFromVerifiedAction({ userId: USER, commitmentId: COMMITMENT, workflowId: WORKFLOW });
+  assert.equal(result.status, 'completed');
+  assert.deepEqual(calls.at(-1), { userId: USER, commitmentId: COMMITMENT, revision: 7, status: 'completed' });
+});

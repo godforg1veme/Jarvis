@@ -265,6 +265,7 @@ async function createRuntime(config, overrides = {}) {
     if (config.lifeOsEnabled) {
       proposalService = overrides.proposalService || new ProposalService({
         repository: lifeProjectionRepository, gateway: lifeEventGateway, orchestrator, manifest: actionManifest,
+        commitmentLifecycleService: lifeCommitmentLifecycleService,
       });
       if (!overrides.orchestrator) orchestrator.onWorkflowStatus = (workflow) => proposalService.onWorkflowStatus(workflow);
       const personLinker = overrides.personLinker || new PersonLinker({

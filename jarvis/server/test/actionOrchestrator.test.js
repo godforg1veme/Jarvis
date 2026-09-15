@@ -92,6 +92,7 @@ function createHarness(plans, options = {}) {
     deviceRepository: { async listForUser(owner) { assert.equal(owner, userId); return options.devices || [{ id: deviceId, name: 'Основной ПК', status: 'online', capabilities: { actions: ['file.search', 'file.open_folder', 'file.delete'] } }]; } },
     conversationRepository: { async appendMessage() {} },
     deliverUpdate: async (input) => delivered.push(input),
+    lifeEventGateway: options.lifeEventGateway || null,
     fastResultWaitMs: 1,
   });
   return { orchestrator, repository, executions, commands, delivered };
@@ -202,15 +203,27 @@ test('an uncertain Desktop result becomes outcome_unknown and is never replanned
 
 test('declared workspace preparation completes after one origin confirmation without planner continuation', async () => {
   const devices = [{ id: deviceId, name: 'Основной ПК', status: 'online', capabilities: { actions: ['workspace.prepare'] } }];
+  const workflowEvents = [];
   const { orchestrator, repository, executions } = createHarness([], { devices, terminals: {
     'workspace.prepare': { status: 'succeeded', result: { ok: true, action: 'workspace.prepare', steps: [{ type: 'application', label: 'VS Code', status: 'completed' }] } },
-  } });
+  }, lifeEventGateway: { async record(input) { workflowEvents.push(input); } } });
+  const proposalId = '44444444-4444-4444-8444-444444444444';
+  const projectId = '55555555-5555-4555-8555-555555555555';
+  const commitmentId = '66666666-6666-4666-8666-666666666666';
   const result = await orchestrator.executeDeclaredProposal({ userId, conversationId, originChannel: 'desktop', originDeviceId: deviceId,
-    proposalId: '44444444-4444-4444-8444-444444444444', text: 'Подготовить Life OS', actionName: 'workspace.prepare',
+    proposalId, projectId, commitmentId, text: 'Подготовить Life OS', actionName: 'workspace.prepare',
     actionArguments: { projectId: '55555555-5555-4555-8555-555555555555', capabilityClasses: ['applications'] } });
   assert.equal(result.status, 'succeeded');
   assert.equal(executions.length, 1);
-  assert.equal([...repository.workflows.values()][0].status, 'succeeded');
+  const workflow = [...repository.workflows.values()][0];
+  assert.equal(workflow.status, 'succeeded');
+  assert.equal(workflow.state.proposalId, proposalId);
+  assert.equal(workflow.state.projectId, projectId);
+  assert.equal(workflow.state.commitmentId, commitmentId);
+  const completedEvent = workflowEvents.find((event) => event.eventType === 'workflow.completed');
+  assert.equal(completedEvent.structuredData.proposalId, proposalId);
+  assert.equal(completedEvent.structuredData.projectId, projectId);
+  assert.equal(completedEvent.structuredData.commitmentId, commitmentId);
 });
 
 test('APP_NOT_FOUND error code returns a clear public message', async () => {

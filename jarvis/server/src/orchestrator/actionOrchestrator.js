@@ -12,6 +12,12 @@ const TERMINAL_AFTER_SUCCESS = new Set(['file.open', 'file.open_folder', 'file.r
 const OPEN_INTENT = /(?:^|\s)(?:открой|открыть|запусти|запустить|open|launch)(?:\s|$)/iu;
 const REVEAL_INTENT = /(?:покажи|показать|проводник|где\s+(?:лежит|находится)|расположен|reveal|show\s+in\s+(?:explorer|folder))/iu;
 const DEVICE_ACTION_INTENT = /(?:(?:^|\s)(?:найди|найти|поищи|поиск|открой|открыть|покажи|показать|посмотри|взгляни|запусти|запустить|закрой|закрыть|удали|удалить|удаляй|перемести|перенеси|переместить|переименуй|переименовать|создай|создать|скопируй|копировать|сфокусируй|разверни|восстанови|расположи|выполни|сделай|команда|find|search|open|reveal|show|look|launch|close|delete|remove|move|rename|create|copy|focus|restore|resize|layout|execute)(?:\s|$)|что\s+(?:ты\s+)?видишь|что\s+(?:сейчас\s+)?на\s+(?:камере|экране|мониторе)|(?:какие|перечисли|покажи)\s+окна(?:\s|[?.!,]|$)|что\s+(?:сейчас\s+)?открыто\s+(?:на|в)\s+(?:пк|компьютере)(?:\s|[?.!,]|$)|что\s+(?:лежит|находится)\s+в\s+папке(?:\s|[?.!,]|$)|[a-z]:[\\/])/iu;
+const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
+
+function optionalUuid(value) {
+  const candidate = String(value || '');
+  return UUID.test(candidate) ? candidate : null;
+}
 
 function hasPotentialDeviceAction(text) {
   return DEVICE_ACTION_INTENT.test(String(text || '').trim());
@@ -261,7 +267,10 @@ class ActionOrchestrator {
       targetExecutorType: action.executorType, targetId: input.originDeviceId || null,
       expiresAt: new Date(this.now().getTime() + WORKFLOW_TTL_MS),
       state: { originalRequest: String(input.text || '').slice(0, 10000), latestUserText: String(input.text || '').slice(0, 10000),
-        proposalId: input.proposalId, toolResults: [] },
+        proposalId: optionalUuid(input.proposalId),
+        ...(optionalUuid(input.projectId) ? { projectId: optionalUuid(input.projectId) } : {}),
+        ...(optionalUuid(input.commitmentId) ? { commitmentId: optionalUuid(input.commitmentId) } : {}),
+        toolResults: [] },
     });
     await this._recordWorkflowEvent(workflow, 'workflow.started');
     const devices = await this.deviceRepository.listForUser(input.userId);
@@ -619,6 +628,9 @@ class ActionOrchestrator {
         workflowId: workflow.id,
         state: workflow.status,
         originChannel: workflow.origin_channel,
+        ...(optionalUuid(workflow.state?.proposalId) ? { proposalId: workflow.state.proposalId } : {}),
+        ...(optionalUuid(workflow.state?.projectId) ? { projectId: workflow.state.projectId } : {}),
+        ...(optionalUuid(workflow.state?.commitmentId) ? { commitmentId: workflow.state.commitmentId } : {}),
         ...(workflow.target_id ? { targetDeviceId: workflow.target_id } : {}),
       },
       correlationId: workflow.id,

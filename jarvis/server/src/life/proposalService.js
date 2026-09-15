@@ -7,6 +7,7 @@ class ProposalService {
     this.orchestrator = options.orchestrator || null;
     this.manifest = options.manifest || null;
     this.recoveryPlanService = options.recoveryPlanService || null;
+    this.commitmentLifecycleService = options.commitmentLifecycleService || null;
     this.now = options.now || (() => new Date());
   }
 
@@ -73,6 +74,8 @@ class ProposalService {
       const result = await this.orchestrator.executeDeclaredProposal({
         userId, proposalId, conversationId: confirmed.origin_conversation_id,
         originChannel, originDeviceId, text: confirmed.title,
+        projectId: confirmed.project_id || null,
+        commitmentId: confirmed.commitment_id || null,
         actionName: confirmed.action_name, actionArguments: confirmed.action_arguments || {},
       });
       const terminalStatus = result.pending ? 'executing'
@@ -86,6 +89,11 @@ class ProposalService {
       if (updated && !result.pending && planId && this.recoveryPlanService) await this.recoveryPlanService.applyWorkflowResult({
         userId, planId, status: result.partial === true ? 'partial' : result.status || 'succeeded',
       });
+      if (updated && result.status === 'succeeded' && confirmed.commitment_id && this.commitmentLifecycleService) {
+        await this.commitmentLifecycleService.completeFromVerifiedAction({
+          userId, commitmentId: confirmed.commitment_id, workflowId: result.workflowId,
+        });
+      }
       return updated;
     } catch (_) {
       return this.repository.transitionProposal({
@@ -130,6 +138,11 @@ class ProposalService {
       userId: workflow.user_id, planId,
       status: workflow.state?.partialResult === true ? 'partial' : workflow.status,
     });
+    if (updated && workflow.status === 'succeeded' && proposal.commitment_id && this.commitmentLifecycleService) {
+      await this.commitmentLifecycleService.completeFromVerifiedAction({
+        userId: workflow.user_id, commitmentId: proposal.commitment_id, workflowId: workflow.id,
+      });
+    }
     return updated;
   }
 }
