@@ -58,11 +58,15 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter, con
         elif request["operation"] in {"service.start", "service.stop", "service.restart", "backup.run", "vpn.client.issue", "vpn.client.revoke", "vpn.client.rotate", "vpn.client.export", "vpn.restart", "vpn.hysteria2.client.issue", "vpn.hysteria2.client.revoke", "vpn.hysteria2.client.rotate", "vpn.hysteria2.client.export", "vpn.hysteria2.restart"}:
             placeholder = response_for(request, {"state": "unknown", "errorCode": "ACTION_OUTCOME_PENDING"})
             if journal.claim(request, placeholder):
-                payload = journal.complete(request, response_for(request, execute(config, request["operation"], request["arguments"])))
+                loop = asyncio.get_running_loop()
+                exec_result = await loop.run_in_executor(None, execute, config, request["operation"], request["arguments"])
+                payload = journal.complete(request, response_for(request, exec_result))
             else:
                 payload = journal.get(request)
         else:
-            payload = journal.put(request, response_for(request, execute(config, request["operation"], request["arguments"])))
+            loop = asyncio.get_running_loop()
+            exec_result = await loop.run_in_executor(None, execute, config, request["operation"], request["arguments"])
+            payload = journal.put(request, response_for(request, exec_result))
     except (UnicodeError, ValueError, ProtocolError, asyncio.TimeoutError):
         payload = {"version": 1, "requestId": "00000000-0000-4000-8000-000000000000", "operation": "host.snapshot", "receivedAt": utc_now(), "completedAt": utc_now(), "result": {"state": "failed", "errorCode": "REQUEST_REJECTED"}}
     writer.write(json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8") + b"\n")
