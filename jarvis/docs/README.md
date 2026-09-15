@@ -61,6 +61,14 @@ external providers, Telegram behavior, and interactive changing recovery remain
 manual acceptance. Details are recorded in
 `updates/2026-09-15-jarvis-life-os-v2.md`.
 
+Host Agent HTTP-auth hardening & test sync, 2026-09-15: Hysteria 2 HTTP-auth
+endpoint (`127.0.0.1:3211/vpn/hysteria2/auth`) was hardened with strict path,
+method, length, and malformed UTF-8/JSON validation returning 400/404/405. Full
+Host Agent runtime and tests were deployed to VPS, eliminating partial-file
+deployments. All 42 tests passed locally and on the VPS; live endpoint and
+service health were verified. See `updates/2026-09-15-host-agent-http-auth-test-sync.md`.
+
+
 Happ VPN update, 2026-09-13: dedicated VLESS + REALITY + XTLS Vision Xray is
 deployed on port 443, externally accepted through the production client URI,
 and monitored by Operations. Owner-only Telegram/Desktop commands use

@@ -1,16 +1,37 @@
+import asyncio
 import json
 import tempfile
 import unittest
 from pathlib import Path
 
 from jarvis_host_agent.hysteria_vpn_manager import (
+    DEFAULT_AUTH_PATH,
     DEFAULT_AUTH_URL,
     HysteriaVpnManager,
+    handle_hysteria_auth,
     hysteria_config,
     validate_hysteria_state,
     verify_client_auth,
 )
 from jarvis_host_agent.vpn_manager import VpnManagerError
+
+
+class MockStreamWriter:
+    def __init__(self):
+        self.output = bytearray()
+        self.closed = False
+
+    def write(self, data: bytes) -> None:
+        self.output.extend(data)
+
+    async def drain(self) -> None:
+        pass
+
+    def close(self) -> None:
+        self.closed = True
+
+    async def wait_closed(self) -> None:
+        pass
 
 
 def base_state():
@@ -118,6 +139,142 @@ class HysteriaVpnManagerTests(unittest.TestCase):
         status = self.manager.status()
         self.assertEqual(status, {"serviceState": "active", "configValid": True, "listenerReady": True, "clientCount": 0})
         self.assertNotIn(base_state()["obfsPassword"], json.dumps(status))
+
+    def test_health_snapshot_is_structured_and_secret_free(self):
+        snapshot = self.manager.health_snapshot(listener_tcp_output="LISTEN 0 128 127.0.0.1:3211 0.0.0.0:*\n")
+        self.assertEqual(snapshot, {"service": "healthy", "config": "healthy", "listener": "healthy", "auth": "healthy"})
+        self.assertNotIn(base_state()["obfsPassword"], json.dumps(snapshot))
+
+    def _send_http_auth(self, request_bytes: bytes, state_path: Path | None = None) -> bytes:
+        target_path = state_path or self.state_path
+
+        async def _run():
+            reader = asyncio.StreamReader()
+            reader.feed_data(request_bytes)
+            reader.feed_eof()
+            writer = MockStreamWriter()
+            await handle_hysteria_auth(reader, writer, state_path=target_path)
+            return bytes(writer.output)
+
+        return asyncio.run(_run())
+
+    def test_http_auth_valid_credentials(self):
+        self.manager.issue("iPhone")
+        state = json.loads(self.state_path.read_text(encoding="utf-8"))
+        client = state["clients"][0]
+        body = json.dumps({"auth": f"{client['id']}:{client['password']}"}).encode("utf-8")
+        req = (
+            f"POST {DEFAULT_AUTH_PATH} HTTP/1.1\r\n"
+            f"Host: 127.0.0.1\r\n"
+            f"Content-Type: application/json\r\n"
+            f"Content-Length: {len(body)}\r\n\r\n"
+        ).encode("latin1") + body
+        resp = self._send_http_auth(req)
+        self.assertIn(b"HTTP/1.1 200 OK", resp)
+        self.assertIn(b'"ok": true', resp)
+        self.assertIn(f'"{client["id"]}"'.encode("utf-8"), resp)
+
+    def test_http_auth_invalid_credentials(self):
+        self.manager.issue("iPhone")
+        body = b'{"auth": "vpn-0123456789ab:wrong_password"}'
+        req = (
+            f"POST {DEFAULT_AUTH_PATH} HTTP/1.1\r\n"
+            f"Host: 127.0.0.1\r\n"
+            f"Content-Length: {len(body)}\r\n\r\n"
+        ).encode("latin1") + body
+        resp = self._send_http_auth(req)
+        self.assertIn(b"HTTP/1.1 200 OK", resp)
+        self.assertIn(b'{"ok":false}', resp)
+
+    def test_http_auth_wrong_method(self):
+        req = f"GET {DEFAULT_AUTH_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n".encode("latin1")
+        resp = self._send_http_auth(req)
+        self.assertIn(b"HTTP/1.1 405 Method Not Allowed", resp)
+        self.assertIn(b'{"ok":false}', resp)
+
+    def test_http_auth_wrong_path(self):
+        req = b"POST /invalid/path HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 0\r\n\r\n"
+        resp = self._send_http_auth(req)
+        self.assertIn(b"HTTP/1.1 404 Not Found", resp)
+        self.assertIn(b'{"ok":false}', resp)
+
+    def test_http_auth_oversized_body(self):
+        req = f"POST {DEFAULT_AUTH_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 5000\r\n\r\n".encode("latin1")
+        resp = self._send_http_auth(req)
+        self.assertIn(b"HTTP/1.1 400 Bad Request", resp)
+        self.assertIn(b'{"ok":false}', resp)
+
+    def test_http_auth_invalid_content_length(self):
+        for invalid in ("-1", "not_a_number"):
+            req = f"POST {DEFAULT_AUTH_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: {invalid}\r\n\r\n".encode("latin1")
+            resp = self._send_http_auth(req)
+            self.assertIn(b"HTTP/1.1 400 Bad Request", resp)
+            self.assertIn(b'{"ok":false}', resp)
+
+    def test_http_auth_malformed_utf8(self):
+        body = b"\xff\xfe\xfd\xfc"
+        req = (
+            f"POST {DEFAULT_AUTH_PATH} HTTP/1.1\r\n"
+            f"Host: 127.0.0.1\r\n"
+            f"Content-Length: {len(body)}\r\n\r\n"
+        ).encode("latin1") + body
+        resp = self._send_http_auth(req)
+        self.assertIn(b"HTTP/1.1 400 Bad Request", resp)
+        self.assertIn(b'{"ok":false}', resp)
+
+    def test_http_auth_malformed_json(self):
+        body = b'{"auth": "unterminated'
+        req = (
+            f"POST {DEFAULT_AUTH_PATH} HTTP/1.1\r\n"
+            f"Host: 127.0.0.1\r\n"
+            f"Content-Length: {len(body)}\r\n\r\n"
+        ).encode("latin1") + body
+        resp = self._send_http_auth(req)
+        self.assertIn(b"HTTP/1.1 400 Bad Request", resp)
+        self.assertIn(b'{"ok":false}', resp)
+
+    def test_http_auth_non_object_json(self):
+        body = b'["auth", "vpn-1:pwd"]'
+        req = (
+            f"POST {DEFAULT_AUTH_PATH} HTTP/1.1\r\n"
+            f"Host: 127.0.0.1\r\n"
+            f"Content-Length: {len(body)}\r\n\r\n"
+        ).encode("latin1") + body
+        resp = self._send_http_auth(req)
+        self.assertIn(b"HTTP/1.1 400 Bad Request", resp)
+        self.assertIn(b'{"ok":false}', resp)
+
+    def test_http_auth_tcp_integration_smoke(self):
+        self.manager.issue("iPhone")
+        state = json.loads(self.state_path.read_text(encoding="utf-8"))
+        client = state["clients"][0]
+        body = json.dumps({"auth": f"{client['id']}:{client['password']}"}).encode("utf-8")
+
+        async def _run():
+            server = await asyncio.start_server(
+                lambda r, w: handle_hysteria_auth(r, w, state_path=self.state_path),
+                host="127.0.0.1",
+                port=0,
+            )
+            port = server.sockets[0].getsockname()[1]
+            async with server:
+                reader, writer = await asyncio.open_connection("127.0.0.1", port)
+                req = (
+                    f"POST {DEFAULT_AUTH_PATH} HTTP/1.1\r\n"
+                    f"Host: 127.0.0.1\r\n"
+                    f"Content-Length: {len(body)}\r\n\r\n"
+                ).encode("latin1") + body
+                writer.write(req)
+                await writer.drain()
+                resp = await reader.read(4096)
+                writer.close()
+                await writer.wait_closed()
+                return resp
+
+        resp = asyncio.run(_run())
+        self.assertIn(b"HTTP/1.1 200 OK", resp)
+        self.assertIn(b'"ok": true', resp)
+        self.assertIn(f'"{client["id"]}"'.encode("utf-8"), resp)
 
 
 if __name__ == "__main__":

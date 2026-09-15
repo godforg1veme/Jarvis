@@ -24,7 +24,8 @@ DEFAULT_HYSTERIA_BIN = "/usr/local/bin/hysteria"
 DEFAULT_SERVICE = "hysteria-server.service"
 DEFAULT_AUTH_PORT = 3211
 DEFAULT_AUTH_HOST = "127.0.0.1"
-DEFAULT_AUTH_URL = f"http://{DEFAULT_AUTH_HOST}:{DEFAULT_AUTH_PORT}/vpn/hysteria2/auth"
+DEFAULT_AUTH_PATH = "/vpn/hysteria2/auth"
+DEFAULT_AUTH_URL = f"http://{DEFAULT_AUTH_HOST}:{DEFAULT_AUTH_PORT}{DEFAULT_AUTH_PATH}"
 HOST_RE = re.compile(r"^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
 EMAIL_RE = re.compile(r"^[^\s@]{1,64}@[^\s@]{1,190}$")
 SECRET_RE = re.compile(r"^[A-Za-z0-9_-]{32,96}$")
@@ -121,7 +122,7 @@ def verify_client_auth(state_or_path: dict[str, Any] | Path, auth_str: str) -> t
 
 
 async def _write_http_response(writer: asyncio.StreamWriter, status: int, body: bytes) -> None:
-    status_text = {200: "OK", 400: "Bad Request", 405: "Method Not Allowed", 500: "Internal Server Error"}.get(status, "OK")
+    status_text = {200: "OK", 400: "Bad Request", 404: "Not Found", 405: "Method Not Allowed", 500: "Internal Server Error"}.get(status, "OK")
     response = (
         f"HTTP/1.1 {status} {status_text}\r\n"
         f"Content-Type: application/json\r\n"
@@ -142,8 +143,12 @@ async def handle_hysteria_auth(reader: asyncio.StreamReader, writer: asyncio.Str
         if len(parts) < 2 or parts[0] != "POST":
             await _write_http_response(writer, 405, b'{"ok":false}')
             return
+        if parts[1] != DEFAULT_AUTH_PATH:
+            await _write_http_response(writer, 404, b'{"ok":false}')
+            return
 
         content_length = 0
+        content_length_invalid = False
         while True:
             header_line = await asyncio.wait_for(reader.readline(), timeout=5)
             if not header_line or header_line in (b"\r\n", b"\n"):
@@ -154,15 +159,25 @@ async def handle_hysteria_auth(reader: asyncio.StreamReader, writer: asyncio.Str
                 if name.strip().lower() == "content-length":
                     try:
                         content_length = int(val.strip())
+                        if content_length < 0:
+                            content_length_invalid = True
                     except ValueError:
-                        content_length = 0
+                        content_length_invalid = True
 
-        if content_length > 4096:
+        if content_length_invalid or content_length > 4096:
             await _write_http_response(writer, 400, b'{"ok":false}')
             return
 
         body = await asyncio.wait_for(reader.readexactly(content_length), timeout=5) if content_length > 0 else b""
-        payload = json.loads(body.decode("utf-8")) if body else {}
+        try:
+            decoded = body.decode("utf-8")
+            payload = json.loads(decoded) if decoded else {}
+            if not isinstance(payload, dict):
+                raise ValueError("payload must be a JSON object")
+        except (UnicodeDecodeError, json.JSONDecodeError, ValueError):
+            await _write_http_response(writer, 400, b'{"ok":false}')
+            return
+
         auth_val = payload.get("auth", "")
         ok, client_id = verify_client_auth(state_path, auth_val)
         if ok:
@@ -308,6 +323,37 @@ class HysteriaVpnManager:
             }
         except VpnManagerError:
             return {"serviceState": "unavailable", "configValid": False, "listenerReady": False, "clientCount": 0}
+
+    def health_snapshot(self, listener_tcp_output: str | None = None) -> dict[str, str]:
+        try:
+            state = self._read_state()
+            active = self.run(["/usr/bin/systemctl", "is-active", self.service], timeout=15)
+            listener_udp = self.run(["/usr/bin/ss", "-lun"], timeout=15)
+            listener_udp_output = listener_udp.get("data", {}).get("output", "") if listener_udp.get("state") == "succeeded" else ""
+            if listener_tcp_output is None:
+                listener_tcp = self.run(["/usr/bin/ss", "-lnt"], timeout=15)
+                listener_tcp_output = listener_tcp.get("data", {}).get("output", "") if listener_tcp.get("state") == "succeeded" else ""
+
+            active_out = active.get("data", {}).get("output", "").strip() if active.get("state") == "succeeded" else ""
+            if active_out == "active":
+                service_health = "healthy"
+            elif active_out in {"activating", "reloading"}:
+                service_health = "degraded"
+            else:
+                service_health = "unavailable"
+
+            config_health = "healthy" if self._config_valid(state) else "unavailable"
+            listener_health = "healthy" if f'{state["address"]}:{state["port"]}' in listener_udp_output else "unavailable"
+            auth_health = "healthy" if f":{DEFAULT_AUTH_PORT}" in listener_tcp_output else "unavailable"
+
+            return {
+                "service": service_health,
+                "config": config_health,
+                "listener": listener_health,
+                "auth": auth_health,
+            }
+        except (VpnManagerError, Exception):
+            return {"service": "unavailable", "config": "unavailable", "listener": "unavailable", "auth": "unavailable"}
 
     def clients(self) -> list[dict[str, Any]]:
         return [self._public_client(client) for client in self._read_state()["clients"]]

@@ -19,3 +19,7 @@ Install or update from the deployed application tree with:
 ```bash
 sudo bash /home/deploy/apps/jarvis/deploy/host-agent/install.sh
 ```
+
+Never cherry-pick individual `.py` files to `/opt/jarvis-host-agent`. Always
+synchronize the full `host-agent/` tree (both `jarvis_host_agent/` and `tests/`)
+and verify `unittest discover -s tests` passes before and after updating.
