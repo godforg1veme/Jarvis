@@ -47,6 +47,9 @@ OPERATIONS = frozenset((
     "vpn.health.snapshot",
     "vpn.external_probe.snapshot",
     "vpn.external_probe.credential.install",
+    "vpn.external_probe.run",
+    "vpn.external_probe.monitor.enable",
+    "vpn.external_probe.monitor.disable",
 ))
 
 VPN_CLIENT_ID_RE = re.compile(r"^vpn-[a-f0-9]{12}$")
@@ -95,7 +98,7 @@ def _service_id(value: Any) -> str:
 
 def validate_arguments(operation: str, value: Any) -> dict[str, Any]:
     args = _require_mapping(value, "arguments")
-    if operation == "vpn.external_probe.snapshot":
+    if operation in {"vpn.external_probe.snapshot", "vpn.external_probe.run", "vpn.external_probe.monitor.enable", "vpn.external_probe.monitor.disable"}:
         _no_extra(args, {"targetNode"}, "arguments")
         if args.get("targetNode") not in {"de", "nl"}:
             raise ProtocolError("arguments.targetNode is invalid")

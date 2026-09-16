@@ -55,7 +55,7 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter, con
             original = journal.get_response(request["arguments"]["requestId"])
             result = {"state": "succeeded", "data": {"found": original is not None, "response": original}}
             payload = journal.put(request, response_for(request, result))
-        elif request["operation"] in {"service.start", "service.stop", "service.restart", "backup.run", "vpn.client.issue", "vpn.client.revoke", "vpn.client.rotate", "vpn.client.export", "vpn.restart", "vpn.hysteria2.client.issue", "vpn.hysteria2.client.revoke", "vpn.hysteria2.client.rotate", "vpn.hysteria2.client.export", "vpn.hysteria2.restart", "vpn.external_probe.credential.install"}:
+        elif request["operation"] in {"service.start", "service.stop", "service.restart", "backup.run", "vpn.client.issue", "vpn.client.revoke", "vpn.client.rotate", "vpn.client.export", "vpn.restart", "vpn.hysteria2.client.issue", "vpn.hysteria2.client.revoke", "vpn.hysteria2.client.rotate", "vpn.hysteria2.client.export", "vpn.hysteria2.restart", "vpn.external_probe.credential.install", "vpn.external_probe.run", "vpn.external_probe.monitor.enable", "vpn.external_probe.monitor.disable"}:
             placeholder = response_for(request, {"state": "unknown", "errorCode": "ACTION_OUTCOME_PENDING"})
             if journal.claim(request, placeholder):
                 loop = asyncio.get_running_loop()

@@ -40,7 +40,7 @@ class ActionsTests(unittest.TestCase):
             },
         )
 
-    @patch("jarvis_host_agent.vpn_external_probe.read_probe_result")
+    @patch("jarvis_host_agent.actions.read_probe_result")
     def test_external_probe_snapshot_is_read_only_and_target_scoped(self, read_result):
         read_result.return_value = {"version": 1, "targetNode": "nl", "checks": {}}
         response = execute(self.config, "vpn.external_probe.snapshot", {"targetNode": "nl"})
@@ -59,6 +59,29 @@ class ActionsTests(unittest.TestCase):
         self.assertEqual(response["data"]["targetNode"], "de")
         self.assertNotIn("credential", str(response))
         install.assert_called_once()
+
+    @patch("jarvis_host_agent.actions.read_probe_result")
+    @patch("jarvis_host_agent.actions._run")
+    def test_external_probe_run_starts_only_opposite_fixed_instance(self, run, read_result):
+        config = SimpleNamespace(node_code="nl", probe_target=SimpleNamespace(node_code="de"))
+        run.return_value = {"state": "succeeded", "data": {"output": ""}}
+        read_result.return_value = {"targetNode": "de", "checks": {}}
+        response = execute(config, "vpn.external_probe.run", {"targetNode": "de"})
+        self.assertEqual(response["state"], "succeeded")
+        self.assertEqual(response["data"]["targetNode"], "de")
+        run.assert_called_once_with(["/usr/bin/systemctl", "start", "jarvis-vpn-probe@de.service"], timeout=75)
+
+    @patch("jarvis_host_agent.actions._run")
+    def test_external_probe_monitor_lifecycle_never_targets_vpn_services(self, run):
+        config = SimpleNamespace(node_code="de", probe_target=SimpleNamespace(node_code="nl"))
+        run.side_effect = [
+            {"state": "succeeded", "data": {"output": ""}},
+            {"state": "succeeded", "data": {"output": "enabled\n"}},
+        ]
+        enabled = execute(config, "vpn.external_probe.monitor.enable", {"targetNode": "nl"})
+        self.assertEqual(enabled["state"], "succeeded")
+        self.assertEqual(run.call_args_list[0].args[0], ["/usr/bin/systemctl", "enable", "--now", "jarvis-vpn-probe@nl.timer"])
+        self.assertFalse(any("xray" in str(call) or "hysteria-server" in str(call) for call in run.call_args_list))
 
     @patch("jarvis_host_agent.actions._run")
     def test_services_snapshot_returns_only_normalized_allowlisted_state(self, run):

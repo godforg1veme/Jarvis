@@ -19,6 +19,7 @@ from .vpn_manager import XrayVpnManager
 from .network_probes import probe_dns, probe_outbound_https
 from .vpn_incident_classifier import classify_vpn_incident
 from .vpn_probe_credentials import ProbeCredentialError, install_probe_credential
+from .vpn_external_probe import read_probe_result
 
 MAX_OUTPUT_BYTES = 32 * 1024
 
@@ -150,7 +151,49 @@ def _vpn_health_snapshot(
     return {**snapshot, "diagnosis": classify_vpn_incident(snapshot)}
 
 
+def _probe_target_allowed(config: HostAgentConfig, target_node: str) -> bool:
+    return (target_node in {"de", "nl"}
+            and getattr(config, "node_code", None) in {"de", "nl"}
+            and target_node != config.node_code
+            and target_node == getattr(getattr(config, "probe_target", None), "node_code", None))
+
+
+def _probe_unit(target_node: str) -> str:
+    return f"jarvis-vpn-probe@{target_node}"
+
+
+def _run_probe(config: HostAgentConfig, target_node: str) -> dict[str, Any]:
+    if not _probe_target_allowed(config, target_node):
+        return {"state": "failed", "errorCode": "VPN_PROBE_TARGET_REJECTED"}
+    result = _run(["/usr/bin/systemctl", "start", f"{_probe_unit(target_node)}.service"], timeout=75)
+    if result["state"] != "succeeded":
+        return {"state": "unknown", "errorCode": "PROBE_RUN_UNKNOWN"}
+    return {"state": "succeeded", "data": read_probe_result(target_node)}
+
+
+def _probe_monitor(config: HostAgentConfig, target_node: str, enabled: bool) -> dict[str, Any]:
+    if not _probe_target_allowed(config, target_node):
+        return {"state": "failed", "errorCode": "VPN_PROBE_TARGET_REJECTED"}
+    unit = f"{_probe_unit(target_node)}.timer"
+    command = ["/usr/bin/systemctl", "enable" if enabled else "disable", "--now", unit]
+    result = _run(command, timeout=45)
+    if result["state"] != "succeeded":
+        return {"state": "unknown", "errorCode": "PROBE_MONITOR_UNKNOWN"}
+    check = _run(["/usr/bin/systemctl", "is-enabled", unit], timeout=15)
+    state = check.get("data", {}).get("output", "").strip()
+    expected = "enabled" if enabled else "disabled"
+    if check["state"] != "succeeded" or state != expected:
+        return {"state": "unknown", "errorCode": "PROBE_MONITOR_UNKNOWN"}
+    return {"state": "succeeded", "data": {"targetNode": target_node, "monitoring": enabled}}
+
+
 def execute(config: HostAgentConfig, operation: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    if operation == "vpn.external_probe.run":
+        return _run_probe(config, arguments["targetNode"])
+    if operation == "vpn.external_probe.monitor.enable":
+        return _probe_monitor(config, arguments["targetNode"], True)
+    if operation == "vpn.external_probe.monitor.disable":
+        return _probe_monitor(config, arguments["targetNode"], False)
     if operation == "vpn.external_probe.credential.install":
         try:
             data = install_probe_credential(config, target_node=arguments["targetNode"],
@@ -159,7 +202,6 @@ def execute(config: HostAgentConfig, operation: str, arguments: dict[str, Any]) 
             return {"state": "failed", "errorCode": "VPN_PROBE_CREDENTIAL_REJECTED"}
         return {"state": "succeeded", "data": data}
     if operation == "vpn.external_probe.snapshot":
-        from .vpn_external_probe import read_probe_result
         return {"state": "succeeded", "data": read_probe_result(arguments["targetNode"])}
     if operation == "vpn.health.snapshot":
         return {"state": "succeeded", "data": _vpn_health_snapshot(_run)}

@@ -69,6 +69,10 @@ class ProtocolTests(unittest.TestCase):
             validate_request(request(operation="vpn.external_probe.credential.install", arguments={
                 "targetNode": "nl", "protocol": "wireguard", "credential": "synthetic",
             }))
+        self.assertEqual(validate_request(request(operation="vpn.external_probe.run", arguments={"targetNode": "nl"}))["arguments"], {"targetNode": "nl"})
+        self.assertEqual(validate_request(request(operation="vpn.external_probe.monitor.enable", arguments={"targetNode": "de"}))["arguments"], {"targetNode": "de"})
+        with self.assertRaises(ProtocolError):
+            validate_request(request(operation="vpn.external_probe.monitor.disable", arguments={"targetNode": "de", "unit": "xray"}))
         with self.assertRaises(ProtocolError):
             validate_request(request(operation="vpn.health.snapshot", arguments={"extra": 1}))
         with self.assertRaises(ProtocolError):
