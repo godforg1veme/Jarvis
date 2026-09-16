@@ -254,8 +254,12 @@ See `docs/README.md` for current implementation status and historical records.
   PostgreSQL migration `022_vpn_subscriptions.sql` stores only SHA-256 token hashes
   (`token_hash`) for strict zero raw secret persistence. `GET /sub/:token` dynamically generates
   Sing-box JSON (or Base64 for legacy clients) demoting probe-degraded nodes via `ExternalProbeMonitor`.
-  `GET /happ-sub/:token` provides a 1-click HTML landing bridge to `happ://add/sub?url=...`.
+  `GET /happ-sub/:token` provides a 1-click HTML landing bridge to the Happ
+  subscription deeplink for that same URL.
   Telegram `/vpn` offers «📲 Умная подписка (Happ)» with 1-click creation, token rotation, and revocation.
+  Initial binding of the four client identities is a separate owner-confirmed
+  `subscription.repair` action (migration 023); an already bound or uncertain
+  repair is blocked rather than overwriting clients or issuing another access set.
 - PostgreSQL must never be published publicly.
 - The DE-4 runs the private `gigaam-asr` service for Russian server ASR with a
   four-CPU/8-GiB cap and no host port. Its observed steady-state RSS is about
