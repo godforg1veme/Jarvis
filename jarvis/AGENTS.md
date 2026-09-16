@@ -182,7 +182,8 @@ See `docs/README.md` for current implementation status and historical records.
 - Backup scheduling and real backup/restore acceptance are deferred by the
   owner as of 2026-09-06. Do not enable the timer as part of panel maintenance.
 
-- The current VPS runs Ubuntu 24.04 LTS, not the original planned 22.04.
+- The production VPS (`87.120.187.202`) runs Ubuntu 24.04 LTS (SSH host `jarvis-vps`).
+- The new VPS (`94.183.208.56`) runs Ubuntu 24.04.4 LTS; passwordless sudo user `deploy` and SSH access are configured via host alias `jarvis-vps-new` in `~/.ssh/config` using `~/.ssh/gemini_vps2`. Remote application root is `/home/deploy/apps/jarvis`.
 - Docker Compose runs `server` and private `postgres`; `cloudflared` is the
   intended public ingress because the dedicated `xray.service` owns port 443.
   The deployed VPN is VLESS + REALITY + XTLS Vision for Happ. Xray health and

@@ -118,8 +118,8 @@ rollback() {
   fi
 }
 trap rollback ERR
-systemctl stop x-ui.service
-systemctl disable x-ui.service >/dev/null
+systemctl stop x-ui.service >/dev/null 2>&1 || true
+systemctl disable x-ui.service >/dev/null 2>&1 || true
 systemctl enable --now xray.service
 systemctl is-active --quiet xray.service
 for _attempt in {1..20}; do

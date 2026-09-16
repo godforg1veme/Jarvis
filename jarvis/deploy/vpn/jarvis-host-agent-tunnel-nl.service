@@ -1,0 +1,15 @@
+﻿[Unit]
+Description=Jarvis Host Agent NL Tunnel
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=deploy
+Group=deploy
+ExecStart=/usr/bin/ssh -N -L /run/jarvis-host-agent/agent-nl.sock:/run/jarvis-host-agent/agent.sock -i /home/deploy/.ssh/jarvis_interhost_ed25519 -o ExitOnForwardFailure=yes -o StreamLocalBindUnlink=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o StrictHostKeyChecking=accept-new deploy@94.183.208.56
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

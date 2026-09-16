@@ -394,9 +394,18 @@ async function createRuntime(config, overrides = {}) {
           socketPath: config.operationsSocketPath,
           authenticatorPath: config.operationsAuthenticatorPath,
         });
+      const vpnHostAgentClientNl = overrides.vpnHostAgentClientNl || (config.operationsNlSocketPath ? new HostAgentClient({
+          socketPath: config.operationsNlSocketPath,
+          authenticatorPath: config.operationsAuthenticatorPath,
+        }) : null);
+      const vpnClients = overrides.vpnClients || {
+        de: vpnHostAgentClient,
+        ...(vpnHostAgentClientNl ? { nl: vpnHostAgentClientNl } : {}),
+      };
       vpnService = overrides.vpnService || new VpnCommandService({
         repository: vpnRepository,
         client: vpnHostAgentClient,
+        clients: vpnClients,
         ownerTelegramId: config.operationsOwnerTelegramId,
       });
       vpnRecoveryWorker = overrides.vpnRecoveryWorker || new VpnRecoveryWorker({

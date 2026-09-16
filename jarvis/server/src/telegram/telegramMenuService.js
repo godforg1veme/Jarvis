@@ -307,11 +307,12 @@ class TelegramMenuService {
 
     if (interaction.kind === 'vpn_access_label') {
       try {
-        validateVpnAction('issue', { protocol: interaction.context.protocol, label: value });
+        const node = interaction.context.node || 'de';
+        validateVpnAction('issue', { protocol: interaction.context.protocol, node, label: value });
         const consumed = await this.interactions.consume({ id: interaction.id, userId: context.user.id, conversationId: context.conversation.id, chatId: context.chatId });
         if (!consumed) return { answer: 'Этот запрос уже недоступен.' };
         const result = await this.vpnService.requestAction({
-          action: 'issue', protocol: interaction.context.protocol, arguments: { label: value },
+          action: 'issue', protocol: interaction.context.protocol, node, arguments: { label: value, node },
           userId: context.user.id, conversationId: context.conversation.id, originChannel: 'telegram', originDeviceId: null,
         });
         return result;

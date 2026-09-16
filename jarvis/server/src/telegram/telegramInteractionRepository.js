@@ -28,8 +28,8 @@ function validateContext(kind, value) {
   const context = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   const keys = Object.keys(context);
   if (kind === 'vpn_access_label') {
-    if (keys.length !== 1 || !['vless', 'hysteria2'].includes(context.protocol)) throw new Error('invalid Telegram interaction context');
-    return { protocol: context.protocol };
+    if (keys.length < 1 || keys.length > 2 || !['vless', 'hysteria2'].includes(context.protocol) || (context.node && !['de', 'nl'].includes(context.node))) throw new Error('invalid Telegram interaction context');
+    return { protocol: context.protocol, node: context.node || 'de' };
   }
   if (kind === 'device_instruction') {
     if (keys.length !== 1 || !UUID_RE.test(String(context.deviceId || ''))) throw new Error('invalid Telegram interaction context');

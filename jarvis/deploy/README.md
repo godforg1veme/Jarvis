@@ -12,6 +12,7 @@ and 443 are free, but it must not be started on the current Xray host.
 ## Layout and trust boundaries
 
 - production directory: `/home/deploy/apps/jarvis`;
+- SSH access: configured via `~/.ssh/config` (`jarvis-vps` for `87.120.187.202`, `jarvis-vps-new` for new `94.183.208.56`);
 - `server` listens only inside the Compose network on port 3210;
 - `postgres` has no host port and must remain private;
 - Cloudflare must publish the selected Jarvis hostname to `http://server:3210`;

@@ -60,16 +60,19 @@ test('parses only the closed VPN command set', () => {
   assert.deepEqual(parseVpnCommand('/vpn'), { kind: 'menu' });
   assert.deepEqual(parseVpnCommand('/vpn_health'), { kind: 'read', action: 'health', protocol: 'both', arguments: {} });
   assert.deepEqual(parseVpnCommand('/vpn_snapshot'), { kind: 'read', action: 'health', protocol: 'both', arguments: {} });
-  assert.deepEqual(parseVpnCommand('/vpn_status'), { kind: 'read', action: 'status', protocol: 'vless', arguments: {} });
-  assert.deepEqual(parseVpnCommand('/vpn_issue My Phone'), { kind: 'change', action: 'issue', protocol: 'vless', arguments: { label: 'My Phone' } });
-  assert.deepEqual(parseVpnCommand('/vpn_hysteria2_issue My Phone'), { kind: 'change', action: 'issue', protocol: 'hysteria2', arguments: { label: 'My Phone' } });
-  assert.deepEqual(parseVpnCommand('/vpn_export My Phone'), { kind: 'change', action: 'export', protocol: 'vless', arguments: { label: 'My Phone' } });
-  assert.deepEqual(parseVpnCommand('/vpn_routing'), { kind: 'routing', protocol: 'hysteria2' });
-  assert.deepEqual(parseVpnCommand('/vpn_ru'), { kind: 'routing', protocol: 'hysteria2' });
-  assert.deepEqual(parseVpnCommand('/vpn_hysteria2_routing'), { kind: 'routing', protocol: 'hysteria2' });
-  assert.deepEqual(parseVpnCommand('/vpn_pc'), { kind: 'pc', protocol: 'hysteria2' });
-  assert.deepEqual(parseVpnCommand('/vpn_vless_pc'), { kind: 'pc', protocol: 'vless' });
-  assert.deepEqual(parseVpnCommand('/vpn_hysteria2_pc'), { kind: 'pc', protocol: 'hysteria2' });
+  assert.deepEqual(parseVpnCommand('/vpn_status'), { kind: 'read', action: 'status', protocol: 'vless', node: 'de', arguments: {} });
+  assert.deepEqual(parseVpnCommand('/vpn_nl_status'), { kind: 'read', action: 'status', protocol: 'vless', node: 'nl', arguments: {} });
+  assert.deepEqual(parseVpnCommand('/vpn_issue My Phone'), { kind: 'change', action: 'issue', protocol: 'vless', node: 'de', arguments: { label: 'My Phone' } });
+  assert.deepEqual(parseVpnCommand('/vpn_hysteria2_issue My Phone'), { kind: 'change', action: 'issue', protocol: 'hysteria2', node: 'de', arguments: { label: 'My Phone' } });
+  assert.deepEqual(parseVpnCommand('/vpn_nl_hysteria2_issue My Phone'), { kind: 'change', action: 'issue', protocol: 'hysteria2', node: 'nl', arguments: { label: 'My Phone' } });
+  assert.deepEqual(parseVpnCommand('/vpn_export My Phone'), { kind: 'change', action: 'export', protocol: 'vless', node: 'de', arguments: { label: 'My Phone' } });
+  assert.deepEqual(parseVpnCommand('/vpn_routing'), { kind: 'routing', protocol: 'hysteria2', node: 'de' });
+  assert.deepEqual(parseVpnCommand('/vpn_ru'), { kind: 'routing', protocol: 'hysteria2', node: 'de' });
+  assert.deepEqual(parseVpnCommand('/vpn_hysteria2_routing'), { kind: 'routing', protocol: 'hysteria2', node: 'de' });
+  assert.deepEqual(parseVpnCommand('/vpn_pc'), { kind: 'pc', protocol: 'hysteria2', node: 'de' });
+  assert.deepEqual(parseVpnCommand('/vpn_vless_pc'), { kind: 'pc', protocol: 'vless', node: 'de' });
+  assert.deepEqual(parseVpnCommand('/vpn_hysteria2_pc'), { kind: 'pc', protocol: 'hysteria2', node: 'de' });
+  assert.deepEqual(parseVpnCommand('/vpn_nl_pc'), { kind: 'pc', protocol: 'hysteria2', node: 'nl' });
   assert.deepEqual(parseVpnCommand('/vpn_confirm'), { kind: 'decision', decision: 'confirm', requestId: null });
   assert.equal(parseVpnCommand('расскажи о погоде'), null);
   assert.equal(parseVpnCommand('/vpn_issue').kind, 'invalid');
@@ -77,16 +80,20 @@ test('parses only the closed VPN command set', () => {
 });
 
 test('parses only bounded VPN callback actions', () => {
-  assert.deepEqual(parseVpnCallback('vpn:clients'), { action: 'clients', protocol: 'vless' });
+  assert.deepEqual(parseVpnCallback('vpn:clients'), { action: 'clients', protocol: 'vless', node: 'de' });
   assert.deepEqual(parseVpnCallback('vpn:health'), { action: 'health', protocol: 'both' });
-  assert.deepEqual(parseVpnCallback('vpn:routing'), { action: 'routing' });
-  assert.deepEqual(parseVpnCallback('vpn:h:routing'), { action: 'routing', protocol: 'hysteria2' });
-  assert.deepEqual(parseVpnCallback('vpn:pc'), { action: 'pc' });
-  assert.deepEqual(parseVpnCallback('vpn:h:pc'), { action: 'pc', protocol: 'hysteria2' });
-  assert.deepEqual(parseVpnCallback('vpn:v:pc'), { action: 'pc', protocol: 'vless' });
-  assert.deepEqual(parseVpnCallback('vpn:export:vpn-0123456789ab'), { action: 'export', protocol: 'vless', clientId: 'vpn-0123456789ab' });
-  assert.deepEqual(parseVpnCallback('vpn:p:h'), { action: 'protocol', protocol: 'hysteria2' });
-  assert.deepEqual(parseVpnCallback('vpn:h:export:vpn-0123456789ab'), { action: 'export', protocol: 'hysteria2', clientId: 'vpn-0123456789ab' });
+  assert.deepEqual(parseVpnCallback('vpn:routing'), { action: 'routing', protocol: 'vless', node: 'de' });
+  assert.deepEqual(parseVpnCallback('vpn:h:routing'), { action: 'routing', protocol: 'hysteria2', node: 'de' });
+  assert.deepEqual(parseVpnCallback('vpn:pc'), { action: 'pc', protocol: 'vless', node: 'de' });
+  assert.deepEqual(parseVpnCallback('vpn:h:pc'), { action: 'pc', protocol: 'hysteria2', node: 'de' });
+  assert.deepEqual(parseVpnCallback('vpn:v:pc'), { action: 'pc', protocol: 'vless', node: 'de' });
+  assert.deepEqual(parseVpnCallback('vpn:export:vpn-0123456789ab'), { action: 'export', protocol: 'vless', clientId: 'vpn-0123456789ab', node: 'de' });
+  assert.deepEqual(parseVpnCallback('vpn:p:h'), { action: 'protocol', protocol: 'hysteria2', node: 'de' });
+  assert.deepEqual(parseVpnCallback('vpn:h:export:vpn-0123456789ab'), { action: 'export', protocol: 'hysteria2', clientId: 'vpn-0123456789ab', node: 'de' });
+  assert.deepEqual(parseVpnCallback('vpn:c:de'), { action: 'country', node: 'de' });
+  assert.deepEqual(parseVpnCallback('vpn:c:nl'), { action: 'country', node: 'nl' });
+  assert.deepEqual(parseVpnCallback('vpn:nl:h:status'), { action: 'status', protocol: 'hysteria2', node: 'nl' });
+  assert.deepEqual(parseVpnCallback('vpn:nl:v:export:vpn-0123456789ab'), { action: 'export', protocol: 'vless', clientId: 'vpn-0123456789ab', node: 'nl' });
   assert.deepEqual(parseVpnCallback(`vpn:confirm:${REQUEST_ID}`), { action: 'confirm', requestId: REQUEST_ID });
   assert.equal(parseVpnCallback('ops:allow:anything'), null);
   assert.equal(parseVpnCallback('vpn:export:../../root'), null);
@@ -100,7 +107,9 @@ test('rejects unsafe labels and client identifiers', () => {
 test('owner can observe VPN without confirmation', async () => {
   const { service, calls } = harness();
   const result = await service.handle({ text: '/vpn', userId: USER_ID, conversationId: 'conversation', originChannel: 'telegram' });
-  assert.match(result.answer, /VPN-протокол/);
+  assert.match(result.answer, /Выберите страну подключения или протокол/);
+  assert.equal(result.buttons.flat().some((button) => button.data === 'vpn:c:de'), true);
+  assert.equal(result.buttons.flat().some((button) => button.data === 'vpn:c:nl'), true);
   assert.equal(result.buttons.flat().some((button) => button.data === 'vpn:p:h'), true);
   assert.equal(result.buttons.flat().some((button) => button.data === 'vpn:p:v'), true);
   assert.equal(result.buttons.flat().some((button) => button.data === 'vpn:routing'), false);
@@ -110,10 +119,10 @@ test('owner can observe VPN without confirmation', async () => {
   assert.match(h2Menu.answer, /Hysteria 2 — основной скоростной VPN/);
   assert.match(h2Menu.answer, /Как настроить за 2 шага/);
   assert.match(h2Menu.answer, /Включить обход РФ/);
-  assert.equal(h2Menu.buttons.flat().some((button) => button.data === 'vpn:h:routing'), true);
+  assert.equal(h2Menu.buttons.flat().some((button) => button.data === 'vpn:de:h:routing'), true);
 
   const status = await service.handleCallback({ userId: USER_ID, originChannel: 'telegram', data: 'vpn:h:status' });
-  assert.match(status.answer, /Hysteria2 работает/);
+  assert.match(status.answer, /Hysteria2.*работает/);
   assert.equal(calls.find((call) => call[0] === 'request')[1].operation, 'vpn.hysteria2.status');
 });
 
@@ -148,7 +157,7 @@ test('client menu hides IDs and label commands resolve internally', async () => 
   assert.equal(list.buttons[0][0].text, 'Phone');
   const detail = await service.handleCallback({ ...context, data: list.buttons[0][0].data });
   assert.equal(detail.answer.includes('vpn-0123456789ab'), false);
-  assert.equal(detail.buttons.flat().some((button) => button.data === 'vpn:v:export:vpn-0123456789ab'), true);
+  assert.equal(detail.buttons.flat().some((button) => button.data === 'vpn:de:v:export:vpn-0123456789ab'), true);
   const created = await service.handle({ ...context, text: '/vpn_export Phone' });
   assert.equal(created.answer.includes('vpn-0123456789ab'), false);
   assert.equal(calls.filter((call) => call[0] === 'request').at(-1)[1].operation, 'vpn.clients.list');
@@ -231,13 +240,13 @@ test('PC guide command and callback return detailed PC setup and troubleshooting
   assert.match(viaCommand.answer, /ПОЧЕМУ ПИШЕТ «ПИНГ N\/A»/);
   assert.match(viaCommand.answer, /Запуск от Администратора/);
   assert.match(viaCommand.answer, /Синхронизация времени/);
-  assert.ok(viaCommand.buttons.flat().some((b) => b.data === 'vpn:h:pc'));
+  assert.ok(viaCommand.buttons.flat().some((b) => b.data === 'vpn:de:h:pc'));
 
   const viaCallback = await service.handleCallback({ ...context, data: 'vpn:v:pc' });
   assert.match(viaCallback.answer, /Настройка VLESS на ПК/);
   assert.match(viaCallback.answer, /v2rayN/);
   assert.match(viaCallback.answer, /Тест реальной задержки/);
-  assert.ok(viaCallback.buttons.flat().some((b) => b.data === 'vpn:v:pc'));
+  assert.ok(viaCallback.buttons.flat().some((b) => b.data === 'vpn:de:v:pc'));
 
   assert.match(buildPcSetupGuide('hysteria2'), /Hiddify/);
   assert.match(buildPcSetupGuide('vless'), /v2rayN/);
@@ -253,8 +262,8 @@ test('VPN_CLIENT_LABEL_EXISTS failure returns user-friendly guidance and direct 
   const decided = await service.handle({ ...context, text: '/vpn_confirm' });
   assert.match(decided.answer, /уже существует/);
   assert.match(decided.answer, /Duplicate/);
-  assert.ok(decided.buttons.flat().some((b) => b.data === 'vpn:h:clients'));
-  assert.ok(decided.buttons.flat().some((b) => b.data === 'vpn:h:new'));
+  assert.ok(decided.buttons.flat().some((b) => b.data === 'vpn:de:h:clients'));
+  assert.ok(decided.buttons.flat().some((b) => b.data === 'vpn:de:h:new'));
 });
 
 test('health snapshot command and callback return structured overview without secrets', async () => {
@@ -304,3 +313,86 @@ test('health snapshot renders only closed incident language and rejects malforme
   assert.equal(rejected.answer, 'Диагностика VPN вернула некорректные данные.');
   assert.doesNotMatch(rejected.answer, /secret/);
 });
+
+test('multi-node support routes operations cleanly to DE and NL clients', async () => {
+  const deCalls = [];
+  const nlCalls = [];
+  const deClient = {
+    async request(req) {
+      deCalls.push(req);
+      if (req.operation === 'vpn.hysteria2.status') return { result: { state: 'succeeded', data: { serviceState: 'active', configValid: true, listenerReady: true, clientCount: 3 } } };
+      if (req.operation === 'vpn.health.snapshot') return { result: { state: 'succeeded', data: defaultHealthData() } };
+      return { result: { state: 'succeeded', data: {} } };
+    },
+  };
+  const nlClient = {
+    async request(req) {
+      nlCalls.push(req);
+      if (req.operation === 'vpn.hysteria2.status') return { result: { state: 'succeeded', data: { serviceState: 'active', configValid: true, listenerReady: true, clientCount: 1 } } };
+      if (req.operation === 'vpn.hysteria2.clients.list') return { result: { state: 'succeeded', data: { clients: [{ id: 'vpn-112233445566', label: 'NL Mobile', createdAt: '2026-09-15T00:00:00Z' }] } } };
+      if (req.operation === 'vpn.hysteria2.client.issue') return { result: { state: 'succeeded', data: { client: { id: 'vpn-112233445566', label: req.arguments?.label || 'NL Mobile' }, shareUri: 'hy2://secret@94.183.208.56:443?sni=vpn.rilora.ru' } } };
+      if (req.operation === 'vpn.health.snapshot') return { result: { state: 'succeeded', data: defaultHealthData() } };
+      return { result: { state: 'succeeded', data: {} } };
+    },
+  };
+
+  const records = new Map();
+  const repository = {
+    async isOwner() { return true; },
+    async create(record) { records.set(record.id, { ...record, status: 'pending' }); return record; },
+    async latestPending() { return Array.from(records.values()).find((r) => r.status === 'pending'); },
+    async approve({ requestId }) { const r = records.get(requestId); if (r) r.status = 'approved'; return r; },
+    async complete({ requestId, status }) { const r = records.get(requestId); if (r) r.status = status; return r; },
+    async audit() {},
+  };
+
+  const service = new VpnCommandService({
+    repository,
+    clients: { de: deClient, nl: nlClient },
+    ownerTelegramId: '101',
+    now: () => new Date('2026-09-16T00:00:00Z'),
+  });
+
+  const context = { userId: USER_ID, conversationId: 'conversation', originChannel: 'telegram' };
+
+  // 1. Country selection for Netherlands
+  const countryMenu = await service.handleCallback({ ...context, data: 'vpn:c:nl' });
+  assert.match(countryMenu.answer, /Нидерланды/);
+  assert.ok(countryMenu.buttons.flat().some((b) => b.data === 'vpn:nl:h:menu'));
+  assert.ok(countryMenu.buttons.flat().some((b) => b.data === 'vpn:nl:v:menu'));
+
+  // 2. Open Hysteria 2 on Netherlands
+  const nlH2 = await service.handleCallback({ ...context, data: 'vpn:nl:h:menu' });
+  assert.match(nlH2.answer, /Нидерланды/);
+  assert.match(nlH2.answer, /Amsterdam/);
+  assert.ok(nlH2.buttons.flat().some((b) => b.data === 'vpn:nl:h:status'));
+  assert.ok(nlH2.buttons.flat().some((b) => b.data === 'vpn:nl:h:clients'));
+  assert.ok(nlH2.buttons.flat().some((b) => b.data === 'vpn:nl:h:new'));
+
+  // 3. Status on Netherlands routes to nlClient
+  const nlStatus = await service.handleCallback({ ...context, data: 'vpn:nl:h:status' });
+  assert.match(nlStatus.answer, /🇳🇱 Hysteria2 \(Нидерланды\) работает/);
+  assert.equal(nlCalls.some((c) => c.operation === 'vpn.hysteria2.status'), true);
+
+  // 4. Clients list on Netherlands routes to nlClient
+  const nlClients = await service.handleCallback({ ...context, data: 'vpn:nl:h:clients' });
+  assert.match(nlClients.answer, /🇳🇱 Hysteria2-доступы \(Нидерланды\): 1/);
+  assert.ok(nlClients.buttons.flat().some((b) => b.data === 'vpn:nl:h:client:vpn-112233445566'));
+
+  // 5. Issue new access on Netherlands
+  const issuePrompt = await service.handle({ ...context, text: '/vpn_nl_hysteria2_issue AmsterdamPhone' });
+  assert.match(issuePrompt.answer, /Нидерланды/);
+  const confirmResult = await service.handle({ ...context, text: '/vpn_confirm' });
+  assert.match(confirmResult.answer, /Нидерланды/);
+  assert.equal(confirmResult.artifact.filename, 'AmsterdamPhone-nl-hysteria2.txt');
+  assert.ok(nlCalls.some((c) => c.operation === 'vpn.hysteria2.client.issue' && c.arguments.label === 'AmsterdamPhone'));
+
+  // 6. Multi-node health snapshot checks both DE and NL
+  const multiHealth = await service.handle({ ...context, text: '/vpn_health' });
+  assert.match(multiHealth.answer, /Диагностика всех VPN-нод/);
+  assert.match(multiHealth.answer, /🇩🇪 \*\*Германия/);
+  assert.match(multiHealth.answer, /🇳🇱 \*\*Нидерланды/);
+  assert.equal(deCalls.some((c) => c.operation === 'vpn.health.snapshot'), true);
+  assert.equal(nlCalls.some((c) => c.operation === 'vpn.health.snapshot'), true);
+});
+

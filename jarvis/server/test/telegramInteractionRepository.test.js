@@ -7,7 +7,8 @@ const CONVERSATION_ID = '22222222-2222-4222-8222-222222222222';
 const DEVICE_ID = '33333333-3333-4333-8333-333333333333';
 
 test('accepts only closed bounded Telegram interaction contexts', () => {
-  assert.deepEqual(validateContext('vpn_access_label', { protocol: 'hysteria2' }), { protocol: 'hysteria2' });
+  assert.deepEqual(validateContext('vpn_access_label', { protocol: 'hysteria2' }), { protocol: 'hysteria2', node: 'de' });
+  assert.deepEqual(validateContext('vpn_access_label', { protocol: 'hysteria2', node: 'nl' }), { protocol: 'hysteria2', node: 'nl' });
   assert.deepEqual(validateContext('device_instruction', { deviceId: DEVICE_ID }), { deviceId: DEVICE_ID });
   assert.throws(() => validateContext('vpn_access_label', { protocol: 'wireguard' }), /invalid/);
   assert.throws(() => validateContext('device_instruction', { deviceId: DEVICE_ID, command: 'delete' }), /invalid/);
@@ -55,7 +56,7 @@ test('begin serializes a conversation and parameterizes bounded interaction data
     kind: 'vpn_access_label', context: { protocol: 'hysteria2' },
   });
   assert.match(created.id, /^[a-f0-9-]{36}$/);
-  assert.deepEqual(created.context, { protocol: 'hysteria2' });
+  assert.deepEqual(created.context, { protocol: 'hysteria2', node: 'de' });
   assert.equal(calls[0].sql, 'BEGIN');
   assert.match(calls[1].sql, /pg_advisory_xact_lock/);
   assert.ok(calls.find((call) => call.sql.includes("status='cancelled'")).params);

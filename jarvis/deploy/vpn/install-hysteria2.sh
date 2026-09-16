@@ -33,8 +33,10 @@ ipaddress.IPv4Address(sys.argv[1])
 PY
 
 /usr/sbin/ip -4 -o addr show scope global | /usr/bin/grep -F " $server_address/" >/dev/null || { echo "Server address is not assigned" >&2; exit 1; }
-resolved=$(/usr/bin/getent ahostsv4 "$server_name" | /usr/bin/awk '{print $1}' | /usr/bin/sort -u)
-/usr/bin/grep -Fx "$server_address" <<<"$resolved" >/dev/null || { echo "Public DNS does not point to the server address" >&2; exit 1; }
+if [[ ! -d /var/lib/hysteria/acme/certificates ]]; then
+  resolved=$(/usr/bin/getent ahostsv4 "$server_name" | /usr/bin/awk '{print $1}' | /usr/bin/sort -u)
+  /usr/bin/grep -Fx "$server_address" <<<"$resolved" >/dev/null || { echo "Public DNS does not point to the server address" >&2; exit 1; }
+fi
 
 udp_owner=$(/usr/bin/ss -H -lunp 'sport = :443' || true)
 if [[ -n "$udp_owner" ]] && ! /usr/bin/grep -q 'hysteria' <<<"$udp_owner"; then
@@ -70,6 +72,7 @@ id -u hysteria >/dev/null 2>&1 || useradd --system --gid hysteria --home-dir /va
 install -d -o root -g root -m 0700 /etc/jarvis-vpn
 install -d -o root -g hysteria -m 0750 /etc/hysteria
 install -d -o hysteria -g hysteria -m 0700 /var/lib/hysteria /var/lib/hysteria/acme
+chown -R hysteria:hysteria /var/lib/hysteria
 install -o root -g root -m 0644 "$app_root/deploy/vpn/hysteria-server.service" /etc/systemd/system/hysteria-server.service
 
 PYTHONPATH="$app_root/host-agent" /usr/bin/python3 - "$server_address" "$server_name" "$acme_email" "$client_label" <<'PY'
