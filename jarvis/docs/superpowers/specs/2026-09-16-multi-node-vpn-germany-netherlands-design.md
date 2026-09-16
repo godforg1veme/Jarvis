@@ -1,7 +1,8 @@
 ﻿# Multi-Node VPN: Germany (DE) and Netherlands (NL) Design
 
 **Date:** 2026-09-16  
-**Status:** In Progress (Milestone: Multi-Node Rollout)  
+**Status:** Implemented and production-deployed; final owner Telegram tap-through
+is tracked in the rollout record.
 **Nodes:**
 - **DE Node (Primary):** `87.120.187.202` (Xray) / `87.120.187.109` (Hysteria 2) — Germany 🇩🇪
 - **NL Node (Secondary):** `94.183.208.56` (Xray + Hysteria 2) — Netherlands 🇳🇱

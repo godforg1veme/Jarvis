@@ -8,6 +8,10 @@
 and safe production no-op acceptance. Real VPN repair execution remains
 disabled after this plan.
 
+**Status:** Implemented and deployed on 2026-09-16 for both DE and NL. Automated
+verification and the live provider contract passed; the owner-button result is
+recorded in `docs/updates/2026-09-16-vpn-supervisor-multinode-rollout.md`.
+
 ## 1. Define prompt, evidence, catalog, and response contracts
 
 - Add a versioned Supervisor system policy separate from the Jarvis persona.

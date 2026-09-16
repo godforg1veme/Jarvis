@@ -158,13 +158,14 @@ See `docs/README.md` for current implementation status and historical records.
 - Operations checks track actual Telegram poll completion, database migrations,
   stuck jobs, and a configured primary-model probe. The model probe uses only
   a synthetic health message and a PostgreSQL-backed six-hour schedule.
-- The first VPN Supervisor foundation was production-deployed on 2026-09-15.
-  Host Agent deterministically classifies one primary cause from the bounded
-  `vpn.health.snapshot`; Jarvis Server strictly cross-validates that diagnosis,
-  debounces it over three identical observations, and records one correlated
-  `vpn.*` incident. Unknown protocol probes remain informational when all local
-  checks pass. The same closed diagnosis is rendered by Telegram
-  `/vpn_health`. This milestone performs no LLM call and no repair action.
+- VPN Supervisor is production-deployed across the DE and NL nodes. Host Agent
+  deterministically classifies one primary cause from the bounded
+  `vpn.health.snapshot`; Jarvis Server cross-validates and debounces it, then an
+  isolated planner may use the configured Jarvis model path with sanitized,
+  bounded node-local logs. The response must match a strict seven-field schema
+  and a closed playbook catalog. Real repair playbooks remain disabled. Only
+  `supervisor_acceptance_noop` can execute, after a fresh owner Telegram
+  confirmation, and it never calls Host Agent.
 - Host Agent mutation claims are persisted before execution. An interrupted
   command has an unknown outcome and is reconciled; never retry it under a new
   identifier merely because its connection was lost. Discovery is read-only.
@@ -177,6 +178,13 @@ See `docs/README.md` for current implementation status and historical records.
   root-only Hysteria2 state and generated config. Its closed
   `vpn.hysteria2.*` operations use the same owner-confirmation boundary, while
   one-time `hy2://` exports follow the same non-persistence rule.
+- VPN control is multi-node: `de` uses the local Host Agent socket and `nl`
+  uses the authenticated StreamLocal-forwarded
+  `/run/jarvis-host-agent/agent-nl.sock`. Telegram requires a country choice
+  before protocol actions. Pending and recovery records retain the closed node
+  code so an uncertain NL action is never reconciled against DE. Operations
+  stores both hosts and runs a VPN-only collector and separate incident/advisory
+  path for NL.
 - Operations log archives contain bounded severity/lifecycle summaries only;
   raw parser findings, family content, SQL values and credentials are excluded.
 - Backup scheduling and real backup/restore acceptance are deferred by the

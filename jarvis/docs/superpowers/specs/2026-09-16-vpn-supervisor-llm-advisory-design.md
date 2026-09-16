@@ -2,8 +2,9 @@
 
 **Date:** 2026-09-16
 
-**Status:** Approved in conversation; awaiting owner review of this written
-specification before implementation planning.
+**Status:** Implemented and production-deployed. The real model contract and
+two-node monitoring path are verified; final owner-button no-op acceptance is
+tracked in the 2026-09-16 rollout record. Real repair playbooks remain disabled.
 
 **Milestone boundary:** use the same configured model path as Jarvis to analyze
 confirmed VPN incidents, request bounded diagnostics, and propose a closed

@@ -4,7 +4,20 @@ This file is the status authority for project documentation. Specifications and
 plans under `docs/superpowers/` are preserved as decision history; their old
 future-tense wording does not override the current architecture in `AGENTS.md`.
 
-Status snapshot: 2026-09-15.
+Status snapshot: 2026-09-16.
+
+Multi-node VPN Supervisor rollout, 2026-09-16: Jarvis now manages separate
+Germany and Netherlands VPN nodes through authenticated local/forwarded Host
+Agent sockets. Telegram requires an explicit country choice before protocol
+actions, while `/vpn_health` reads both nodes. Operations persists both hosts,
+polls DE normally and NL with a VPN-only collector, and runs the deterministic
+incident classifier plus isolated LLM advisory against the affected node's
+sanitized logs. Real repair playbooks remain disabled; the only executable
+Supervisor playbook is the synthetic owner-approved no-op. The deployed model
+contract, two-node Host Agent path, TCP 443/8443 reachability, production image,
+public smoke, and unchanged VPN service uptimes are verified. Final owner-button
+acceptance is recorded separately when completed. See
+`updates/2026-09-16-vpn-supervisor-multinode-rollout.md`.
 
 VPN Supervisor classifier rollout, 2026-09-15: the current VPS now emits a
 versioned, deterministic and secret-free VPN diagnosis from Host Agent. Jarvis
@@ -13,8 +26,8 @@ keeps one causal `vpn.*` incident, and exposes the same closed diagnosis through
 Telegram `/vpn_health`. Local suites passed 79 Host Agent and 430 server tests;
 36 focused tests passed inside the built production image. Public smoke and
 live Xray/Hysteria/Host Agent health passed, and the healthy production snapshot
-opened no false incident. LLM invocation, remote-node enrollment, and repair
-execution remain later milestones. See
+opened no false incident. The LLM advisory and remote-node enrollment milestones
+were implemented on 2026-09-16; real repair execution remains disabled. See
 `updates/2026-09-15-vpn-supervisor-classifier.md`.
 
 Happ VPN routing default-proxy correction, 2026-09-15: the `Jarvis RU Direct`
