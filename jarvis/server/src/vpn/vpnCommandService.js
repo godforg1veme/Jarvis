@@ -148,7 +148,7 @@ function isVpnCallback(value) {
 function menuButtons() {
   return [
     [{ text: '🇩🇪 Германия (Frankfurt)', data: 'vpn:c:de' }, { text: '🇳🇱 Нидерланды (Amsterdam)', data: 'vpn:c:nl' }],
-    [{ text: '📲 Умная подписка (Happ)', data: 'vpn:sub:menu' }],
+    [{ text: '📲 Подписки (Happ)', data: 'vpn:sub:menu' }],
     [{ text: '🏥 Диагностика (Health Snapshot)', data: 'vpn:health' }],
     [{ text: '🧪 Внешние проверки VPN', data: 'vpn:probe:menu' }],
   ];
@@ -856,7 +856,7 @@ class VpnCommandService {
     if (callback.action === 'menu') {
       return callback.protocol
         ? { answer: renderProtocolGreeting(callback.protocol, node), buttons: protocolButtons(callback.protocol, node) }
-        : { answer: 'Выберите страну подключения:', buttons: menuButtons() };
+        : { answer: 'Выберите страну для отдельного VPN-доступа или откройте подписки Happ:', buttons: menuButtons() };
     }
     if (callback.action === 'protocol') return { answer: renderProtocolGreeting(callback.protocol, node), buttons: protocolButtons(callback.protocol, node) };
     if (callback.action === 'health') return this._read({ action: 'health', protocol: 'both' });
@@ -932,9 +932,9 @@ class VpnCommandService {
     const subs = await this.subscriptionService.listSubscriptions(context.userId, { activeOnly: true });
     if (!subs.length) {
       return {
-        answer: '📲 **Умная подписка Jarvis VPN (Happ)**\n\n' +
-          'Динамическая мульти-узловая подписка с автоматическим выбором узлов (Smart Failover) и прыгающими портами (port-hopping `20000-50000`) против блокировок РКН.\n\n' +
-          'У вас пока нет активных подписок. Нажмите кнопку ниже, чтобы создать подписку для этого устройства.',
+        answer: '📲 **Подписки Jarvis VPN**\n\n' +
+          'Одна подписка добавляет в Happ четыре сервера: Германию и Нидерланды через Hysteria 2 и VLESS. Список серверов обновляется в Happ по ссылке подписки.\n\n' +
+          'Подписок пока нет. Создайте профиль, затем подтвердите выпуск доступов — бот выдаст ссылку и кнопку для Happ.',
         buttons: [
           [{ text: '➕ Создать подписку', data: 'vpn:sub:new' }],
           [{ text: '« Главное меню', data: 'vpn:menu' }],
@@ -943,9 +943,8 @@ class VpnCommandService {
     }
 
     return {
-      answer: `📲 **Ваши умные подписки (${subs.length}):**\n\n` +
-        'Каждая ссылка добавляет все совместимые серверы одного профиля. Happ обновляет этот список по той же ссылке.\n\n' +
-        'Выберите профиль для просмотра или управления:',
+      answer: `📲 **Ваши подписки (${subs.length})**\n\n` +
+        'В каждом профиле — четыре сервера. Откройте профиль, чтобы получить ссылку для Happ или управлять подпиской.',
       buttons: [
         ...subs.map((s) => [{ text: `📱 ${s.label}`, data: `vpn:sub:view:${s.id}` }]),
         [{ text: '➕ Новая подписка', data: 'vpn:sub:new' }],
@@ -969,31 +968,23 @@ class VpnCommandService {
     const isBound = this.subscriptionService.hasCompleteClientBinding?.(sub);
     if (!isBound) {
       return {
-        answer: '📲 **Подписка Jarvis VPN**\n\n' +
-          `Профиль: **${sub.label}**\n\n` +
-          'Для этого профиля ещё не выпущены связанные доступы DE/NL. Ссылка Happ сохранится, но серверы станут доступны только после восстановления.\n\n' +
-          'Нажмите «Восстановить доступы», затем подтвердите выпуск четырёх отдельных серверных доступов.',
+        answer: `📲 **${sub.label}**\n\n` +
+          'Профиль создан, но серверные доступы ещё не выпущены. Подписка пока не готова к добавлению в Happ.\n\n' +
+          'Нажмите «Подключить 4 сервера» и подтвердите действие. После успешного выпуска бот пришлёт ссылку.',
         buttons: [
-          [{ text: '🛠 Восстановить доступы', data: `vpn:sub:repair:${sub.id}` }],
+          [{ text: '🔐 Подключить 4 сервера', data: `vpn:sub:repair:${sub.id}` }],
           [{ text: '🗑 Отозвать подписку', data: `vpn:sub:revoke:${sub.id}` }],
           [{ text: '« К подпискам', data: 'vpn:sub:menu' }],
         ],
       };
     }
     return {
-      answer: '📲 **Умная подписка Jarvis VPN**\n\n' +
-        `Профиль: **${sub.label}**\n` +
-        'Статус: **Активна**\n\n' +
-        '⚡ **Smart Failover сеть:**\n' +
-        '1. 🇩🇪 Германия Hysteria 2 (UDP 20000-50000)\n' +
-        '2. 🇳🇱 Нидерланды Hysteria 2 (UDP 20000-50000)\n' +
-        '3. 🇩🇪 Германия VLESS REALITY (TCP 8443)\n' +
-        '4. 🇳🇱 Нидерланды VLESS REALITY (TCP 8443)\n\n' +
-        'Одна ссылка добавляет все совместимые серверы этого профиля. Happ получает изменения при обновлении подписки.\n\n' +
-        'Для обычного обновления откройте Happ и нажмите обновление подписки — ссылка и доступы не меняются.\n\n' +
-        'Чтобы выпустить ссылку для нового устройства, нажмите кнопку ниже. Старая ссылка будет аннулирована.',
+      answer: `📲 **${sub.label}**\n\n` +
+        'Серверы подключены: 🇩🇪 Германия и 🇳🇱 Нидерланды, Hysteria 2 и VLESS. Одна ссылка добавляет все четыре варианта в Happ.\n\n' +
+        'Если профиль уже добавлен в Happ, обновите подписку в самом приложении — серверы загрузятся по прежней ссылке.\n\n' +
+        'Если ссылка потеряна или нужна для другого устройства, выпустите новую. После этого старую ссылку придётся заменить в Happ на всех устройствах.',
       buttons: [
-        [{ text: '🔄 Выпустить новую ссылку', data: `vpn:sub:rotate:${sub.id}` }],
+        [{ text: '🔗 Получить новую ссылку', data: `vpn:sub:rotate:${sub.id}` }],
         [{ text: '🗑 Отозвать подписку', data: `vpn:sub:revoke:${sub.id}` }],
         [{ text: '« К подпискам', data: 'vpn:sub:menu' }],
       ],
@@ -1010,16 +1001,10 @@ class VpnCommandService {
       createdBy: context.userId,
     });
     return {
-      answer: '✅ **Умная подписка Jarvis VPN создана!**\n\n' +
-        `Профиль: **${created.label}**\n\n` +
-        '⚡ **Smart Failover сеть:**\n' +
-        '1. 🇩🇪 Германия Hysteria 2 (UDP 20000-50000)\n' +
-        '2. 🇳🇱 Нидерланды Hysteria 2 (UDP 20000-50000)\n' +
-        '3. 🇩🇪 Германия VLESS REALITY (TCP 8443)\n' +
-        '4. 🇳🇱 Нидерланды VLESS REALITY (TCP 8443)\n\n' +
-        'Сначала выпустите связанные доступы DE/NL и подтвердите действие. После этого одна ссылка добавит все серверы, а Happ будет обновлять их по той же ссылке.\n\n',
+      answer: `📲 **Профиль «${created.label}» создан**\n\n` +
+        'Остался один шаг: подключить четыре сервера. Подтвердите выпуск доступов, и бот пришлёт ссылку для Happ. Пока подключение не завершено, профиль в Happ добавлять не нужно.',
       buttons: [
-        [{ text: '🛠 Восстановить доступы', data: `vpn:sub:repair:${created.id}` }],
+        [{ text: '🔐 Подключить 4 сервера', data: `vpn:sub:repair:${created.id}` }],
         [{ text: '🗑 Отозвать', data: `vpn:sub:revoke:${created.id}` }],
         [{ text: '« К подпискам', data: 'vpn:sub:menu' }],
       ],
@@ -1029,7 +1014,7 @@ class VpnCommandService {
   async _createSubscriptionRepair(subscriptionId, context) {
     const sub = await this.subscriptionService?.repository?.findById(subscriptionId);
     if (!sub || sub.revokedAt || sub.userId !== context.userId) return { answer: 'Подписка не найдена или отозвана.', buttons: [[{ text: '« К подпискам', data: 'vpn:sub:menu' }]] };
-    if (this.subscriptionService.hasCompleteClientBinding(sub)) return { answer: 'Доступы уже привязаны. Откройте подписку в Happ и нажмите «Обновить».', buttons: [[{ text: '« К подписке', data: `vpn:sub:view:${sub.id}` }]] };
+    if (this.subscriptionService.hasCompleteClientBinding(sub)) return { answer: 'Четыре сервера уже подключены. Если ссылка потеряна, откройте профиль и нажмите «Получить новую ссылку».', buttons: [[{ text: '« К подписке', data: `vpn:sub:view:${sub.id}` }]] };
     if (await this.repository.hasUnresolvedSubscriptionRepair({ userId: context.userId, subscriptionId })) return { answer: 'Восстановление этой подписки уже ожидает подтверждения или проверки результата. Повторный выпуск доступов заблокирован.', buttons: [[{ text: '« К подписке', data: `vpn:sub:view:${sub.id}` }]] };
     const id = crypto.randomUUID();
     const args = { subscriptionId };
@@ -1040,7 +1025,7 @@ class VpnCommandService {
       expiresAt: new Date(this.now().getTime() + CONFIRMATION_TTL_MS),
     });
     return {
-      answer: `Выпустить новые связанные доступы DE/NL для подписки «${sub.label}»? Ссылка Happ останется прежней; после подтверждения обновите её в Happ.`,
+      answer: `Подключить четыре сервера к профилю «${sub.label}»? После подтверждения бот выпустит доступы и пришлёт новую ссылку для Happ.`,
       buttons: [[{ text: '✅ Подтвердить', data: `vpn:confirm:${record.id}` }, { text: '✖️ Отмена', data: `vpn:reject:${record.id}` }]],
     };
   }
@@ -1053,7 +1038,7 @@ class VpnCommandService {
     }
     if (this.subscriptionService.hasCompleteClientBinding(sub)) {
       await this.repository.complete({ requestId: record.id, status: 'failed', errorCode: 'SUBSCRIPTION_ALREADY_BOUND' });
-      return { answer: 'Доступы уже привязаны. Обновите подписку в Happ.', buttons: [[{ text: '« К подписке', data: `vpn:sub:view:${sub.id}` }]] };
+      return { answer: 'Четыре сервера уже подключены. Откройте профиль, чтобы получить новую ссылку.', buttons: [[{ text: '« К подписке', data: `vpn:sub:view:${sub.id}` }]] };
     }
     const clientIds = { de: {}, nl: {} };
     const issued = [];
@@ -1070,7 +1055,6 @@ class VpnCommandService {
       if (!bound) throw new Error('BIND_FAILED');
       await this.repository.complete({ requestId: record.id, status: 'succeeded', result: { subscriptionId: sub.id, repairedNodes: ['de', 'nl'] } });
       await this.repository.audit({ userId: context.userId, requestId: record.id, type: 'vpn.subscription.repaired', metadata: { subscriptionId: sub.id } });
-      return { answer: '✅ Доступы DE/NL выпущены и привязаны к подписке. Откройте Happ и обновите эту же подписку — её ссылка не изменилась.', buttons: [[{ text: '« К подписке', data: `vpn:sub:view:${sub.id}` }]] };
     } catch (error) {
       // A transport error may mean the host applied the mutation. Never issue
       // compensating revokes or a second repair until an operator reconciles it.
@@ -1086,26 +1070,46 @@ class VpnCommandService {
       await this.repository.complete({ requestId: record.id, status: unknown ? 'unknown' : 'failed', errorCode: unknown ? 'SUBSCRIPTION_REPAIR_UNKNOWN' : 'SUBSCRIPTION_REPAIR_FAILED' });
       return { answer: unknown ? 'Результат восстановления неизвестен. Повторный выпуск заблокирован до проверки администратором; старую ссылку не удаляйте.' : 'Не удалось восстановить доступы; выпущенные доступы отозваны. Попробуйте ещё раз позже.', buttons: [[{ text: '« К подписке', data: `vpn:sub:view:${sub.id}` }]] };
     }
+    try {
+      const link = await this.subscriptionService.rotateSubscription({ id: sub.id, userId: context.userId });
+      if (!link) throw new Error('SUBSCRIPTION_LINK_UNAVAILABLE');
+      return {
+        answer: `✅ **Четыре сервера подключены к профилю «${sub.label}»**\n\n` +
+          `Ссылка для Happ:\n\`${link.url}\`\n\n` +
+          'Нажмите кнопку ниже, чтобы открыть Happ, или скопируйте ссылку вручную. В Happ это одна подписка с четырьмя серверами. Для обновления списка позже используйте кнопку обновления в Happ.',
+        historyAnswer: `Четыре сервера подключены к профилю «${sub.label}». Ссылка выдана в Telegram без сохранения в истории Jarvis.`,
+        buttons: [
+          [{ text: '🚀 Открыть в Happ', url: link.happUrl }],
+          [{ text: '« К профилю', data: `vpn:sub:view:${sub.id}` }],
+        ],
+      };
+    } catch (_) {
+      return {
+        answer: '✅ Четыре сервера подключены, но ссылку сейчас выдать не удалось. Откройте профиль и нажмите «Получить новую ссылку».',
+        buttons: [[{ text: '🔗 Получить новую ссылку', data: `vpn:sub:rotate:${sub.id}` }]],
+      };
+    }
   }
 
   async _rotateSubscription(id, context) {
     if (!this.subscriptionService) {
       return { answer: 'Сервис подписок временно недоступен.', buttons: [[{ text: '« Главное меню', data: 'vpn:menu' }]] };
     }
+    const sub = await this.subscriptionService.repository?.findById(id);
+    if (!sub || sub.revokedAt || sub.userId !== context.userId) return { answer: 'Профиль не найден или отозван.', buttons: [[{ text: '« К подпискам', data: 'vpn:sub:menu' }]] };
+    if (!this.subscriptionService.hasCompleteClientBinding(sub)) return { answer: 'Сначала подключите четыре сервера к профилю. После этого бот выдаст ссылку.', buttons: [[{ text: '« К профилю', data: `vpn:sub:view:${id}` }]] };
     const rotated = await this.subscriptionService.rotateSubscription({ id, userId: context.userId });
     if (!rotated) {
       return { answer: 'Не удалось обновить подписку. Возможно, она была отозвана.', buttons: [[{ text: '« К подпискам', data: 'vpn:sub:menu' }]] };
     }
     return {
-      answer: '🔄 **Токен подписки обновлен!**\n\n' +
-        `Профиль: **${rotated.label}**\n` +
-        'Старая ссылка аннулирована.\n\n' +
-        'Новая ссылка добавляет все совместимые серверы этого профиля. В Happ замените старую подписку или добавьте новую на устройстве.\n\n' +
-        `🔑 Новая ссылка для Happ:\n\`${rotated.url}\`\n\n` +
-        'Нажмите кнопку ниже, чтобы добавить её в Happ в 1 клик:',
+      answer: `🔗 **Новая ссылка для «${rotated.label}»**\n\n` +
+        `\`${rotated.url}\`\n\n` +
+        'Нажмите «Открыть в Happ» или скопируйте ссылку. Предыдущая ссылка больше не работает: замените её в Happ на каждом устройстве, где она была добавлена.',
+      historyAnswer: `Новая ссылка для профиля «${rotated.label}» выдана в Telegram без сохранения в истории Jarvis.`,
       buttons: [
-        [{ text: '🚀 Активировать в Happ (1 клик)', url: rotated.happUrl }],
-        [{ text: '« К подпискам', data: 'vpn:sub:menu' }],
+        [{ text: '🚀 Открыть в Happ', url: rotated.happUrl }],
+        [{ text: '« К профилю', data: `vpn:sub:view:${id}` }],
       ],
     };
   }
@@ -1114,16 +1118,17 @@ class VpnCommandService {
     if (!this.subscriptionService) {
       return { answer: 'Сервис подписок временно недоступен.', buttons: [[{ text: '« Главное меню', data: 'vpn:menu' }]] };
     }
-    await this.subscriptionService.revokeSubscription({ id, userId: context.userId });
+    const revoked = await this.subscriptionService.revokeSubscription({ id, userId: context.userId });
+    if (!revoked) return { answer: 'Профиль уже отозван или не найден.', buttons: [[{ text: '« К подпискам', data: 'vpn:sub:menu' }]] };
     return {
-      answer: '🗑 **Подписка отозвана.**\n\nДоступ через этот профиль заблокирован.',
+      answer: '🗑 **Подписка отозвана.**\n\nЕё ссылка больше не выдаёт обновления. Уже импортированные отдельные конфигурации серверов могут продолжать работать; отзыв подписки сам по себе не отзывает VPN-ключи.',
       buttons: [[{ text: '« К подпискам', data: 'vpn:sub:menu' }]],
     };
   }
 
   async openMenu(context) {
     await this._requireOwner(context.userId);
-    return { answer: 'Выберите страну подключения:', buttons: menuButtons() };
+    return { answer: 'Выберите страну для отдельного VPN-доступа или откройте подписки Happ:', buttons: menuButtons() };
   }
 
   async requestAction({ action, protocol, node = 'de', arguments: actionArguments = {}, ...context }) {

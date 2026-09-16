@@ -208,7 +208,7 @@ class TelegramMessageService {
         if (!menuResult) throw error;
       }
       if (menuResult) {
-        await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: menuResult.answer });
+        await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: menuResult.historyAnswer || menuResult.answer });
         return { status: 'answered', ...menuResult };
       }
     }
@@ -228,7 +228,7 @@ class TelegramMessageService {
         result = vpnPublicError(error);
       }
       if (!result) return { status: 'ignored' };
-      await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: result.answer });
+      await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: result.historyAnswer || result.answer });
       return {
         status: 'answered',
         answer: result.answer,
@@ -628,7 +628,7 @@ class TelegramMessageService {
         userId: user.id,
         conversationId: conversation.id,
         role: 'assistant',
-        content: vpnResult.answer,
+        content: vpnResult.historyAnswer || vpnResult.answer,
       });
       return {
         status: 'answered',

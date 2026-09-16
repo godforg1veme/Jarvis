@@ -8,7 +8,7 @@ test('menuButtons includes smart subscription button', () => {
   const flat = buttons.flat();
   const subBtn = flat.find((b) => b.data === 'vpn:sub:menu');
   assert.ok(subBtn, 'vpn:sub:menu button must exist');
-  assert.match(subBtn.text, /подписка/i);
+  assert.match(subBtn.text, /подписки/i);
 });
 
 test('parseVpnCommand and parseVpnCallback handle subscription commands', () => {
@@ -59,6 +59,7 @@ test('VpnCommandService handles sub-menu, sub-new, sub-rotate, and sub-revoke fl
 
   const mockSubService = {
     repository: mockRepo,
+    hasCompleteClientBinding(item) { return Boolean(item.clientIdDe && item.clientIdNl); },
     async listSubscriptions(userId) {
       return mockRepo.listByUser(userId);
     },
@@ -102,45 +103,54 @@ test('VpnCommandService handles sub-menu, sub-new, sub-rotate, and sub-revoke fl
 
   // 1. Initial menu with 0 subscriptions -> prompts to create
   const menuRes = await service.handleCallback({ data: 'vpn:sub:menu', userId: '100' });
-  assert.match(menuRes.answer, /у вас пока нет активных подписок/i);
+  assert.match(menuRes.answer, /Подписок пока нет/i);
   assert.equal(menuRes.buttons[0][0].data, 'vpn:sub:new');
 
   // 2. Create subscription
   const createRes = await service.handleCallback({ data: 'vpn:sub:new', userId: '100' });
-  assert.match(createRes.answer, /Умная подписка Jarvis VPN создана/i);
-  assert.match(createRes.answer, /выпустите связанные доступы/i);
+  assert.match(createRes.answer, /Профиль.*создан/i);
+  assert.match(createRes.answer, /бот пришлёт ссылку/i);
   assert.equal(createRes.buttons[0][0].data, 'vpn:sub:repair:11111111-2222-3333-4444-555555555555');
 
   // 3. The subscription entry stays a list even with one active profile.
   const oneProfileMenu = await service.handleCallback({ data: 'vpn:sub:menu', userId: '100' });
-  assert.match(oneProfileMenu.answer, /Ваши умные подписки/i);
+  assert.match(oneProfileMenu.answer, /Ваши подписки/i);
   assert.equal(oneProfileMenu.buttons[0][0].data, 'vpn:sub:view:11111111-2222-3333-4444-555555555555');
 
   // 4. Both command aliases enter that same list.
   for (const text of ['/vpn_sub', '/vpn_subscriptions']) {
     const result = await service.handle({ text, userId: '100' });
-    assert.match(result.answer, /Ваши умные подписки/i);
+    assert.match(result.answer, /Ваши подписки/i);
   }
 
-  // 5. Rotate token
+  // 5. An unbound profile does not issue a link.
+  const unbound = await service.handleCallback({
+    data: 'vpn:sub:rotate:11111111-2222-3333-4444-555555555555', userId: '100',
+  });
+  assert.match(unbound.answer, /Сначала подключите/);
+
+  // 6. Rotate after binding.
+  mockSubscriptions[0].clientIdDe = { hy2: 'vpn-000000000001', vless: 'vpn-000000000002' };
+  mockSubscriptions[0].clientIdNl = { hy2: 'vpn-000000000003', vless: 'vpn-000000000004' };
   const rotateRes = await service.handleCallback({
     data: 'vpn:sub:rotate:11111111-2222-3333-4444-555555555555',
     userId: '100',
   });
-  assert.match(rotateRes.answer, /Токен подписки обновлен/i);
-  assert.match(rotateRes.answer, /все совместимые серверы/i);
+  assert.match(rotateRes.answer, /Новая ссылка/i);
+  assert.match(rotateRes.answer, /замените её в Happ на каждом устройстве/i);
+  assert.equal(rotateRes.historyAnswer.includes('sub_rotatedtoken'), false);
   assert.equal(rotateRes.buttons[0][0].url, 'https://jarvis.rilora.ru/happ-sub/sub_rotatedtoken67890');
 
-  // 6. Revoke subscription
+  // 7. Revoke subscription
   const revokeRes = await service.handleCallback({
     data: 'vpn:sub:revoke:11111111-2222-3333-4444-555555555555',
     userId: '100',
   });
   assert.match(revokeRes.answer, /Подписка отозвана/i);
 
-  // 7. Menu after revoke has 0 active
+  // 8. Menu after revoke has 0 active
   const menuAfterRes = await service.handleCallback({ data: 'vpn:sub:menu', userId: '100' });
-  assert.match(menuAfterRes.answer, /у вас пока нет активных подписок/i);
+  assert.match(menuAfterRes.answer, /Подписок пока нет/i);
 });
 
 test('repair confirmation binds exactly four issued clients and blocks a repeated repair', async () => {
@@ -160,18 +170,22 @@ test('repair confirmation binds exactly four issued clients and blocks a repeate
     repository: { async findById() { return sub; } },
     hasCompleteClientBinding(item) { return Boolean(item.clientIdDe && item.clientIdNl); },
     async bindClientIds({ clientIds }) { sub.clientIdDe = clientIds.de; sub.clientIdNl = clientIds.nl; return sub; },
+    async rotateSubscription() { return { url: 'https://jarvis.rilora.ru/sub/sub_test_only', happUrl: 'https://jarvis.rilora.ru/happ-sub/sub_test_only' }; },
   };
   let number = 0;
   const issue = async () => ({ result: { state: 'succeeded', data: { client: { id: `vpn-${String(++number).padStart(12, '0')}` } } } });
   const service = new VpnCommandService({ repository, subscriptionService, clients: { de: { request: issue }, nl: { request: issue } } });
   const context = { userId: 'owner', originChannel: 'telegram', conversationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' };
   const prompt = await service.handleCallback({ ...context, data: `vpn:sub:repair:${subscriptionId}` });
-  assert.match(prompt.answer, /Подтвердить|Выпустить/);
+  assert.match(prompt.answer, /Подключить четыре сервера/);
   const result = await service.handleCallback({ ...context, data: `vpn:confirm:${actionId}` });
-  assert.match(result.answer, /привязаны/);
+  assert.match(result.answer, /Четыре сервера подключены/);
+  assert.match(result.answer, /https:\/\/jarvis\.rilora\.ru\/sub\/sub_test_only/);
+  assert.equal(result.buttons[0][0].url, 'https://jarvis.rilora.ru/happ-sub/sub_test_only');
+  assert.equal(result.historyAnswer.includes('sub_test_only'), false);
   assert.equal(number, 4);
   assert.equal(calls.at(-1).status, 'succeeded');
   const repeat = await service.handleCallback({ ...context, data: `vpn:sub:repair:${subscriptionId}` });
-  assert.match(repeat.answer, /уже привязаны/);
+  assert.match(repeat.answer, /уже подключены/);
   assert.equal(number, 4);
 });

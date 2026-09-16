@@ -22,6 +22,11 @@ revocation, and an owner-confirmed first binding of all four server clients.
 Migration 023 additionally permits that closed repair action. A repeated or
 uncertain repair is blocked rather than issuing another access set. See
 `updates/2026-09-16-happ-subscription-compatibility.md`.
+Telegram now gives the Happ link and import button immediately after successful
+client binding. Existing bound profiles can issue a replacement link; the old
+link stops working, and the new token is not stored in Jarvis conversation
+history. Subscription revocation stops the dynamic URL but does not revoke
+already issued VPN clients.
 
 Multi-node VPN Supervisor rollout, 2026-09-16: Jarvis now manages separate
 Germany and Netherlands VPN nodes through authenticated local/forwarded Host

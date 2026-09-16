@@ -48,3 +48,14 @@ flow compares and sets an unbound profile, so duplicate taps cannot replace an
 existing access set. If any Host Agent mutation has an unknown outcome, the
 subscription is kept blocked for operator reconciliation instead of attempting
 a second issue or an unverified rollback.
+
+## Follow-up: Telegram delivery
+
+The owner-confirmed binding response now includes the actual HTTPS subscription
+URL and an «Открыть в Happ» button. A bound profile offers «Получить новую
+ссылку» if the original was lost; this rotates the token and invalidates the
+old URL on every device. An unbound profile cannot issue an import link. The
+Telegram response is a one-time delivery artifact: Jarvis conversation history
+stores a redacted status sentence rather than the token. The bot explains that
+revoking a subscription disables its dynamic URL, while previously imported
+individual VPN credentials may still work.

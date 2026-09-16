@@ -260,6 +260,11 @@ See `docs/README.md` for current implementation status and historical records.
   Initial binding of the four client identities is a separate owner-confirmed
   `subscription.repair` action (migration 023); an already bound or uncertain
   repair is blocked rather than overwriting clients or issuing another access set.
+  The binding response delivers a one-time Happ URL and import button. A bound
+  profile can rotate its token to obtain a new URL; the previous URL then stops
+  working on every device. Telegram conversation history stores only a redacted
+  delivery status, never the raw subscription token. Subscription revocation
+  disables the URL but does not revoke already issued node credentials.
 - PostgreSQL must never be published publicly.
 - The DE-4 runs the private `gigaam-asr` service for Russian server ASR with a
   four-CPU/8-GiB cap and no host port. Its observed steady-state RSS is about

@@ -454,3 +454,31 @@ test('Telegram VPN callback stays owner-scoped and persists no technical ID', as
   assert.equal((await service.handleVpnCallback(callbackUpdate(51, 101, 101, `vpn:confirm:${requestId}`))).status, 'duplicate');
   assert.equal((await service.handleVpnCallback(callbackUpdate(52, 999, 999, 'vpn:menu'))).status, 'forbidden');
 });
+
+test('Telegram sends a new subscription link without storing its token in conversation history', async () => {
+  const secretUrl = 'https://jarvis.rilora.ru/sub/sub_test_private_token';
+  const response = {
+    answer: `Ссылка для Happ: ${secretUrl}`,
+    historyAnswer: 'Ссылка для Happ выдана в Telegram.',
+    buttons: [[{ text: 'Открыть в Happ', url: 'https://jarvis.rilora.ru/happ-sub/sub_test_private_token' }]],
+  };
+  const { service, state } = harness(['101'], null, null, {
+    vpnService: {
+      async handleCallback() { return response; },
+      async handle() { return response; },
+    },
+  });
+  const callback = await service.handleCallback(callbackUpdate(61, 101, 101, 'vpn:sub:rotate:11111111-2222-3333-4444-555555555555'));
+  assert.equal(callback.answer, response.answer);
+  assert.equal(state.messages.some((message) => String(message.content).includes('sub_test_private_token')), false);
+  const command = await service.handle(update(62, 101, 101, '/vpn_sub'));
+  assert.equal(command.answer, response.answer);
+  assert.equal(state.messages.some((message) => String(message.content).includes('sub_test_private_token')), false);
+
+  const viaMenu = harness(['101'], null, null, {
+    menuService: { async handleCallback() { return response; } },
+  });
+  const menuCallback = await viaMenu.service.handleCallback(callbackUpdate(63, 101, 101, 'vpn:sub:rotate:11111111-2222-3333-4444-555555555555'));
+  assert.equal(menuCallback.answer, response.answer);
+  assert.equal(viaMenu.state.messages.some((message) => String(message.content).includes('sub_test_private_token')), false);
+});
