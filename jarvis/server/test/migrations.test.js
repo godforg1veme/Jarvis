@@ -29,7 +29,16 @@ test('migration files are ordered and narrowly named', () => {
     '018_life_os_proactivity_actions.sql',
     '019_telegram_life_os_interactions.sql',
     '020_vpn_supervisor_advisory.sql',
+    '021_vpn_probe_credentials.sql',
   ]);
+});
+
+test('probe credential migration adds only closed VPN action kinds', () => {
+  const migration = fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, '021_vpn_probe_credentials.sql'), 'utf8');
+  for (const action of ['probe.install', 'probe.rotate', 'probe.enable', 'probe.disable']) {
+    assert.match(migration, new RegExp(`'${action.replace('.', '\\.')}'`));
+  }
+  assert.doesNotMatch(migration, /credential|share_uri|uri|token|password/i);
 });
 
 test('VPN Supervisor migration stores only bounded workflow metadata', () => {

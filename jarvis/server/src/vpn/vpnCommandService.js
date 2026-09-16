@@ -2,6 +2,7 @@ const crypto = require('node:crypto');
 const { buildRoutingArtifact, buildRoutingSummary } = require('./vpnRoutingService');
 const { parseVpnHealth } = require('./vpnHealthSchema');
 const { ExternalProbeMonitor } = require('../operations/vpnSupervisor/externalProbeMonitor');
+const { ProbeCredentialWorkflow, ProbeWorkflowError, probeBindingFor } = require('./vpnProbeCredentialWorkflow');
 
 const CONFIRMATION_TTL_MS = 60 * 1000;
 const REQUEST_ID_RE = /^[a-f0-9-]{36}$/i;
@@ -86,8 +87,17 @@ function parseVpnCallback(value) {
   const data = String(value || '');
   if (data === 'vpn:menu') return { action: 'menu' };
   if (data === 'vpn:health') return { action: 'health', protocol: 'both' };
+  if (data === 'vpn:probe:menu') return { action: 'probe-menu' };
+  if (data === 'vpn:probe:enable') return { action: 'probe-enable' };
+  if (data === 'vpn:probe:disable') return { action: 'probe-disable' };
 
-  let match = /^vpn:c:(de|nl)$/.exec(data);
+  let match = /^vpn:probe:(install|rotate):(de|nl):(v|h)$/.exec(data);
+  if (match) return {
+    action: match[1] === 'install' ? 'probe-install' : 'probe-rotate',
+    sourceNode: match[2], protocol: match[3] === 'h' ? 'hysteria2' : 'vless',
+  };
+
+  match = /^vpn:c:(de|nl)$/.exec(data);
   if (match) return { action: 'country', node: match[1] };
 
   match = /^vpn:(de|nl):(v|h):menu$/.exec(data);
@@ -126,6 +136,7 @@ function menuButtons() {
   return [
     [{ text: '🇩🇪 Германия (Frankfurt)', data: 'vpn:c:de' }, { text: '🇳🇱 Нидерланды (Amsterdam)', data: 'vpn:c:nl' }],
     [{ text: '🏥 Диагностика (Health Snapshot)', data: 'vpn:health' }],
+    [{ text: '🧪 Внешние проверки VPN', data: 'vpn:probe:menu' }],
   ];
 }
 
@@ -242,6 +253,23 @@ function backButton(protocol, node = 'de') {
 }
 
 function validateAction(action, args) {
+  if (action === 'probe.install' || action === 'probe.rotate') {
+    try {
+      return probeBindingFor({
+        sourceNode: String(args?.sourceNode || ''),
+        runnerNode: String(args?.runnerNode || ''),
+        protocol: String(args?.protocol || ''),
+        clientId: String(args?.clientId || '').toLowerCase(),
+        label: String(args?.label || ''),
+      });
+    } catch (_) {
+      throw publicError('PROBE_BINDING_INVALID');
+    }
+  }
+  if (action === 'probe.enable' || action === 'probe.disable') {
+    if (args && Object.keys(args).length > 0) throw publicError('VPN_ACTION_INVALID');
+    return {};
+  }
   const protocol = normalizeProtocol(args?.protocol);
   const node = normalizeNode(args?.node);
   if (action === 'issue') {
@@ -267,6 +295,19 @@ function safeHostData(data = {}) {
   return {
     ...(client ? { client } : {}),
     ...(Number.isInteger(data.clientCount) ? { clientCount: Math.min(Math.max(data.clientCount, 0), 50) } : {}),
+  };
+}
+
+function safeProbeWorkflowData(data = {}) {
+  const targetNode = NODES[data.targetNode] ? data.targetNode : null;
+  const runnerNode = NODES[data.runnerNode] ? data.runnerNode : null;
+  const protocol = PROTOCOLS[data.protocol] ? data.protocol : null;
+  if (typeof data.monitoring === 'boolean') return { monitoring: data.monitoring };
+  return {
+    ...(targetNode ? { targetNode } : {}),
+    ...(runnerNode ? { runnerNode } : {}),
+    ...(protocol ? { protocol } : {}),
+    ...(typeof data.installedAt === 'string' && data.installedAt.length <= 40 ? { installedAt: data.installedAt } : {}),
   };
 }
 
@@ -332,6 +373,14 @@ function formatConnectionAnswer(protocol, action, data, node) {
 }
 
 function actionPrompt(action, args) {
+  if (action === 'probe.install' || action === 'probe.rotate') {
+    const source = NODES[args.sourceNode];
+    const runner = NODES[args.runnerNode];
+    const verb = action === 'probe.install' ? 'Установить' : 'Обновить';
+    return `${verb} тестовый ключ ${PROTOCOLS[args.protocol].title} для проверки ${runner.flag} ${runner.country} → ${source.flag} ${source.country}? Ключ не будет показан или сохранён в Jarvis.`;
+  }
+  if (action === 'probe.enable') return 'Включить периодические внешние проверки между Германией и Нидерландами? Сначала должны успешно пройти все четыре разовые проверки.';
+  if (action === 'probe.disable') return 'Отключить периодические внешние проверки между Германией и Нидерландами? VPN-службы и ключи пользователей не изменятся.';
   const title = PROTOCOLS[normalizeProtocol(args.protocol)].title;
   const n = args.node ? NODES[normalizeNode(args.node)] : null;
   const nodeSuffix = n ? ` (${n.flag} ${n.country})` : '';
@@ -380,6 +429,12 @@ class VpnCommandService {
     this.now = options.now || (() => new Date());
     this.externalProbeMonitor = options.externalProbeMonitor || (this.clients.de && this.clients.nl
       ? new ExternalProbeMonitor({ clients: this.clients, now: this.now }) : null);
+    this.probeWorkflow = options.probeWorkflow || new ProbeCredentialWorkflow({
+      clients: this.clients,
+      now: this.now,
+      verifiedBindings: async () => (typeof this.repository.hasVerifiedProbeBindings === 'function'
+        ? this.repository.hasVerifiedProbeBindings() : false),
+    });
   }
 
   _getClient(node = 'de') {
@@ -610,6 +665,81 @@ class VpnCommandService {
     };
   }
 
+  async _probeBinding(sourceNode, protocol) {
+    const normalizedSource = normalizeNode(sourceNode);
+    const normalizedProtocol = normalizeProtocol(protocol);
+    const expected = normalizedSource === 'de'
+      ? (normalizedProtocol === 'vless' ? 'Probe NL to DE VLESS' : 'Probe NL to DE Hysteria')
+      : (normalizedProtocol === 'vless' ? 'Probe DE to NL VLESS' : 'Probe DE to NL Hysteria');
+    const clients = await this._clients(normalizedProtocol, normalizedSource);
+    const matches = clients.filter((item) => item.label === expected);
+    if (matches.length !== 1) throw publicError('PROBE_BINDING_INVALID');
+    return validateAction('probe.install', {
+      sourceNode: normalizedSource,
+      runnerNode: normalizedSource === 'de' ? 'nl' : 'de',
+      protocol: normalizedProtocol,
+      clientId: matches[0].id,
+      label: expected,
+    });
+  }
+
+  async _probeMenu() {
+    const resolved = await Promise.allSettled([
+      this._probeBinding('de', 'vless'), this._probeBinding('de', 'hysteria2'),
+      this._probeBinding('nl', 'vless'), this._probeBinding('nl', 'hysteria2'),
+    ]);
+    const bindings = resolved.filter((item) => item.status === 'fulfilled').map((item) => item.value);
+    const canEnable = typeof this.repository.hasVerifiedProbeBindings === 'function'
+      && await this.repository.hasVerifiedProbeBindings();
+    return {
+      answer: [
+        '🧪 **Внешние проверки VPN**',
+        'Каждая операция требует отдельного подтверждения владельца. URI тестовых ключей не выводятся и не сохраняются в Jarvis.',
+        bindings.length === 4
+          ? (canEnable ? 'Все четыре разовые проверки подтверждены. Таймеры можно включить отдельным действием.' : 'Сначала установи и проверь все четыре направления, затем отдельно включи таймеры.')
+          : `Доступно направлений: ${bindings.length} из 4. Недостающие тестовые устройства нужно создать или проверить отдельно.`,
+      ].join('\n'),
+      buttons: [
+        ...bindings.map((binding) => [{
+          text: `Установить: ${NODES[binding.runnerNode].flag} → ${NODES[binding.sourceNode].flag} ${PROTOCOLS[binding.protocol].title}`,
+          data: `vpn:probe:install:${binding.sourceNode}:${PROTOCOLS[binding.protocol].code}`,
+        }]),
+        ...bindings.map((binding) => [{
+          text: `Обновить ключ: ${NODES[binding.runnerNode].flag} → ${NODES[binding.sourceNode].flag} ${PROTOCOLS[binding.protocol].title}`,
+          data: `vpn:probe:rotate:${binding.sourceNode}:${PROTOCOLS[binding.protocol].code}`,
+        }]),
+        [{ ...(canEnable ? { text: '▶️ Включить таймеры', data: 'vpn:probe:enable' } : { text: '⏹ Отключить таймеры', data: 'vpn:probe:disable' }) }, ...(canEnable ? [{ text: '⏹ Отключить таймеры', data: 'vpn:probe:disable' }] : [])],
+        [{ text: '← В меню VPN', data: 'vpn:menu' }],
+      ],
+    };
+  }
+
+  async _decideProbe(record, context) {
+    let data;
+    try {
+      if (record.action === 'probe.install') data = await this.probeWorkflow.install(record.arguments);
+      else if (record.action === 'probe.rotate') data = await this.probeWorkflow.rotate(record.arguments);
+      else if (record.action === 'probe.enable') data = await this.probeWorkflow.enable();
+      else data = await this.probeWorkflow.disable();
+    } catch (error) {
+      const code = error instanceof ProbeWorkflowError ? error.code : 'PROBE_WORKFLOW_UNAVAILABLE';
+      const unknown = code.endsWith('_UNKNOWN') || code === 'PROBE_WORKFLOW_UNAVAILABLE';
+      await this.repository.complete({ requestId: record.id, status: unknown ? 'unknown' : 'failed', errorCode: code });
+      await this.repository.audit({ userId: context.userId, requestId: record.id, type: 'vpn.action.failed', metadata: { action: record.action, errorCode: code } });
+      return {
+        answer: unknown ? 'Результат внешней проверки пока неизвестен; повторно она не запускалась.' : `Внешняя проверка не выполнена: ${code}.`,
+        buttons: [[{ text: '← Внешние проверки', data: 'vpn:probe:menu' }]],
+      };
+    }
+    const metadata = safeProbeWorkflowData(data);
+    await this.repository.complete({ requestId: record.id, status: 'succeeded', result: metadata });
+    await this.repository.audit({ userId: context.userId, requestId: record.id, type: 'vpn.action.succeeded', metadata: { action: record.action, ...metadata } });
+    const answer = record.action === 'probe.enable' ? 'Периодические внешние проверки включены.'
+      : record.action === 'probe.disable' ? 'Периодические внешние проверки отключены. VPN-службы и пользовательские ключи не менялись.'
+      : `Разовая внешняя проверка ${NODES[metadata.runnerNode].flag} → ${NODES[metadata.targetNode].flag} (${PROTOCOLS[metadata.protocol].title}) завершена.`;
+    return { answer, buttons: [[{ text: '← Внешние проверки', data: 'vpn:probe:menu' }]] };
+  }
+
   async _decide(command, context) {
     let requestId = command.requestId;
     if (!requestId && typeof this.repository.latestPending === 'function') {
@@ -625,6 +755,7 @@ class VpnCommandService {
     }
     const record = await this.repository.approve({ userId: context.userId, requestId, originChannel: context.originChannel, originDeviceId: context.originDeviceId || null });
     if (!record) throw publicError('VPN_CONFIRMATION_UNAVAILABLE');
+    if (record.action.startsWith('probe.')) return this._decideProbe(record, context);
     const node = normalizeNode(record.arguments?.node || 'de');
     const protocol = normalizeProtocol(record.arguments?.protocol);
     const operation = hostOperation(record.action, protocol);
@@ -666,6 +797,14 @@ class VpnCommandService {
     if (!callback) return null;
     await this._requireOwner(context.userId);
     const node = callback.node || 'de';
+    if (callback.action === 'probe-menu') return this._probeMenu();
+    if (callback.action === 'probe-install' || callback.action === 'probe-rotate') {
+      const binding = await this._probeBinding(callback.sourceNode, callback.protocol);
+      return this._create({ action: callback.action === 'probe-install' ? 'probe.install' : 'probe.rotate', arguments: binding }, context);
+    }
+    if (callback.action === 'probe-enable' || callback.action === 'probe-disable') {
+      return this._create({ action: callback.action === 'probe-enable' ? 'probe.enable' : 'probe.disable', arguments: {} }, context);
+    }
     if (callback.action === 'country') {
       const n = NODES[normalizeNode(node)];
       return {

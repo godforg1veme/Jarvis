@@ -1,0 +1,116 @@
+const crypto = require('node:crypto');
+
+const CLIENT_ID = /^vpn-[a-f0-9]{12}$/;
+const NODES = new Set(['de', 'nl']);
+const PROTOCOLS = new Set(['vless', 'hysteria2']);
+const PROBE_BINDINGS = Object.freeze({
+  'de:vless': Object.freeze({ runnerNode: 'nl', label: 'Probe NL to DE VLESS' }),
+  'de:hysteria2': Object.freeze({ runnerNode: 'nl', label: 'Probe NL to DE Hysteria' }),
+  'nl:vless': Object.freeze({ runnerNode: 'de', label: 'Probe DE to NL VLESS' }),
+  'nl:hysteria2': Object.freeze({ runnerNode: 'de', label: 'Probe DE to NL Hysteria' }),
+});
+
+class ProbeWorkflowError extends Error {
+  constructor(code) { super(code); this.code = code; }
+}
+
+function probeBindingFor({ sourceNode, protocol, clientId, label }) {
+  const binding = PROBE_BINDINGS[`${sourceNode}:${protocol}`];
+  if (!binding || !CLIENT_ID.test(String(clientId || '')) || label !== binding.label) {
+    throw new ProbeWorkflowError('PROBE_BINDING_INVALID');
+  }
+  return Object.freeze({ sourceNode, runnerNode: binding.runnerNode, protocol, clientId, label });
+}
+
+function uriForProtocol(value, protocol) {
+  const uri = String(value || '');
+  const expected = protocol === 'vless' ? 'vless://' : 'hy2://';
+  if (!uri.startsWith(expected) || uri.length > 2048) throw new ProbeWorkflowError('PROBE_EXPORT_INVALID');
+  return uri;
+}
+
+function operationFor(protocol, action) {
+  const prefix = protocol === 'hysteria2' ? 'vpn.hysteria2.client.' : 'vpn.client.';
+  return `${prefix}${action}`;
+}
+
+function resultOrThrow(response, unavailableCode, failedCode) {
+  const result = response?.result;
+  if (result?.state === 'succeeded') return result.data || {};
+  throw new ProbeWorkflowError(result?.state === 'unknown' ? unavailableCode : failedCode);
+}
+
+class ProbeCredentialWorkflow {
+  constructor({ clients, now = () => new Date(), verifiedBindings = async () => false }) {
+    this.clients = clients || {};
+    this.now = now;
+    this.verifiedBindings = verifiedBindings;
+  }
+
+  _client(node) {
+    if (!NODES.has(node) || !this.clients[node]) throw new ProbeWorkflowError('PROBE_RUNNER_UNAVAILABLE');
+    return this.clients[node];
+  }
+
+  async _request(node, operation, requestArguments) {
+    return this._client(node).request({
+      version: 1,
+      requestId: crypto.randomUUID(),
+      operation,
+      arguments: requestArguments,
+      sentAt: this.now().toISOString(),
+    });
+  }
+
+  async _transfer(binding, sourceAction) {
+    const verified = probeBindingFor(binding);
+    let credential = null;
+    try {
+      const exported = await this._request(verified.sourceNode, operationFor(verified.protocol, sourceAction), { clientId: verified.clientId });
+      credential = uriForProtocol(resultOrThrow(exported, 'PROBE_EXPORT_UNKNOWN', 'PROBE_EXPORT_FAILED').shareUri, verified.protocol);
+      const installed = await this._request(verified.runnerNode, 'vpn.external_probe.credential.install', {
+        targetNode: verified.sourceNode,
+        protocol: verified.protocol,
+        credential,
+      });
+      const installData = resultOrThrow(installed, 'PROBE_INSTALL_UNKNOWN', 'PROBE_INSTALL_FAILED');
+      const probed = await this._request(verified.runnerNode, 'vpn.external_probe.run', { targetNode: verified.sourceNode });
+      const probeData = resultOrThrow(probed, 'PROBE_RUN_UNKNOWN', 'PROBE_RUN_FAILED');
+      return {
+        targetNode: verified.sourceNode,
+        runnerNode: verified.runnerNode,
+        protocol: verified.protocol,
+        installedAt: String(installData.installedAt || '').slice(0, 40),
+        probe: probeData,
+      };
+    } finally {
+      credential = null;
+    }
+  }
+
+  install(binding) { return this._transfer(binding, 'export'); }
+  rotate(binding) { return this._transfer(binding, 'rotate'); }
+
+  async enable() {
+    if (!await this.verifiedBindings()) throw new ProbeWorkflowError('PROBE_ACCEPTANCE_INCOMPLETE');
+    const [de, nl] = await Promise.all([
+      this._request('nl', 'vpn.external_probe.monitor.enable', { targetNode: 'de' }),
+      this._request('de', 'vpn.external_probe.monitor.enable', { targetNode: 'nl' }),
+    ]);
+    resultOrThrow(de, 'PROBE_MONITOR_UNKNOWN', 'PROBE_MONITOR_FAILED');
+    resultOrThrow(nl, 'PROBE_MONITOR_UNKNOWN', 'PROBE_MONITOR_FAILED');
+    return { monitoring: true };
+  }
+
+  async disable() {
+    const [de, nl] = await Promise.all([
+      this._request('nl', 'vpn.external_probe.monitor.disable', { targetNode: 'de' }),
+      this._request('de', 'vpn.external_probe.monitor.disable', { targetNode: 'nl' }),
+    ]);
+    resultOrThrow(de, 'PROBE_MONITOR_UNKNOWN', 'PROBE_MONITOR_FAILED');
+    resultOrThrow(nl, 'PROBE_MONITOR_UNKNOWN', 'PROBE_MONITOR_FAILED');
+    return { monitoring: false };
+  }
+}
+
+module.exports = { PROBE_BINDINGS, ProbeCredentialWorkflow, ProbeWorkflowError, probeBindingFor };

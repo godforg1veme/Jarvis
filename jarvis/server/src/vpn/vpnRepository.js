@@ -81,6 +81,16 @@ class VpnRepository {
     return result.rows;
   }
 
+  async hasVerifiedProbeBindings() {
+    const result = await this.pool.query(`
+      SELECT COUNT(DISTINCT (arguments->>'sourceNode', arguments->>'protocol'))::int AS count
+      FROM vpn_action_requests
+      WHERE action='probe.install' AND status='succeeded'
+        AND completed_at>now()-interval '24 hours'
+    `);
+    return result.rows[0]?.count === 4;
+  }
+
   async audit({ userId, requestId = null, type, metadata = {} }) {
     await this.pool.query(`
       INSERT INTO vpn_audit_events (user_id,action_request_id,event_type,metadata)

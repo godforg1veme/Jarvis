@@ -18,6 +18,47 @@ from .idempotency import IdempotencyJournal, request_mac
 from .protocol import MAX_ENVELOPE_BYTES, ProtocolError, validate_request
 
 
+# These operations intentionally return a one-time client URI.  A URI may cross
+# the authenticated Unix socket, but it must never enter the durable operation
+# journal: that journal backs `operation.status` and survives process restarts.
+# Exports are read-only, so durable at-most-once semantics are neither needed
+# nor appropriate here.
+EPHEMERAL_SECRET_OPERATIONS = frozenset({
+    "vpn.client.export",
+    "vpn.hysteria2.client.export",
+})
+
+# These are changing operations, so their claims must remain durable.  Only a
+# closed public projection of their result is journaled; the one-time URI is
+# returned to the current authenticated caller and is otherwise irrecoverable.
+SECRET_OUTPUT_MUTATIONS = frozenset({
+    "vpn.client.issue",
+    "vpn.client.rotate",
+    "vpn.hysteria2.client.issue",
+    "vpn.hysteria2.client.rotate",
+})
+
+
+def journal_safe_result(result: dict[str, Any]) -> dict[str, Any]:
+    """Project a secret-bearing VPN response into durable, public metadata."""
+    projected: dict[str, Any] = {"state": result.get("state", "failed")}
+    error_code = result.get("errorCode")
+    if isinstance(error_code, str) and len(error_code) <= 120:
+        projected["errorCode"] = error_code
+    data = result.get("data")
+    if not isinstance(data, dict):
+        return projected
+    client = data.get("client")
+    if isinstance(client, dict):
+        safe_client = {
+            key: value for key, value in client.items()
+            if key in {"id", "label", "createdAt"} and isinstance(value, str) and len(value) <= 80
+        }
+        if safe_client:
+            projected["data"] = {"client": safe_client}
+    return projected
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
@@ -48,8 +89,11 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter, con
         request = validate_request(wrapper["request"])
         if not hmac.compare_digest(wrapper["auth"], request_mac(authenticator, request)):
             raise ProtocolError("request is unauthenticated")
-        cached = journal.get(request)
-        if cached is not None:
+        if request["operation"] in EPHEMERAL_SECRET_OPERATIONS:
+            loop = asyncio.get_running_loop()
+            exec_result = await loop.run_in_executor(None, execute, config, request["operation"], request["arguments"])
+            payload = response_for(request, exec_result)
+        elif (cached := journal.get(request)) is not None:
             payload = cached
         elif request["operation"] == "operation.status":
             original = journal.get_response(request["arguments"]["requestId"])
@@ -60,7 +104,11 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter, con
             if journal.claim(request, placeholder):
                 loop = asyncio.get_running_loop()
                 exec_result = await loop.run_in_executor(None, execute, config, request["operation"], request["arguments"])
-                payload = journal.complete(request, response_for(request, exec_result))
+                if request["operation"] in SECRET_OUTPUT_MUTATIONS:
+                    journal.complete(request, response_for(request, journal_safe_result(exec_result)))
+                    payload = response_for(request, exec_result)
+                else:
+                    payload = journal.complete(request, response_for(request, exec_result))
             else:
                 payload = journal.get(request)
         else:

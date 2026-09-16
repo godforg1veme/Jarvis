@@ -62,3 +62,11 @@ test('routes Netherlands recovery to the Netherlands Host Agent only', async () 
   assert.equal(calls.length, 1);
   assert.equal(calls[0].arguments.requestId, requestId);
 });
+
+test('never replays a cross-node probe credential handoff', async () => {
+  const worker = new VpnRecoveryWorker({
+    repository: { complete: async () => assert.fail('must not complete'), audit: async () => assert.fail('must not audit') },
+    client: { request: async () => assert.fail('must not contact Host Agent') },
+  });
+  assert.equal(await worker.reconcile({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', user_id: 'u1', action: 'probe.install' }), false);
+});

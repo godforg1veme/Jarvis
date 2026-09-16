@@ -95,6 +95,9 @@ test('parses only bounded VPN callback actions', () => {
   assert.deepEqual(parseVpnCallback('vpn:nl:h:status'), { action: 'status', protocol: 'hysteria2', node: 'nl' });
   assert.deepEqual(parseVpnCallback('vpn:nl:v:export:vpn-0123456789ab'), { action: 'export', protocol: 'vless', clientId: 'vpn-0123456789ab', node: 'nl' });
   assert.deepEqual(parseVpnCallback(`vpn:confirm:${REQUEST_ID}`), { action: 'confirm', requestId: REQUEST_ID });
+  assert.deepEqual(parseVpnCallback('vpn:probe:menu'), { action: 'probe-menu' });
+  assert.deepEqual(parseVpnCallback('vpn:probe:install:de:v'), { action: 'probe-install', sourceNode: 'de', protocol: 'vless' });
+  assert.deepEqual(parseVpnCallback('vpn:probe:disable'), { action: 'probe-disable' });
   assert.equal(parseVpnCallback('ops:allow:anything'), null);
   assert.equal(parseVpnCallback('vpn:export:../../root'), null);
 });
@@ -170,6 +173,29 @@ test('secret host fields are excluded from persistence metadata', () => {
   assert.equal(JSON.stringify(safe).includes('private'), false);
   assert.equal(artifactFrom(data).content, 'vless://secret\n');
   assert.equal(artifactFrom({ ...data, shareUri: 'hy2://secret' }).kind, 'happ-hysteria2');
+});
+
+test('probe credential handoff requires the normal owner confirmation and persists only public metadata', async () => {
+  const { service, calls, records } = harness();
+  service.probeWorkflow = {
+    async install() {
+      return { targetNode: 'de', runnerNode: 'nl', protocol: 'vless', installedAt: '2026-09-16T12:00:00Z' };
+    },
+  };
+  const context = { userId: USER_ID, conversationId: 'conversation', originChannel: 'telegram' };
+  const binding = {
+    sourceNode: 'de', runnerNode: 'nl', protocol: 'vless',
+    clientId: 'vpn-0123456789ab', label: 'Probe NL to DE VLESS',
+  };
+  const created = await service.requestAction({ ...context, action: 'probe.install', arguments: binding });
+  assert.match(created.answer, /тестовый ключ VLESS/);
+  assert.equal(calls.some(([type]) => type === 'request'), false);
+  const decided = await service.handle({ ...context, text: '/vpn_confirm' });
+  assert.match(decided.answer, /Разовая внешняя проверка/);
+  const stored = records.get(REQUEST_ID);
+  assert.equal(JSON.stringify(stored.arguments).includes('vless://'), false);
+  const completion = calls.find(([type]) => type === 'complete')[1];
+  assert.deepEqual(completion.result, { targetNode: 'de', runnerNode: 'nl', protocol: 'vless', installedAt: '2026-09-16T12:00:00Z' });
 });
 
 test('Hysteria2 confirmation stays protocol-bound and never sends protocol to Host Agent arguments', async () => {
