@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-16
 
-**Status:** Design approved in conversation; implementation pending written-spec review.
+**Status:** Design and written specification approved by the owner; implementation pending.
 
 ## Goal and boundary
 
