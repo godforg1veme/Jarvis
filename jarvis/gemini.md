@@ -12,4 +12,6 @@ Gemini is an optional provider/advisor, not Jarvis's identity or the sole AI
 architecture. For implemented-versus-roadmap status and historical design
 records, use [`docs/README.md`](docs/README.md).
 
-Current status note: the dynamic multi-node VPN subscription network with UDP port hopping (20000-50000), Smart Failover across DE & NL (Hysteria 2 + VLESS), migration 022, and 1-click Happ Telegram bot integration was production-deployed and verified on 2026-09-16. Both production DE (`jarvis-vps`) and new target NL (`jarvis-vps-new`) run iptables NAT PREROUTING port-hopping redirect. Real owner/member Telegram taps remain manual acceptance.
+Do not keep an independent status snapshot here. Current VPN deployment and
+remaining client/certificate acceptance risks are tracked in `AGENTS.md` and
+[`docs/README.md`](docs/README.md).

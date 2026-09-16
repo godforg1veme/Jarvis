@@ -4,20 +4,23 @@ This file is the status authority for project documentation. Specifications and
 plans under `docs/superpowers/` are preserved as decision history; their old
 future-tense wording does not override the current architecture in `AGENTS.md`.
 
-Status snapshot: 2026-09-16.
+Status snapshot: 2026-09-17.
 
 Dynamic VPN Subscription Network & Port Hopping rollout, 2026-09-16: Jarvis
-now generates dynamic Sing-box/Happ subscriptions with 4-tier Smart Failover
-(DE Hysteria 2 -> NL Hysteria 2 -> DE VLESS 8443 -> NL VLESS 8443) and automatic
+now generates dynamic Sing-box/Happ subscriptions with four endpoints
+(DE Hysteria 2, NL Hysteria 2, DE VLESS 8443, NL VLESS 8443). Explicit Sing-box
+JSON includes `url-test` automatic selection; the default Happ-compatible
+Base64 subscription contains four URIs, but automatic failover in Happ has not
+been verified on a phone. The deployment also provides
 UDP port hopping (20000:50000, 30s hop interval) redirecting to port 443 via iptables
 NAT PREROUTING on both German (`87.120.187.109`) and Netherlands (`94.183.208.56`)
-nodes to defeat ISP QUIC port-443 blackholing. Migration 022 (`vpn_subscriptions`)
+nodes to mitigate observed ISP QUIC port-443 blackholing. Migration 022 (`vpn_subscriptions`)
 persists only SHA-256 token hashes (zero raw secret persistence). Dynamic endpoint
 `GET /sub/:token` serves an ordinary Base64 subscription by default, with explicit
 Sing-box JSON when requested, demoting probe-degraded nodes via
 `ExternalProbeMonitor`. `GET /happ-sub/:token` provides a 1-click HTML landing
-bridge to the Happ subscription deeplink. Telegram `/vpn` exposes «📲 Умная
-подписка (Happ)» as a profile list, with creation, 1-click import, token rotation,
+bridge to the Happ subscription deeplink. Telegram `/vpn` exposes «📲 Подписки
+(Happ)» as a profile list, with creation, import, token rotation,
 revocation, and an owner-confirmed first binding of all four server clients.
 Migration 023 additionally permits that closed repair action. A repeated or
 uncertain repair is blocked rather than issuing another access set. See
@@ -27,6 +30,14 @@ client binding. Existing bound profiles can issue a replacement link; the old
 link stops working, and the new token is not stored in Jarvis conversation
 history. Subscription revocation stops the dynamic URL but does not revoke
 already issued VPN clients.
+Read-only production checks on 2026-09-17 verified the four generated URIs,
+node addresses, running services and UDP redirect rules; real Happ latency and
+traffic on Wi-Fi/mobile remain unverified. NL currently has a valid certificate
+for `vpn.rilora.ru` (expires 2026-12-12), but that name resolves to DE. NL's
+unattended HTTP-01 renewal is therefore not established. A distinct DNS-only NL
+hostname and matching certificate are required before expiry; do not present
+this as a completed redundant TLS deployment. See
+`updates/2026-09-16-happ-subscription-compatibility.md`.
 
 Multi-node VPN Supervisor rollout, 2026-09-16: Jarvis now manages separate
 Germany and Netherlands VPN nodes through authenticated local/forwarded Host

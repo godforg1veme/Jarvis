@@ -2,6 +2,15 @@
 
 Date: 2026-09-16
 
+> Status correction (2026-09-17): This is the original rollout record, not
+> current Happ acceptance. The `happ://add/sub?url=...` link below was invalid
+> and has been replaced. Happ currently receives a Base64 list of four URIs;
+> only explicit Sing-box JSON contains `url-test`. Real Happ failover, latency,
+> and traffic remain unverified on the owner's phone. NL certificate renewal
+> also needs a distinct hostname: `vpn.rilora.ru` resolves to DE. See
+> [compatibility and follow-ups](2026-09-16-happ-subscription-compatibility.md)
+> and the current [status authority](../README.md).
+
 ## Outcome
 
 Jarvis now provides an autonomous dynamic multi-node VPN subscription network for

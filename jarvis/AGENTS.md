@@ -247,16 +247,19 @@ See `docs/README.md` for current implementation status and historical records.
   alongside a 2-step setup guide.
 - `server/src/vpn/vpnSubscriptionService.js` and `server/src/vpn/vpnSubscriptionRepository.js`
   provide dynamic multi-node subscriptions for Happ / Sing-box. A single subscription
-  profile aggregates 4 resilient endpoints with automated client-side `url-test` failover:
+  profile aggregates four endpoints; explicit Sing-box JSON includes client-side
+  `url-test` failover, while the default Happ-compatible Base64 response is a list
+  of four URIs and does not itself guarantee automatic failover:
   (1) 🇩🇪 DE Hysteria 2, (2) 🇳🇱 NL Hysteria 2, (3) 🇩🇪 DE VLESS 8443, and (4) 🇳🇱 NL VLESS 8443.
   Both DE and NL nodes run UDP port hopping across `20000:50000` via iptables NAT PREROUTING
-  redirecting to port 443 (`deploy/vpn/setup-port-hopping.sh`), bypassing ISP QUIC blackholing.
+  redirecting to port 443 (`deploy/vpn/setup-port-hopping.sh`), mitigating observed
+  UDP 443 blocking without guaranteeing reachability on every client network.
   PostgreSQL migration `022_vpn_subscriptions.sql` stores only SHA-256 token hashes
   (`token_hash`) for strict zero raw secret persistence. `GET /sub/:token` dynamically generates
   Sing-box JSON (or Base64 for legacy clients) demoting probe-degraded nodes via `ExternalProbeMonitor`.
   `GET /happ-sub/:token` provides a 1-click HTML landing bridge to the Happ
   subscription deeplink for that same URL.
-  Telegram `/vpn` offers «📲 Умная подписка (Happ)» with 1-click creation, token rotation, and revocation.
+  Telegram `/vpn` offers «📲 Подписки (Happ)» with creation, token rotation, and revocation.
   Initial binding of the four client identities is a separate owner-confirmed
   `subscription.repair` action (migration 023); an already bound or uncertain
   repair is blocked rather than overwriting clients or issuing another access set.
@@ -269,6 +272,11 @@ See `docs/README.md` for current implementation status and historical records.
   its certificate `serverName` as SNI. Happ subscription URIs preserve the
   userpass colon and put the UDP port-hopping range in the authority; phone-side
   latency and traffic remain a manual acceptance check.
+  NL currently uses a `vpn.rilora.ru` certificate, but public DNS for that name
+  points to DE. The existing NL certificate expires on 2026-12-12; unattended
+  HTTP-01 renewal on NL is not established. Provision a distinct DNS-only NL
+  hostname and matching certificate before that date. The Hysteria installer
+  now rejects DNS/address mismatches even when cached ACME files exist.
 - PostgreSQL must never be published publicly.
 - The DE-4 runs the private `gigaam-asr` service for Russian server ASR with a
   four-CPU/8-GiB cap and no host port. Its observed steady-state RSS is about

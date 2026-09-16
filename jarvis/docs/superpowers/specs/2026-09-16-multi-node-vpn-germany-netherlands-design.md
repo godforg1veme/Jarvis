@@ -1,6 +1,13 @@
 ﻿# Multi-Node VPN: Germany (DE) and Netherlands (NL) Design
 
-**Date:** 2026-09-16  
+**Date:** 2026-09-16
+
+> Status correction (2026-09-17): The intended automatic NL certificate sync
+> and renewal below were not deployed. The current NL certificate for
+> `vpn.rilora.ru` expires 2026-12-12; that hostname resolves to DE. Provision
+> and test a distinct DNS-only NL hostname and matching certificate before
+> claiming unattended renewal. See [current status](../../README.md).
+
 **Status:** Implemented and production-deployed; final owner Telegram tap-through
 is tracked in the rollout record.
 **Nodes:**

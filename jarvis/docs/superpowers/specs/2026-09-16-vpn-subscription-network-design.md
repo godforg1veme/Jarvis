@@ -1,6 +1,13 @@
 # Jarvis VPN Smart Subscription Network Design
 
 Date: 2026-09-16
+
+> Historical design, not current acceptance: the original Happ deeplink below
+> was invalid and has been replaced. The current Happ subscription is a Base64
+> list of four URIs; `url-test` applies only to explicit Sing-box JSON. Real
+> Happ failover and phone traffic remain unverified. NL certificate renewal
+> requires a distinct DNS hostname. See [current status](../../README.md).
+
 Status: approved design; ready for implementation planning
 
 ## Context and Problem Statement

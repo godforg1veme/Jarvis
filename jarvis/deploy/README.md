@@ -209,8 +209,10 @@ v2.12.2 is pinned by SHA-256 because the current binary has no dry-run config
 check command; Jarvis validates its generated JSON exactly and treats the real
 process/listener probe as the activation check.
 
-Before installation, create a DNS-only A record for `vpn.rilora.ru` pointing to
-the second VPS address. Then run:
+For DE, create a DNS-only A record for `vpn.rilora.ru` pointing to
+`87.120.187.109`. The installer now checks this on every invocation, including
+when cached certificates exist, because ACME HTTP-01 renewal needs the hostname
+to resolve to the same node. Then run:
 
 ```bash
 sudo bash deploy/vpn/install-hysteria2.sh 87.120.187.109 vpn.rilora.ru admin@rilora.ru Owner-iPhone
@@ -218,6 +220,13 @@ sudo bash deploy/host-agent/install.sh
 sudo bash deploy/host-agent/enable-safe-actions.sh
 sudo PYTHONPATH=/opt/jarvis-host-agent python3 deploy/vpn/hysteria2_acceptance.py
 ```
+
+For NL, use a separate DNS-only hostname resolving to `94.183.208.56` and
+issue a matching certificate before relying on unattended renewal. Do not use
+`vpn.rilora.ru` for a fresh NL install: it resolves to DE. The existing NL
+certificate for that name expires on 2026-12-12; its renewal is not verified.
+Do not change the live NL SNI/config until the new DNS record and certificate
+are ready and the new endpoint has passed a real-client test.
 
 The installer opens only UDP 443 on the second address plus TCP 80 for ACME
 HTTP-01, and verifies that Xray remains active on TCP 443/8443. Its bootstrap

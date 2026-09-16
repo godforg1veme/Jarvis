@@ -78,3 +78,10 @@ Production read-only export verification returned four profiles, with distinct
 DE/NL Hysteria addresses and matching SNI. Both Host Agent suites passed
 101/101 as root, the server suite passed 499/499, and public smoke plus service
 health passed after rollout.
+
+Certificate follow-up on 2026-09-17: NL currently serves a certificate for
+`vpn.rilora.ru` that expires on 2026-12-12, while public DNS for that name
+resolves to DE. NL HTTP-01 renewal is not established. The installer now
+rejects this DNS/address mismatch even if ACME files already exist. A distinct
+DNS-only NL hostname and matching certificate must be provisioned and tested
+before expiry; no live SNI or certificate was changed during this audit.

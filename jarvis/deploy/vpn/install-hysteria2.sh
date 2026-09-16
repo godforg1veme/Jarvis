@@ -33,10 +33,8 @@ ipaddress.IPv4Address(sys.argv[1])
 PY
 
 /usr/sbin/ip -4 -o addr show scope global | /usr/bin/grep -F " $server_address/" >/dev/null || { echo "Server address is not assigned" >&2; exit 1; }
-if [[ ! -d /var/lib/hysteria/acme/certificates ]]; then
-  resolved=$(/usr/bin/getent ahostsv4 "$server_name" | /usr/bin/awk '{print $1}' | /usr/bin/sort -u)
-  /usr/bin/grep -Fx "$server_address" <<<"$resolved" >/dev/null || { echo "Public DNS does not point to the server address" >&2; exit 1; }
-fi
+resolved=$(/usr/bin/getent ahostsv4 "$server_name" | /usr/bin/awk '{print $1}' | /usr/bin/sort -u)
+/usr/bin/grep -Fx "$server_address" <<<"$resolved" >/dev/null || { echo "Public DNS does not point to the server address; ACME renewal would fail" >&2; exit 1; }
 
 udp_owner=$(/usr/bin/ss -H -lunp 'sport = :443' || true)
 if [[ -n "$udp_owner" ]] && ! /usr/bin/grep -q 'hysteria' <<<"$udp_owner"; then
