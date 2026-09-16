@@ -96,7 +96,8 @@ passed 93/93 tests on each VPS and returned only `unknown` for missing probe
 results. The rebuilt server image passed 21/21 focused tests, public smoke
 passed, and the container reached `healthy`. Xray and Hysteria2 active
 timestamps and restart counters were unchanged on both nodes. Neither probe
-timer is installed or enabled; no test identity or credential source exists.
+timer is installed or enabled; this stage issued no test identity and installed
+no credential source.
 Rollback copies are under
 `deploy/rollback-vpn-probe-stage-20260916` on each VPS and the previous DE
 server image is tagged `jarvis-family-server:pre-probe-stage-20260916`.
