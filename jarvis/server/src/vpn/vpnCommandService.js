@@ -50,7 +50,10 @@ function normalizeNode(value) {
 function parseVpnCommand(text) {
   const value = String(text || '').trim();
   let match;
-  if (/^\/vpn$/i.test(value)) return { kind: 'menu' };
+  if (/^\/vpn(?:_sub|_subscription|_subscriptions)?$/i.test(value)) {
+    if (/^\/vpn_(?:sub|subscription|subscriptions)$/i.test(value)) return { kind: 'subscription', action: 'menu' };
+    return { kind: 'menu' };
+  }
   if (/^\/vpn_(health|snapshot)$/i.test(value)) return { kind: 'read', action: 'health', protocol: 'both', arguments: {} };
   if ((match = /^\/vpn_(?:(de|nl)_)?status$/i.exec(value))) {
     return { kind: 'read', action: 'status', protocol: 'vless', node: match[1] || 'de', arguments: {} };
@@ -87,11 +90,19 @@ function parseVpnCallback(value) {
   const data = String(value || '');
   if (data === 'vpn:menu') return { action: 'menu' };
   if (data === 'vpn:health') return { action: 'health', protocol: 'both' };
+  if (data === 'vpn:sub:menu') return { action: 'sub-menu' };
+  if (data === 'vpn:sub:new') return { action: 'sub-new' };
+  let match = /^vpn:sub:view:([a-f0-9-]{36})$/.exec(data);
+  if (match) return { action: 'sub-view', subscriptionId: match[1] };
+  match = /^vpn:sub:rotate:([a-f0-9-]{36})$/.exec(data);
+  if (match) return { action: 'sub-rotate', subscriptionId: match[1] };
+  match = /^vpn:sub:revoke:([a-f0-9-]{36})$/.exec(data);
+  if (match) return { action: 'sub-revoke', subscriptionId: match[1] };
   if (data === 'vpn:probe:menu') return { action: 'probe-menu' };
   if (data === 'vpn:probe:enable') return { action: 'probe-enable' };
   if (data === 'vpn:probe:disable') return { action: 'probe-disable' };
 
-  let match = /^vpn:probe:(install|rotate):(de|nl):(v|h)$/.exec(data);
+  match = /^vpn:probe:(install|rotate):(de|nl):(v|h)$/.exec(data);
   if (match) return {
     action: match[1] === 'install' ? 'probe-install' : 'probe-rotate',
     sourceNode: match[2], protocol: match[3] === 'h' ? 'hysteria2' : 'vless',
@@ -135,6 +146,7 @@ function isVpnCallback(value) {
 function menuButtons() {
   return [
     [{ text: '🇩🇪 Германия (Frankfurt)', data: 'vpn:c:de' }, { text: '🇳🇱 Нидерланды (Amsterdam)', data: 'vpn:c:nl' }],
+    [{ text: '📲 Умная подписка (Happ)', data: 'vpn:sub:menu' }],
     [{ text: '🏥 Диагностика (Health Snapshot)', data: 'vpn:health' }],
     [{ text: '🧪 Внешние проверки VPN', data: 'vpn:probe:menu' }],
   ];
@@ -435,6 +447,8 @@ class VpnCommandService {
       verifiedBindings: async () => (typeof this.repository.hasVerifiedProbeBindings === 'function'
         ? this.repository.hasVerifiedProbeBindings() : false),
     });
+    this.subscriptionService = options.subscriptionService || null;
+    this.publicUrl = (options.publicUrl || 'https://jarvis.rilora.ru').replace(/\/+$/, '');
   }
 
   _getClient(node = 'de') {
@@ -829,6 +843,12 @@ class VpnCommandService {
         ],
       };
     }
+    if (callback.action === 'sub-menu') return this._renderSubscriptionMenu(context);
+    if (callback.action === 'sub-view') return this._renderSubscriptionView(callback.subscriptionId, context);
+    if (callback.action === 'sub-new') return this._createSubscription(context);
+    if (callback.action === 'sub-rotate') return this._rotateSubscription(callback.subscriptionId, context);
+    if (callback.action === 'sub-revoke') return this._revokeSubscription(callback.subscriptionId, context);
+
     if (callback.action === 'menu') {
       return callback.protocol
         ? { answer: renderProtocolGreeting(callback.protocol, node), buttons: protocolButtons(callback.protocol, node) }
@@ -881,6 +901,7 @@ class VpnCommandService {
       };
     }
     if (command.kind === 'menu') return { answer: 'Выберите страну подключения:', buttons: menuButtons() };
+    if (command.kind === 'subscription') return this._renderSubscriptionMenu(context);
     if (command.kind === 'routing') {
       return {
         answer: buildRoutingSummary(),
@@ -895,6 +916,129 @@ class VpnCommandService {
     if (command.kind === 'read') return this._read(command);
     if (command.kind === 'change') return this._create(command, context);
     return this._decide(command, context);
+  }
+
+  async _renderSubscriptionMenu(context) {
+    if (!this.subscriptionService) {
+      return {
+        answer: 'Сервис подписок временно недоступен.',
+        buttons: [[{ text: '« Главное меню', data: 'vpn:menu' }]],
+      };
+    }
+    const subs = await this.subscriptionService.listSubscriptions(context.userId, { activeOnly: true });
+    if (!subs.length) {
+      return {
+        answer: '📲 **Умная подписка Jarvis VPN (Happ)**\n\n' +
+          'Динамическая мульти-узловая подписка с автоматическим выбором узлов (Smart Failover) и прыгающими портами (port-hopping `20000-50000`) против блокировок РКН.\n\n' +
+          'У вас пока нет активных подписок. Нажмите кнопку ниже, чтобы создать подписку для этого устройства.',
+        buttons: [
+          [{ text: '➕ Создать подписку', data: 'vpn:sub:new' }],
+          [{ text: '« Главное меню', data: 'vpn:menu' }],
+        ],
+      };
+    }
+
+    if (subs.length === 1) {
+      return this._renderSubscriptionView(subs[0].id, context, subs[0]);
+    }
+
+    return {
+      answer: `📲 **Ваши умные подписки (${subs.length}):**\n\nВыберите профиль для просмотра или управления:`,
+      buttons: [
+        ...subs.map((s) => [{ text: `📱 ${s.label}`, data: `vpn:sub:view:${s.id}` }]),
+        [{ text: '➕ Новая подписка', data: 'vpn:sub:new' }],
+        [{ text: '« Главное меню', data: 'vpn:menu' }],
+      ],
+    };
+  }
+
+  async _renderSubscriptionView(id, context, existingSub = null) {
+    if (!this.subscriptionService) {
+      return { answer: 'Сервис подписок временно недоступен.', buttons: [[{ text: '« Главное меню', data: 'vpn:menu' }]] };
+    }
+    const sub = existingSub || (await this.subscriptionService.repository?.findById(id));
+    if (!sub || sub.revokedAt || (sub.userId && sub.userId !== context.userId)) {
+      return {
+        answer: 'Подписка не найдена или отозвана.',
+        buttons: [[{ text: '« К подпискам', data: 'vpn:sub:menu' }]],
+      };
+    }
+
+    return {
+      answer: '📲 **Умная подписка Jarvis VPN**\n\n' +
+        `Профиль: **${sub.label}**\n` +
+        'Статус: **Активна**\n\n' +
+        '⚡ **Smart Failover сеть:**\n' +
+        '1. 🇩🇪 Германия Hysteria 2 (UDP 20000-50000)\n' +
+        '2. 🇳🇱 Нидерланды Hysteria 2 (UDP 20000-50000)\n' +
+        '3. 🇩🇪 Германия VLESS REALITY (TCP 8443)\n' +
+        '4. 🇳🇱 Нидерланды VLESS REALITY (TCP 8443)\n\n' +
+        'Для получения актуальной ссылки или добавления на новое устройство нажмите «🔄 Получить ссылку».',
+      buttons: [
+        [{ text: '🔄 Получить ссылку / Обновить', data: `vpn:sub:rotate:${sub.id}` }],
+        [{ text: '🗑 Отозвать подписку', data: `vpn:sub:revoke:${sub.id}` }],
+        [{ text: '« К подпискам', data: 'vpn:sub:menu' }],
+      ],
+    };
+  }
+
+  async _createSubscription(context) {
+    if (!this.subscriptionService) {
+      return { answer: 'Сервис подписок временно недоступен.', buttons: [[{ text: '« Главное меню', data: 'vpn:menu' }]] };
+    }
+    const created = await this.subscriptionService.createSubscription({
+      userId: context.userId,
+      label: 'Мой телефон',
+      createdBy: context.userId,
+    });
+    return {
+      answer: '✅ **Умная подписка Jarvis VPN создана!**\n\n' +
+        `Профиль: **${created.label}**\n\n` +
+        '⚡ **Smart Failover сеть:**\n' +
+        '1. 🇩🇪 Германия Hysteria 2 (UDP 20000-50000)\n' +
+        '2. 🇳🇱 Нидерланды Hysteria 2 (UDP 20000-50000)\n' +
+        '3. 🇩🇪 Германия VLESS REALITY (TCP 8443)\n' +
+        '4. 🇳🇱 Нидерланды VLESS REALITY (TCP 8443)\n\n' +
+        `🔑 Ссылка подписки:\n\`${created.url}\`\n\n` +
+        'Нажмите кнопку ниже для активации в Happ в 1 клик:',
+      buttons: [
+        [{ text: '🚀 Активировать в Happ (1 клик)', url: created.happUrl }],
+        [{ text: '🔄 Обновить токен', data: `vpn:sub:rotate:${created.id}` }, { text: '🗑 Отозвать', data: `vpn:sub:revoke:${created.id}` }],
+        [{ text: '« К подпискам', data: 'vpn:sub:menu' }],
+      ],
+    };
+  }
+
+  async _rotateSubscription(id, context) {
+    if (!this.subscriptionService) {
+      return { answer: 'Сервис подписок временно недоступен.', buttons: [[{ text: '« Главное меню', data: 'vpn:menu' }]] };
+    }
+    const rotated = await this.subscriptionService.rotateSubscription({ id, userId: context.userId });
+    if (!rotated) {
+      return { answer: 'Не удалось обновить подписку. Возможно, она была отозвана.', buttons: [[{ text: '« К подпискам', data: 'vpn:sub:menu' }]] };
+    }
+    return {
+      answer: '🔄 **Токен подписки обновлен!**\n\n' +
+        `Профиль: **${rotated.label}**\n` +
+        'Старая ссылка аннулирована.\n\n' +
+        `🔑 Новая ссылка подписки:\n\`${rotated.url}\`\n\n` +
+        'Нажмите кнопку ниже, чтобы обновить подключение в Happ в 1 клик:',
+      buttons: [
+        [{ text: '🚀 Активировать в Happ (1 клик)', url: rotated.happUrl }],
+        [{ text: '« К подпискам', data: 'vpn:sub:menu' }],
+      ],
+    };
+  }
+
+  async _revokeSubscription(id, context) {
+    if (!this.subscriptionService) {
+      return { answer: 'Сервис подписок временно недоступен.', buttons: [[{ text: '« Главное меню', data: 'vpn:menu' }]] };
+    }
+    await this.subscriptionService.revokeSubscription({ id, userId: context.userId });
+    return {
+      answer: '🗑 **Подписка отозвана.**\n\nДоступ через этот профиль заблокирован.',
+      buttons: [[{ text: '« К подпискам', data: 'vpn:sub:menu' }]],
+    };
   }
 
   async openMenu(context) {

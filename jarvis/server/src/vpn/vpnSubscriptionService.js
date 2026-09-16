@@ -133,6 +133,23 @@ function buildSingboxOutbound(item) {
   return null;
 }
 
+function extractClientIds(raw) {
+  if (!raw) return { hy2: null, vless: null, any: null };
+  if (typeof raw === 'object') return { hy2: raw.hy2 || null, vless: raw.vless || null, any: raw.id || null };
+  const str = String(raw).trim();
+  if (str.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(str);
+      return { hy2: parsed.hy2 || null, vless: parsed.vless || null, any: parsed.id || null };
+    } catch (_) {}
+  }
+  if (str.includes(',')) {
+    const parts = str.split(',').map((s) => s.trim()).filter(Boolean);
+    return { hy2: parts[0], vless: parts[1], any: parts[0] };
+  }
+  return { hy2: str, vless: str, any: str };
+}
+
 class VpnSubscriptionService {
   constructor(options = {}) {
     this.repository = options.repository;
@@ -540,65 +557,204 @@ class VpnSubscriptionService {
     const deClient = this.clients?.de;
     const nlClient = this.clients?.nl;
 
-    // DE exports
-    if (deClient && record.client_id_de) {
-      try {
-        const hy2Resp = await deClient.request({
-          version: 1,
-          requestId: crypto.randomUUID(),
-          operation: 'vpn.hysteria2.client.export',
-          arguments: { clientId: record.client_id_de },
-          sentAt: this.now().toISOString(),
-        });
-        if (hy2Resp?.result?.state === 'succeeded' && hy2Resp.result.data?.shareUri) {
-          result.deHy2 = hy2Resp.result.data.shareUri;
-        }
-      } catch (_) {}
+    const deIds = extractClientIds(record.client_id_de);
+    const nlIds = extractClientIds(record.client_id_nl);
 
-      try {
-        const vlessResp = await deClient.request({
-          version: 1,
-          requestId: crypto.randomUUID(),
-          operation: 'vpn.client.export',
-          arguments: { clientId: record.client_id_de },
-          sentAt: this.now().toISOString(),
-        });
-        if (vlessResp?.result?.state === 'succeeded' && vlessResp.result.data?.shareUri) {
-          result.deVless = vlessResp.result.data.shareUri;
-        }
-      } catch (_) {}
+    // DE exports
+    if (deClient) {
+      const hy2Id = deIds.hy2 || deIds.any;
+      if (hy2Id) {
+        try {
+          const resp = await deClient.request({
+            version: 1,
+            requestId: crypto.randomUUID(),
+            operation: 'vpn.hysteria2.client.export',
+            arguments: { clientId: hy2Id },
+            sentAt: this.now().toISOString(),
+          });
+          if (resp?.result?.state === 'succeeded' && resp.result.data?.shareUri) {
+            result.deHy2 = resp.result.data.shareUri;
+          }
+        } catch (_) {}
+      }
+      if (!result.deHy2) {
+        try {
+          const listResp = await deClient.request({
+            version: 1,
+            requestId: crypto.randomUUID(),
+            operation: 'vpn.hysteria2.clients.list',
+            arguments: {},
+            sentAt: this.now().toISOString(),
+          });
+          const clients = (listResp?.result?.data?.clients || []).filter((c) => !String(c.label || '').toLowerCase().includes('probe'));
+          const match = clients.find((c) => c.label === record.label) || clients[0];
+          if (match) {
+            const expResp = await deClient.request({
+              version: 1,
+              requestId: crypto.randomUUID(),
+              operation: 'vpn.hysteria2.client.export',
+              arguments: { clientId: match.id },
+              sentAt: this.now().toISOString(),
+            });
+            if (expResp?.result?.state === 'succeeded' && expResp.result.data?.shareUri) {
+              result.deHy2 = expResp.result.data.shareUri;
+            }
+          }
+        } catch (_) {}
+      }
+
+      const vlessId = deIds.vless || deIds.any;
+      if (vlessId) {
+        try {
+          const resp = await deClient.request({
+            version: 1,
+            requestId: crypto.randomUUID(),
+            operation: 'vpn.client.export',
+            arguments: { clientId: vlessId },
+            sentAt: this.now().toISOString(),
+          });
+          if (resp?.result?.state === 'succeeded' && resp.result.data?.shareUri) {
+            result.deVless = resp.result.data.shareUri;
+          }
+        } catch (_) {}
+      }
+      if (!result.deVless) {
+        try {
+          const listResp = await deClient.request({
+            version: 1,
+            requestId: crypto.randomUUID(),
+            operation: 'vpn.clients.list',
+            arguments: {},
+            sentAt: this.now().toISOString(),
+          });
+          const clients = (listResp?.result?.data?.clients || []).filter((c) => !String(c.label || '').toLowerCase().includes('probe'));
+          const match = clients.find((c) => c.label === record.label) || clients[0];
+          if (match) {
+            const expResp = await deClient.request({
+              version: 1,
+              requestId: crypto.randomUUID(),
+              operation: 'vpn.client.export',
+              arguments: { clientId: match.id },
+              sentAt: this.now().toISOString(),
+            });
+            if (expResp?.result?.state === 'succeeded' && expResp.result.data?.shareUri) {
+              result.deVless = expResp.result.data.shareUri;
+            }
+          }
+        } catch (_) {}
+      }
     }
 
     // NL exports
-    if (nlClient && record.client_id_nl) {
-      try {
-        const hy2Resp = await nlClient.request({
-          version: 1,
-          requestId: crypto.randomUUID(),
-          operation: 'vpn.hysteria2.client.export',
-          arguments: { clientId: record.client_id_nl },
-          sentAt: this.now().toISOString(),
-        });
-        if (hy2Resp?.result?.state === 'succeeded' && hy2Resp.result.data?.shareUri) {
-          result.nlHy2 = hy2Resp.result.data.shareUri;
-        }
-      } catch (_) {}
+    if (nlClient) {
+      const hy2Id = nlIds.hy2 || nlIds.any;
+      if (hy2Id) {
+        try {
+          const resp = await nlClient.request({
+            version: 1,
+            requestId: crypto.randomUUID(),
+            operation: 'vpn.hysteria2.client.export',
+            arguments: { clientId: hy2Id },
+            sentAt: this.now().toISOString(),
+          });
+          if (resp?.result?.state === 'succeeded' && resp.result.data?.shareUri) {
+            result.nlHy2 = resp.result.data.shareUri;
+          }
+        } catch (_) {}
+      }
+      if (!result.nlHy2) {
+        try {
+          const listResp = await nlClient.request({
+            version: 1,
+            requestId: crypto.randomUUID(),
+            operation: 'vpn.hysteria2.clients.list',
+            arguments: {},
+            sentAt: this.now().toISOString(),
+          });
+          const clients = (listResp?.result?.data?.clients || []).filter((c) => !String(c.label || '').toLowerCase().includes('probe'));
+          const match = clients.find((c) => c.label === record.label) || clients[0];
+          if (match) {
+            const expResp = await nlClient.request({
+              version: 1,
+              requestId: crypto.randomUUID(),
+              operation: 'vpn.hysteria2.client.export',
+              arguments: { clientId: match.id },
+              sentAt: this.now().toISOString(),
+            });
+            if (expResp?.result?.state === 'succeeded' && expResp.result.data?.shareUri) {
+              result.nlHy2 = expResp.result.data.shareUri;
+            }
+          }
+        } catch (_) {}
+      }
 
-      try {
-        const vlessResp = await nlClient.request({
-          version: 1,
-          requestId: crypto.randomUUID(),
-          operation: 'vpn.client.export',
-          arguments: { clientId: record.client_id_nl },
-          sentAt: this.now().toISOString(),
-        });
-        if (vlessResp?.result?.state === 'succeeded' && vlessResp.result.data?.shareUri) {
-          result.nlVless = vlessResp.result.data.shareUri;
-        }
-      } catch (_) {}
+      const vlessId = nlIds.vless || nlIds.any;
+      if (vlessId) {
+        try {
+          const resp = await nlClient.request({
+            version: 1,
+            requestId: crypto.randomUUID(),
+            operation: 'vpn.client.export',
+            arguments: { clientId: vlessId },
+            sentAt: this.now().toISOString(),
+          });
+          if (resp?.result?.state === 'succeeded' && resp.result.data?.shareUri) {
+            result.nlVless = resp.result.data.shareUri;
+          }
+        } catch (_) {}
+      }
+      if (!result.nlVless) {
+        try {
+          const listResp = await nlClient.request({
+            version: 1,
+            requestId: crypto.randomUUID(),
+            operation: 'vpn.clients.list',
+            arguments: {},
+            sentAt: this.now().toISOString(),
+          });
+          const clients = (listResp?.result?.data?.clients || []).filter((c) => !String(c.label || '').toLowerCase().includes('probe'));
+          const match = clients.find((c) => c.label === record.label) || clients[0];
+          if (match) {
+            const expResp = await nlClient.request({
+              version: 1,
+              requestId: crypto.randomUUID(),
+              operation: 'vpn.client.export',
+              arguments: { clientId: match.id },
+              sentAt: this.now().toISOString(),
+            });
+            if (expResp?.result?.state === 'succeeded' && expResp.result.data?.shareUri) {
+              result.nlVless = expResp.result.data.shareUri;
+            }
+          }
+        } catch (_) {}
+      }
     }
 
     return result;
+  }
+
+  async rotateSubscription({ id, userId = null }) {
+    if (!this.repository) throw new Error('SUBSCRIPTION_REPOSITORY_UNAVAILABLE');
+    const { token, tokenHash } = this.generateToken();
+    const record = await this.repository.rotate({ id, userId, tokenHash });
+    if (!record) return null;
+    return {
+      id: record.id,
+      token,
+      label: record.label,
+      url: `${this.publicUrl}/sub/${token}`,
+      happUrl: `${this.publicUrl}/happ-sub/${token}`,
+    };
+  }
+
+  async revokeSubscription({ id, userId = null }) {
+    if (!this.repository) throw new Error('SUBSCRIPTION_REPOSITORY_UNAVAILABLE');
+    return this.repository.revoke({ id, userId });
+  }
+
+  async listSubscriptions(userId, options = {}) {
+    if (!this.repository) return [];
+    return this.repository.listByUser(userId, options);
   }
 
   async resolveSubscription(token, { userAgent = '', format = null } = {}) {

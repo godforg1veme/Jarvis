@@ -124,6 +124,33 @@ class VpnSubscriptionRepository {
     `, [id.trim()]);
   }
 
+  async rotate({ id, userId = null, tokenHash }) {
+    if (!id || typeof id !== 'string' || !id.trim()) {
+      throw new Error('Subscription id is required');
+    }
+    if (!tokenHash || typeof tokenHash !== 'string' || !tokenHash.trim()) {
+      throw new Error('tokenHash is required');
+    }
+
+    const sql = userId
+      ? `
+        UPDATE vpn_subscriptions
+        SET token_hash = $1
+        WHERE id = $2 AND user_id = $3 AND revoked_at IS NULL
+        RETURNING *
+      `
+      : `
+        UPDATE vpn_subscriptions
+        SET token_hash = $1
+        WHERE id = $2 AND revoked_at IS NULL
+        RETURNING *
+      `;
+
+    const params = userId ? [tokenHash.trim(), id.trim(), String(userId).trim()] : [tokenHash.trim(), id.trim()];
+    const result = await this.pool.query(sql, params);
+    return mapSubscriptionRow(result.rows?.[0] || null);
+  }
+
   async revoke({ id, userId = null }) {
     if (!id || typeof id !== 'string' || !id.trim()) {
       throw new Error('Subscription id is required');

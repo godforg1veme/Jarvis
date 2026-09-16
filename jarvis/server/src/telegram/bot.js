@@ -3,8 +3,8 @@ const { sendTelegramText, splitTelegramText } = require('./telegramFormatting');
 const { isLifeCallback } = require('./telegramLifeOsService');
 const { isVpnCallback } = require('../vpn/vpnCommandService');
 
-const VPN_CALLBACK_RE = /^vpn:(?:menu|status|health|clients|new|restart|routing|pc|c:(?:de|nl)|p:[vh]|(?:(?:de|nl):)?[vh]:(?:menu|status|clients|new|restart|routing|pc|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12})|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12}|(?:confirm|reject):[a-f0-9-]{36})$/i;
-const TELEGRAM_CALLBACK_RE = /^(?:vpn:(?:menu|status|health|clients|new|restart|routing|pc|c:(?:de|nl)|p:[vh]|(?:(?:de|nl):)?[vh]:(?:menu|status|clients|new|restart|routing|pc|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12})|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12}|(?:confirm|reject):[a-f0-9-]{36})|vpsup:(?:allow|reject|details):[a-f0-9-]{36}|cmd:(?:confirm|reject):[a-f0-9-]{36}|life:(?:confirm|dismiss):[a-f0-9-]{36}|mem:(?:menu|list|add|correct|forget|(?:edit|forget_prompt|forget_confirm):[a-f0-9-]{36})|doc:(?:menu|add|cancel|(?:del_prompt|delete):[a-f0-9-]{36})|dev:(?:menu|list|pair|cancel|(?:(?:select|task|revoke_prompt|revoke):[a-f0-9-]{36}))|flow:cancel:[a-f0-9-]{36}|gallery:(?:(?:page|keep):[0-9]{1,4}|(?:open|delete):[dv]:[a-f0-9-]{36}:[0-9]{1,4}))$/i;
+const VPN_CALLBACK_RE = /^vpn:(?:menu|status|health|clients|new|restart|routing|pc|sub:(?:menu|new|(?:view|rotate|revoke):[a-f0-9-]{36})|c:(?:de|nl)|p:[vh]|(?:(?:de|nl):)?[vh]:(?:menu|status|clients|new|restart|routing|pc|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12})|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12}|(?:confirm|reject):[a-f0-9-]{36})$/i;
+const TELEGRAM_CALLBACK_RE = /^(?:vpn:(?:menu|status|health|clients|new|restart|routing|pc|sub:(?:menu|new|(?:view|rotate|revoke):[a-f0-9-]{36})|c:(?:de|nl)|p:[vh]|(?:(?:de|nl):)?[vh]:(?:menu|status|clients|new|restart|routing|pc|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12})|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12}|(?:confirm|reject):[a-f0-9-]{36})|vpsup:(?:allow|reject|details):[a-f0-9-]{36}|cmd:(?:confirm|reject):[a-f0-9-]{36}|life:(?:confirm|dismiss):[a-f0-9-]{36}|mem:(?:menu|list|add|correct|forget|(?:edit|forget_prompt|forget_confirm):[a-f0-9-]{36})|doc:(?:menu|add|cancel|(?:del_prompt|delete):[a-f0-9-]{36})|dev:(?:menu|list|pair|cancel|(?:(?:select|task|revoke_prompt|revoke):[a-f0-9-]{36}))|flow:cancel:[a-f0-9-]{36}|gallery:(?:(?:page|keep):[0-9]{1,4}|(?:open|delete):[dv]:[a-f0-9-]{36}:[0-9]{1,4}))$/i;
 
 function vpnReplyMarkup(buttons, options = {}) {
   if (buttons === undefined) return undefined;
@@ -19,7 +19,11 @@ function vpnReplyMarkup(buttons, options = {}) {
         const validCallback = data && !url && Buffer.byteLength(data, 'utf8') <= 64 && (TELEGRAM_CALLBACK_RE.test(data) || isLifeCallback(data) || isVpnCallback(data));
         const validOperationsUrl = url && !data && options.operationsPanelUrl && url === options.operationsPanelUrl;
         const validRoutingUrl = url && !data && (url === 'https://jarvis.rilora.ru/happ-routing' || (options.routingUrl && url === options.routingUrl));
-        const validUrl = validOperationsUrl || validRoutingUrl;
+        const validSubscriptionUrl = url && !data && (
+          url.startsWith('https://jarvis.rilora.ru/happ-sub/') ||
+          (options.publicUrl && url.startsWith(`${options.publicUrl}/happ-sub/`))
+        );
+        const validUrl = validOperationsUrl || validRoutingUrl || validSubscriptionUrl;
         if (text.length < 1 || text.length > 64 || (!validCallback && !validUrl)) {
           throw new Error('invalid VPN button');
         }
