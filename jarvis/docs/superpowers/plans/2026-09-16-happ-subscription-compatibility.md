@@ -176,13 +176,13 @@ Happ-compatible endpoints; `/happ-sub/:token` opens it using
 `happ://add/<encoded-url>`. Telegram always opens the profile list first.
 ```
 
-- [ ] **Step 4: Run full server regression and inspect staged diff**
+- [x] **Step 4: Run full server regression and inspect staged diff**
 
 Run: `cd server; npm test`
 
 Expected: PASS. Confirm `git diff --cached` contains no real token, URI credential, or deployment secret.
 
-- [ ] **Step 5: Commit, push, deploy, and verify**
+- [x] **Step 5: Commit, push, deploy, and verify**
 
 ```powershell
 git commit -m "fix(vpn): make Happ subscriptions importable"
