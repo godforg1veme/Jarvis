@@ -59,3 +59,9 @@ Telegram response is a one-time delivery artifact: Jarvis conversation history
 stores a redacted status sentence rather than the token. The bot explains that
 revoking a subscription disables its dynamic URL, while previously imported
 individual VPN credentials may still work.
+
+Production follow-up on 2026-09-17: the server was rebuilt and passed public
+health checks. Read-only Host Agent exports succeeded for all four clients of
+the active profile. Two older assistant messages containing subscription URLs
+were redacted in PostgreSQL; a follow-up count found zero such URLs in message
+history. A live tap on the new Happ button remains a device acceptance check.
