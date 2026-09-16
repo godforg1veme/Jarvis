@@ -1,0 +1,13 @@
+[Unit]
+Description=Schedule Jarvis external VPN client probe for %i
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=3min
+RandomizedDelaySec=30s
+AccuracySec=15s
+Persistent=false
+Unit=jarvis-vpn-probe@%i.service
+
+[Install]
+WantedBy=timers.target

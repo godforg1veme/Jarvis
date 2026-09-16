@@ -39,6 +39,14 @@ class ActionsTests(unittest.TestCase):
             },
         )
 
+    @patch("jarvis_host_agent.vpn_external_probe.read_probe_result")
+    def test_external_probe_snapshot_is_read_only_and_target_scoped(self, read_result):
+        read_result.return_value = {"version": 1, "targetNode": "nl", "checks": {}}
+        response = execute(self.config, "vpn.external_probe.snapshot", {"targetNode": "nl"})
+        self.assertEqual(response["state"], "succeeded")
+        self.assertEqual(response["data"]["targetNode"], "nl")
+        read_result.assert_called_once_with("nl")
+
     @patch("jarvis_host_agent.actions._run")
     def test_services_snapshot_returns_only_normalized_allowlisted_state(self, run):
         def result(arguments, timeout=15):

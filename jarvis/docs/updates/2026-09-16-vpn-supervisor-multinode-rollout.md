@@ -74,3 +74,19 @@ This deployment does **not** include the cross-node authenticated client
 probes. `protocolProbe` remains `unknown` until separate test identities and
 the probe runner are safely provisioned and verified. No VPN key or service was
 changed by this rollout.
+
+## Cross-node client probe staging (later on 2026-09-16)
+
+The next code increment adds strict URI/config/result contracts, a bounded
+non-root runner for official Xray and Hysteria2 clients, disabled systemd
+template units, and a closed read-only Host Agent result operation. The server
+reads DE results only from NL and NL results only from DE; it validates target
+identity and freshness and shows the external status separately in
+`/vpn_health`. A missing or ambiguous result stays `unknown`. This code does
+not create repair approvals, restart VPN services, or issue/rotate keys.
+
+Local Host Agent tests passed 93/93 and server tests passed 463/463. DE
+`systemd-analyze verify` accepted both unit files. The runner has not yet been
+accepted with dedicated live test credentials. Timers must remain disabled
+until four owner-confirmed test identities are issued and installed as
+root-owned systemd credential sources, one target at a time.

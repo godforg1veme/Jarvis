@@ -170,6 +170,12 @@ See `docs/README.md` for current implementation status and historical records.
   playbooks remain disabled. Only
   `supervisor_acceptance_noop` can execute, after a fresh owner Telegram
   confirmation, and it never calls Host Agent.
+- Cross-node client probe code is staged but its timers and test credentials
+  are not enabled. A non-root runner can check DE from NL and NL from DE with
+  dedicated owner-approved credentials; Host Agent exposes only a closed
+  read-only result. `/vpn_health` reports these separately and treats missing,
+  stale, mismatched, or ambiguous checks as unknown. External probe failures
+  do not authorize an LLM repair or key rotation.
 - Host Agent mutation claims are persisted before execution. An interrupted
   command has an unknown outcome and is reconciled; never retry it under a new
   identifier merely because its connection was lost. Discovery is read-only.

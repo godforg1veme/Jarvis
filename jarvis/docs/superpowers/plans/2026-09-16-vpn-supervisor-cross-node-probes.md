@@ -40,6 +40,11 @@
 
 ### Task 2: Bounded non-root probe runner and Linux unit
 
+Implementation note: the runner is a separate `vpn_external_probe_runner.py` module;
+the units are `jarvis-vpn-probe@.service` and `jarvis-vpn-probe@.timer` so the
+opposite target is fixed by the instance name. Both remain disabled until
+owner-approved credentials are installed.
+
 **Files:**
 - Modify: `host-agent/jarvis_host_agent/vpn_external_probe.py`
 - Create: `deploy/vpn/jarvis-vpn-probe.service`
@@ -50,10 +55,10 @@
 - CLI `python3 -m jarvis_host_agent.vpn_external_probe --target de|nl --credential-dir PATH --result PATH` writes one atomic JSON result, never a share URI or raw client output.
 - Credential files `vless.uri` and `hysteria2.uri` are root-owned source files exposed only through systemd `LoadCredential` to the non-root process.
 
-- [ ] Add fake-process/fake-HTTPS tests proving one loopback client per protocol, strict TLS, expected egress IP, bounded timeouts, cleanup on timeout, status `unknown` for missing credentials/egress endpoint failure, and no secret in result/log/exception.
-- [ ] Implement process lifecycle with private temporary config files, `stdout/stderr=DEVNULL`, fixed local ports or OS-allocated loopback ports, explicit child termination, and an atomic result write. No command string or shell invocation.
-- [ ] Add a disabled-by-default oneshot unit/timer with `User=jarvis-vpn-probe`, `NoNewPrivileges`, `ProtectSystem=strict`, `ProtectHome`, `PrivateTmp`, `LoadCredential`, fixed interval, and hard runtime cap. Do not install/enable during coding.
-- [ ] Run Python tests; commit `feat(vpn): add isolated cross-node probe runner`.
+- [x] Add synthetic fake-process/fake-HTTPS tests for three loopback clients, expected egress IP, no-proxy bypass, private config cleanup, missing credentials, and unavailable egress.
+- [x] Implement bounded process lifecycle, no shell, suppressed child output, and atomic result write.
+- [x] Add disabled-by-default templated oneshot/timer with `DynamicUser`, systemd credentials, filesystem/network restrictions, and a hard runtime cap. `systemd-analyze verify` passed on DE; neither unit is enabled.
+- [ ] Production validation of both official client configs using owner-approved test credentials remains pending.
 
 ### Task 3: Read-only Host Agent result operation
 
@@ -65,9 +70,9 @@
 **Interfaces:**
 - Closed operation `vpn.external_probe.snapshot` takes `{}` and returns only validated `targetNode`, `sampledAt`, and status/failure-code fields; source file is runner-owned and read-only to Host Agent.
 
-- [ ] Add tests rejecting extra arguments and secret-bearing result fields; verify stale result becomes `unknown` and a missing result file is nonfatal.
-- [ ] Wire only the new read-only operation, never the runner's credential files or raw client output, through Host Agent and JS protocol validation.
-- [ ] Run both protocol suites and full Host Agent tests; commit `feat(vpn): expose bounded external probe results`.
+- [x] Tests reject extra arguments and secret-bearing result fields; stale or missing result is `unknown`.
+- [x] Wire only the new read-only operation; it reads only the bounded result file.
+- [x] Full local Host Agent suite passed 93/93; server protocol tests passed.
 
 ### Task 4: Control-plane binding and safe classification
 
@@ -80,9 +85,10 @@
 - The monitor reads NL runner results for target DE and DE runner results for target NL using authenticated clients; it validates target identity and five-minute freshness.
 - `/vpn_health` adds closed external-probe statuses separately from the Host Agent's local `protocolProbe`, preserving the distinction until corroborated.
 
-- [ ] Test swapped runner/target, stale result, runner outage, invalid credentials, egress-test outage, repeated failure, recovery, and DE/NL isolation. No case may invoke a mutation or create a real repair approval.
-- [ ] Implement bounded read polling and debounced owner notification: an uncorroborated failure is labelled external-route uncertainty, while a fresh failure plus target-side failed local fact may be associated with the existing incident. No arbitrary model input or new execution authority.
-- [ ] Run focused and full server suites; commit `feat(vpn): monitor cross-node client probes`.
+- [x] Validate swapped runner/target, stale result, runner outage, and DE/NL isolation; no mutation is requested.
+- [x] Add a read-only on-demand view to `/vpn_health`, explicitly separate from local `protocolProbe`. No external result creates a repair proposal.
+- [x] Full local server suite passed 463/463.
+- [ ] Debounced owner notification and incident corroboration are deferred until real client probes have been accepted on both VPSs; a lone external failure currently appears as "requires verification" in `/vpn_health` only.
 
 ### Task 5: Gated production acceptance
 

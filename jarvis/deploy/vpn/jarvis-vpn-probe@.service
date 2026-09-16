@@ -1,0 +1,28 @@
+[Unit]
+Description=Jarvis external VPN client probe for %i
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+DynamicUser=yes
+Environment=PYTHONPATH=/opt/jarvis-host-agent
+EnvironmentFile=/etc/jarvis-vpn/probe-%i.env
+LoadCredential=vless.uri:/etc/jarvis-vpn/probe-%i-vless.uri
+LoadCredential=hysteria2.uri:/etc/jarvis-vpn/probe-%i-hysteria2.uri
+StateDirectory=jarvis-vpn-probe
+StateDirectoryMode=0700
+ExecStart=/usr/bin/python3 -m jarvis_host_agent.vpn_external_probe_runner --target %i --vless-host ${VPN_PROBE_VLESS_HOST} --hysteria-host ${VPN_PROBE_HYSTERIA_HOST} --expected-exit-ip ${VPN_PROBE_EXPECTED_EXIT_IP} --result /var/lib/jarvis-vpn-probe/%i.json
+TimeoutStartSec=65
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ProtectControlGroups=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+UMask=0077
+
+# Deliberately no Install section: the timer is enabled only after owner-approved
+# dedicated test credentials and a manual read-only probe acceptance.

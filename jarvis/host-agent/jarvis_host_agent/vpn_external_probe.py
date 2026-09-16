@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import os
 import re
+import stat
 import uuid
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from urllib.parse import parse_qsl, unquote, urlsplit
 
 
@@ -150,3 +153,24 @@ def validate_probe_result(value: object, expected_target: str, now: datetime) ->
             raise ProbeConfigError()
     return {"version": 1, "targetNode": expected_target, "sampledAt": sampled.astimezone(timezone.utc).isoformat(),
             "checks": {name: dict(checks[name]) for name in sorted(CHECK_NAMES)}}
+
+
+def read_probe_result(target: str, *, root: Path = Path("/var/lib/jarvis-vpn-probe"),
+                      now: datetime | None = None) -> dict:
+    if target not in {"de", "nl"}:
+        raise ProbeConfigError()
+    moment = now or datetime.now(timezone.utc)
+    try:
+        descriptor = os.open(root / f"{target}.json", os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        with os.fdopen(descriptor, "rb") as handle:
+            info = os.fstat(handle.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_size > 4096:
+                raise ProbeConfigError()
+            raw = handle.read(4097)
+            if len(raw) > 4096:
+                raise ProbeConfigError()
+        return validate_probe_result(json.loads(raw), target, moment)
+    except (OSError, ValueError, UnicodeError, TypeError):
+        checks = {name: {"status": "unknown", "failureCode": "RUNNER_UNAVAILABLE"}
+                  for name in sorted(CHECK_NAMES)}
+        return {"version": 1, "targetNode": target, "sampledAt": moment.isoformat(), "checks": checks}

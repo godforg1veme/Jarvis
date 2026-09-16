@@ -1,5 +1,8 @@
 import unittest
+import json
+import tempfile
 from datetime import datetime, timezone
+from pathlib import Path
 
 from jarvis_host_agent.vpn_external_probe import (
     ProbeConfigError,
@@ -8,6 +11,7 @@ from jarvis_host_agent.vpn_external_probe import (
     parse_hysteria_uri,
     parse_vless_uri,
     validate_probe_result,
+    read_probe_result,
 )
 
 
@@ -77,6 +81,18 @@ class ExternalProbeContractTests(unittest.TestCase):
                     {**result, "checks": {**result["checks"], "vless_tcp_443": {"status": "failed", "failureCode": []}}}):
             with self.assertRaises(ProbeConfigError):
                 validate_probe_result(bad, "nl", now)
+
+    def test_read_only_result_reader_returns_unknown_for_missing_or_hostile_file(self):
+        now = datetime(2026, 9, 16, 12, 0, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            missing = read_probe_result("de", root=root, now=now)
+            self.assertEqual(missing["checks"]["vless_tcp_443"],
+                             {"status": "unknown", "failureCode": "RUNNER_UNAVAILABLE"})
+            (root / "de.json").write_text(json.dumps({"secret": "must-not-leak"}), encoding="utf-8")
+            invalid = read_probe_result("de", root=root, now=now)
+            self.assertNotIn("must-not-leak", json.dumps(invalid))
+            self.assertEqual(invalid["checks"]["hysteria2_udp_443"]["status"], "unknown")
 
 
 if __name__ == "__main__":

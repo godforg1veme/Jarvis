@@ -26,7 +26,8 @@ The server validates the fresh diagnosis, provides only typed check statuses
 to a second planner call, and stops on stale, invalid, or repeated requests.
 Simulated DE/Xray and NL/Hysteria2 fault E2E and the full 461-test server suite
 passed; 33 focused tests passed in the production image. Real repair remains
-disabled, and cross-node client protocol probes remain unimplemented. See
+disabled. Cross-node client probe code is implemented but not activated;
+dedicated test credentials still require owner Telegram confirmation. See
 `updates/2026-09-16-vpn-supervisor-multinode-rollout.md`.
 
 VPN Supervisor classifier rollout, 2026-09-15: the current VPS now emits a

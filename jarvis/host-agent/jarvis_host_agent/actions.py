@@ -126,10 +126,13 @@ def _host_health() -> str:
 
 
 def _vpn_health_snapshot(
-    run: Callable[..., dict[str, Any]] = _run,
-    dns_probe: Callable[[], str] = probe_dns,
-    outbound_probe: Callable[[], str] = probe_outbound_https,
+    run: Callable[..., dict[str, Any]] | None = None,
+    dns_probe: Callable[[], str] | None = None,
+    outbound_probe: Callable[[], str] | None = None,
 ) -> dict[str, Any]:
+    run = run or _run
+    dns_probe = dns_probe or probe_dns
+    outbound_probe = outbound_probe or probe_outbound_https
     ss_tcp = run(["/usr/bin/ss", "-lnt"], timeout=15)
     ss_tcp_out = ss_tcp.get("data", {}).get("output", "") if ss_tcp.get("state") == "succeeded" else ""
     xray = XrayVpnManager(run=run).health_snapshot(listener_tcp_output=ss_tcp_out)
@@ -147,6 +150,9 @@ def _vpn_health_snapshot(
 
 
 def execute(config: HostAgentConfig, operation: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    if operation == "vpn.external_probe.snapshot":
+        from .vpn_external_probe import read_probe_result
+        return {"state": "succeeded", "data": read_probe_result(arguments["targetNode"])}
     if operation == "vpn.health.snapshot":
         return {"state": "succeeded", "data": _vpn_health_snapshot(_run)}
     if operation.startswith("vpn.hysteria2."):

@@ -1,6 +1,7 @@
 const crypto = require('node:crypto');
 const { buildRoutingArtifact, buildRoutingSummary } = require('./vpnRoutingService');
 const { parseVpnHealth } = require('./vpnHealthSchema');
+const { ExternalProbeMonitor } = require('../operations/vpnSupervisor/externalProbeMonitor');
 
 const CONFIRMATION_TTL_MS = 60 * 1000;
 const REQUEST_ID_RE = /^[a-f0-9-]{36}$/i;
@@ -377,6 +378,8 @@ class VpnCommandService {
     this.client = options.client || this.clients.de;
     this.ownerTelegramId = String(options.ownerTelegramId || '');
     this.now = options.now || (() => new Date());
+    this.externalProbeMonitor = options.externalProbeMonitor || (this.clients.de && this.clients.nl
+      ? new ExternalProbeMonitor({ clients: this.clients, now: this.now }) : null);
   }
 
   _getClient(node = 'de') {
@@ -513,13 +516,21 @@ class VpnCommandService {
         })
       );
 
+      const external = this.externalProbeMonitor
+        ? await Promise.all(targetNodes.map((code) => this.externalProbeMonitor.snapshot(code))) : null;
       const sections = results.map((res, idx) => {
         const code = targetNodes[idx];
+        const probe = external?.[idx];
+        const formatExternal = (item) => item.status === 'healthy' ? '✅ OK'
+          : item.status === 'failed' ? '❌ Не прошёл (требует проверки)' : '❓ Нет достоверного результата';
+        const probeLines = probe ? [
+          `🌐 Внешняя проба с другого VPS: VLESS 443 ${formatExternal(probe.checks.vless_tcp_443)}, VLESS 8443 ${formatExternal(probe.checks.vless_tcp_8443)}, Hysteria2 443/UDP ${formatExternal(probe.checks.hysteria2_udp_443)}.`,
+        ] : [];
         if (res.status === 'fulfilled') {
-          return renderNodeHealth(code, res.value.result);
+          return [renderNodeHealth(code, res.value.result), ...probeLines].join('\n');
         }
         const targetNode = NODES[code] || { flag: '🌐', country: code.toUpperCase(), city: '' };
-        return `${targetNode.flag} **${targetNode.country}:** ❌ Серверный агент недоступен.`;
+        return [`${targetNode.flag} **${targetNode.country}:** ❌ Серверный агент недоступен.`, ...probeLines].join('\n');
       });
 
       const answer = [

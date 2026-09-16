@@ -52,6 +52,11 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(vpn_cyrillic["arguments"], {"label": "iphone меня"})
         self.assertEqual(validate_request(request(operation="vpn.hysteria2.status", arguments={}))["arguments"], {})
         self.assertEqual(validate_request(request(operation="vpn.health.snapshot", arguments={}))["arguments"], {})
+        self.assertEqual(validate_request(request(operation="vpn.external_probe.snapshot", arguments={"targetNode": "nl"}))["arguments"], {"targetNode": "nl"})
+        with self.assertRaises(ProtocolError):
+            validate_request(request(operation="vpn.external_probe.snapshot", arguments={"targetNode": "other"}))
+        with self.assertRaises(ProtocolError):
+            validate_request(request(operation="vpn.external_probe.snapshot", arguments={"targetNode": "de", "path": "/tmp/x"}))
         with self.assertRaises(ProtocolError):
             validate_request(request(operation="vpn.health.snapshot", arguments={"extra": 1}))
         with self.assertRaises(ProtocolError):

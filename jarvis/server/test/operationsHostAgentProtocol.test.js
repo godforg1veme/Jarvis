@@ -45,6 +45,9 @@ test('Host Agent protocol validates VPN operations without accepting config or s
   assert.throws(() => validateRequest({ ...hysteria, operation: 'vpn.hysteria2.restart', arguments: { port: 53 } }), /invalid/i);
   const health = validateRequest({ version: 1, requestId: REQUEST_ID, operation: 'vpn.health.snapshot', arguments: {}, sentAt: NOW });
   assert.deepEqual(health.arguments, {});
+  assert.deepEqual(validateRequest({ ...health, operation: 'vpn.external_probe.snapshot', arguments: { targetNode: 'nl' } }).arguments, { targetNode: 'nl' });
+  assert.throws(() => validateRequest({ ...health, operation: 'vpn.external_probe.snapshot', arguments: { targetNode: 'other' } }), /invalid/i);
+  assert.throws(() => validateRequest({ ...health, operation: 'vpn.external_probe.snapshot', arguments: { targetNode: 'de', path: '/tmp/x' } }), /invalid/i);
   assert.throws(() => validateRequest({ ...health, arguments: { extra: true } }), /invalid/i);
 });
 
