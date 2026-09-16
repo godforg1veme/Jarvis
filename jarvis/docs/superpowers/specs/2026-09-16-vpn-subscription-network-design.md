@@ -108,7 +108,7 @@ To achieve continuous, zero-touch resilience against censorship, Jarvis requires
 
 ### 1. Database Schema (`vpn_subscriptions`)
 
-Migration `020_vpn_subscriptions.sql`:
+Migration `022_vpn_subscriptions.sql` (following `021_vpn_probe_credentials.sql`):
 ```sql
 CREATE TABLE IF NOT EXISTS vpn_subscriptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -149,17 +149,25 @@ On each VPN node (DE `87.120.187.109` and NL `94.183.208.56`):
      { "portHopping": { "enabled": true, "range": "20000-50000", "targetPort": 443 } }
      ```
 
-### 3. Subscription Endpoint Controller (`vpnSubscriptionService.js`)
+### 3. Subscription Endpoint Controller & Auto-Verification (`vpnSubscriptionService.js`)
 
 Located in `server/src/vpn/vpnSubscriptionService.js`:
+- **Two-Layer Health Verification Architecture:**
+  * **Layer 1 (Server-Side Cross-Node Verification via `ExternalProbeMonitor`):**
+    Before compiling the subscription profile, the controller inspects the latest snapshots from `ExternalProbeMonitor` (`de` and `nl` probes):
+    - If a check (e.g. `vless_tcp_443` or `hysteria2_udp_443`) is marked as `failed` by the cross-node probe runner, it is dynamically downgraded or flagged in the generated profile so clients do not waste cycles attempting down nodes.
+    - If both nodes are healthy, all 4 endpoints are served with normal priority order.
+  * **Layer 2 (Client-Side Consumer-Route Failover via Happ `url-test`):**
+    Tests reachability directly through the consumer's ISP (e.g., MGTS/Beeline), switching seamlessly if an ISP-specific DPI drop occurs mid-session.
 - `GET /sub/:token`:
   1. Computes `crypto.createHash('sha256').update(token).digest('hex')`.
   2. Queries `vpn_subscriptions` where `token_hash = hash AND revoked_at IS NULL`.
   3. If not found or revoked -> returns `404 Not Found`.
   4. Updates `last_accessed_at = NOW()`.
   5. Inspects `req.headers['user-agent']` and query parameters (`?format=base64|json`).
-  6. Fetches client secrets from Host Agent for DE and NL.
-  7. Formats and responds with:
+  6. Consults `ExternalProbeMonitor` snapshots for real-time node reachability.
+  7. Fetches client secrets from Host Agent for DE and NL.
+  8. Formats and responds with:
      - `application/json` (Sing-box config with `url-test` and routing) for Happ/Sing-box.
      - `text/plain; charset=utf-8` (Base64 URI list) for generic clients.
 - `GET /happ-sub/:token`:
