@@ -90,3 +90,13 @@ Local Host Agent tests passed 93/93 and server tests passed 463/463. DE
 accepted with dedicated live test credentials. Timers must remain disabled
 until four owner-confirmed test identities are issued and installed as
 root-owned systemd credential sources, one target at a time.
+
+The disabled-stage code was subsequently deployed to both nodes. Host Agent
+passed 93/93 tests on each VPS and returned only `unknown` for missing probe
+results. The rebuilt server image passed 21/21 focused tests, public smoke
+passed, and the container reached `healthy`. Xray and Hysteria2 active
+timestamps and restart counters were unchanged on both nodes. Neither probe
+timer is installed or enabled; no test identity or credential source exists.
+Rollback copies are under
+`deploy/rollback-vpn-probe-stage-20260916` on each VPS and the previous DE
+server image is tagged `jarvis-family-server:pre-probe-stage-20260916`.

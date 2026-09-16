@@ -170,8 +170,9 @@ See `docs/README.md` for current implementation status and historical records.
   playbooks remain disabled. Only
   `supervisor_acceptance_noop` can execute, after a fresh owner Telegram
   confirmation, and it never calls Host Agent.
-- Cross-node client probe code is staged but its timers and test credentials
-  are not enabled. A non-root runner can check DE from NL and NL from DE with
+- Cross-node client probe code and its read-only Host Agent result operation
+  are deployed on DE and NL, but timers and test credentials are not enabled.
+  A non-root runner can check DE from NL and NL from DE with
   dedicated owner-approved credentials; Host Agent exposes only a closed
   read-only result. `/vpn_health` reports these separately and treats missing,
   stale, mismatched, or ambiguous checks as unknown. External probe failures

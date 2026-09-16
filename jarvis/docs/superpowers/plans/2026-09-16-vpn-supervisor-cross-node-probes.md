@@ -98,7 +98,7 @@ owner-approved credentials are installed.
 **Interfaces:**
 - Four dedicated test identities (VLESS/Hysteria2 × DE/NL) issued by existing Telegram owner buttons; one-time exports installed as root-owned systemd credential sources on the opposite runner.
 
-- [ ] Run full local suites and production-image tests. Record pre-change timestamps/restart counters, keys/client counts, open incidents, and public smoke.
-- [ ] Deploy Host Agent read-only operation and server monitor with probe timers **disabled**; verify healthy baseline and rollback.
+- [x] Run full local suites (93 Host Agent, 463 server) and 21 production-image focused tests. Record pre-change VPN service timestamps/restart counters and public smoke; direct client/key acceptance remains pending.
+- [x] Deploy Host Agent read-only operation on DE/NL and server health view with probe timers **disabled**; verify healthy snapshots, public smoke, and retained rollback copies/image.
 - [ ] Ask owner to approve each of four dedicated test-client issuance requests in Telegram. Do not bypass the button via SSH or test script. Install each one-time export without printing it, enable one probe at a time, and compare with a manual client-level external check.
 - [ ] After all protocols pass, verify read-only cross-node status, stale/runner-down behavior, no VPN restart, zero unintended key changes, and owner notification semantics. Update docs with measured results, commit and push.
