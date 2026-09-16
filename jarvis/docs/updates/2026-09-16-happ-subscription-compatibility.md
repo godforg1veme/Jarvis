@@ -73,3 +73,8 @@ certificate hostname in SNI. The Happ Base64 subscription keeps userpass as
 `username:password` and encodes the port-hopping interval with Happ's documented
 `mportHopInt` parameter. A real phone test is still required to confirm latency
 and traffic on both mobile and Wi-Fi networks.
+The fix was deployed to both Host Agents and the DE server on 2026-09-17.
+Production read-only export verification returned four profiles, with distinct
+DE/NL Hysteria addresses and matching SNI. Both Host Agent suites passed
+101/101 as root, the server suite passed 499/499, and public smoke plus service
+health passed after rollout.
