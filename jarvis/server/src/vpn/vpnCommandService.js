@@ -8,6 +8,7 @@ const CONFIRMATION_TTL_MS = 60 * 1000;
 const REQUEST_ID_RE = /^[a-f0-9-]{36}$/i;
 const CLIENT_ID_RE = /^vpn-[a-f0-9]{12}$/;
 const LABEL_RE = /^[A-Za-zА-Яа-яЁё0-9_. -]{1,40}$/;
+const SUBSCRIPTION_LABEL_RE = /^[A-Za-zА-Яа-яЁё0-9_. -]+$/;
 const PROTOCOLS = Object.freeze({ vless: { code: 'v', title: 'VLESS' }, hysteria2: { code: 'h', title: 'Hysteria2' } });
 const NODES = Object.freeze({
   de: Object.freeze({ code: 'de', country: 'Германия', flag: '🇩🇪', city: 'Frankfurt' }),
@@ -45,6 +46,12 @@ function normalizeProtocol(value) {
 function normalizeNode(value) {
   const node = String(value || 'de').toLowerCase();
   return NODES[node] ? node : 'de';
+}
+
+function normalizeSubscriptionLabel(value) {
+  const label = String(value || '').trim();
+  if (!SUBSCRIPTION_LABEL_RE.test(label) || Array.from(label).length > 25) throw publicError('VPN_SUBSCRIPTION_LABEL_INVALID');
+  return label;
 }
 
 function parseVpnCommand(text) {
@@ -100,6 +107,8 @@ function parseVpnCallback(value) {
   if (match) return { action: 'sub-revoke', subscriptionId: match[1] };
   match = /^vpn:sub:repair:([a-f0-9-]{36})$/.exec(data);
   if (match) return { action: 'sub-repair', subscriptionId: match[1] };
+  match = /^vpn:sub:rename:([a-f0-9-]{36})$/.exec(data);
+  if (match) return { action: 'sub-rename', subscriptionId: match[1] };
   if (data === 'vpn:probe:menu') return { action: 'probe-menu' };
   if (data === 'vpn:probe:enable') return { action: 'probe-enable' };
   if (data === 'vpn:probe:disable') return { action: 'probe-disable' };
@@ -852,6 +861,7 @@ class VpnCommandService {
     if (callback.action === 'sub-rotate') return this._rotateSubscription(callback.subscriptionId, context);
     if (callback.action === 'sub-revoke') return this._revokeSubscription(callback.subscriptionId, context);
     if (callback.action === 'sub-repair') return this._createSubscriptionRepair(callback.subscriptionId, context);
+    if (callback.action === 'sub-rename') return this._requestSubscriptionRename(callback.subscriptionId, context);
 
     if (callback.action === 'menu') {
       return callback.protocol
@@ -973,6 +983,7 @@ class VpnCommandService {
           'Нажмите «Подключить 4 сервера» и подтвердите действие. После успешного выпуска бот пришлёт ссылку.',
         buttons: [
           [{ text: '🔐 Подключить 4 сервера', data: `vpn:sub:repair:${sub.id}` }],
+          [{ text: '✏️ Переименовать', data: `vpn:sub:rename:${sub.id}` }],
           [{ text: '🗑 Отозвать подписку', data: `vpn:sub:revoke:${sub.id}` }],
           [{ text: '« К подпискам', data: 'vpn:sub:menu' }],
         ],
@@ -985,19 +996,24 @@ class VpnCommandService {
         'Если ссылка потеряна или нужна для другого устройства, выпустите новую. После этого старую ссылку придётся заменить в Happ на всех устройствах.',
       buttons: [
         [{ text: '🔗 Получить новую ссылку', data: `vpn:sub:rotate:${sub.id}` }],
+        [{ text: '✏️ Переименовать', data: `vpn:sub:rename:${sub.id}` }],
         [{ text: '🗑 Отозвать подписку', data: `vpn:sub:revoke:${sub.id}` }],
         [{ text: '« К подпискам', data: 'vpn:sub:menu' }],
       ],
     };
   }
 
-  async _createSubscription(context) {
+  async _createSubscription(context, label = null) {
     if (!this.subscriptionService) {
       return { answer: 'Сервис подписок временно недоступен.', buttons: [[{ text: '« Главное меню', data: 'vpn:menu' }]] };
     }
+    if (label === null) return {
+      answer: 'Как назвать подписку? Например: Мой iPhone. Имя появится в боте и будет передано в Happ при следующем успешном обновлении.',
+      requestInput: { kind: 'vpn_subscription_create_label', context: {} },
+    };
     const created = await this.subscriptionService.createSubscription({
       userId: context.userId,
-      label: 'Мой телефон',
+      label: normalizeSubscriptionLabel(label),
       createdBy: context.userId,
     });
     return {
@@ -1008,6 +1024,30 @@ class VpnCommandService {
         [{ text: '🗑 Отозвать', data: `vpn:sub:revoke:${created.id}` }],
         [{ text: '« К подпискам', data: 'vpn:sub:menu' }],
       ],
+    };
+  }
+
+  async _requestSubscriptionRename(id, context) {
+    const sub = await this.subscriptionService?.repository?.findById(id);
+    if (!sub || sub.revokedAt || sub.userId !== context.userId) return { answer: 'Профиль не найден или отозван.', buttons: [[{ text: '« К подпискам', data: 'vpn:sub:menu' }]] };
+    return {
+      answer: `Новое имя для «${sub.label}»? До 25 символов. Оно появится в Happ после следующего успешного обновления подписки.`,
+      requestInput: { kind: 'vpn_subscription_rename_label', context: { subscriptionId: sub.id } },
+    };
+  }
+
+  async createSubscription({ label, ...context }) {
+    await this._requireOwner(context.userId);
+    return this._createSubscription(context, label);
+  }
+
+  async renameSubscription({ id, label, ...context }) {
+    await this._requireOwner(context.userId);
+    const renamed = await this.subscriptionService?.repository?.rename({ id, userId: context.userId, label: normalizeSubscriptionLabel(label) });
+    if (!renamed) return { answer: 'Профиль не найден или отозван.', buttons: [[{ text: '« К подпискам', data: 'vpn:sub:menu' }]] };
+    return {
+      answer: `✅ Подписка переименована: «${renamed.label}».\n\nСсылка и серверы не менялись. Happ получит это имя после следующего успешного обновления подписки.`,
+      buttons: [[{ text: '« К профилю', data: `vpn:sub:view:${renamed.id}` }]],
     };
   }
 
@@ -1150,6 +1190,7 @@ module.exports = {
   isVpnCallback,
   menuButtons,
   normalizeNode,
+  normalizeSubscriptionLabel,
   parseVpnCallback,
   parseVpnCommand,
   protocolButtons,

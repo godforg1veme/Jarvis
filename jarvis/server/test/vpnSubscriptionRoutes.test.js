@@ -36,6 +36,7 @@ test('GET /sub/:token returns the ordinary subscription for Happ user agent', as
       return {
         status: 200,
         contentType: 'text/plain; charset=utf-8',
+        headers: { 'profile-title': Buffer.from('Мой iPhone', 'utf8').toString('base64'), 'profile-update-interval': '1' },
         body: Buffer.from('vless://fixture@vpn.rilora.ru:8443', 'utf8').toString('base64'),
       };
     },
@@ -50,6 +51,8 @@ test('GET /sub/:token returns the ordinary subscription for Happ user agent', as
   });
   assert.equal(response.statusCode, 200);
   assert.match(response.headers['content-type'], /text\/plain/);
+  assert.equal(response.headers['profile-title'], Buffer.from('Мой iPhone', 'utf8').toString('base64'));
+  assert.equal(response.headers['profile-update-interval'], '1');
   assert.match(Buffer.from(response.body, 'base64').toString('utf8'), /^vless:\/\//);
 });
 

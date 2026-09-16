@@ -268,6 +268,11 @@ See `docs/README.md` for current implementation status and historical records.
   working on every device. Telegram conversation history stores only a redacted
   delivery status, never the raw subscription token. Subscription revocation
   disables the URL but does not revoke already issued node credentials.
+  The owner names a profile before creation and may rename an active profile in
+  Telegram without rotating its token or changing bound clients. Successful
+  ordinary Happ refreshes receive the documented Base64 `profile-title` and a
+  one-hour `profile-update-interval`; the label visible in Happ remains a
+  client acceptance check when a refresh itself fails.
   Hysteria 2 Host Agent exports connect to each node's `address` while retaining
   its certificate `serverName` as SNI. Happ subscription URIs preserve the
   userpass colon and put the UDP port-hopping range in the authority; phone-side

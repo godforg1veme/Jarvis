@@ -84,6 +84,7 @@ function buildApp(options = {}) {
     const userAgent = request.headers['user-agent'] || '';
     const format = request.query && request.query.format;
     const result = await svc.resolveSubscription(token, { userAgent, format });
+    for (const [name, value] of Object.entries(result.headers || {})) reply.header(name, value);
     reply.code(result.status).type(result.contentType).send(result.body);
   });
 

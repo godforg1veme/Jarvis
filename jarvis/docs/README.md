@@ -30,6 +30,11 @@ client binding. Existing bound profiles can issue a replacement link; the old
 link stops working, and the new token is not stored in Jarvis conversation
 history. Subscription revocation stops the dynamic URL but does not revoke
 already issued VPN clients.
+The owner supplies a profile name before creation and can rename any active
+profile in Telegram without changing its URL or server credentials. Successful
+ordinary Happ refreshes receive that name through Happ's `profile-title`
+metadata and request a one-hour automatic update interval. A Happ display-name
+change still depends on a successful client refresh.
 Read-only production checks on 2026-09-17 verified the four generated URIs,
 node addresses, running services and UDP redirect rules; real Happ latency and
 traffic on Wi-Fi/mobile remain unverified. NL currently has a valid certificate

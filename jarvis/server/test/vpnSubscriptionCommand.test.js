@@ -17,6 +17,9 @@ test('parseVpnCommand and parseVpnCallback handle subscription commands', () => 
 
   assert.deepEqual(parseVpnCallback('vpn:sub:menu'), { action: 'sub-menu' });
   assert.deepEqual(parseVpnCallback('vpn:sub:new'), { action: 'sub-new' });
+  assert.deepEqual(parseVpnCallback('vpn:sub:rename:11111111-2222-3333-4444-555555555555'), {
+    action: 'sub-rename', subscriptionId: '11111111-2222-3333-4444-555555555555',
+  });
   assert.deepEqual(parseVpnCallback('vpn:sub:view:11111111-2222-3333-4444-555555555555'), {
     action: 'sub-view',
     subscriptionId: '11111111-2222-3333-4444-555555555555',
@@ -54,6 +57,12 @@ test('VpnCommandService handles sub-menu, sub-new, sub-rotate, and sub-revoke fl
       const sub = mockSubscriptions.find ((s) => s.id === id && s.userId === userId);
       if (sub) sub.revokedAt = new Date().toISOString();
       return true;
+    },
+    async rename({ id, userId, label }) {
+      const sub = mockSubscriptions.find((s) => s.id === id && s.userId === userId && !s.revokedAt);
+      if (!sub) return null;
+      sub.label = label;
+      return sub;
     },
   };
 
@@ -106,30 +115,39 @@ test('VpnCommandService handles sub-menu, sub-new, sub-rotate, and sub-revoke fl
   assert.match(menuRes.answer, /Подписок пока нет/i);
   assert.equal(menuRes.buttons[0][0].data, 'vpn:sub:new');
 
-  // 2. Create subscription
-  const createRes = await service.handleCallback({ data: 'vpn:sub:new', userId: '100' });
+  // 2. New profile asks for the label before insertion.
+  const namePrompt = await service.handleCallback({ data: 'vpn:sub:new', userId: '100' });
+  assert.equal(namePrompt.requestInput.kind, 'vpn_subscription_create_label');
+  const createRes = await service.createSubscription({ label: 'Мой iPhone', userId: '100' });
   assert.match(createRes.answer, /Профиль.*создан/i);
   assert.match(createRes.answer, /бот пришлёт ссылку/i);
   assert.equal(createRes.buttons[0][0].data, 'vpn:sub:repair:11111111-2222-3333-4444-555555555555');
 
-  // 3. The subscription entry stays a list even with one active profile.
+  // 3. Rename keeps token and server bindings untouched.
+  const renamePrompt = await service.handleCallback({ data: 'vpn:sub:rename:11111111-2222-3333-4444-555555555555', userId: '100' });
+  assert.equal(renamePrompt.requestInput.kind, 'vpn_subscription_rename_label');
+  const renamed = await service.renameSubscription({ id: '11111111-2222-3333-4444-555555555555', label: 'Рабочий iPhone', userId: '100' });
+  assert.match(renamed.answer, /Рабочий iPhone/);
+  assert.equal(mockSubscriptions[0].token, 'sub_testtoken12345');
+
+  // 4. The subscription entry stays a list even with one active profile.
   const oneProfileMenu = await service.handleCallback({ data: 'vpn:sub:menu', userId: '100' });
   assert.match(oneProfileMenu.answer, /Ваши подписки/i);
   assert.equal(oneProfileMenu.buttons[0][0].data, 'vpn:sub:view:11111111-2222-3333-4444-555555555555');
 
-  // 4. Both command aliases enter that same list.
+  // 5. Both command aliases enter that same list.
   for (const text of ['/vpn_sub', '/vpn_subscriptions']) {
     const result = await service.handle({ text, userId: '100' });
     assert.match(result.answer, /Ваши подписки/i);
   }
 
-  // 5. An unbound profile does not issue a link.
+  // 6. An unbound profile does not issue a link.
   const unbound = await service.handleCallback({
     data: 'vpn:sub:rotate:11111111-2222-3333-4444-555555555555', userId: '100',
   });
   assert.match(unbound.answer, /Сначала подключите/);
 
-  // 6. Rotate after binding.
+  // 7. Rotate after binding.
   mockSubscriptions[0].clientIdDe = { hy2: 'vpn-000000000001', vless: 'vpn-000000000002' };
   mockSubscriptions[0].clientIdNl = { hy2: 'vpn-000000000003', vless: 'vpn-000000000004' };
   const rotateRes = await service.handleCallback({
@@ -141,14 +159,14 @@ test('VpnCommandService handles sub-menu, sub-new, sub-rotate, and sub-revoke fl
   assert.equal(rotateRes.historyAnswer.includes('sub_rotatedtoken'), false);
   assert.equal(rotateRes.buttons[0][0].url, 'https://jarvis.rilora.ru/happ-sub/sub_rotatedtoken67890');
 
-  // 7. Revoke subscription
+  // 8. Revoke subscription
   const revokeRes = await service.handleCallback({
     data: 'vpn:sub:revoke:11111111-2222-3333-4444-555555555555',
     userId: '100',
   });
   assert.match(revokeRes.answer, /Подписка отозвана/i);
 
-  // 8. Menu after revoke has 0 active
+  // 9. Menu after revoke has 0 active
   const menuAfterRes = await service.handleCallback({ data: 'vpn:sub:menu', userId: '100' });
   assert.match(menuAfterRes.answer, /Подписок пока нет/i);
 });

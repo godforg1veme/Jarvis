@@ -199,6 +199,23 @@ test('revoke sets revoked_at atomically and respects user scoping', async () => 
   );
 });
 
+test('rename updates only an active subscription owned by the caller', async () => {
+  const calls = [];
+  const pool = {
+    query: async (sql, params) => {
+      calls.push({ sql, params });
+      if (params[1] === 'active-sub' && params[2] === 'owner-1') return { rows: [{ id: 'active-sub', user_id: 'owner-1', label: params[0], token_hash: 'unchanged' }] };
+      return { rows: [] };
+    },
+  };
+  const repo = new VpnSubscriptionRepository(pool);
+  const renamed = await repo.rename({ id: 'active-sub', userId: 'owner-1', label: 'Мой iPhone' });
+  assert.equal(renamed.label, 'Мой iPhone');
+  assert.match(calls[0].sql, /WHERE id = \$2 AND user_id = \$3 AND revoked_at IS NULL/);
+  assert.deepEqual(calls[0].params, ['Мой iPhone', 'active-sub', 'owner-1']);
+  assert.equal(await repo.rename({ id: 'active-sub', userId: 'other-owner', label: 'Чужой' }), null);
+});
+
 test('findById returns subscription by id or null if missing', async () => {
   const pool = {
     query: async (sql, params) => {

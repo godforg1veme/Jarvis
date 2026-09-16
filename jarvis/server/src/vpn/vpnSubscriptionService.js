@@ -6,6 +6,10 @@ const DEFAULT_HOP_INTERVAL = '30s';
 const DEFAULT_TEST_URL = 'http://cp.cloudflare.com/generate_204';
 const DEFAULT_PUBLIC_URL = 'https://jarvis.rilora.ru';
 
+function happProfileTitle(label) {
+  return Buffer.from(Array.from(String(label || 'Устройство')).slice(0, 25).join(''), 'utf8').toString('base64');
+}
+
 function generateToken() {
   const rawBytes = crypto.randomBytes(32).toString('hex');
   const token = `sub_${rawBytes}`;
@@ -823,6 +827,10 @@ class VpnSubscriptionService {
     return {
       status: 200,
       contentType: 'text/plain; charset=utf-8',
+      headers: {
+        'profile-title': happProfileTitle(subscription.label),
+        'profile-update-interval': '1',
+      },
       body: base64,
     };
   }
@@ -832,6 +840,7 @@ module.exports = {
   VpnSubscriptionService,
   generateToken,
   hashToken,
+  happProfileTitle,
   parseHysteriaUri,
   parseVlessUri,
   DEFAULT_PORT_HOPPING_RANGE,

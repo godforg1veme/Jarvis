@@ -1,7 +1,7 @@
 const { publicDocumentStatus } = require('../knowledge/knowledgeService');
 const { containsSensitiveMemoryData, normalizeMemoryContent } = require('../memory/memoryService');
 const { normalizeDeviceName } = require('../devices/deviceService');
-const { validateAction: validateVpnAction } = require('../vpn/vpnCommandService');
+const { validateAction: validateVpnAction, normalizeSubscriptionLabel } = require('../vpn/vpnCommandService');
 const { MENU, isOwner, replyKeyboard } = require('./telegramMenu');
 
 function memoryMenu() {
@@ -318,6 +318,21 @@ class TelegramMenuService {
         return result;
       } catch (error) {
         if (error?.publicCode === 'VPN_LABEL_INVALID') return { answer: 'Имя должно содержать от 1 до 40 букв, цифр, пробелов, точек, дефисов или подчёркиваний.', buttons: interactionCancel(interaction.id) };
+        throw error;
+      }
+    }
+
+    if (interaction.kind === 'vpn_subscription_create_label' || interaction.kind === 'vpn_subscription_rename_label') {
+      try {
+        const label = normalizeSubscriptionLabel(value);
+        const consumed = await this.interactions.consume({ id: interaction.id, userId: context.user.id, conversationId: context.conversation.id, chatId: context.chatId });
+        if (!consumed) return { answer: 'Этот запрос уже недоступен.' };
+        if (interaction.kind === 'vpn_subscription_create_label') {
+          return this.vpnService.createSubscription({ label, userId: context.user.id, conversationId: context.conversation.id, originChannel: 'telegram', originDeviceId: null });
+        }
+        return this.vpnService.renameSubscription({ id: interaction.context.subscriptionId, label, userId: context.user.id, conversationId: context.conversation.id, originChannel: 'telegram', originDeviceId: null });
+      } catch (error) {
+        if (error?.publicCode === 'VPN_SUBSCRIPTION_LABEL_INVALID') return { answer: 'Имя: от 1 до 25 букв, цифр, пробелов, точек, дефисов или подчёркиваний.', buttons: interactionCancel(interaction.id) };
         throw error;
       }
     }

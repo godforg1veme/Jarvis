@@ -134,6 +134,18 @@ class VpnSubscriptionRepository {
     return mapSubscriptionRow(result.rows?.[0] || null);
   }
 
+  async rename({ id, userId, label }) {
+    if (!id || typeof id !== 'string' || !id.trim()) throw new Error('Subscription id is required');
+    if (!userId || typeof userId !== 'string' || !userId.trim()) throw new Error('userId is required');
+    if (!label || typeof label !== 'string' || !label.trim()) throw new Error('label is required');
+    const result = await this.pool.query(`
+      UPDATE vpn_subscriptions SET label = $1
+      WHERE id = $2 AND user_id = $3 AND revoked_at IS NULL
+      RETURNING *
+    `, [label.trim(), id.trim(), userId.trim()]);
+    return mapSubscriptionRow(result.rows?.[0] || null);
+  }
+
   async rotate({ id, userId = null, tokenHash }) {
     if (!id || typeof id !== 'string' || !id.trim()) {
       throw new Error('Subscription id is required');

@@ -207,12 +207,15 @@ test('resolveSubscription uses an explicit format and handles invalid tokens', a
   assert.equal(happResp.status, 200);
   assert.equal(happResp.contentType.includes('text/plain'), true);
   assert.equal(Buffer.from(happResp.body, 'base64').toString('utf8').includes('hy2://'), true);
+  assert.equal(happResp.headers['profile-title'], Buffer.from('iPhone Max', 'utf8').toString('base64'));
+  assert.equal(happResp.headers['profile-update-interval'], '1');
   assert.equal(touchedId, 'sub-uuid-1');
 
   // 3. Sing-box JSON is opt-in and not inferred from a User-Agent.
   const singboxResp = await service.resolveSubscription('sub_valid', { format: 'sing-box' });
   assert.equal(singboxResp.status, 200);
   assert.equal(singboxResp.contentType.includes('application/json'), true);
+  assert.equal(singboxResp.headers, undefined);
   const jsonBody = JSON.parse(singboxResp.body);
   assert.equal(jsonBody.version, 1);
   assert.equal(jsonBody.outbounds[0].tag, '⚡ Авто-выбор (Smart Failover)');

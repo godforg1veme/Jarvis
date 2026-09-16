@@ -97,6 +97,35 @@ test('VPN new-access button asks only for a label and consumes the flow before c
   assert.deepEqual(calls.filter(([name]) => ['consume', 'vpn'].includes(name)).map(([name]) => name), ['consume', 'vpn']);
 });
 
+test('VPN subscription naming consumes guided input once and preserves an invalid retry', async () => {
+  const calls = [];
+  const { service, context, getActive } = harness({
+    vpnService: {
+      async handleCallback(received) {
+        if (received.data === 'vpn:sub:new') return { answer: 'Как назвать подписку?', requestInput: { kind: 'vpn_subscription_create_label', context: {} } };
+        if (received.data === 'vpn:sub:rename:77777777-7777-4777-8777-777777777777') return { answer: 'Новое имя?', requestInput: { kind: 'vpn_subscription_rename_label', context: { subscriptionId: '77777777-7777-4777-8777-777777777777' } } };
+        return null;
+      },
+      async createSubscription(input) { calls.push(['create', input]); return { answer: `Создано: ${input.label}` }; },
+      async renameSubscription(input) { calls.push(['rename', input]); return { answer: `Переименовано: ${input.label}` }; },
+    },
+  });
+  await service.handleCallback('vpn:sub:new', { ...context, data: 'vpn:sub:new' });
+  const invalid = await service.handlePendingText('слишком длинное имя подписки которое Happ не примет', context);
+  assert.match(invalid.answer, /25/);
+  assert.equal(getActive().kind, 'vpn_subscription_create_label');
+  const created = await service.handlePendingText('Мой iPhone', context);
+  assert.match(created.answer, /Мой iPhone/);
+  assert.equal(calls[0][0], 'create');
+  assert.equal(calls[0][1].label, 'Мой iPhone');
+
+  await service.handleCallback('vpn:sub:rename:77777777-7777-4777-8777-777777777777', { ...context, data: 'vpn:sub:rename:77777777-7777-4777-8777-777777777777' });
+  const renamed = await service.handlePendingText('Рабочий iPhone', context);
+  assert.match(renamed.answer, /Рабочий iPhone/);
+  assert.equal(calls[1][0], 'rename');
+  assert.equal(calls[1][1].id, '77777777-7777-4777-8777-777777777777');
+});
+
 test('memory input rejects secrets without consuming and handles correction by selected owner ID', async () => {
   const { service, context, calls, getActive } = harness();
   await service.handleCallback('mem:add', context);
