@@ -54,6 +54,9 @@ const { HostAgentClient } = require('./operations/hostAgentClient');
 const { VpnRepository } = require('./vpn/vpnRepository');
 const { VpnCommandService } = require('./vpn/vpnCommandService');
 const { VpnRecoveryWorker } = require('./vpn/vpnRecoveryWorker');
+const { ExternalProbeMonitor } = require('./operations/vpnSupervisor/externalProbeMonitor');
+const { VpnSubscriptionRepository } = require('./vpn/vpnSubscriptionRepository');
+const { VpnSubscriptionService } = require('./vpn/vpnSubscriptionService');
 const { VisionLeaseStore } = require('./vision/visionLeaseStore');
 const { createVisionProvider } = require('./vision/visionProviderFactory');
 const { registerVisionRoutes } = require('./vision/visionRoutes');
@@ -127,6 +130,8 @@ async function createRuntime(config, overrides = {}) {
   let visualMemoryWorker = null;
   let asr = null;
   let vpnService = null;
+  let vpnSubscriptionRepository = null;
+  let vpnSubscriptionService = null;
   let vpnRecoveryWorker = null;
   let vpnSupervisorService = null;
   let vpnSupervisorServiceNl = null;
@@ -405,11 +410,23 @@ async function createRuntime(config, overrides = {}) {
         ...(vpnHostAgentClientNl ? { nl: vpnHostAgentClientNl } : {}),
       };
       vpnOperationsClients = vpnClients;
+      const externalProbeMonitor = overrides.externalProbeMonitor || ((vpnClients.de && vpnClients.nl)
+        ? new ExternalProbeMonitor({ clients: vpnClients }) : null);
+      vpnSubscriptionRepository = overrides.vpnSubscriptionRepository || new VpnSubscriptionRepository(pool);
+      vpnSubscriptionService = overrides.vpnSubscriptionService || new VpnSubscriptionService({
+        repository: vpnSubscriptionRepository,
+        clients: vpnClients,
+        externalProbeMonitor,
+        publicUrl: config.publicUrl || 'https://jarvis.rilora.ru',
+      });
+      app.vpnSubscriptionService = vpnSubscriptionService;
       vpnService = overrides.vpnService || new VpnCommandService({
         repository: vpnRepository,
         client: vpnHostAgentClient,
         clients: vpnClients,
         ownerTelegramId: config.operationsOwnerTelegramId,
+        externalProbeMonitor,
+        subscriptionService: vpnSubscriptionService,
       });
       vpnRecoveryWorker = overrides.vpnRecoveryWorker || new VpnRecoveryWorker({
         repository: vpnRepository,
@@ -670,6 +687,8 @@ async function createRuntime(config, overrides = {}) {
     vpnService,
     vpnSupervisorService,
     vpnSupervisorServiceNl,
+    vpnSubscriptionService,
+    vpnSubscriptionRepository,
     lifeEventGateway,
     async start() {
       await app.listen({ host: config.host, port: config.port });

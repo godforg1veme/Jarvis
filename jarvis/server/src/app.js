@@ -1,5 +1,6 @@
 const Fastify = require('fastify');
 const { buildRoutingHtmlPage } = require('./vpn/vpnRoutingService');
+const { hashToken } = require('./vpn/vpnSubscriptionService');
 
 function loggerOptions(config) {
   if (config.logLevel === 'silent') return false;
@@ -53,8 +54,14 @@ function buildApp(options = {}) {
     reply.header('X-Frame-Options', 'DENY');
     reply.header('Referrer-Policy', 'no-referrer');
     const opsAsset = request.raw.url && request.raw.url.startsWith('/ops/');
+    const isHtmlLanding = request.raw.url && (
+      request.raw.url.startsWith('/happ-routing') ||
+      request.raw.url.startsWith('/happ-sub/')
+    );
     reply.header('Content-Security-Policy', opsAsset
       ? "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'"
+      : isHtmlLanding
+      ? "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'"
       : "default-src 'none'; frame-ancestors 'none'; base-uri 'none'");
     if (config.nodeEnv === 'production') {
       reply.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
@@ -65,6 +72,35 @@ function buildApp(options = {}) {
   app.get('/health/live', async () => ({ ok: true, service: 'jarvis-family-server' }));
   app.get('/happ-routing', async (request, reply) => {
     reply.type('text/html; charset=utf-8').send(buildRoutingHtmlPage());
+  });
+
+  app.get('/sub/:token', async (request, reply) => {
+    const svc = options.vpnSubscriptionService || app.vpnSubscriptionService;
+    if (!svc) {
+      reply.code(503).type('application/json').send({ error: 'SERVICE_UNAVAILABLE' });
+      return;
+    }
+    const token = request.params.token;
+    const userAgent = request.headers['user-agent'] || '';
+    const format = request.query && request.query.format;
+    const result = await svc.resolveSubscription(token, { userAgent, format });
+    reply.code(result.status).type(result.contentType).send(result.body);
+  });
+
+  app.get('/happ-sub/:token', async (request, reply) => {
+    const svc = options.vpnSubscriptionService || app.vpnSubscriptionService;
+    if (!svc) {
+      reply.code(503).type('text/html; charset=utf-8').send('<h1>503 Сервис недоступен</h1>');
+      return;
+    }
+    const token = request.params.token;
+    const tokenHash = hashToken(token);
+    const sub = await svc.repository?.findActiveByTokenHash(tokenHash);
+    if (!sub) {
+      reply.code(404).type('text/html; charset=utf-8').send('<h1>404 Подписка не найдена</h1>');
+      return;
+    }
+    reply.type('text/html; charset=utf-8').send(svc.renderHappLandingHtml({ token, label: sub.label }));
   });
   app.get('/health/ready', async (request, reply) => {
     const checks = [];
