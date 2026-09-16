@@ -44,6 +44,11 @@ const operationArguments = {
   'vpn.hysteria2.restart': z.object({}).strict(),
   'vpn.health.snapshot': z.object({}).strict(),
   'vpn.external_probe.snapshot': z.object({ targetNode: z.enum(['de', 'nl']) }).strict(),
+  'vpn.external_probe.credential.install': z.object({
+    targetNode: z.enum(['de', 'nl']),
+    protocol: z.enum(['vless', 'hysteria2']),
+    credential: z.string().min(1).max(2048),
+  }).strict(),
 };
 
 const operationNames = Object.keys(operationArguments);

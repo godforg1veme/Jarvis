@@ -1,6 +1,13 @@
 {
   "authenticatorPath": "/etc/jarvis-host-agent/authenticator",
   "stateDir": "/var/lib/jarvis-host-agent",
+  "nodeCode": "de",
+  "probeTarget": {
+    "nodeCode": "nl",
+    "vlessHost": "vpn-nl.example.invalid",
+    "hysteriaHost": "vpn-nl.example.invalid"
+  },
+  "probeCredentialDir": "/etc/jarvis-vpn/probes",
   "managedServices": [
     { "id": "jarvis-server", "type": "docker", "target": "jarvis-family-server-1", "actions": [] },
     { "id": "postgres", "type": "docker", "target": "jarvis-family-postgres-1", "actions": [] },

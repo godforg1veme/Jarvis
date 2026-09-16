@@ -18,6 +18,7 @@ from .hysteria_vpn_manager import HysteriaVpnManager
 from .vpn_manager import XrayVpnManager
 from .network_probes import probe_dns, probe_outbound_https
 from .vpn_incident_classifier import classify_vpn_incident
+from .vpn_probe_credentials import ProbeCredentialError, install_probe_credential
 
 MAX_OUTPUT_BYTES = 32 * 1024
 
@@ -150,6 +151,13 @@ def _vpn_health_snapshot(
 
 
 def execute(config: HostAgentConfig, operation: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    if operation == "vpn.external_probe.credential.install":
+        try:
+            data = install_probe_credential(config, target_node=arguments["targetNode"],
+                                            protocol=arguments["protocol"], credential=arguments["credential"])
+        except (KeyError, ProbeCredentialError):
+            return {"state": "failed", "errorCode": "VPN_PROBE_CREDENTIAL_REJECTED"}
+        return {"state": "succeeded", "data": data}
     if operation == "vpn.external_probe.snapshot":
         from .vpn_external_probe import read_probe_result
         return {"state": "succeeded", "data": read_probe_result(arguments["targetNode"])}

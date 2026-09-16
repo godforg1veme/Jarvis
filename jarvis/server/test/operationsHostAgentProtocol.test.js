@@ -48,6 +48,10 @@ test('Host Agent protocol validates VPN operations without accepting config or s
   assert.deepEqual(validateRequest({ ...health, operation: 'vpn.external_probe.snapshot', arguments: { targetNode: 'nl' } }).arguments, { targetNode: 'nl' });
   assert.throws(() => validateRequest({ ...health, operation: 'vpn.external_probe.snapshot', arguments: { targetNode: 'other' } }), /invalid/i);
   assert.throws(() => validateRequest({ ...health, operation: 'vpn.external_probe.snapshot', arguments: { targetNode: 'de', path: '/tmp/x' } }), /invalid/i);
+  const install = validateRequest({ ...health, operation: 'vpn.external_probe.credential.install', arguments: { targetNode: 'nl', protocol: 'vless', credential: 'vless://synthetic' } });
+  assert.equal(install.arguments.protocol, 'vless');
+  assert.throws(() => validateRequest({ ...install, arguments: { targetNode: 'nl', protocol: 'vless', credential: 'x'.repeat(2049) } }), /invalid/i);
+  assert.throws(() => validateRequest({ ...install, arguments: { targetNode: 'nl', protocol: 'wireguard', credential: 'synthetic' } }), /invalid/i);
   assert.throws(() => validateRequest({ ...health, arguments: { extra: true } }), /invalid/i);
 });
 

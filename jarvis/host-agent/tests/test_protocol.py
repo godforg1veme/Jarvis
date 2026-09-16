@@ -57,6 +57,18 @@ class ProtocolTests(unittest.TestCase):
             validate_request(request(operation="vpn.external_probe.snapshot", arguments={"targetNode": "other"}))
         with self.assertRaises(ProtocolError):
             validate_request(request(operation="vpn.external_probe.snapshot", arguments={"targetNode": "de", "path": "/tmp/x"}))
+        installed = validate_request(request(operation="vpn.external_probe.credential.install", arguments={
+            "targetNode": "nl", "protocol": "vless", "credential": "vless://synthetic",
+        }))
+        self.assertEqual(set(installed["arguments"]), {"targetNode", "protocol", "credential"})
+        with self.assertRaises(ProtocolError):
+            validate_request(request(operation="vpn.external_probe.credential.install", arguments={
+                "targetNode": "nl", "protocol": "vless", "credential": "x" * 2049,
+            }))
+        with self.assertRaises(ProtocolError):
+            validate_request(request(operation="vpn.external_probe.credential.install", arguments={
+                "targetNode": "nl", "protocol": "wireguard", "credential": "synthetic",
+            }))
         with self.assertRaises(ProtocolError):
             validate_request(request(operation="vpn.health.snapshot", arguments={"extra": 1}))
         with self.assertRaises(ProtocolError):

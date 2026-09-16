@@ -1,6 +1,7 @@
 import unittest
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from jarvis_host_agent.actions import execute, _run, MAX_OUTPUT_BYTES
@@ -46,6 +47,18 @@ class ActionsTests(unittest.TestCase):
         self.assertEqual(response["state"], "succeeded")
         self.assertEqual(response["data"]["targetNode"], "nl")
         read_result.assert_called_once_with("nl")
+
+    @patch("jarvis_host_agent.actions.install_probe_credential")
+    def test_external_probe_credential_install_returns_only_closed_metadata(self, install):
+        config = SimpleNamespace(node_code="nl", probe_target=object(), probe_credential_dir=Path("/unused"))
+        install.return_value = {"targetNode": "de", "protocol": "vless", "installedAt": "2026-09-16T12:00:00Z"}
+        response = execute(config, "vpn.external_probe.credential.install", {
+            "targetNode": "de", "protocol": "vless", "credential": "vless://synthetic",
+        })
+        self.assertEqual(response["state"], "succeeded")
+        self.assertEqual(response["data"]["targetNode"], "de")
+        self.assertNotIn("credential", str(response))
+        install.assert_called_once()
 
     @patch("jarvis_host_agent.actions._run")
     def test_services_snapshot_returns_only_normalized_allowlisted_state(self, run):

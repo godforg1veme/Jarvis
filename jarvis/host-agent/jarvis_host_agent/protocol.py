@@ -46,6 +46,7 @@ OPERATIONS = frozenset((
     "vpn.hysteria2.restart",
     "vpn.health.snapshot",
     "vpn.external_probe.snapshot",
+    "vpn.external_probe.credential.install",
 ))
 
 VPN_CLIENT_ID_RE = re.compile(r"^vpn-[a-f0-9]{12}$")
@@ -99,6 +100,16 @@ def validate_arguments(operation: str, value: Any) -> dict[str, Any]:
         if args.get("targetNode") not in {"de", "nl"}:
             raise ProtocolError("arguments.targetNode is invalid")
         return {"targetNode": args["targetNode"]}
+    if operation == "vpn.external_probe.credential.install":
+        _no_extra(args, {"targetNode", "protocol", "credential"}, "arguments")
+        target = args.get("targetNode")
+        protocol = args.get("protocol")
+        credential = args.get("credential")
+        if target not in {"de", "nl"} or protocol not in {"vless", "hysteria2"}:
+            raise ProtocolError("probe credential arguments are invalid")
+        if not isinstance(credential, str) or not 1 <= len(credential) <= 2048:
+            raise ProtocolError("probe credential arguments are invalid")
+        return {"targetNode": target, "protocol": protocol, "credential": credential}
     if operation in {"host.snapshot", "inventory.snapshot", "services.snapshot", "backup.status", "backup.run", "parser.snapshot", "vpn.status", "vpn.clients.list", "vpn.restart", "vpn.hysteria2.status", "vpn.hysteria2.clients.list", "vpn.hysteria2.restart", "vpn.health.snapshot"}:
         _no_extra(args, set(), "arguments")
         return {}
