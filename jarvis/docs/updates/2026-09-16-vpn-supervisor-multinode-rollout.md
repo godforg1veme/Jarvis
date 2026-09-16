@@ -36,9 +36,16 @@ Telegram confirmation and never calls Host Agent.
 
 ## Owner acceptance
 
-The production no-op proposal was delivered to the owner in Telegram. Until the
-owner presses its approval button, PostgreSQL correctly retains the workflow as
-`awaiting_owner`; no VPN or key mutation is possible in that state.
+The first production proposal expired without approval. A fresh proposal was
+delivered to the owner in Telegram, who approved it before its deadline.
+PostgreSQL records the exact `supervisor_acceptance_noop` / `TEST_ACCEPTANCE`
+workflow as `succeeded` at 2026-09-16 08:36:00 UTC, with no pending Supervisor
+run. The only executable step was the no-op; Host Agent was not called by the
+playbook, and no VPN state or key was changed. The acceptance flag was then set
+to `false` in the running server container. Public HTTPS smoke passed after
+that server-only restart; both Operations hosts and all four VPN services
+remained healthy, with zero open `vpn.*` incidents. Xray and Hysteria2 active
+timestamps remained unchanged on both VPSs.
 
 Real repair execution and key rotation remain future milestones. Any future key
 rotation must identify the affected node/device and reason in Telegram and must

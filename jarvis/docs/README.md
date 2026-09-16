@@ -15,8 +15,9 @@ incident classifier plus isolated LLM advisory against the affected node's
 sanitized logs. Real repair playbooks remain disabled; the only executable
 Supervisor playbook is the synthetic owner-approved no-op. The deployed model
 contract, two-node Host Agent path, TCP 443/8443 reachability, production image,
-public smoke, and unchanged VPN service uptimes are verified. Final owner-button
-acceptance is recorded separately when completed. See
+public smoke, and unchanged VPN service uptimes are verified. The real owner
+approved the synthetic no-op in Telegram; PostgreSQL recorded `succeeded` and
+the acceptance flag was disabled afterward. See
 `updates/2026-09-16-vpn-supervisor-multinode-rollout.md`.
 
 VPN Supervisor classifier rollout, 2026-09-15: the current VPS now emits a
