@@ -66,6 +66,21 @@ test('renders only closed bounded VPN inline buttons on the final reply', async 
   assert.doesNotThrow(() => vpnReplyMarkup([[{ text: 'Устройство', data: 'dev:task:33333333-3333-4333-8333-333333333333' }]]));
   assert.doesNotThrow(() => vpnReplyMarkup([[{ text: 'Отмена', data: 'flow:cancel:33333333-3333-4333-8333-333333333333' }]]));
   assert.doesNotThrow(() => vpnReplyMarkup([[{ text: 'Фото', data: 'gallery:open:d:33333333-3333-4333-8333-333333333333:0' }]]));
+
+  const { menuButtons, countryProtocolButtons, protocolButtons } = require('../src/vpn/vpnCommandService');
+  assert.doesNotThrow(() => vpnReplyMarkup(menuButtons()));
+  assert.doesNotThrow(() => vpnReplyMarkup(countryProtocolButtons('de')));
+  assert.doesNotThrow(() => vpnReplyMarkup(countryProtocolButtons('nl')));
+  assert.doesNotThrow(() => vpnReplyMarkup(protocolButtons('hysteria2', 'de')));
+  assert.doesNotThrow(() => vpnReplyMarkup(protocolButtons('vless', 'de')));
+  assert.doesNotThrow(() => vpnReplyMarkup(protocolButtons('hysteria2', 'nl')));
+  assert.doesNotThrow(() => vpnReplyMarkup(protocolButtons('vless', 'nl')));
+  assert.equal(TELEGRAM_CALLBACK_RE.test('vpn:c:de'), true);
+  assert.equal(TELEGRAM_CALLBACK_RE.test('vpn:c:nl'), true);
+  assert.equal(TELEGRAM_CALLBACK_RE.test('vpn:nl:h:status'), true);
+  assert.equal(TELEGRAM_CALLBACK_RE.test('vpn:de:v:clients'), true);
+  assert.equal(TELEGRAM_CALLBACK_RE.test('vpn:nl:h:export:vpn-0123456789ab'), true);
+  assert.equal(TELEGRAM_CALLBACK_RE.test('vpn:c:invalid'), false);
 });
 
 test('renders persistent bottom navigation separately from inline buttons', async () => {

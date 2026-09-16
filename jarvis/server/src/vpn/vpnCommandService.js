@@ -117,6 +117,10 @@ function parseVpnCallback(value) {
   return null;
 }
 
+function isVpnCallback(value) {
+  return Boolean(parseVpnCallback(value));
+}
+
 function menuButtons() {
   return [
     [{ text: '🇩🇪 Германия (Frankfurt)', data: 'vpn:c:de' }, { text: '🇳🇱 Нидерланды (Amsterdam)', data: 'vpn:c:nl' }],
@@ -765,6 +769,7 @@ module.exports = {
   buildPcSetupGuide,
   countryProtocolButtons,
   formatConnectionAnswer,
+  isVpnCallback,
   menuButtons,
   normalizeNode,
   parseVpnCallback,
