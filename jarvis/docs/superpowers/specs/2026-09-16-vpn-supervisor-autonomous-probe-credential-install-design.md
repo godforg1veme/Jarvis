@@ -1,6 +1,6 @@
 # Autonomous cross-node VPN probe credential installation
 
-**Status:** Approved for implementation on 2026-09-16.  
+**Status:** Approved for implementation on 2026-09-16.
 **Scope:** Dedicated VLESS and Hysteria2 credentials used only by the already
 staged cross-node VPN probe runner.
 
