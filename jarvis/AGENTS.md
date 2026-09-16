@@ -252,7 +252,7 @@ See `docs/README.md` for current implementation status and historical records.
   of four URIs and does not itself guarantee automatic failover:
   (1) 🇩🇪 DE Hysteria 2, (2) 🇳🇱 NL Hysteria 2, (3) 🇩🇪 DE VLESS 8443, and (4) 🇳🇱 NL VLESS 8443.
   Both DE and NL nodes run UDP port hopping across `20000:50000` via iptables NAT PREROUTING
-  redirecting to port 443 (`deploy/vpn/setup-port-hopping.sh`), mitigating observed
+  DNAT to port 443 (`deploy/vpn/setup-port-hopping.sh`), mitigating observed
   UDP 443 blocking without guaranteeing reachability on every client network.
   PostgreSQL migration `022_vpn_subscriptions.sql` stores only SHA-256 token hashes
   (`token_hash`) for strict zero raw secret persistence. `GET /sub/:token` dynamically generates

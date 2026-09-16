@@ -85,3 +85,14 @@ resolves to DE. NL HTTP-01 renewal is not established. The installer now
 rejects this DNS/address mismatch even if ACME files already exist. A distinct
 DNS-only NL hostname and matching certificate must be provisioned and tested
 before expiry; no live SNI or certificate was changed during this audit.
+
+Port hopping follow-up on 2026-09-17: connection stalls on DE (`tx: 0` and QUIC
+idle timeout) occurred because iptables `REDIRECT --to-ports 443` on `ens3`
+rewrote packets destined for secondary alias `87.120.187.109:20000-50000` to the
+interface's primary IP `87.120.187.202:443 UDP`. Since UFW drops UDP 443 on the
+primary IP and Hysteria listens strictly on `87.120.187.109:443`, port-hopped
+packets were discarded. `deploy/vpn/setup-port-hopping.sh` was updated to remove
+legacy `REDIRECT` and use `DNAT --to-destination $server_address:$target_port`.
+The fix was applied and persisted on DE and NL. Cross-VPS testing from NL
+confirmed port 443 and port 25000 (DNAT) both succeeded with exit IP `87.120.187.202`.
+
