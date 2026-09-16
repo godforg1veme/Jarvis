@@ -166,17 +166,20 @@ See `docs/README.md` for current implementation status and historical records.
   one closed read-only `vpn.health.snapshot` against the same node; a changed
   incident revision, invalid snapshot, or second request stops planning. The
   response must match a strict seven-field schema and a closed playbook catalog.
-  Cross-node real client protocol probes are not yet deployed. Real repair
+  Cross-node probe units and the owner-confirmed transient credential handoff
+  are deployed, but no test credential is installed and both timers remain
+  disabled until four successful owner-approved one-shot checks. Real repair
   playbooks remain disabled. Only
   `supervisor_acceptance_noop` can execute, after a fresh owner Telegram
   confirmation, and it never calls Host Agent.
-- Cross-node client probe code and its read-only Host Agent result operation
-  are deployed on DE and NL, but timers and test credentials are not enabled.
-  A non-root runner can check DE from NL and NL from DE with
-  dedicated owner-approved credentials; Host Agent exposes only a closed
-  read-only result. `/vpn_health` reports these separately and treats missing,
-  stale, mismatched, or ambiguous checks as unknown. External probe failures
-  do not authorize an LLM repair or key rotation.
+- Cross-node client probe code, root-only credential installer and disabled
+  units are deployed on DE and NL. A one-time URI may travel only through the
+  authenticated Host Agent socket; it is neither journaled nor returned to
+  Telegram, PostgreSQL, logs, prompts or telemetry. Telegram offers only four
+  fixed test-device bindings and an origin-bound owner confirmation for each.
+  `/vpn_health` reports results separately and treats missing, stale, mismatched,
+  or ambiguous checks as unknown. External probe failures do not authorize an
+  LLM repair or key rotation.
 - Host Agent mutation claims are persisted before execution. An interrupted
   command has an unknown outcome and is reconciled; never retry it under a new
   identifier merely because its connection was lost. Discovery is read-only.

@@ -70,10 +70,25 @@ Both Operations hosts and all four VPN services were healthy, with zero open
 restart counters remained unchanged on both nodes. The rollback source files
 and pre-change server image were retained on DE.
 
-This deployment does **not** include the cross-node authenticated client
-probes. `protocolProbe` remains `unknown` until separate test identities and
-the probe runner are safely provisioned and verified. No VPN key or service was
-changed by this rollout.
+This deployment does **not** include an accepted cross-node authenticated client
+probe. `protocolProbe` remains `unknown` until separate test identities are
+installed and verified. No VPN key or service was changed by this rollout.
+
+## Probe handoff staging update (2026-09-16)
+
+The DE and NL Host Agents now have reciprocal public target configuration,
+root-only probe directories, disabled systemd probe units, and a closed Server
+workflow. A one-time export is forwarded only through the authenticated Host
+Agent sockets to the opposite node; it is not retained in a durable journal,
+PostgreSQL, Telegram, prompts, logs, or telemetry. Server migration 021 and
+the Telegram owner-confirmation surface are deployed. Both timers remain
+`disabled`; no probe credential has been installed and no probe has run.
+
+Host Agent health passed on both nodes after deployment (101 tests each), the
+Server image became healthy, and the public smoke check passed. Xray and
+Hysteria2 service PIDs and activation timestamps remained unchanged. The next
+step is four separate owner approvals for the fixed probe devices; timer
+activation is offered only after all four successful one-shot checks.
 
 ## Cross-node client probe staging (later on 2026-09-16)
 
