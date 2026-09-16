@@ -245,6 +245,17 @@ See `docs/README.md` for current implementation status and historical records.
   profile contains only public routing/DNS rules and zero credentials or tokens.
   The Telegram bot `/vpn` menu exposes the profile directly in the Hysteria 2 tab
   alongside a 2-step setup guide.
+- `server/src/vpn/vpnSubscriptionService.js` and `server/src/vpn/vpnSubscriptionRepository.js`
+  provide dynamic multi-node subscriptions for Happ / Sing-box. A single subscription
+  profile aggregates 4 resilient endpoints with automated client-side `url-test` failover:
+  (1) 🇩🇪 DE Hysteria 2, (2) 🇳🇱 NL Hysteria 2, (3) 🇩🇪 DE VLESS 8443, and (4) 🇳🇱 NL VLESS 8443.
+  Both DE and NL nodes run UDP port hopping across `20000:50000` via iptables NAT PREROUTING
+  redirecting to port 443 (`deploy/vpn/setup-port-hopping.sh`), bypassing ISP QUIC blackholing.
+  PostgreSQL migration `022_vpn_subscriptions.sql` stores only SHA-256 token hashes
+  (`token_hash`) for strict zero raw secret persistence. `GET /sub/:token` dynamically generates
+  Sing-box JSON (or Base64 for legacy clients) demoting probe-degraded nodes via `ExternalProbeMonitor`.
+  `GET /happ-sub/:token` provides a 1-click HTML landing bridge to `happ://add/sub?url=...`.
+  Telegram `/vpn` offers «📲 Умная подписка (Happ)» with 1-click creation, token rotation, and revocation.
 - PostgreSQL must never be published publicly.
 - The DE-4 runs the private `gigaam-asr` service for Russian server ASR with a
   four-CPU/8-GiB cap and no host port. Its observed steady-state RSS is about

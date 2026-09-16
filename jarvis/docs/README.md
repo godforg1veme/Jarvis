@@ -6,6 +6,20 @@ future-tense wording does not override the current architecture in `AGENTS.md`.
 
 Status snapshot: 2026-09-16.
 
+Dynamic VPN Subscription Network & Port Hopping rollout, 2026-09-16: Jarvis
+now generates dynamic Sing-box/Happ subscriptions with 4-tier Smart Failover
+(DE Hysteria 2 -> NL Hysteria 2 -> DE VLESS 8443 -> NL VLESS 8443) and automatic
+UDP port hopping (20000:50000, 30s hop interval) redirecting to port 443 via iptables
+NAT PREROUTING on both German (`87.120.187.109`) and Netherlands (`94.183.208.56`)
+nodes to defeat ISP QUIC port-443 blackholing. Migration 022 (`vpn_subscriptions`)
+persists only SHA-256 token hashes (zero raw secret persistence). Dynamic endpoint
+`GET /sub/:token` serves Sing-box JSON or Base64, demoting probe-degraded nodes
+via `ExternalProbeMonitor`. `GET /happ-sub/:token` provides a 1-click HTML landing
+bridge to `happ://add/sub?url=...`. Telegram `/vpn` exposes «📲 Умная подписка (Happ)»
+with creation, 1-click import, token rotation, and revocation. 495/495 tests pass;
+deployed and verified live on production VPS DE (`87.120.187.202`) and NL (`94.183.208.56`).
+See `updates/2026-09-16-vpn-subscription-network-rollout.md`.
+
 Multi-node VPN Supervisor rollout, 2026-09-16: Jarvis now manages separate
 Germany and Netherlands VPN nodes through authenticated local/forwarded Host
 Agent sockets. Telegram requires an explicit country choice before protocol

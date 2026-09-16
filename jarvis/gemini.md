@@ -12,7 +12,4 @@ Gemini is an optional provider/advisor, not Jarvis's identity or the sole AI
 architecture. For implemented-versus-roadmap status and historical design
 records, use [`docs/README.md`](docs/README.md).
 
-Current status note: the native button-driven Telegram Life OS surface and
-migration 019 were production-deployed on 2026-09-15. New target VPS
-`94.183.208.56` is configured and accessible via `ssh jarvis-vps-new`
-(Ubuntu 24.04.4, user deploy). Real owner/member Telegram taps remain manual acceptance.
+Current status note: the dynamic multi-node VPN subscription network with UDP port hopping (20000-50000), Smart Failover across DE & NL (Hysteria 2 + VLESS), migration 022, and 1-click Happ Telegram bot integration was production-deployed and verified on 2026-09-16. Both production DE (`jarvis-vps`) and new target NL (`jarvis-vps-new`) run iptables NAT PREROUTING port-hopping redirect. Real owner/member Telegram taps remain manual acceptance.
