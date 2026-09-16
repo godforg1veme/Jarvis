@@ -98,3 +98,29 @@ test('VPN collector reports an unavailable classified snapshot without opening g
   assert.equal(unavailable, 1);
   assert.equal(genericIncidents, 0);
 });
+
+test('VPN-only collector monitors a secondary node without probing control-plane services', async () => {
+  const operations = [];
+  const hostStates = [];
+  const observed = [];
+  const worker = new CollectorWorker({
+    hostId: 'host-nl', intervalMs: 30000, vpnOnly: true,
+    repository: {
+      async recordHostSnapshot(value) { hostStates.push(value); },
+      async recordMetricSamples() {},
+      async serviceByKey() { return { id: 'vpn-service' }; },
+      async upsertService(value) { return { id: `${value.serviceKey}-service`, ...value }; },
+    },
+    client: { async request(request) {
+      operations.push(request.operation);
+      if (request.operation === 'host.snapshot') return { result: { state: 'succeeded', data: { loadavg: ['0', '0', '0'], meminfo: [], uptimeSeconds: 100 } } };
+      if (request.operation === 'vpn.health.snapshot') return { result: { state: 'succeeded', data: { diagnosis: { state: 'healthy' } } } };
+      return { result: { state: 'succeeded', data: { serviceState: 'active', configValid: true, listenerReady: true, clientCount: 0 } } };
+    } },
+    vpnIncidentAdapter: { async observe(value) { observed.push(value); }, async observeUnavailable() {} },
+  });
+  await worker.runOnce();
+  assert.deepEqual(operations, ['host.snapshot', 'vpn.status', 'vpn.hysteria2.status', 'vpn.health.snapshot']);
+  assert.deepEqual(hostStates, [{ hostId: 'host-nl', state: 'healthy' }]);
+  assert.equal(observed.length, 1);
+});

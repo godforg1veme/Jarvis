@@ -25,18 +25,25 @@ const { HealthCheckWorker } = require('./collectors/healthCheckWorker');
 const { LogCollector } = require('./collectors/logCollector');
 const { providerByName } = require('../providers/providerFactory');
 
-async function createOperationsRuntime({ config, pool, logger, app, getBot, getPollingHealth, onDeviceRevoked, vpnSupervisorService = null, overrides = {} }) {
+async function createOperationsRuntime({ config, pool, logger, app, getBot, getPollingHealth, onDeviceRevoked, vpnSupervisorService = null, vpnSupervisorServices = null, vpnClients = null, overrides = {} }) {
   if (!config.operationsEnabled) return { enabled: false, async start() {}, async close() {} };
   const repository = overrides.repository || new OperationsRepository(pool);
   const host = await repository.ensureHost({ hostKey: config.operationsHostKey, label: config.operationsHostLabel });
   const client = overrides.client || new HostAgentClient({ socketPath: config.operationsSocketPath, authenticatorPath: config.operationsAuthenticatorPath });
+  const nlClient = overrides.nlClient || vpnClients?.nl || (config.operationsNlSocketPath ? new HostAgentClient({
+    socketPath: config.operationsNlSocketPath,
+    authenticatorPath: config.operationsAuthenticatorPath,
+  }) : null);
+  const nlHost = nlClient ? await repository.ensureHost({ hostKey: config.operationsNlHostKey, label: config.operationsNlHostLabel }) : null;
   const sseHub = overrides.sseHub || new SseHub();
   const incidentNotifier = overrides.incidentNotifier || new IncidentNotifier({ getBot, ownerTelegramId: config.operationsOwnerTelegramId, panelOrigin: config.operationsPublicOrigin, logger });
   const incidentEngine = overrides.incidentEngine || new IncidentEngine({ repository, hostId: host.id, notifier: incidentNotifier });
+  const deSupervisor = vpnSupervisorServices?.de || vpnSupervisorService;
+  const nlSupervisor = vpnSupervisorServices?.nl || null;
   const vpnIncidentAdapter = overrides.vpnIncidentAdapter || new VpnIncidentAdapter({
     repository, incidentEngine, hostId: host.id,
-    onIncident: vpnSupervisorService ? async (value) => {
-      try { await vpnSupervisorService.analyzeIncident(value); }
+    onIncident: deSupervisor ? async (value) => {
+      try { await deSupervisor.analyzeIncident(value); }
       catch (_) { if (logger) logger.warn('VPN Supervisor advisory failed'); }
     } : null,
   });
@@ -47,6 +54,26 @@ async function createOperationsRuntime({ config, pool, logger, app, getBot, getP
     incidentEngine,
     vpnIncidentAdapter,
   });
+  const nlIncidentEngine = nlHost ? new IncidentEngine({ repository, hostId: nlHost.id, notifier: incidentNotifier }) : null;
+  const nlVpnIncidentAdapter = nlHost ? new VpnIncidentAdapter({
+    repository, incidentEngine: nlIncidentEngine, hostId: nlHost.id,
+    onIncident: nlSupervisor ? async (value) => {
+      try { await nlSupervisor.analyzeIncident(value); }
+      catch (_) { if (logger) logger.warn('Netherlands VPN Supervisor advisory failed'); }
+    } : null,
+  }) : null;
+  const nlCollector = nlHost ? new CollectorWorker({
+    client: nlClient,
+    repository,
+    hostId: nlHost.id,
+    intervalMs: config.operationsPollIntervalMs,
+    logger,
+    vpnOnly: true,
+    incidentEngine: nlIncidentEngine,
+    vpnIncidentAdapter: nlVpnIncidentAdapter,
+    onSnapshot: (payload) => sseHub.publish('snapshot', payload),
+    onEvent: (payload) => sseHub.publish('event', payload),
+  }) : null;
   const rollupWorker = overrides.rollupWorker || new RollupWorker({ repository, logger });
   const retentionWorker = overrides.retentionWorker || new RetentionWorker({ repository, logger, incidentEngine });
   const logCollector = new LogCollector({ client, repository, hostId: host.id, logger });
@@ -74,7 +101,16 @@ async function createOperationsRuntime({ config, pool, logger, app, getBot, getP
   const connectionService = overrides.connectionService || new ConnectionAdminService(new ConnectionAdminRepository(pool), { onDeviceRevoked });
   registerConnectionRoutes(app, { service: connectionService, requireSession, requireSameOrigin: sameOrigin });
   await registerOperationsStatic(app);
-  return { enabled: true, host, repository, sessionService, approvalHandler: createTelegramApprovalHandler({ service: sessionService, ownerTelegramId: config.operationsOwnerTelegramId }), async start() { collector.start(); rollupWorker.start(); retentionWorker.start(); operationRecoveryWorker.start(); healthCheckWorker.start(); logCollector.start(); }, async close() { collector.stop(); rollupWorker.stop(); retentionWorker.stop(); operationRecoveryWorker.stop(); healthCheckWorker.stop(); logCollector.stop(); sseHub.close(); } };
+  return {
+    enabled: true,
+    host,
+    nlHost,
+    repository,
+    sessionService,
+    approvalHandler: createTelegramApprovalHandler({ service: sessionService, ownerTelegramId: config.operationsOwnerTelegramId }),
+    async start() { collector.start(); if (nlCollector) nlCollector.start(); rollupWorker.start(); retentionWorker.start(); operationRecoveryWorker.start(); healthCheckWorker.start(); logCollector.start(); },
+    async close() { collector.stop(); if (nlCollector) nlCollector.stop(); rollupWorker.stop(); retentionWorker.stop(); operationRecoveryWorker.stop(); healthCheckWorker.stop(); logCollector.stop(); sseHub.close(); },
+  };
 }
 
 module.exports = { createOperationsRuntime };

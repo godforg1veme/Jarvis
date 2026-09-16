@@ -129,6 +129,8 @@ async function createRuntime(config, overrides = {}) {
   let vpnService = null;
   let vpnRecoveryWorker = null;
   let vpnSupervisorService = null;
+  let vpnSupervisorServiceNl = null;
+  let vpnOperationsClients = null;
   let lifeEventGateway = null;
   let lifeProjectionWorker = null;
   let proactivityWorker = null;
@@ -402,6 +404,7 @@ async function createRuntime(config, overrides = {}) {
         de: vpnHostAgentClient,
         ...(vpnHostAgentClientNl ? { nl: vpnHostAgentClientNl } : {}),
       };
+      vpnOperationsClients = vpnClients;
       vpnService = overrides.vpnService || new VpnCommandService({
         repository: vpnRepository,
         client: vpnHostAgentClient,
@@ -411,12 +414,14 @@ async function createRuntime(config, overrides = {}) {
       vpnRecoveryWorker = overrides.vpnRecoveryWorker || new VpnRecoveryWorker({
         repository: vpnRepository,
         client: vpnHostAgentClient,
+        clients: vpnClients,
         logger: app.log,
       });
       const supervisorOperationsRepository = overrides.supervisorOperationsRepository || new OperationsRepository(pool);
       const supervisorPlanner = overrides.vpnSupervisorPlanner || new VpnSupervisorPlanner({ provider: answerProvider });
+      const supervisorRepository = overrides.vpnSupervisorRepository || new VpnSupervisorRepository(pool);
       vpnSupervisorService = overrides.vpnSupervisorService || new VpnSupervisorService({
-        repository: overrides.vpnSupervisorRepository || new VpnSupervisorRepository(pool),
+        repository: supervisorRepository,
         planner: supervisorPlanner,
         hostIdProvider: () => supervisorOperationsRepository.ensureHost({ hostKey: config.operationsHostKey, label: config.operationsHostLabel }),
         ownerTelegramId: config.operationsOwnerTelegramId,
@@ -425,6 +430,18 @@ async function createRuntime(config, overrides = {}) {
         getBot: () => bot,
         logger: app.log,
       });
+      if (vpnHostAgentClientNl) {
+        vpnSupervisorServiceNl = overrides.vpnSupervisorServiceNl || new VpnSupervisorService({
+          repository: supervisorRepository,
+          planner: supervisorPlanner,
+          hostIdProvider: () => supervisorOperationsRepository.ensureHost({ hostKey: config.operationsNlHostKey, label: config.operationsNlHostLabel }),
+          ownerTelegramId: config.operationsOwnerTelegramId,
+          acceptanceEnabled: false,
+          evidenceCollector: new VpnEvidenceCollector({ client: vpnHostAgentClientNl }),
+          getBot: () => bot,
+          logger: app.log,
+        });
+      }
     }
     if (typeof pool.query === 'function') {
       const knowledgeRepository = overrides.knowledgeRepository || new DocumentRepository(pool);
@@ -631,6 +648,8 @@ async function createRuntime(config, overrides = {}) {
       },
       logger: app.log,
       vpnSupervisorService,
+      vpnSupervisorServices: { de: vpnSupervisorService, ...(vpnSupervisorServiceNl ? { nl: vpnSupervisorServiceNl } : {}) },
+      vpnClients: vpnOperationsClients,
       overrides: overrides.operations || {},
     });
     if (operationsRuntime.enabled && bot && typeof bot.on === 'function') {
@@ -650,6 +669,7 @@ async function createRuntime(config, overrides = {}) {
     operationsRuntime,
     vpnService,
     vpnSupervisorService,
+    vpnSupervisorServiceNl,
     lifeEventGateway,
     async start() {
       await app.listen({ host: config.host, port: config.port });

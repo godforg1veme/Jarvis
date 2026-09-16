@@ -46,3 +46,19 @@ test('leaves an unclaimed action recoverable', async () => {
   });
   assert.equal(await worker.reconcile({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', user_id: 'u1', action: 'restart' }), false);
 });
+
+test('routes Netherlands recovery to the Netherlands Host Agent only', async () => {
+  const calls = [];
+  const requestId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const worker = new VpnRecoveryWorker({
+    repository: { complete: async () => {}, audit: async () => {} },
+    client: { request: async () => assert.fail('DE client must not receive NL recovery') },
+    clients: {
+      de: { request: async () => assert.fail('DE client must not receive NL recovery') },
+      nl: { request: async (request) => { calls.push(request); return { result: { state: 'succeeded', data: { response: original(request.arguments.requestId) } } }; } },
+    },
+  });
+  assert.equal(await worker.reconcile({ id: requestId, user_id: 'u1', action: 'issue', arguments: { node: 'nl' } }), true);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].arguments.requestId, requestId);
+});

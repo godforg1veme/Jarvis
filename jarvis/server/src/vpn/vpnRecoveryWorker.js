@@ -7,6 +7,7 @@ class VpnRecoveryWorker {
   constructor(options = {}) {
     this.repository = options.repository;
     this.client = options.client;
+    this.clients = options.clients || (options.client ? { de: options.client } : {});
     this.logger = options.logger || { warn() {}, info() {} };
     this.intervalMs = Math.min(Math.max(Number(options.intervalMs || 30_000), 5_000), 300_000);
     this.now = options.now || (() => new Date());
@@ -15,7 +16,10 @@ class VpnRecoveryWorker {
   }
 
   async reconcile(record) {
-    const response = await this.client.request({
+    const node = record.arguments?.node === 'nl' ? 'nl' : 'de';
+    const client = this.clients[node] || (node === 'de' ? this.client : null);
+    if (!client) throw new Error(`VPN recovery client unavailable for ${node}`);
+    const response = await client.request({
       version: 1,
       requestId: crypto.randomUUID(),
       operation: 'operation.status',
@@ -36,7 +40,7 @@ class VpnRecoveryWorker {
         userId: record.user_id,
         requestId: record.id,
         type: 'vpn.action.recovery_failed',
-        metadata: { action: record.action, errorCode: 'HOST_AGENT_RESPONSE_INVALID' },
+        metadata: { action: record.action, node, errorCode: 'HOST_AGENT_RESPONSE_INVALID' },
       });
       return true;
     }
@@ -55,7 +59,7 @@ class VpnRecoveryWorker {
       userId: record.user_id,
       requestId: record.id,
       type: success ? 'vpn.action.recovered' : 'vpn.action.recovery_failed',
-      metadata: { action: record.action, errorCode },
+      metadata: { action: record.action, node, errorCode },
     });
     return true;
   }

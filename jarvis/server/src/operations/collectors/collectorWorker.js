@@ -74,6 +74,7 @@ class CollectorWorker {
     this.onEvent = options.onEvent || (() => {});
     this.incidentEngine = options.incidentEngine || null;
     this.vpnIncidentAdapter = options.vpnIncidentAdapter || null;
+    this.vpnOnly = options.vpnOnly === true;
     this.lastStates = new Map();
     this.timer = null;
     this.running = false;
@@ -176,6 +177,32 @@ class CollectorWorker {
   async runOnce() {
     if (this.running) return;
     this.running = true;
+    if (this.vpnOnly) {
+      try {
+        const response = await this.request('host.snapshot');
+        const healthy = response.result.state === 'succeeded' && response.result.data;
+        await this.repository.recordHostSnapshot({ hostId: this.hostId, state: healthy ? 'healthy' : 'unavailable' });
+        if (healthy) {
+          await this.repository.recordMetricSamples({
+            hostId: this.hostId,
+            sampledAt: new Date(),
+            metrics: normalizeHostMetrics(response.result.data),
+          });
+        }
+      } catch (error) {
+        await this.repository.recordHostSnapshot({ hostId: this.hostId, state: 'unavailable' }).catch(() => {});
+        if (this.logger) this.logger.warn({ err: error, hostId: this.hostId }, 'VPN node host collection failed');
+      }
+      try {
+        await this.collectVpn();
+      } catch (error) {
+        if (this.logger) this.logger.warn({ err: error, hostId: this.hostId }, 'VPN node collection failed');
+      } finally {
+        this.running = false;
+        this.onSnapshot({ observedAt: new Date().toISOString(), hostId: this.hostId });
+      }
+      return;
+    }
     try {
       const response = await this.request('host.snapshot');
       const healthy = response.result.state === 'succeeded' && response.result.data;

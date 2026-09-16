@@ -124,7 +124,6 @@ function isVpnCallback(value) {
 function menuButtons() {
   return [
     [{ text: '🇩🇪 Германия (Frankfurt)', data: 'vpn:c:de' }, { text: '🇳🇱 Нидерланды (Amsterdam)', data: 'vpn:c:nl' }],
-    [{ text: '⚡ Hysteria2 — рекомендуется', data: 'vpn:p:h' }, { text: '🛡 VLESS — резерв', data: 'vpn:p:v' }],
     [{ text: '🏥 Диагностика (Health Snapshot)', data: 'vpn:health' }],
   ];
 }
@@ -683,7 +682,7 @@ class VpnCommandService {
     if (callback.action === 'menu') {
       return callback.protocol
         ? { answer: renderProtocolGreeting(callback.protocol, node), buttons: protocolButtons(callback.protocol, node) }
-        : { answer: 'Выберите страну подключения или протокол:', buttons: menuButtons() };
+        : { answer: 'Выберите страну подключения:', buttons: menuButtons() };
     }
     if (callback.action === 'protocol') return { answer: renderProtocolGreeting(callback.protocol, node), buttons: protocolButtons(callback.protocol, node) };
     if (callback.action === 'health') return this._read({ action: 'health', protocol: 'both' });
@@ -731,7 +730,7 @@ class VpnCommandService {
         buttons: protocolButtons(protocol, node),
       };
     }
-    if (command.kind === 'menu') return { answer: 'Выберите страну подключения или протокол:', buttons: menuButtons() };
+    if (command.kind === 'menu') return { answer: 'Выберите страну подключения:', buttons: menuButtons() };
     if (command.kind === 'routing') {
       return {
         answer: buildRoutingSummary(),
@@ -750,7 +749,7 @@ class VpnCommandService {
 
   async openMenu(context) {
     await this._requireOwner(context.userId);
-    return { answer: 'Выберите страну подключения или протокол:', buttons: menuButtons() };
+    return { answer: 'Выберите страну подключения:', buttons: menuButtons() };
   }
 
   async requestAction({ action, protocol, node = 'de', arguments: actionArguments = {}, ...context }) {

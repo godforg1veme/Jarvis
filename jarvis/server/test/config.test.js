@@ -19,6 +19,9 @@ test('loads safe development defaults', () => {
   assert.equal(config.lifeOsReminderBatchSize, 10);
   assert.equal(config.lifeOsFixtureSourcesEnabled, false);
   assert.equal(config.vpnSupervisorAcceptanceEnabled, false);
+  assert.equal(config.operationsNlHostKey, 'vpn-nl');
+  assert.equal(config.operationsNlHostLabel, 'Netherlands VPN VPS');
+  assert.equal(config.operationsNlSocketPath, '/run/jarvis-host-agent/agent-nl.sock');
 });
 
 test('VPN Supervisor acceptance requires Operations and a configured model', () => {

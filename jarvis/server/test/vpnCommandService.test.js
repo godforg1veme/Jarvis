@@ -107,11 +107,11 @@ test('rejects unsafe labels and client identifiers', () => {
 test('owner can observe VPN without confirmation', async () => {
   const { service, calls } = harness();
   const result = await service.handle({ text: '/vpn', userId: USER_ID, conversationId: 'conversation', originChannel: 'telegram' });
-  assert.match(result.answer, /Выберите страну подключения или протокол/);
+  assert.match(result.answer, /Выберите страну подключения/);
   assert.equal(result.buttons.flat().some((button) => button.data === 'vpn:c:de'), true);
   assert.equal(result.buttons.flat().some((button) => button.data === 'vpn:c:nl'), true);
-  assert.equal(result.buttons.flat().some((button) => button.data === 'vpn:p:h'), true);
-  assert.equal(result.buttons.flat().some((button) => button.data === 'vpn:p:v'), true);
+  assert.equal(result.buttons.flat().some((button) => button.data === 'vpn:p:h'), false);
+  assert.equal(result.buttons.flat().some((button) => button.data === 'vpn:p:v'), false);
   assert.equal(result.buttons.flat().some((button) => button.data === 'vpn:routing'), false);
   assert.equal(calls.some((call) => call[0] === 'request'), false);
 
@@ -395,4 +395,3 @@ test('multi-node support routes operations cleanly to DE and NL clients', async 
   assert.equal(deCalls.some((c) => c.operation === 'vpn.health.snapshot'), true);
   assert.equal(nlCalls.some((c) => c.operation === 'vpn.health.snapshot'), true);
 });
-
