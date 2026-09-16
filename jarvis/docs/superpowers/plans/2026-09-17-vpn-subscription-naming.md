@@ -67,4 +67,4 @@
 
 - [x] Update current status documentation to state the confirmed subscription naming behavior and remaining Happ-device acceptance.
 - [x] Run `npm test` from `server` and inspect `git diff --check`.
-- [ ] Commit the tested implementation with a conventional `feat(vpn)` message, push normally, deploy the server, and verify health plus redacted production subscription headers.
+- [x] Commit the tested implementation with a conventional `feat(vpn)` message, push normally, deploy the server, and verify health plus safe production title-header code.
