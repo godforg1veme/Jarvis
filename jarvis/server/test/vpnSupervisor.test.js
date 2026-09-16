@@ -6,9 +6,70 @@ const { VpnSupervisorPlanner } = require('../src/operations/vpnSupervisor/planne
 const { evaluateProposal } = require('../src/operations/vpnSupervisor/policy');
 const { VpnSupervisorService, acceptanceContext } = require('../src/operations/vpnSupervisor/service');
 const { VpnEvidenceCollector } = require('../src/operations/vpnSupervisor/evidenceCollector');
+const { collectObservationRound } = require('../src/operations/vpnSupervisor/observationRound');
 
 const HOST_ID = '11111111-1111-4111-8111-111111111111';
 const RUN_ID = '22222222-2222-4222-8222-222222222222';
+
+function failedXrayHealth() {
+  return {
+    host: 'healthy', network: { dns: 'healthy', outbound: 'healthy' },
+    xray: { service: 'unavailable', config: 'healthy', listener: 'unavailable', protocolProbe: 'unknown' },
+    hysteria2: { service: 'healthy', config: 'healthy', listener: 'healthy', auth: 'healthy', authEndpoint: 'healthy', authCredentialProbe: 'healthy', protocolProbe: 'unknown' },
+    diagnosis: { version: 1, state: 'incident', primary: {
+      code: 'XRAY_SERVICE_FAILURE', failureKind: 'vpn.xray.service_failure', severity: 'error',
+      scope: 'xray', confidence: 'high', likelyCause: 'xray_service',
+      evidence: [{ path: 'xray.config', status: 'healthy' }, { path: 'xray.service', status: 'unavailable' }, { path: 'xray.listener', status: 'unavailable' }],
+      safeNextChecks: ['xray_service_status'],
+    }, secondarySignals: [{ code: 'XRAY_PROTOCOL_UNVERIFIED', severity: 'info' }, { code: 'HYSTERIA2_PROTOCOL_UNVERIFIED', severity: 'info' }] },
+  };
+}
+
+test('observation round maps only requested closed checks from one validated snapshot', async () => {
+  const requests = [];
+  const health = failedXrayHealth();
+  const client = { async request(request) { requests.push(request); return { result: { state: 'succeeded', data: health } }; } };
+  const result = await collectObservationRound({ client, checks: ['xray_config', 'host_dns'], originalHealth: health,
+    originalFacts: [{ id: 'F1', name: 'xray.service', status: 'unavailable' }], clock: () => new Date('2026-09-16T12:00:00Z') });
+  assert.equal(result.state, 'ready');
+  assert.deepEqual(result.facts.slice(1), [
+    { id: 'F2', name: 'check.xray_config', status: 'healthy' },
+    { id: 'F3', name: 'check.host_dns', status: 'healthy' },
+  ]);
+  assert.deepEqual(requests.map((request) => request.operation), ['vpn.health.snapshot']);
+  assert.deepEqual(requests[0].arguments, {});
+  assert.doesNotMatch(JSON.stringify(result), /failureKind|safeNextChecks|token|output/);
+});
+
+test('observation round rejects empty or duplicate checks and stops on changed incident', async () => {
+  const originalHealth = failedXrayHealth();
+  const requests = [];
+  const client = { async request(request) { requests.push(request); return { result: { state: 'succeeded', data: {
+    ...originalHealth,
+    xray: { ...originalHealth.xray, service: 'healthy', listener: 'healthy' },
+    diagnosis: { ...originalHealth.diagnosis, state: 'healthy', primary: null },
+  } } }; } };
+  const options = { client, originalHealth, originalFacts: [{ id: 'F1', name: 'xray.service', status: 'unavailable' }], clock: () => new Date() };
+  assert.equal((await collectObservationRound({ ...options, checks: [] })).state, 'invalid');
+  assert.equal((await collectObservationRound({ ...options, checks: ['xray_config', 'xray_config'] })).state, 'invalid');
+  assert.equal(requests.length, 0);
+  assert.equal((await collectObservationRound({ ...options, checks: ['xray_config'] })).state, 'stale');
+  assert.equal(requests.length, 1);
+});
+
+test('observation round fails closed on a revised diagnosis or invalid snapshot', async () => {
+  const originalHealth = failedXrayHealth();
+  let response = { result: { state: 'succeeded', data: { ...originalHealth,
+    diagnosis: { ...originalHealth.diagnosis, primary: { ...originalHealth.diagnosis.primary,
+      evidence: [{ path: 'xray.service', status: 'unavailable' }] } } } } };
+  const options = { client: { async request() { return response; } }, checks: ['xray_config'], originalHealth,
+    originalFacts: [{ id: 'F1', name: 'xray.service', status: 'unavailable' }] };
+  assert.equal((await collectObservationRound(options)).state, 'stale');
+  response = { result: { state: 'succeeded', data: { ...originalHealth, token: 'must-not-be-forwarded' } } };
+  const invalid = await collectObservationRound(options);
+  assert.equal(invalid.state, 'unavailable');
+  assert.doesNotMatch(JSON.stringify(invalid), /must-not-be-forwarded/);
+});
 
 function validProposal(overrides = {}) {
   return {
@@ -207,4 +268,54 @@ test('real incident advisory suppresses a mismatched playbook recommendation', a
   await harness.service.analyzeIncident({ incident: { id: '33333333-3333-4333-8333-333333333333' }, health });
   assert.equal(sent.length, 0);
   assert.equal([...harness.rows.values()][0].reason_code, 'DECISION_PROPOSE');
+});
+
+test('real advisory performs one requested observation round on its node then proposes without execution', async () => {
+  const harness = serviceHarness();
+  const health = failedXrayHealth();
+  const contexts = [];
+  const operations = [];
+  const sent = [];
+  harness.service.evidenceCollector = {
+    client: { async request(request) { operations.push(request.operation); return { result: { state: 'succeeded', data: health } }; } },
+    async collect() { return { evidence: [], truncated: false, digest: 'a'.repeat(64) }; },
+  };
+  harness.service.planner = { async plan(context) {
+    contexts.push(context);
+    return contexts.length === 1
+      ? validProposal({ decision: 'need_observation', playbookId: null, reasonCode: 'INSUFFICIENT_EVIDENCE', requiredChecks: ['xray_config'], evidenceRefs: ['F1'] })
+      : validProposal({ playbookId: 'restart_xray', reasonCode: 'SERVICE_FAILED', evidenceRefs: ['F11'] });
+  } };
+  harness.service.getBot = () => ({ api: { async sendMessage(chatId, message, options) { sent.push({ chatId, message, options }); } } });
+  const proposal = await harness.service.analyzeIncident({ incident: { id: RUN_ID }, health });
+  assert.equal(proposal.playbookId, 'restart_xray');
+  assert.equal(contexts.length, 2);
+  assert.deepEqual(operations, ['vpn.health.snapshot']);
+  assert.deepEqual(contexts[1].facts.at(-1), { id: 'F11', name: 'check.xray_config', status: 'healthy' });
+  assert.equal(sent.length, 1);
+  assert.equal([...harness.rows.values()][0].reason_code, 'REAL_EXECUTION_DISABLED');
+  assert.equal(harness.hostAgentCalls, 0);
+});
+
+test('real advisory stops on second observation request or stale diagnosis', async () => {
+  for (const scenario of ['second', 'stale']) {
+    const harness = serviceHarness();
+    const health = failedXrayHealth();
+    let calls = 0;
+    let snapshotCalls = 0;
+    harness.service.evidenceCollector = {
+      client: { async request() { snapshotCalls += 1; return { result: { state: 'succeeded', data: scenario === 'stale'
+        ? { ...health, xray: { ...health.xray, service: 'healthy', listener: 'healthy' }, diagnosis: { ...health.diagnosis, state: 'healthy', primary: null } }
+        : health } }; } },
+      async collect() { return { evidence: [], truncated: false, digest: 'a'.repeat(64) }; },
+    };
+    harness.service.planner = { async plan() { calls += 1; return validProposal({ decision: 'need_observation', playbookId: null,
+      reasonCode: 'INSUFFICIENT_EVIDENCE', requiredChecks: ['xray_config'], evidenceRefs: ['F1'] }); } };
+    const result = await harness.service.analyzeIncident({ incident: { id: RUN_ID }, health });
+    assert.equal(calls, scenario === 'second' ? 2 : 1);
+    assert.equal(snapshotCalls, 1);
+    assert.equal(result?.decision || null, scenario === 'second' ? 'need_observation' : null);
+    assert.equal([...harness.rows.values()][0].reason_code, scenario === 'second' ? 'OBSERVATION_LIMIT' : 'INCIDENT_STALE');
+    assert.equal(harness.hostAgentCalls, 0);
+  }
 });

@@ -3,6 +3,7 @@ const { CATALOG_VERSION, PROMPT_VERSION } = require('./contracts');
 const { sanitizeEvidence } = require('./evidenceSanitizer');
 const { evaluateProposal } = require('./policy');
 const { playbookById } = require('./playbookCatalog');
+const { collectObservationRound } = require('./observationRound');
 const { sendTelegramText } = require('../../telegram/telegramFormatting');
 
 const CALLBACK_RE = /^vpsup:(allow|reject|details):([a-f0-9-]{36})$/i;
@@ -216,6 +217,27 @@ class VpnSupervisorService {
     let proposal;
     try { proposal = await this.planner.plan(context); }
     catch (_) { await this.repository.fail(id, 'PLANNER_UNAVAILABLE'); return null; }
+    if (proposal.decision === 'need_observation') {
+      const followUp = await collectObservationRound({
+        client: this.evidenceCollector.client,
+        checks: proposal.requiredChecks,
+        originalHealth: health,
+        originalFacts: context.facts,
+        clock: this.clock,
+      });
+      if (followUp.state !== 'ready') {
+        const reason = { stale: 'INCIDENT_STALE', invalid: 'OBSERVATION_INVALID', unavailable: 'OBSERVATION_UNAVAILABLE' }[followUp.state]
+          || 'OBSERVATION_UNAVAILABLE';
+        await this.repository.fail(id, reason);
+        return null;
+      }
+      try { proposal = await this.planner.plan({ ...context, facts: followUp.facts }); }
+      catch (_) { await this.repository.fail(id, 'PLANNER_UNAVAILABLE'); return null; }
+      if (proposal.decision === 'need_observation') {
+        await this.repository.fail(id, 'OBSERVATION_LIMIT');
+        return proposal;
+      }
+    }
     const playbook = playbookById(proposal.playbookId);
     const highConfidenceProposal = proposal.decision === 'propose'
       && proposal.confidence === 'high'
