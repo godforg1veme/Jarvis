@@ -162,8 +162,12 @@ See `docs/README.md` for current implementation status and historical records.
   deterministically classifies one primary cause from the bounded
   `vpn.health.snapshot`; Jarvis Server cross-validates and debounces it, then an
   isolated planner may use the configured Jarvis model path with sanitized,
-  bounded node-local logs. The response must match a strict seven-field schema
-  and a closed playbook catalog. Real repair playbooks remain disabled. Only
+  bounded node-local logs. One `need_observation` response can trigger exactly
+  one closed read-only `vpn.health.snapshot` against the same node; a changed
+  incident revision, invalid snapshot, or second request stops planning. The
+  response must match a strict seven-field schema and a closed playbook catalog.
+  Cross-node real client protocol probes are not yet deployed. Real repair
+  playbooks remain disabled. Only
   `supervisor_acceptance_noop` can execute, after a fresh owner Telegram
   confirmation, and it never calls Host Agent.
 - Host Agent mutation claims are persisted before execution. An interrupted

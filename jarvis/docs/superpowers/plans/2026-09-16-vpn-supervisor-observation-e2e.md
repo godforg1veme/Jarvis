@@ -10,6 +10,11 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-16-vpn-supervisor-cross-node-probes-design.md` (Diagnostic follow-up and Safe failure E2E); existing advisory contract in `docs/superpowers/specs/2026-09-16-vpn-supervisor-llm-advisory-design.md`.
 
+**Status:** Core read-only follow-up and two-node synthetic fault E2E
+implemented and deployed on 2026-09-16. Cross-node authenticated client probes
+remain separate pending work. Existing owner approval/replay/unknown-outcome
+regression tests passed in the full server suite; no live VPN fault was injected.
+
 This is the first of two independent implementation plans from the approved
 spec. Cross-node client probes, credential provisioning, and probe rollout get
 their own plan and test cycle after this server-only milestone.

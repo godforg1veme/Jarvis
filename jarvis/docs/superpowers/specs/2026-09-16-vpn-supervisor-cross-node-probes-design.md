@@ -2,7 +2,9 @@
 
 **Date:** 2026-09-16
 
-**Status:** Design and written specification approved by the owner; implementation pending.
+**Status:** Design and written specification approved by the owner. The bounded
+diagnostic follow-up and synthetic two-node fault E2E were deployed on
+2026-09-16; authenticated cross-node client probes remain pending.
 
 ## Goal and boundary
 

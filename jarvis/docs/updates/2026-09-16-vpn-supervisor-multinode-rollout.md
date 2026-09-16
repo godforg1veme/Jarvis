@@ -50,3 +50,27 @@ timestamps remained unchanged on both VPSs.
 Real repair execution and key rotation remain future milestones. Any future key
 rotation must identify the affected node/device and reason in Telegram and must
 receive a separate owner button confirmation.
+
+## Bounded diagnostic follow-up (later on 2026-09-16)
+
+The server now handles one LLM `need_observation` request by taking a fresh,
+validated, read-only `vpn.health.snapshot` from the affected node. It passes
+only requested allowlisted status facts to one additional model call. Empty or
+duplicate requests, a changed incident revision, invalid/unavailable snapshot,
+or a second `need_observation` stop without executing any repair.
+
+Local server tests passed 461/461. Host Agent tests passed 79/79 on each VPS.
+The production image passed 33/33 focused VPN tests, including simulated
+DE/Xray and NL/Hysteria2 end-to-end faults, hostile log evidence, and a
+repeated observation request. The first smoke check immediately after the
+server-only container replacement received a transient 502 while health was
+starting. The subsequent checks passed, and the container became healthy.
+Both Operations hosts and all four VPN services were healthy, with zero open
+`vpn.*` incidents. Xray, Hysteria2, and Host Agent activation timestamps and
+restart counters remained unchanged on both nodes. The rollback source files
+and pre-change server image were retained on DE.
+
+This deployment does **not** include the cross-node authenticated client
+probes. `protocolProbe` remains `unknown` until separate test identities and
+the probe runner are safely provisioned and verified. No VPN key or service was
+changed by this rollout.
