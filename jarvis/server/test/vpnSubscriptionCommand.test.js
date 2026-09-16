@@ -108,8 +108,8 @@ test('VpnCommandService handles sub-menu, sub-new, sub-rotate, and sub-revoke fl
   // 2. Create subscription
   const createRes = await service.handleCallback({ data: 'vpn:sub:new', userId: '100' });
   assert.match(createRes.answer, /Умная подписка Jarvis VPN создана/i);
-  assert.match(createRes.answer, /все совместимые серверы/i);
-  assert.equal(createRes.buttons[0][0].url, 'https://jarvis.rilora.ru/happ-sub/sub_testtoken12345');
+  assert.match(createRes.answer, /выпустите связанные доступы/i);
+  assert.equal(createRes.buttons[0][0].data, 'vpn:sub:repair:11111111-2222-3333-4444-555555555555');
 
   // 3. The subscription entry stays a list even with one active profile.
   const oneProfileMenu = await service.handleCallback({ data: 'vpn:sub:menu', userId: '100' });

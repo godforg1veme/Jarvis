@@ -98,6 +98,8 @@ function parseVpnCallback(value) {
   if (match) return { action: 'sub-rotate', subscriptionId: match[1] };
   match = /^vpn:sub:revoke:([a-f0-9-]{36})$/.exec(data);
   if (match) return { action: 'sub-revoke', subscriptionId: match[1] };
+  match = /^vpn:sub:repair:([a-f0-9-]{36})$/.exec(data);
+  if (match) return { action: 'sub-repair', subscriptionId: match[1] };
   if (data === 'vpn:probe:menu') return { action: 'probe-menu' };
   if (data === 'vpn:probe:enable') return { action: 'probe-enable' };
   if (data === 'vpn:probe:disable') return { action: 'probe-disable' };
@@ -769,6 +771,7 @@ class VpnCommandService {
     }
     const record = await this.repository.approve({ userId: context.userId, requestId, originChannel: context.originChannel, originDeviceId: context.originDeviceId || null });
     if (!record) throw publicError('VPN_CONFIRMATION_UNAVAILABLE');
+    if (record.action === 'subscription.repair') return this._decideSubscriptionRepair(record, context);
     if (record.action.startsWith('probe.')) return this._decideProbe(record, context);
     const node = normalizeNode(record.arguments?.node || 'de');
     const protocol = normalizeProtocol(record.arguments?.protocol);
@@ -848,6 +851,7 @@ class VpnCommandService {
     if (callback.action === 'sub-new') return this._createSubscription(context);
     if (callback.action === 'sub-rotate') return this._rotateSubscription(callback.subscriptionId, context);
     if (callback.action === 'sub-revoke') return this._revokeSubscription(callback.subscriptionId, context);
+    if (callback.action === 'sub-repair') return this._createSubscriptionRepair(callback.subscriptionId, context);
 
     if (callback.action === 'menu') {
       return callback.protocol
@@ -962,6 +966,20 @@ class VpnCommandService {
       };
     }
 
+    const isBound = this.subscriptionService.hasCompleteClientBinding?.(sub);
+    if (!isBound) {
+      return {
+        answer: '📲 **Подписка Jarvis VPN**\n\n' +
+          `Профиль: **${sub.label}**\n\n` +
+          'Для этого профиля ещё не выпущены связанные доступы DE/NL. Ссылка Happ сохранится, но серверы станут доступны только после восстановления.\n\n' +
+          'Нажмите «Восстановить доступы», затем подтвердите выпуск четырёх отдельных серверных доступов.',
+        buttons: [
+          [{ text: '🛠 Восстановить доступы', data: `vpn:sub:repair:${sub.id}` }],
+          [{ text: '🗑 Отозвать подписку', data: `vpn:sub:revoke:${sub.id}` }],
+          [{ text: '« К подпискам', data: 'vpn:sub:menu' }],
+        ],
+      };
+    }
     return {
       answer: '📲 **Умная подписка Jarvis VPN**\n\n' +
         `Профиль: **${sub.label}**\n` +
@@ -972,6 +990,7 @@ class VpnCommandService {
         '3. 🇩🇪 Германия VLESS REALITY (TCP 8443)\n' +
         '4. 🇳🇱 Нидерланды VLESS REALITY (TCP 8443)\n\n' +
         'Одна ссылка добавляет все совместимые серверы этого профиля. Happ получает изменения при обновлении подписки.\n\n' +
+        'Для обычного обновления откройте Happ и нажмите обновление подписки — ссылка и доступы не меняются.\n\n' +
         'Чтобы выпустить ссылку для нового устройства, нажмите кнопку ниже. Старая ссылка будет аннулирована.',
       buttons: [
         [{ text: '🔄 Выпустить новую ссылку', data: `vpn:sub:rotate:${sub.id}` }],
@@ -998,15 +1017,59 @@ class VpnCommandService {
         '2. 🇳🇱 Нидерланды Hysteria 2 (UDP 20000-50000)\n' +
         '3. 🇩🇪 Германия VLESS REALITY (TCP 8443)\n' +
         '4. 🇳🇱 Нидерланды VLESS REALITY (TCP 8443)\n\n' +
-        'Одна ссылка добавляет все совместимые серверы этого профиля. Happ будет получать изменения при обновлении подписки.\n\n' +
-        `🔑 Ссылка для Happ:\n\`${created.url}\`\n\n` +
-        'Нажмите кнопку ниже для добавления в Happ в 1 клик:',
+        'Сначала выпустите связанные доступы DE/NL и подтвердите действие. После этого одна ссылка добавит все серверы, а Happ будет обновлять их по той же ссылке.\n\n',
       buttons: [
-        [{ text: '🚀 Активировать в Happ (1 клик)', url: created.happUrl }],
-        [{ text: '🔄 Обновить токен', data: `vpn:sub:rotate:${created.id}` }, { text: '🗑 Отозвать', data: `vpn:sub:revoke:${created.id}` }],
+        [{ text: '🛠 Восстановить доступы', data: `vpn:sub:repair:${created.id}` }],
+        [{ text: '🗑 Отозвать', data: `vpn:sub:revoke:${created.id}` }],
         [{ text: '« К подпискам', data: 'vpn:sub:menu' }],
       ],
     };
+  }
+
+  async _createSubscriptionRepair(subscriptionId, context) {
+    const sub = await this.subscriptionService?.repository?.findById(subscriptionId);
+    if (!sub || sub.revokedAt || sub.userId !== context.userId) return { answer: 'Подписка не найдена или отозвана.', buttons: [[{ text: '« К подпискам', data: 'vpn:sub:menu' }]] };
+    const id = crypto.randomUUID();
+    const args = { subscriptionId };
+    const fingerprint = crypto.createHash('sha256').update(JSON.stringify({ action: 'subscription.repair', args })).digest();
+    const record = await this.repository.create({
+      id, userId: context.userId, conversationId: context.conversationId, originChannel: context.originChannel,
+      originDeviceId: context.originDeviceId || null, action: 'subscription.repair', arguments: args, fingerprint,
+      expiresAt: new Date(this.now().getTime() + CONFIRMATION_TTL_MS),
+    });
+    return {
+      answer: `Выпустить новые связанные доступы DE/NL для подписки «${sub.label}»? Ссылка Happ останется прежней; после подтверждения обновите её в Happ.`,
+      buttons: [[{ text: '✅ Подтвердить', data: `vpn:confirm:${record.id}` }, { text: '✖️ Отмена', data: `vpn:reject:${record.id}` }]],
+    };
+  }
+
+  async _decideSubscriptionRepair(record, context) {
+    const sub = await this.subscriptionService?.repository?.findById(record.arguments?.subscriptionId);
+    if (!sub || sub.revokedAt || sub.userId !== context.userId) {
+      await this.repository.complete({ requestId: record.id, status: 'failed', errorCode: 'SUBSCRIPTION_NOT_FOUND' });
+      return { answer: 'Подписка не найдена или отозвана.', buttons: [[{ text: '« К подпискам', data: 'vpn:sub:menu' }]] };
+    }
+    const clientIds = { de: {}, nl: {} };
+    const issued = [];
+    const label = `Подписка ${sub.id.slice(0, 8)}`;
+    try {
+      for (const [node, protocol] of [['de', 'hysteria2'], ['de', 'vless'], ['nl', 'hysteria2'], ['nl', 'vless']]) {
+        const response = await this._request(hostOperation('issue', protocol), { label }, crypto.randomUUID(), node);
+        const clientId = response?.result?.state === 'succeeded' ? response.result.data?.client?.id : null;
+        if (!CLIENT_ID_RE.test(String(clientId || ''))) throw new Error(response?.result?.state === 'unknown' ? 'UNKNOWN' : 'ISSUE_FAILED');
+        clientIds[node][protocol === 'hysteria2' ? 'hy2' : 'vless'] = clientId;
+        issued.push({ node, protocol, clientId });
+      }
+      await this.subscriptionService.bindClientIds({ subscriptionId: sub.id, userId: context.userId, clientIds });
+      await this.repository.complete({ requestId: record.id, status: 'succeeded', result: { subscriptionId: sub.id, repairedNodes: ['de', 'nl'] } });
+      await this.repository.audit({ userId: context.userId, requestId: record.id, type: 'vpn.subscription.repaired', metadata: { subscriptionId: sub.id } });
+      return { answer: '✅ Доступы DE/NL выпущены и привязаны к подписке. Откройте Happ и обновите эту же подписку — её ссылка не изменилась.', buttons: [[{ text: '« К подписке', data: `vpn:sub:view:${sub.id}` }]] };
+    } catch (error) {
+      for (const item of issued) await this._request(hostOperation('revoke', item.protocol), { clientId: item.clientId }, crypto.randomUUID(), item.node).catch(() => {});
+      const unknown = error?.message === 'UNKNOWN';
+      await this.repository.complete({ requestId: record.id, status: unknown ? 'unknown' : 'failed', errorCode: unknown ? 'SUBSCRIPTION_REPAIR_UNKNOWN' : 'SUBSCRIPTION_REPAIR_FAILED' });
+      return { answer: unknown ? 'Результат восстановления неизвестен; повторно доступы не выпускались.' : 'Не удалось восстановить доступы; созданные известные доступы отозваны.', buttons: [[{ text: '« К подписке', data: `vpn:sub:view:${sub.id}` }]] };
+    }
   }
 
   async _rotateSubscription(id, context) {

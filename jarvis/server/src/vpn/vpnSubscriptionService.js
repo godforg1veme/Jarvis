@@ -150,6 +150,14 @@ function extractClientIds(raw) {
   return { hy2: str, vless: str, any: str };
 }
 
+function hasCompleteClientBinding(record) {
+  const complete = (raw) => {
+    const ids = extractClientIds(raw);
+    return /^vpn-[a-f0-9]{12}$/.test(String(ids.hy2 || '')) && /^vpn-[a-f0-9]{12}$/.test(String(ids.vless || ''));
+  };
+  return Boolean(record) && complete(record.client_id_de ?? record.clientIdDe) && complete(record.client_id_nl ?? record.clientIdNl);
+}
+
 class VpnSubscriptionService {
   constructor(options = {}) {
     this.repository = options.repository;
@@ -554,6 +562,7 @@ class VpnSubscriptionService {
 
   async _exportNodeCredentials(record) {
     const result = { deHy2: null, nlHy2: null, deVless: null, nlVless: null };
+    if (!hasCompleteClientBinding(record)) return result;
     const deClient = this.clients?.de;
     const nlClient = this.clients?.nl;
 
@@ -577,7 +586,7 @@ class VpnSubscriptionService {
           }
         } catch (_) {}
       }
-      if (!result.deHy2) {
+      if (!result.deHy2 && !hy2Id) {
         try {
           const listResp = await deClient.request({
             version: 1,
@@ -618,7 +627,7 @@ class VpnSubscriptionService {
           }
         } catch (_) {}
       }
-      if (!result.deVless) {
+      if (!result.deVless && !vlessId) {
         try {
           const listResp = await deClient.request({
             version: 1,
@@ -662,7 +671,7 @@ class VpnSubscriptionService {
           }
         } catch (_) {}
       }
-      if (!result.nlHy2) {
+      if (!result.nlHy2 && !hy2Id) {
         try {
           const listResp = await nlClient.request({
             version: 1,
@@ -703,7 +712,7 @@ class VpnSubscriptionService {
           }
         } catch (_) {}
       }
-      if (!result.nlVless) {
+      if (!result.nlVless && !vlessId) {
         try {
           const listResp = await nlClient.request({
             version: 1,
@@ -757,6 +766,13 @@ class VpnSubscriptionService {
     return this.repository.listByUser(userId, options);
   }
 
+  hasCompleteClientBinding(record) { return hasCompleteClientBinding(record); }
+
+  async bindClientIds({ subscriptionId, userId, clientIds }) {
+    if (!hasCompleteClientBinding({ client_id_de: clientIds?.de, client_id_nl: clientIds?.nl })) throw new Error('SUBSCRIPTION_CLIENT_BINDING_INVALID');
+    return this.repository.bindClients({ id: subscriptionId, userId, clientIdDe: clientIds.de, clientIdNl: clientIds.nl });
+  }
+
   async resolveSubscription(token, { format = null } = {}) {
     if (!token || typeof token !== 'string' || !this.repository) {
       return { status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'SUBSCRIPTION_NOT_FOUND' }) };
@@ -775,6 +791,9 @@ class VpnSubscriptionService {
 
     // Fetch node credentials
     const nodes = await this._exportNodeCredentials(subscription);
+    if (!hasCompleteClientBinding(subscription) || !nodes.deHy2 || !nodes.deVless || !nodes.nlHy2 || !nodes.nlVless) {
+      return { status: 503, contentType: 'application/json; charset=utf-8', body: JSON.stringify({ error: 'SUBSCRIPTION_CLIENT_BINDING_REQUIRED' }) };
+    }
 
     // Fetch probe snapshots if monitor available
     let probeSnapshots = {};

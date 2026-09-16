@@ -148,8 +148,8 @@ test('resolveSubscription uses an explicit format and handles invalid tokens', a
         return {
           id: 'sub-uuid-1',
           label: 'iPhone Max',
-          client_id_de: 'vpn-de-client',
-          client_id_nl: null,
+          client_id_de: JSON.stringify({ hy2: 'vpn-aaaaaaaaaaaa', vless: 'vpn-bbbbbbbbbbbb' }),
+          client_id_nl: JSON.stringify({ hy2: 'vpn-cccccccccccc', vless: 'vpn-dddddddddddd' }),
         };
       }
       return null;
@@ -178,6 +178,13 @@ test('resolveSubscription uses an explicit format and handles invalid tokens', a
             },
           };
         }
+        return { result: { state: 'failed' } };
+      },
+    },
+    nl: {
+      request: async ({ operation }) => {
+        if (operation === 'vpn.hysteria2.client.export') return { result: { state: 'succeeded', data: { shareUri: 'hy2://u:p@vpn-nl.rilora.ru:443?obfs=salamander&obfs-password=op' } } };
+        if (operation === 'vpn.client.export') return { result: { state: 'succeeded', data: { shareUri: 'vless://uuid@nl.rilora.ru:8443?flow=xtls-rprx-vision&security=reality&pbk=p&sid=s' } } };
         return { result: { state: 'failed' } };
       },
     },

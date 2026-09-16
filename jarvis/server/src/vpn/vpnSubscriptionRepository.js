@@ -124,6 +124,15 @@ class VpnSubscriptionRepository {
     `, [id.trim()]);
   }
 
+  async bindClients({ id, userId, clientIdDe, clientIdNl }) {
+    if (!id || !userId || !clientIdDe || !clientIdNl) throw new Error('Subscription client binding is required');
+    const result = await this.pool.query(`
+      UPDATE vpn_subscriptions SET client_id_de=$1, client_id_nl=$2
+      WHERE id=$3 AND user_id=$4 AND revoked_at IS NULL RETURNING *
+    `, [JSON.stringify(clientIdDe), JSON.stringify(clientIdNl), id, userId]);
+    return mapSubscriptionRow(result.rows?.[0] || null);
+  }
+
   async rotate({ id, userId = null, tokenHash }) {
     if (!id || typeof id !== 'string' || !id.trim()) {
       throw new Error('Subscription id is required');
