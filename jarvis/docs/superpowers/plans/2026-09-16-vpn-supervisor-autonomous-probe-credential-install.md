@@ -54,7 +54,7 @@ def test_rejects_same_node_symlink_and_mismatched_uri(tmp_path):
 
 - [ ] **Step 2: Run the test before implementation**
 
-Run: `PYTHONPATH=host-agent python3 -m unittest host-agent/tests/test_vpn_probe_credentials.py -q`  
+Run: `PYTHONPATH=host-agent python3 -m unittest host-agent/tests/test_vpn_probe_credentials.py -q`
 Expected: FAIL because the module does not exist.
 
 - [ ] **Step 3: Implement closed parsing and atomic write**
@@ -103,7 +103,7 @@ Run:
 $env:PYTHONPATH='host-agent'; python -m unittest host-agent/tests/test_vpn_probe_credentials.py host-agent/tests/test_protocol.py host-agent/tests/test_actions.py -q
 cd server; node --test test/operationsHostAgentProtocol.test.js
 ```
-Expected: PASS.  
+Expected: PASS.
 Commit: `git add host-agent server && git commit -m "feat(vpn): install bounded probe credentials"`.
 
 ### Task 2: Closed probe lifecycle operations
@@ -132,7 +132,7 @@ def test_probe_run_uses_only_fixed_target_instance(run):
 
 - [ ] **Step 2: Run the test before implementation**
 
-Run: `PYTHONPATH=host-agent python3 -m unittest host-agent/tests/test_actions.py -q`  
+Run: `PYTHONPATH=host-agent python3 -m unittest host-agent/tests/test_actions.py -q`
 Expected: FAIL because the operation is undeclared.
 
 - [ ] **Step 3: Implement the fixed systemd calls**
@@ -156,7 +156,7 @@ Run:
 $env:PYTHONPATH='host-agent'; python -m unittest host-agent/tests/test_actions.py host-agent/tests/test_protocol.py -q
 cd server; node --test test/operationsHostAgentProtocol.test.js
 ```
-Expected: PASS.  
+Expected: PASS.
 Commit: `git add host-agent server deploy/vpn && git commit -m "feat(vpn): add probe lifecycle operations"`.
 
 ### Task 3: Owner-confirmed transient handoff
@@ -190,7 +190,7 @@ Cover fixed-label/client mismatch, same node, failed/unknown export, failed dest
 
 - [ ] **Step 2: Run the test before implementation**
 
-Run: `cd server; node --test test/vpnProbeCredentialWorkflow.test.js`  
+Run: `cd server; node --test test/vpnProbeCredentialWorkflow.test.js`
 Expected: FAIL because the workflow module does not exist.
 
 - [ ] **Step 3: Implement the binding registry and handoff**
@@ -216,7 +216,7 @@ cd server
 node --test test/vpnProbeCredentialWorkflow.test.js test/vpnCommandService.test.js test/vpnRecoveryWorker.test.js test/operationsHostAgentProtocol.test.js
 npm test
 ```
-Expected: PASS.  
+Expected: PASS.
 Commit: `git add server && git commit -m "feat(vpn): confirm probe credential handoff"`.
 
 ### Task 4: Safe deployment and live acceptance
@@ -245,7 +245,7 @@ test('an unavailable probe result cannot create a repair approval', async () => 
 
 - [ ] **Step 2: Verify the regression**
 
-Run: `cd server; node --test test/vpnExternalProbeMonitor.test.js`  
+Run: `cd server; node --test test/vpnExternalProbeMonitor.test.js`
 Expected: PASS with no Host Agent mutation.
 
 - [ ] **Step 3: Deploy with timers disabled**
