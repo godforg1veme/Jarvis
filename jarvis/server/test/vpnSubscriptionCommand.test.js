@@ -142,3 +142,36 @@ test('VpnCommandService handles sub-menu, sub-new, sub-rotate, and sub-revoke fl
   const menuAfterRes = await service.handleCallback({ data: 'vpn:sub:menu', userId: '100' });
   assert.match(menuAfterRes.answer, /у вас пока нет активных подписок/i);
 });
+
+test('repair confirmation binds exactly four issued clients and blocks a repeated repair', async () => {
+  const subscriptionId = '11111111-2222-3333-4444-555555555555';
+  const actionId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const sub = { id: subscriptionId, userId: 'owner', label: 'Phone', revokedAt: null };
+  const calls = [];
+  const repository = {
+    async isOwner() { return true; },
+    async hasUnresolvedSubscriptionRepair() { return false; },
+    async create(input) { return { ...input, id: actionId }; },
+    async approve() { return { id: actionId, action: 'subscription.repair', arguments: { subscriptionId } }; },
+    async complete(value) { calls.push(value); },
+    async audit() {},
+  };
+  const subscriptionService = {
+    repository: { async findById() { return sub; } },
+    hasCompleteClientBinding(item) { return Boolean(item.clientIdDe && item.clientIdNl); },
+    async bindClientIds({ clientIds }) { sub.clientIdDe = clientIds.de; sub.clientIdNl = clientIds.nl; return sub; },
+  };
+  let number = 0;
+  const issue = async () => ({ result: { state: 'succeeded', data: { client: { id: `vpn-${String(++number).padStart(12, '0')}` } } } });
+  const service = new VpnCommandService({ repository, subscriptionService, clients: { de: { request: issue }, nl: { request: issue } } });
+  const context = { userId: 'owner', originChannel: 'telegram', conversationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' };
+  const prompt = await service.handleCallback({ ...context, data: `vpn:sub:repair:${subscriptionId}` });
+  assert.match(prompt.answer, /Подтвердить|Выпустить/);
+  const result = await service.handleCallback({ ...context, data: `vpn:confirm:${actionId}` });
+  assert.match(result.answer, /привязаны/);
+  assert.equal(number, 4);
+  assert.equal(calls.at(-1).status, 'succeeded');
+  const repeat = await service.handleCallback({ ...context, data: `vpn:sub:repair:${subscriptionId}` });
+  assert.match(repeat.answer, /уже привязаны/);
+  assert.equal(number, 4);
+});

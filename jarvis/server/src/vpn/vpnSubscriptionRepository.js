@@ -128,7 +128,8 @@ class VpnSubscriptionRepository {
     if (!id || !userId || !clientIdDe || !clientIdNl) throw new Error('Subscription client binding is required');
     const result = await this.pool.query(`
       UPDATE vpn_subscriptions SET client_id_de=$1, client_id_nl=$2
-      WHERE id=$3 AND user_id=$4 AND revoked_at IS NULL RETURNING *
+      WHERE id=$3 AND user_id=$4 AND revoked_at IS NULL
+        AND client_id_de IS NULL AND client_id_nl IS NULL RETURNING *
     `, [JSON.stringify(clientIdDe), JSON.stringify(clientIdNl), id, userId]);
     return mapSubscriptionRow(result.rows?.[0] || null);
   }

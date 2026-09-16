@@ -1029,6 +1029,8 @@ class VpnCommandService {
   async _createSubscriptionRepair(subscriptionId, context) {
     const sub = await this.subscriptionService?.repository?.findById(subscriptionId);
     if (!sub || sub.revokedAt || sub.userId !== context.userId) return { answer: 'Подписка не найдена или отозвана.', buttons: [[{ text: '« К подпискам', data: 'vpn:sub:menu' }]] };
+    if (this.subscriptionService.hasCompleteClientBinding(sub)) return { answer: 'Доступы уже привязаны. Откройте подписку в Happ и нажмите «Обновить».', buttons: [[{ text: '« К подписке', data: `vpn:sub:view:${sub.id}` }]] };
+    if (await this.repository.hasUnresolvedSubscriptionRepair({ userId: context.userId, subscriptionId })) return { answer: 'Восстановление этой подписки уже ожидает подтверждения или проверки результата. Повторный выпуск доступов заблокирован.', buttons: [[{ text: '« К подписке', data: `vpn:sub:view:${sub.id}` }]] };
     const id = crypto.randomUUID();
     const args = { subscriptionId };
     const fingerprint = crypto.createHash('sha256').update(JSON.stringify({ action: 'subscription.repair', args })).digest();
@@ -1049,6 +1051,10 @@ class VpnCommandService {
       await this.repository.complete({ requestId: record.id, status: 'failed', errorCode: 'SUBSCRIPTION_NOT_FOUND' });
       return { answer: 'Подписка не найдена или отозвана.', buttons: [[{ text: '« К подпискам', data: 'vpn:sub:menu' }]] };
     }
+    if (this.subscriptionService.hasCompleteClientBinding(sub)) {
+      await this.repository.complete({ requestId: record.id, status: 'failed', errorCode: 'SUBSCRIPTION_ALREADY_BOUND' });
+      return { answer: 'Доступы уже привязаны. Обновите подписку в Happ.', buttons: [[{ text: '« К подписке', data: `vpn:sub:view:${sub.id}` }]] };
+    }
     const clientIds = { de: {}, nl: {} };
     const issued = [];
     const label = `Подписка ${sub.id.slice(0, 8)}`;
@@ -1060,15 +1066,25 @@ class VpnCommandService {
         clientIds[node][protocol === 'hysteria2' ? 'hy2' : 'vless'] = clientId;
         issued.push({ node, protocol, clientId });
       }
-      await this.subscriptionService.bindClientIds({ subscriptionId: sub.id, userId: context.userId, clientIds });
+      const bound = await this.subscriptionService.bindClientIds({ subscriptionId: sub.id, userId: context.userId, clientIds });
+      if (!bound) throw new Error('BIND_FAILED');
       await this.repository.complete({ requestId: record.id, status: 'succeeded', result: { subscriptionId: sub.id, repairedNodes: ['de', 'nl'] } });
       await this.repository.audit({ userId: context.userId, requestId: record.id, type: 'vpn.subscription.repaired', metadata: { subscriptionId: sub.id } });
       return { answer: '✅ Доступы DE/NL выпущены и привязаны к подписке. Откройте Happ и обновите эту же подписку — её ссылка не изменилась.', buttons: [[{ text: '« К подписке', data: `vpn:sub:view:${sub.id}` }]] };
     } catch (error) {
-      for (const item of issued) await this._request(hostOperation('revoke', item.protocol), { clientId: item.clientId }, crypto.randomUUID(), item.node).catch(() => {});
-      const unknown = error?.message === 'UNKNOWN';
+      // A transport error may mean the host applied the mutation. Never issue
+      // compensating revokes or a second repair until an operator reconciles it.
+      let unknown = error?.message === 'UNKNOWN' || error?.message !== 'ISSUE_FAILED';
+      if (!unknown) {
+        for (const item of issued) {
+          try {
+            const response = await this._request(hostOperation('revoke', item.protocol), { clientId: item.clientId }, crypto.randomUUID(), item.node);
+            if (response?.result?.state !== 'succeeded') unknown = true;
+          } catch (_) { unknown = true; }
+        }
+      }
       await this.repository.complete({ requestId: record.id, status: unknown ? 'unknown' : 'failed', errorCode: unknown ? 'SUBSCRIPTION_REPAIR_UNKNOWN' : 'SUBSCRIPTION_REPAIR_FAILED' });
-      return { answer: unknown ? 'Результат восстановления неизвестен; повторно доступы не выпускались.' : 'Не удалось восстановить доступы; созданные известные доступы отозваны.', buttons: [[{ text: '« К подписке', data: `vpn:sub:view:${sub.id}` }]] };
+      return { answer: unknown ? 'Результат восстановления неизвестен. Повторный выпуск заблокирован до проверки администратором; старую ссылку не удаляйте.' : 'Не удалось восстановить доступы; выпущенные доступы отозваны. Попробуйте ещё раз позже.', buttons: [[{ text: '« К подписке', data: `vpn:sub:view:${sub.id}` }]] };
     }
   }
 

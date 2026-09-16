@@ -39,3 +39,12 @@ Focused command, route, service, and repository tests cover the corrected
 deeplink, normal Happ response, explicit Sing-box request, command aliases,
 and one-profile list behavior. A real Happ import remains a manual device
 acceptance check after deployment.
+
+## Follow-up: initial access binding
+
+Migration 023 permits the closed, owner-confirmed `subscription.repair` action
+used to issue and bind the four client identities for a new subscription. The
+flow compares and sets an unbound profile, so duplicate taps cannot replace an
+existing access set. If any Host Agent mutation has an unknown outcome, the
+subscription is kept blocked for operator reconciliation instead of attempting
+a second issue or an unverified rollback.

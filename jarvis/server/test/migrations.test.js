@@ -31,6 +31,7 @@ test('migration files are ordered and narrowly named', () => {
     '020_vpn_supervisor_advisory.sql',
     '021_vpn_probe_credentials.sql',
     '022_vpn_subscriptions.sql',
+    '023_vpn_subscription_repair_action.sql',
   ]);
 });
 
@@ -41,6 +42,15 @@ test('VPN subscription migration creates owner-scoped subscription table without
   assert.match(migration, /idx_vpn_subscriptions_token_hash/);
   assert.match(migration, /idx_vpn_subscriptions_user/);
   assert.doesNotMatch(migration, /raw_token|private_key|password|credential|secret/i);
+});
+
+test('subscription repair is an allowed confirmed VPN action', () => {
+  const migration = fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, '023_vpn_subscription_repair_action.sql'), 'utf8');
+  assert.match(migration, /'subscription\.repair'/);
+  for (const action of ['issue', 'revoke', 'rotate', 'export', 'restart', 'probe.install', 'probe.rotate', 'probe.enable', 'probe.disable']) {
+    assert.ok(migration.includes(`'${action}'`));
+  }
+  assert.doesNotMatch(migration, /credential|share_uri|password|secret/i);
 });
 
 test('probe credential migration adds only closed VPN action kinds', () => {

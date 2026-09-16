@@ -81,6 +81,19 @@ class VpnRepository {
     return result.rows;
   }
 
+  async hasUnresolvedSubscriptionRepair({ userId, subscriptionId }) {
+    const result = await this.pool.query(`
+      SELECT EXISTS (
+        SELECT 1 FROM vpn_action_requests
+        WHERE user_id=$1 AND action='subscription.repair'
+          AND arguments->>'subscriptionId'=$2
+          AND status IN ('awaiting_confirmation','running','unknown')
+          AND (status<>'awaiting_confirmation' OR expires_at>now())
+      ) AS unresolved
+    `, [userId, subscriptionId]);
+    return result.rows[0]?.unresolved === true;
+  }
+
   async hasVerifiedProbeBindings() {
     const result = await this.pool.query(`
       SELECT COUNT(DISTINCT (arguments->>'sourceNode', arguments->>'protocol'))::int AS count

@@ -13,12 +13,15 @@ UDP port hopping (20000:50000, 30s hop interval) redirecting to port 443 via ipt
 NAT PREROUTING on both German (`87.120.187.109`) and Netherlands (`94.183.208.56`)
 nodes to defeat ISP QUIC port-443 blackholing. Migration 022 (`vpn_subscriptions`)
 persists only SHA-256 token hashes (zero raw secret persistence). Dynamic endpoint
-`GET /sub/:token` serves Sing-box JSON or Base64, demoting probe-degraded nodes
-via `ExternalProbeMonitor`. `GET /happ-sub/:token` provides a 1-click HTML landing
-bridge to `happ://add/sub?url=...`. Telegram `/vpn` exposes «📲 Умная подписка (Happ)»
-with creation, 1-click import, token rotation, and revocation. 495/495 tests pass;
-deployed and verified live on production VPS DE (`87.120.187.202`) and NL (`94.183.208.56`).
-See `updates/2026-09-16-vpn-subscription-network-rollout.md`.
+`GET /sub/:token` serves an ordinary Base64 subscription by default, with explicit
+Sing-box JSON when requested, demoting probe-degraded nodes via
+`ExternalProbeMonitor`. `GET /happ-sub/:token` provides a 1-click HTML landing
+bridge to the Happ subscription deeplink. Telegram `/vpn` exposes «📲 Умная
+подписка (Happ)» as a profile list, with creation, 1-click import, token rotation,
+revocation, and an owner-confirmed first binding of all four server clients.
+Migration 023 additionally permits that closed repair action. A repeated or
+uncertain repair is blocked rather than issuing another access set. See
+`updates/2026-09-16-happ-subscription-compatibility.md`.
 
 Multi-node VPN Supervisor rollout, 2026-09-16: Jarvis now manages separate
 Germany and Netherlands VPN nodes through authenticated local/forwarded Host

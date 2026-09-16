@@ -70,3 +70,11 @@ test('never replays a cross-node probe credential handoff', async () => {
   });
   assert.equal(await worker.reconcile({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', user_id: 'u1', action: 'probe.install' }), false);
 });
+
+test('never infers a four-host subscription repair from the parent action id', async () => {
+  const worker = new VpnRecoveryWorker({
+    repository: { complete: async () => assert.fail('must not complete'), audit: async () => assert.fail('must not audit') },
+    client: { request: async () => assert.fail('must not contact a single Host Agent') },
+  });
+  assert.equal(await worker.reconcile({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', action: 'subscription.repair' }), false);
+});
