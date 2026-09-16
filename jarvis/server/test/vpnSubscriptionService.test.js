@@ -130,16 +130,17 @@ test('buildBase64Profile outputs decodable URI list with port hopping and tags',
   assert.equal(decoded.includes(encodeURIComponent('🇩🇪 Германия (Hysteria 2)')), true);
 });
 
-test('renderHappLandingHtml produces valid HTML with deeplink and token', () => {
+test('renderHappLandingHtml produces the documented Happ deeplink and manual URL', () => {
   const service = new VpnSubscriptionService({ publicUrl: 'https://jarvis.rilora.ru' });
   const html = service.renderHappLandingHtml({ token: 'sub_test123', label: 'Телефон Сени' });
   assert.equal(html.includes('Телефон Сени'), true);
-  assert.equal(html.includes('happ://add/sub?url='), true);
+  assert.equal(html.includes('happ://add/sub?url='), false);
+  assert.equal(html.includes('happ://add/https%3A%2F%2Fjarvis.rilora.ru%2Fsub%2Fsub_test123'), true);
   assert.equal(html.includes('https%3A%2F%2Fjarvis.rilora.ru%2Fsub%2Fsub_test123'), true);
   assert.equal(html.includes('Активировать в Happ'), true);
 });
 
-test('resolveSubscription handles Happ, generic, and invalid tokens', async () => {
+test('resolveSubscription uses an explicit format and handles invalid tokens', async () => {
   let touchedId = null;
   const mockRepo = {
     findActiveByTokenHash: async (hash) => {
@@ -191,21 +192,20 @@ test('resolveSubscription handles Happ, generic, and invalid tokens', async () =
   const notFound = await service.resolveSubscription('sub_invalid');
   assert.equal(notFound.status, 404);
 
-  // 2. Happ User-Agent -> JSON
+  // 2. Happ receives the ordinary auto-refreshing subscription body.
   const happResp = await service.resolveSubscription('sub_valid', { userAgent: 'Happ/3.2.1 (iOS)' });
   assert.equal(happResp.status, 200);
-  assert.equal(happResp.contentType.includes('application/json'), true);
-  const jsonBody = JSON.parse(happResp.body);
-  assert.equal(jsonBody.version, 1);
-  assert.equal(jsonBody.outbounds[0].tag, '⚡ Авто-выбор (Smart Failover)');
+  assert.equal(happResp.contentType.includes('text/plain'), true);
+  assert.equal(Buffer.from(happResp.body, 'base64').toString('utf8').includes('hy2://'), true);
   assert.equal(touchedId, 'sub-uuid-1');
 
-  // 3. Generic User-Agent -> Base64
-  const genericResp = await service.resolveSubscription('sub_valid', { userAgent: 'curl/7.68.0' });
-  assert.equal(genericResp.status, 200);
-  assert.equal(genericResp.contentType.includes('text/plain'), true);
-  const decoded = Buffer.from(genericResp.body, 'base64').toString('utf8');
-  assert.equal(decoded.includes('hy2://'), true);
+  // 3. Sing-box JSON is opt-in and not inferred from a User-Agent.
+  const singboxResp = await service.resolveSubscription('sub_valid', { format: 'sing-box' });
+  assert.equal(singboxResp.status, 200);
+  assert.equal(singboxResp.contentType.includes('application/json'), true);
+  const jsonBody = JSON.parse(singboxResp.body);
+  assert.equal(jsonBody.version, 1);
+  assert.equal(jsonBody.outbounds[0].tag, '⚡ Авто-выбор (Smart Failover)');
 });
 
 test('createSubscription creates db record and returns valid URLs', async () => {

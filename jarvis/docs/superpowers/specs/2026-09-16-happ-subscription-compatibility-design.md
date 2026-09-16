@@ -31,9 +31,9 @@ entry point behave differently depending on the number of profiles.
 - Sing-box-specific JSON remains explicitly available only through a requested
   `format=sing-box` representation. It is not selected from a guessed
   User-Agent.
-- The service will exclude protocol records that Happ cannot import rather than
-  label a broken entry as usable. The response and Telegram copy explain which
-  compatible servers are included and that refresh changes the whole profile.
+- The normal endpoint uses the standard URI-list subscription representation,
+  not an app-specific JSON profile. The response and Telegram copy explain that
+  the configured servers are included and refresh changes the whole profile.
 
 ### Telegram navigation
 

@@ -378,7 +378,7 @@ class VpnSubscriptionService {
 
   renderHappLandingHtml({ token, label }) {
     const subUrl = `${this.publicUrl}/sub/${encodeURIComponent(token)}`;
-    const happDeeplink = `happ://add/sub?url=${encodeURIComponent(subUrl)}`;
+    const happDeeplink = `happ://add/${encodeURIComponent(subUrl)}`;
     const safeLabel = String(label || 'Устройство').replace(/[<>&"']/g, '');
 
     return `<!DOCTYPE html>
@@ -757,7 +757,7 @@ class VpnSubscriptionService {
     return this.repository.listByUser(userId, options);
   }
 
-  async resolveSubscription(token, { userAgent = '', format = null } = {}) {
+  async resolveSubscription(token, { format = null } = {}) {
     if (!token || typeof token !== 'string' || !this.repository) {
       return { status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'SUBSCRIPTION_NOT_FOUND' }) };
     }
@@ -788,10 +788,7 @@ class VpnSubscriptionService {
       } catch (_) {}
     }
 
-    const ua = String(userAgent || '').toLowerCase();
-    const isSingbox = format === 'json' || ua.includes('happ') || ua.includes('sing-box');
-
-    if (isSingbox && format !== 'base64') {
+    if (String(format || '').toLowerCase() === 'sing-box') {
       const profile = this.buildSingboxProfile({ nodes, probeSnapshots });
       return {
         status: 200,

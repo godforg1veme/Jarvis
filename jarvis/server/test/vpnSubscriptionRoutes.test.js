@@ -28,15 +28,15 @@ test('GET /sub/:token returns 404 for unknown token', async (t) => {
   assert.equal(JSON.parse(response.body).error, 'SUBSCRIPTION_NOT_FOUND');
 });
 
-test('GET /sub/:token returns 200 JSON for Happ user agent', async (t) => {
+test('GET /sub/:token returns the ordinary subscription for Happ user agent', async (t) => {
   const mockSvc = {
     resolveSubscription: async (token, { userAgent }) => {
       assert.equal(token, 'sub_active123');
       assert.match(userAgent, /Happ/);
       return {
         status: 200,
-        contentType: 'application/json; charset=utf-8',
-        body: JSON.stringify({ version: 1, outbounds: [{ tag: '⚡ Авто-выбор (Smart Failover)' }] }),
+        contentType: 'text/plain; charset=utf-8',
+        body: Buffer.from('vless://fixture@vpn.rilora.ru:8443', 'utf8').toString('base64'),
       };
     },
   };
@@ -49,10 +49,8 @@ test('GET /sub/:token returns 200 JSON for Happ user agent', async (t) => {
     headers: { 'user-agent': 'Happ/3.2.0 (iOS)' },
   });
   assert.equal(response.statusCode, 200);
-  assert.match(response.headers['content-type'], /application\/json/);
-  const json = JSON.parse(response.body);
-  assert.equal(json.version, 1);
-  assert.equal(json.outbounds[0].tag, '⚡ Авто-выбор (Smart Failover)');
+  assert.match(response.headers['content-type'], /text\/plain/);
+  assert.match(Buffer.from(response.body, 'base64').toString('utf8'), /^vless:\/\//);
 });
 
 test('GET /sub/:token returns 200 text/plain Base64 for curl user agent', async (t) => {
@@ -80,7 +78,7 @@ test('GET /sub/:token returns 200 text/plain Base64 for curl user agent', async 
   assert.ok(decoded.includes('hy2://test@vpn.rilora.ru:20000-50000'));
 });
 
-test('GET /happ-sub/:token serves 1-click landing HTML with deeplink', async (t) => {
+test('GET /happ-sub/:token serves a landing page with the documented Happ deeplink', async (t) => {
   const token = 'sub_active123';
   const mockSvc = {
     repository: {
@@ -90,7 +88,7 @@ test('GET /happ-sub/:token serves 1-click landing HTML with deeplink', async (t)
       },
     },
     renderHappLandingHtml: ({ token, label }) => {
-      return `<html><body><h1>Подписка Jarvis VPN</h1><a href="happ://add/sub?url=https://jarvis.rilora.ru/sub/${token}">Активировать</a><span>${label}</span></body></html>`;
+      return `<html><body><h1>Подписка Jarvis VPN</h1><a href="happ://add/https%3A%2F%2Fjarvis.rilora.ru%2Fsub%2F${token}">Активировать</a><span>${label}</span></body></html>`;
     },
   };
   const app = buildApp({ config: testConfig(), vpnSubscriptionService: mockSvc });
@@ -102,6 +100,6 @@ test('GET /happ-sub/:token serves 1-click landing HTML with deeplink', async (t)
   });
   assert.equal(response.statusCode, 200);
   assert.match(response.headers['content-type'], /text\/html/);
-  assert.ok(response.body.includes('happ://add/sub?url=https://jarvis.rilora.ru/sub/sub_active123'));
+  assert.ok(response.body.includes('happ://add/https%3A%2F%2Fjarvis.rilora.ru%2Fsub%2Fsub_active123'));
   assert.ok(response.body.includes('Тестовый iPhone'));
 });

@@ -108,24 +108,37 @@ test('VpnCommandService handles sub-menu, sub-new, sub-rotate, and sub-revoke fl
   // 2. Create subscription
   const createRes = await service.handleCallback({ data: 'vpn:sub:new', userId: '100' });
   assert.match(createRes.answer, /Умная подписка Jarvis VPN создана/i);
+  assert.match(createRes.answer, /все совместимые серверы/i);
   assert.equal(createRes.buttons[0][0].url, 'https://jarvis.rilora.ru/happ-sub/sub_testtoken12345');
 
-  // 3. Rotate token
+  // 3. The subscription entry stays a list even with one active profile.
+  const oneProfileMenu = await service.handleCallback({ data: 'vpn:sub:menu', userId: '100' });
+  assert.match(oneProfileMenu.answer, /Ваши умные подписки/i);
+  assert.equal(oneProfileMenu.buttons[0][0].data, 'vpn:sub:view:11111111-2222-3333-4444-555555555555');
+
+  // 4. Both command aliases enter that same list.
+  for (const text of ['/vpn_sub', '/vpn_subscriptions']) {
+    const result = await service.handle({ text, userId: '100' });
+    assert.match(result.answer, /Ваши умные подписки/i);
+  }
+
+  // 5. Rotate token
   const rotateRes = await service.handleCallback({
     data: 'vpn:sub:rotate:11111111-2222-3333-4444-555555555555',
     userId: '100',
   });
   assert.match(rotateRes.answer, /Токен подписки обновлен/i);
+  assert.match(rotateRes.answer, /все совместимые серверы/i);
   assert.equal(rotateRes.buttons[0][0].url, 'https://jarvis.rilora.ru/happ-sub/sub_rotatedtoken67890');
 
-  // 4. Revoke subscription
+  // 6. Revoke subscription
   const revokeRes = await service.handleCallback({
     data: 'vpn:sub:revoke:11111111-2222-3333-4444-555555555555',
     userId: '100',
   });
   assert.match(revokeRes.answer, /Подписка отозвана/i);
 
-  // 5. Menu after revoke has 0 active
+  // 7. Menu after revoke has 0 active
   const menuAfterRes = await service.handleCallback({ data: 'vpn:sub:menu', userId: '100' });
   assert.match(menuAfterRes.answer, /у вас пока нет активных подписок/i);
 });
