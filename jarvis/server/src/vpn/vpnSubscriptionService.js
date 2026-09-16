@@ -331,8 +331,11 @@ class VpnSubscriptionService {
       if (parsed.obfsPassword) query.set('obfs-password', parsed.obfsPassword);
       if (parsed.sni) query.set('sni', parsed.sni);
       if (parsed.insecure) query.set('insecure', '1');
-      query.set('mport', ports);
-      return `hy2://${encodeURIComponent(parsed.auth)}@${parsed.host}:${ports}/?${query.toString()}#${encodeURIComponent(tag)}`;
+      query.set('mportHopInt', '30');
+      const auth = parsed.user && parsed.password
+        ? `${encodeURIComponent(parsed.user)}:${encodeURIComponent(parsed.password)}`
+        : encodeURIComponent(parsed.auth);
+      return `hy2://${auth}@${parsed.host}:${ports}/?${query.toString()}#${encodeURIComponent(tag)}`;
     };
 
     // Helper to format vless with tag

@@ -18,7 +18,7 @@ sudo find "${agent_root}" -type d -exec chmod 0755 {} +
 sudo find "${agent_root}" -type f -exec chmod 0644 {} +
 
 echo "==> Running Host Agent unit tests on VPS..."
-PYTHONPATH="${agent_root}" /usr/bin/python3 -m unittest discover -s "${agent_root}/tests"
+sudo env PYTHONPATH="${agent_root}" /usr/bin/python3 -m unittest discover -s "${agent_root}/tests"
 
 echo "==> Restarting jarvis-host-agent.service..."
 sudo systemctl restart jarvis-host-agent

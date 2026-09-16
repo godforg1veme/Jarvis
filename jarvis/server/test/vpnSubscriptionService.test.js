@@ -125,7 +125,10 @@ test('buildBase64Profile outputs decodable URI list with port hopping and tags',
 
   const decoded = Buffer.from(base64, 'base64').toString('utf8');
   assert.equal(decoded.includes('vpn-de.rilora.ru:20000-50000'), true);
-  assert.equal(decoded.includes('mport=20000-50000'), true);
+  assert.equal(decoded.includes(':20000-50000/'), true);
+  assert.equal(decoded.includes('mportHopInt=30'), true);
+  assert.equal(decoded.includes('u1:p1@'), true);
+  assert.equal(decoded.includes('u1%3Ap1@'), false);
   assert.equal(decoded.includes('vless://uuid-de@jarvis.rilora.ru:8443'), true);
   assert.equal(decoded.includes(encodeURIComponent('🇩🇪 Германия (Hysteria 2)')), true);
 });

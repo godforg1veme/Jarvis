@@ -65,3 +65,11 @@ health checks. Read-only Host Agent exports succeeded for all four clients of
 the active profile. Two older assistant messages containing subscription URLs
 were redacted in PostgreSQL; a follow-up count found zero such URLs in message
 history. A live tap on the new Happ button remains a device acceptance check.
+
+Hysteria 2 follow-up on 2026-09-17: both server processes and UDP redirect rules
+were active, but the NL Host Agent exported the DE hostname while using NL
+credentials. Host Agent exports now connect to the node's own address with the
+certificate hostname in SNI. The Happ Base64 subscription keeps userpass as
+`username:password` and encodes the port-hopping interval with Happ's documented
+`mportHopInt` parameter. A real phone test is still required to confirm latency
+and traffic on both mobile and Wi-Fi networks.

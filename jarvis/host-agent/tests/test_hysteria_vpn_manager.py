@@ -100,6 +100,7 @@ class HysteriaVpnManagerTests(unittest.TestCase):
         self.assertTrue(result["shareUri"].startswith("hy2://"))
         self.assertIn("obfs=salamander", result["shareUri"])
         self.assertIn("sni=vpn.example.com", result["shareUri"])
+        self.assertIn("@203.0.113.11:443/", result["shareUri"])
         listing = json.dumps(self.manager.clients())
         self.assertNotIn("password", listing)
         self.assertNotIn(base_state()["obfsPassword"], listing)

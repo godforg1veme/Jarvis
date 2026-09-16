@@ -336,7 +336,7 @@ class HysteriaVpnManager:
         state = validate_hysteria_state(state)
         query = f'obfs=salamander&obfs-password={quote(state["obfsPassword"], safe="")}&sni={quote(state["serverName"], safe="")}'
         auth = f'{quote(client["id"], safe="")}:{quote(client["password"], safe="")}'
-        return f'hy2://{auth}@{state["serverName"]}:{state["port"]}/?{query}#{quote(client["label"], safe="")}'
+        return f'hy2://{auth}@{state["address"]}:{state["port"]}/?{query}#{quote(client["label"], safe="")}'
 
     def status(self) -> dict[str, Any]:
         try:
