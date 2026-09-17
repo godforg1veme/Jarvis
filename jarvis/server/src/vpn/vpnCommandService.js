@@ -604,7 +604,7 @@ class VpnCommandService {
         const formatExternal = (item) => item.status === 'healthy' ? '✅ OK'
           : item.status === 'failed' ? '❌ Не прошёл (требует проверки)' : '❓ Нет достоверного результата';
         const probeLines = probe ? [
-          `🌐 Внешняя проба с другого VPS: VLESS 443 ${formatExternal(probe.checks.vless_tcp_443)}, VLESS 8443 ${formatExternal(probe.checks.vless_tcp_8443)}, Hysteria2 443/UDP ${formatExternal(probe.checks.hysteria2_udp_443)}.`,
+          `🌐 Внешняя проба с другого VPS: VLESS 443 ${formatExternal(probe.checks.vless_tcp_443)}, VLESS 8443 ${formatExternal(probe.checks.vless_tcp_8443)}, Hysteria2 443/UDP ${formatExternal(probe.checks.hysteria2_udp_443)}, Hysteria2: hopping-путь ${formatExternal(probe.checks.hysteria2_udp_hop)}.`,
         ] : [];
         if (res.status === 'fulfilled') {
           return [renderNodeHealth(code, res.value.result), ...probeLines].join('\n');

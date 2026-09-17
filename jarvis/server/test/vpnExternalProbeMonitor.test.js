@@ -3,8 +3,13 @@ const test = require('node:test');
 const { ExternalProbeMonitor, validateExternalProbe } = require('../src/operations/vpnSupervisor/externalProbeMonitor');
 
 const NOW = new Date('2026-09-16T12:00:00Z');
-const checks = Object.fromEntries(['vless_tcp_443', 'vless_tcp_8443', 'hysteria2_udp_443'].map((name) => [name, { status: 'healthy', failureCode: null }]));
-const result = (targetNode = 'de', sampledAt = NOW.toISOString()) => ({ version: 1, targetNode, sampledAt, checks });
+const checks = Object.fromEntries(['vless_tcp_443', 'vless_tcp_8443', 'hysteria2_udp_443', 'hysteria2_udp_hop'].map((name) => [name, { status: 'healthy', failureCode: null }]));
+const result = (targetNode = 'de', sampledAt = NOW.toISOString()) => ({
+  version: 1,
+  targetNode,
+  sampledAt,
+  checks: Object.fromEntries(Object.entries(checks).map(([name, value]) => [name, { ...value }])),
+});
 
 test('external probe result is target-bound, fresh and secret-free', () => {
   assert.equal(validateExternalProbe(result(), 'de', NOW).checks.vless_tcp_443.status, 'healthy');
@@ -12,6 +17,15 @@ test('external probe result is target-bound, fresh and secret-free', () => {
     { ...result(), checks: { ...checks, vless_tcp_443: { status: 'failed', failureCode: null } } }]) {
     assert.equal(validateExternalProbe(value, 'de', NOW).checks.vless_tcp_443.status, 'unknown');
   }
+});
+
+test('hop probe is strict and malformed or stale results fail closed', () => {
+  const failed = result();
+  failed.checks.hysteria2_udp_hop = { status: 'failed', failureCode: 'PROXY_CONNECT_FAILURE' };
+  assert.equal(validateExternalProbe(failed, 'de', NOW).checks.hysteria2_udp_hop.status, 'failed');
+  const malformed = result();
+  delete malformed.checks.hysteria2_udp_hop;
+  assert.equal(validateExternalProbe(malformed, 'de', NOW).checks.hysteria2_udp_hop.status, 'unknown');
 });
 
 test('DE is observed only from NL runner, NL only from DE runner; errors fail closed', async () => {
