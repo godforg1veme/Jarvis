@@ -6,14 +6,15 @@ future-tense wording does not override the current architecture in `AGENTS.md`.
 
 Status snapshot: 2026-09-18.
 
-Happ resilient port-pool implementation, 2026-09-18: the working tree now has
+Happ resilient port-pool deployment, 2026-09-18: Jarvis now has
 a closed DE/NL public Hysteria2 port-pool contract, an exact two-request hopping
 probe, and migration 024. Ordinary Happ output uses only a validated finite port
-list and omits the previously used undocumented interval parameter. The code is
-locally tested but not yet production-deployed at this point in the record; the
-real Happ port-hopping and split-routing acceptance remains mandatory after the
-deployment. The current [VPN resilience runbook](VPN_RESILIENCE_RUNBOOK.md)
-defines the evidence order and the no-timer safety boundary.
+list and omits the previously used undocumented interval parameter. The DE server
+and both Host Agents were deployed; migration rows for two four-port pools, public
+smoke, and disabled probe timers were verified. The real Happ port-hopping and
+split-routing acceptance remains mandatory. The current
+[VPN resilience runbook](VPN_RESILIENCE_RUNBOOK.md) defines the evidence order
+and the no-timer safety boundary.
 
 Dynamic VPN Subscription Network & Port Hopping rollout, 2026-09-16: Jarvis
 now generates dynamic Sing-box/Happ subscriptions with four endpoints
