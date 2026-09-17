@@ -8,8 +8,7 @@ CREATE TABLE IF NOT EXISTS vpn_hysteria_port_pools (
     changed_by TEXT NOT NULL CHECK (char_length(changed_by) BETWEEN 1 AND 120)
 );
 
--- Public-only initial pools. They remain inside the pre-existing 20000:50000 UDP
--- allowlist/DNAT range and do not contain a hostname, URI, client, or credential.
+-- Public-only initial pools inside the pre-existing 20000:50000 UDP allowlist/DNAT range.
 INSERT INTO vpn_hysteria_port_pools
   (node_code, generation, ports, hop_interval_seconds, changed_by)
 VALUES

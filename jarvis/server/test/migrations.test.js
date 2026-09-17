@@ -32,7 +32,16 @@ test('migration files are ordered and narrowly named', () => {
     '021_vpn_probe_credentials.sql',
     '022_vpn_subscriptions.sql',
     '023_vpn_subscription_repair_action.sql',
+    '024_vpn_hysteria_port_pools.sql',
   ]);
+});
+
+test('Hysteria port-pool migration stores only bounded public routing metadata', () => {
+  const migration = fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, '024_vpn_hysteria_port_pools.sql'), 'utf8');
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS vpn_hysteria_port_pools/);
+  assert.match(migration, /hop_interval_seconds SMALLINT NOT NULL CHECK \(hop_interval_seconds BETWEEN 5 AND 45\)/);
+  assert.match(migration, /node_code IN \('de', 'nl'\)/);
+  assert.doesNotMatch(migration, /hostname|share_uri|password|credential|secret|token/i);
 });
 
 test('VPN subscription migration creates owner-scoped subscription table without sensitive secret storage', () => {

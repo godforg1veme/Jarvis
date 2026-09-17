@@ -4,7 +4,16 @@ This file is the status authority for project documentation. Specifications and
 plans under `docs/superpowers/` are preserved as decision history; their old
 future-tense wording does not override the current architecture in `AGENTS.md`.
 
-Status snapshot: 2026-09-17.
+Status snapshot: 2026-09-18.
+
+Happ resilient port-pool implementation, 2026-09-18: the working tree now has
+a closed DE/NL public Hysteria2 port-pool contract, an exact two-request hopping
+probe, and migration 024. Ordinary Happ output uses only a validated finite port
+list and omits the previously used undocumented interval parameter. The code is
+locally tested but not yet production-deployed at this point in the record; the
+real Happ port-hopping and split-routing acceptance remains mandatory after the
+deployment. The current [VPN resilience runbook](VPN_RESILIENCE_RUNBOOK.md)
+defines the evidence order and the no-timer safety boundary.
 
 Dynamic VPN Subscription Network & Port Hopping rollout, 2026-09-16: Jarvis
 now generates dynamic Sing-box/Happ subscriptions with four endpoints
@@ -222,6 +231,7 @@ attachment ingestion.
 | `updates/2026-09-15-telegram-life-os-parity.md` | Native Telegram Life OS control surface, migration 019, production rollout, and verification record |
 | `updates/2026-09-15-vpn-supervisor-classifier.md` | Deterministic VPN diagnosis, incident integration, E2E fault simulations, and production rollout record |
 | `VPN_PC_SETUP.md` | Руководство по настройке Hysteria 2 и VLESS на ПК (Windows / macOS) и устранению неполадок |
+| `VPN_RESILIENCE_RUNBOOK.md` | Current Hysteria2/Happ/VLESS diagnostic and acceptance procedure |
 | `CLAUDE.md`, `gemini.md` | Thin pointers to the authoritative agent context |
 | This file | Status and supersession index |
 

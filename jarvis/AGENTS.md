@@ -274,9 +274,12 @@ See `docs/README.md` for current implementation status and historical records.
   one-hour `profile-update-interval`; the label visible in Happ remains a
   client acceptance check when a refresh itself fails.
   Hysteria 2 Host Agent exports connect to each node's `address` while retaining
-  its certificate `serverName` as SNI. Happ subscription URIs preserve the
-  userpass colon and put the UDP port-hopping range in the authority; phone-side
-  latency and traffic remain a manual acceptance check.
+  its certificate `serverName` as SNI. The next deployed subscription revision
+  publishes only a validated finite public port pool in the URI authority and
+  does not rely on an undocumented URI interval parameter. A two-request
+  cross-node hopping probe is required before Hysteria is considered healthy;
+  host data-plane checks and phone-side Happ traffic remain separate acceptance
+  evidence. Probe timers remain disabled.
   NL currently uses a `vpn.rilora.ru` certificate, but public DNS for that name
   points to DE. The existing NL certificate expires on 2026-12-12; unattended
   HTTP-01 renewal on NL is not established. Provision a distinct DNS-only NL

@@ -9,7 +9,10 @@ Date: 2026-09-16
 > and traffic remain unverified on the owner's phone. NL certificate renewal
 > also needs a distinct hostname: `vpn.rilora.ru` resolves to DE. See
 > [compatibility and follow-ups](2026-09-16-happ-subscription-compatibility.md)
-> and the current [status authority](../README.md).
+> and the current [status authority](../README.md). The 2026-09-18
+> [resilience runbook](../VPN_RESILIENCE_RUNBOOK.md) further supersedes this
+> record's full-range/interval assumptions: fixed UDP 443 and DNAT evidence do
+> not establish real Happ hopping acceptance.
 
 ## Outcome
 
