@@ -57,6 +57,8 @@ const { VpnRecoveryWorker } = require('./vpn/vpnRecoveryWorker');
 const { ExternalProbeMonitor } = require('./operations/vpnSupervisor/externalProbeMonitor');
 const { VpnSubscriptionRepository } = require('./vpn/vpnSubscriptionRepository');
 const { VpnSubscriptionService } = require('./vpn/vpnSubscriptionService');
+const { VpnPortPoolRepository } = require('./vpn/vpnPortPoolRepository');
+const { HysteriaPortPoolService } = require('./vpn/hysteriaPortPoolService');
 const { VisionLeaseStore } = require('./vision/visionLeaseStore');
 const { createVisionProvider } = require('./vision/visionProviderFactory');
 const { registerVisionRoutes } = require('./vision/visionRoutes');
@@ -413,10 +415,14 @@ async function createRuntime(config, overrides = {}) {
       const externalProbeMonitor = overrides.externalProbeMonitor || ((vpnClients.de && vpnClients.nl)
         ? new ExternalProbeMonitor({ clients: vpnClients }) : null);
       vpnSubscriptionRepository = overrides.vpnSubscriptionRepository || new VpnSubscriptionRepository(pool);
+      const vpnPortPoolService = overrides.vpnPortPoolService || new HysteriaPortPoolService({
+        repository: overrides.vpnPortPoolRepository || new VpnPortPoolRepository(pool),
+      });
       vpnSubscriptionService = overrides.vpnSubscriptionService || new VpnSubscriptionService({
         repository: vpnSubscriptionRepository,
         clients: vpnClients,
         externalProbeMonitor,
+        portPoolService: vpnPortPoolService,
         publicUrl: config.publicUrl || 'https://jarvis.rilora.ru',
       });
       app.vpnSubscriptionService = vpnSubscriptionService;
