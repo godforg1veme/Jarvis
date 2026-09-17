@@ -21,6 +21,11 @@ from .vpn_external_probe import (
     parse_vless_uri,
     validate_probe_result,
 )
+from .hysteria_port_pool import (
+    PortPoolError,
+    build_hysteria_hop_client_config,
+    validate_port_pool,
+)
 
 
 UNKNOWN = {"status": "unknown", "failureCode": "CHECK_UNAVAILABLE"}
@@ -37,6 +42,19 @@ def _read_credential(directory: Path, name: str) -> str | None:
     except OSError:
         return None
     return value if 0 < len(value) <= 2048 else None
+
+
+def _read_hop_pool(target: str) -> dict | None:
+    """Read a root-owned, public-only JSON pool; credentials stay in LoadCredential files."""
+    raw = os.environ.get("VPN_PROBE_HYSTERIA_HOP_POOL")
+    if raw is None:
+        return None
+    if not 0 < len(raw) <= 512:
+        raise ProbeConfigError()
+    try:
+        return validate_port_pool(json.loads(raw), expected_node=target)
+    except (TypeError, ValueError, PortPoolError):
+        raise ProbeConfigError() from None
 
 
 def _free_port() -> int:
@@ -76,7 +94,11 @@ def _wait_for_proxy(port: int, process: subprocess.Popen, deadline: float) -> bo
     return False
 
 
-def _run_client(config: dict, argv: list[str], expected_exit_ip: str) -> dict:
+def _sleep_for_hop(seconds: int) -> None:
+    time.sleep(seconds)
+
+
+def _run_client(config: dict, argv: list[str], expected_exit_ip: str, *, hop_interval_seconds: int | None = None) -> dict:
     process = None
     try:
         with tempfile.TemporaryDirectory(prefix="jarvis-vpn-probe-") as directory:
@@ -94,6 +116,13 @@ def _run_client(config: dict, argv: list[str], expected_exit_ip: str) -> dict:
                 return dict(UNKNOWN)
             if actual != expected_exit_ip:
                 return {"status": "failed", "failureCode": "EXIT_MISMATCH"}
+            if hop_interval_seconds is not None:
+                _sleep_for_hop(hop_interval_seconds)
+                actual = _curl_ip(port)
+                if actual is None:
+                    return dict(UNKNOWN)
+                if actual != expected_exit_ip:
+                    return {"status": "failed", "failureCode": "EXIT_MISMATCH"}
             return {"status": "healthy", "failureCode": None}
     except (OSError, ValueError, KeyError, subprocess.SubprocessError):
         return dict(UNKNOWN)
@@ -120,7 +149,7 @@ def run_checks(*, target: str, credential_dir: Path, vless_host: str, hysteria_h
         raise ProbeConfigError() from None
     vless_uri = _read_credential(credential_dir, "vless.uri")
     hysteria_uri = _read_credential(credential_dir, "hysteria2.uri")
-    checks = {name: dict(NOT_CONFIGURED) for name in ("vless_tcp_443", "vless_tcp_8443", "hysteria2_udp_443")}
+    checks = {name: dict(NOT_CONFIGURED) for name in ("vless_tcp_443", "vless_tcp_8443", "hysteria2_udp_443", "hysteria2_udp_hop")}
     if _curl_ip(None) is None:
         for name in checks:
             if (name.startswith("vless") and vless_uri) or (name.startswith("hysteria") and hysteria_uri):
@@ -145,6 +174,21 @@ def run_checks(*, target: str, credential_dir: Path, vless_host: str, hysteria_h
                 )
             except ProbeConfigError:
                 checks["hysteria2_udp_443"] = dict(UNKNOWN)
+                parsed = None
+            try:
+                pool = _read_hop_pool(target)
+                if pool is None:
+                    checks["hysteria2_udp_hop"] = dict(NOT_CONFIGURED)
+                elif parsed is None:
+                    checks["hysteria2_udp_hop"] = dict(UNKNOWN)
+                else:
+                    config = build_hysteria_hop_client_config(parsed, _free_port(), pool)
+                    checks["hysteria2_udp_hop"] = _run_client(
+                        config, [hysteria_bin, "client", "--disable-update-check", "--log-level", "error", "--config"],
+                        expected_exit_ip, hop_interval_seconds=pool["hopIntervalSeconds"],
+                    )
+            except (ProbeConfigError, PortPoolError):
+                checks["hysteria2_udp_hop"] = dict(UNKNOWN)
     result = {"version": 1, "targetNode": target, "sampledAt": datetime.now(timezone.utc).isoformat(), "checks": checks}
     return validate_probe_result(result, target, datetime.now(timezone.utc))
 
