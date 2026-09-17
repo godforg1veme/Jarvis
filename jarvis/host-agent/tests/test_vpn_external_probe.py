@@ -73,12 +73,14 @@ class ExternalProbeContractTests(unittest.TestCase):
             "vless_tcp_443": {"status": "healthy", "failureCode": None},
             "vless_tcp_8443": {"status": "unknown", "failureCode": "NOT_CONFIGURED"},
             "hysteria2_udp_443": {"status": "healthy", "failureCode": None},
+            "hysteria2_udp_hop": {"status": "healthy", "failureCode": None},
         }}
         self.assertEqual(validate_probe_result(result, "nl", now)["targetNode"], "nl")
         for bad in ({**result, "targetNode": "de"}, {**result, "secret": "synthetic"},
                     {**result, "sampledAt": "2026-09-16T11:40:00Z"},
                     {**result, "version": True},
-                    {**result, "checks": {**result["checks"], "vless_tcp_443": {"status": "failed", "failureCode": []}}}):
+                    {**result, "checks": {**result["checks"], "vless_tcp_443": {"status": "failed", "failureCode": []}}},
+                    {**result, "checks": {**result["checks"], "hysteria2_udp_hop": {"status": "healthy", "failureCode": "hy2://must-not-appear"}}}):
             with self.assertRaises(ProbeConfigError):
                 validate_probe_result(bad, "nl", now)
 
@@ -93,6 +95,7 @@ class ExternalProbeContractTests(unittest.TestCase):
             invalid = read_probe_result("de", root=root, now=now)
             self.assertNotIn("must-not-leak", json.dumps(invalid))
             self.assertEqual(invalid["checks"]["hysteria2_udp_443"]["status"], "unknown")
+            self.assertEqual(set(invalid["checks"]), {"vless_tcp_443", "vless_tcp_8443", "hysteria2_udp_443", "hysteria2_udp_hop"})
 
 
 if __name__ == "__main__":

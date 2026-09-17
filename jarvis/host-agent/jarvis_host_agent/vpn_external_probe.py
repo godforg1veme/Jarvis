@@ -18,7 +18,7 @@ class ProbeConfigError(ValueError):
         super().__init__("VPN_EXTERNAL_PROBE_INVALID")
 
 
-CHECK_NAMES = frozenset({"vless_tcp_443", "vless_tcp_8443", "hysteria2_udp_443"})
+CHECK_NAMES = frozenset({"vless_tcp_443", "vless_tcp_8443", "hysteria2_udp_443", "hysteria2_udp_hop"})
 FAILURE_CODES = frozenset({
     "NOT_CONFIGURED", "RUNNER_UNAVAILABLE", "CHECK_UNAVAILABLE", "EGRESS_UNAVAILABLE",
     "PROXY_CONNECT_FAILURE", "EXIT_MISMATCH", "HTTP_FAILURE",
