@@ -8,8 +8,8 @@ const {
   parseVlessUri,
 } = require('../src/vpn/vpnSubscriptionService');
 
-const dePool = { nodeCode: 'de', generation: '123e4567-e89b-42d3-a456-426614174000', ports: [20011, 22229, 26549, 30013], hopIntervalSeconds: 15 };
-const nlPool = { nodeCode: 'nl', generation: '223e4567-e89b-42d3-a456-426614174000', ports: [20117, 23483, 27611, 31829], hopIntervalSeconds: 15 };
+const dePool = { nodeCode: 'de', generation: '123e4567-e89b-42d3-a456-426614174000', ports: [20011, 22229, 26549, 30013], hopIntervalSeconds: 30 };
+const nlPool = { nodeCode: 'nl', generation: '223e4567-e89b-42d3-a456-426614174000', ports: [20117, 23483, 27611, 31829], hopIntervalSeconds: 30 };
 
 test('generateToken produces sub_ prefixed 68 char token and valid sha256 hash', () => {
   const { token, tokenHash } = generateToken();
@@ -74,7 +74,7 @@ test('buildSingboxProfile builds valid sing-box JSON with exact priority and por
   const deHy2Outbound = outbounds.find((o) => o.tag === '🇩🇪 Германия (Hysteria 2)');
   assert.equal(deHy2Outbound.server_port, 20011);
   assert.equal(deHy2Outbound.ports, '20011,22229,26549,30013');
-  assert.equal(deHy2Outbound.hop_interval, '15s');
+  assert.equal(deHy2Outbound.hop_interval, '30s');
   assert.equal(deHy2Outbound.obfs.type, 'salamander');
 
   // Check route rules for Russian bypass

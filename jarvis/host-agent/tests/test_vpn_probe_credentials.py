@@ -10,6 +10,7 @@ from jarvis_host_agent.vpn_probe_credentials import (
     ProbeCredentialError,
     _atomic_root_file,
     install_probe_credential,
+    install_probe_environment,
 )
 
 
@@ -47,6 +48,16 @@ class ProbeCredentialStoreTests(unittest.TestCase):
             else:
                 self.assertTrue(path.is_file())
             self.assertNotIn("vless://", str(result))
+
+    def test_installs_public_probe_environment_without_uri_or_credential(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            install_probe_environment(config_for(root), target_node="de")
+            content = (root / "probe-de.env").read_text(encoding="utf-8")
+            self.assertIn("VPN_PROBE_HYSTERIA_HOP_POOL=", content)
+            self.assertIn('"hopIntervalSeconds":30', content)
+            self.assertNotIn("vless://", content)
+            self.assertNotIn("synthetic-password", content)
 
     def test_rejects_same_node_mismatched_host_and_symlink_without_echoing_input(self):
         with tempfile.TemporaryDirectory() as directory:

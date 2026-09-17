@@ -9,7 +9,8 @@ Status snapshot: 2026-09-18.
 Happ resilient port-pool deployment, 2026-09-18: Jarvis now has
 a closed DE/NL public Hysteria2 port-pool contract, an exact two-request hopping
 probe, and migration 024. Ordinary Happ output uses only a validated finite port
-list and omits the previously used undocumented interval parameter. The DE server
+list and omits the previously used undocumented interval parameter. The active
+pools and hopping probe use Happ's 30-second multi-port default. The DE server
 and both Host Agents were deployed; migration rows for two four-port pools, public
 smoke, and disabled probe timers were verified. The real Happ port-hopping and
 split-routing acceptance remains mandatory. The current

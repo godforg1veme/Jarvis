@@ -276,7 +276,8 @@ See `docs/README.md` for current implementation status and historical records.
   Hysteria 2 Host Agent exports connect to each node's `address` while retaining
   its certificate `serverName` as SNI. The current deployed subscription revision
   publishes only a validated finite public port pool in the URI authority and
-  does not rely on an undocumented URI interval parameter. A two-request
+  uses Happ's 30-second multi-port default rather than an undocumented URI
+  interval parameter. A two-request
   cross-node hopping probe is required before Hysteria is considered healthy;
   host data-plane checks and phone-side Happ traffic remain separate acceptance
   evidence. Probe timers remain disabled.

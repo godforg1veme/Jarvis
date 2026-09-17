@@ -5,7 +5,7 @@ const { normalizePortPool } = require('../src/vpn/vpnPortPoolRepository');
 
 const DE_POOL = {
   nodeCode: 'de', generation: '123e4567-e89b-42d3-a456-426614174000',
-  ports: [20011, 22229, 26549, 30013], hopIntervalSeconds: 15, revision: 1,
+  ports: [20011, 22229, 26549, 30013], hopIntervalSeconds: 30, revision: 1,
 };
 
 test('activeForSubscription returns only a bounded public pool per node', async () => {

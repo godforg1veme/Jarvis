@@ -57,4 +57,4 @@ Record only pass/fail, timestamp, node, transport, and next action. The owner-ph
 - [Happ Hysteria2 FAQ](https://github.com/HappDev/happ_su/blob/main/faq/hysteria2.md)
 - [Happ routing documentation](https://github.com/HappDev/happ_su/blob/main/dev-docs/routing.md)
 
-Hysteria2 native hopping supports a multi-port server value and `transport.udp.hopInterval`. Happ compatibility with the emitted list is an owner-device acceptance requirement; the project does not depend on an undocumented URI interval parameter.
+Hysteria2 native hopping supports a multi-port server value and `transport.udp.hopInterval`. Happ compatibility with the emitted list is an owner-device acceptance requirement. Its multi-port import uses the client default 30-second hop interval, so the active public pools and hop probe use 30 seconds; the project does not depend on an undocumented URI interval parameter.

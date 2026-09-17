@@ -33,7 +33,15 @@ test('migration files are ordered and narrowly named', () => {
     '022_vpn_subscriptions.sql',
     '023_vpn_subscription_repair_action.sql',
     '024_vpn_hysteria_port_pools.sql',
+    '025_vpn_hysteria_port_pool_hop_interval.sql',
   ]);
+});
+
+test('Hysteria port-pool interval correction is public-only and idempotent', () => {
+  const migration = fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, '025_vpn_hysteria_port_pool_hop_interval.sql'), 'utf8');
+  assert.match(migration, /SET hop_interval_seconds = 30/);
+  assert.match(migration, /AND hop_interval_seconds = 15/);
+  assert.doesNotMatch(migration, /hostname|share_uri|password|credential|secret|token/i);
 });
 
 test('Hysteria port-pool migration stores only bounded public routing metadata', () => {
