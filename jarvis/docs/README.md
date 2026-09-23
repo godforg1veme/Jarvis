@@ -4,7 +4,7 @@ This file is the status authority for project documentation. Specifications and
 plans under `docs/superpowers/` are preserved as decision history; their old
 future-tense wording does not override the current architecture in `AGENTS.md`.
 
-Status snapshot: 2026-09-23.
+Status snapshot: 2026-09-24.
 
 VPN external-probe acceptance gate, deployed integration source 2026-09-23:
 credential installation is counted only after a fresh, node-matched VLESS 8443
@@ -14,16 +14,23 @@ and failed rotations cannot. Local tests and a read-only production SQL parse
 passed. Activation enables timers sequentially, compensates a second-side
 failure with one closed first-side disable, and never claims success for an
 uncertain outcome. The initial integrated server was deployed on 2026-09-23.
-One owner-confirmed NL-to-DE VLESS test key is now installed, but its original
-probe outcome remains unknown; a new private-chat recheck button is deployed
-and requires separate owner confirmation. No retry, reinstall, or rotation of
-that uncertain action occurred. Three other bindings still require their own
-owner-confirmed checks, and both external-probe timers remain disabled.
+One owner-confirmed NL-to-DE VLESS test key is installed; its original install
+outcome remains unknown. A separate confirmed recheck completed but returned
+`EXIT_MISMATCH`. The likely cause is that the checker derived expected egress
+from the VLESS endpoint while the node's direct egress differs; this mismatch
+is not proof that the tunnel is healthy. The separate expected-egress source
+fix is implemented locally but awaits production config/environment migration
+and deployment. No key was changed. A fresh owner-confirmed recheck is required
+after deployment. Three other bindings still need separate confirmed checks,
+and both timers remain disabled. No 99.9% uptime claim is made.
 The deployed DE/NL timer units were changed to an approximately 15-minute
 repeat interval on 2026-09-23 and verified while still disabled.
 See `updates/2026-09-23-vpn-probe-gate-and-monitor-rollout.md`.
 The credential-safe recheck deployment and current manual acceptance step are
 recorded in `updates/2026-09-23-vpn-probe-credential-recheck-rollout.md`.
+The egress correction design and task plan are
+`superpowers/specs/2026-09-23-vpn-probe-egress-baseline-design.md` and
+`superpowers/plans/2026-09-23-vpn-probe-egress-baseline.md`.
 
 VPN Supervisor owner-approved restarts, 2026-09-23: the deployed server may
 propose only a matching Xray or Hysteria2 service restart after bounded

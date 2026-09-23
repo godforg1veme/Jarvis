@@ -30,22 +30,38 @@ Happ shows n/a or traffic fails
 
 The pool has exactly a node code, generation UUID, four to twelve unique increasing UDP ports inside 20000–50000, and a 5–45 second interval. It never has a hostname, URI, key, password, client ID, or routing rule. The server only publishes a validated pool. The cross-node probe starts a private loopback SOCKS client, completes one proxied HTTPS request, waits one configured interval, and completes a second request. Both must use the expected exit. A fixed-443 result alone cannot publish or restore Hysteria priority.
 
+The corrected Host Agent `probeTarget` schema keeps the VLESS and Hysteria2
+connection endpoints separate from `expectedExitIp`, the target node's public
+egress address. Its generated root-only probe environment takes
+`VPN_PROBE_EXPECTED_EXIT_IP` only from that explicit field. The runner compares
+proxied HTTPS responses against it but never stores or returns the observed IP.
+The expected egress must be independently confirmed and stable; missing or
+invalid configuration fails closed. Do not infer an exit address from either
+service's listener address. The source/config correction is not in production
+until the migration and deployment below have completed.
+
 ## Recovery paths and owner confirmation
 
 For a per-port restriction, retain the subscription URL and use the active port list after its refresh. For a broad UDP restriction, choose a VLESS 8443 entry; a server-side port change cannot bypass an access network that blocks all QUIC/UDP. A changed pool, credentials, DNS, firewall, or probe scheduling requires the existing owner-confirmation boundary. Timers stay disabled until the documented dedicated-credential acceptance has succeeded.
 
-In the deployed server source, each owner-confirmed credential installation counts only after a fresh, node-matched authenticated `vless_tcp_8443` or `hysteria2_udp_hop` check is healthy. Timer activation requires four distinct matching proofs from the latest attempts within 24 hours. Legacy success records without this closed proof, failed rotations, and unknown results do not qualify. At the initial 2026-09-23 rollout no dedicated test credential had yet been installed; current acceptance status is below. The production timers remain disabled.
+In the deployed server source, each owner-confirmed credential installation counts only after a fresh, node-matched authenticated `vless_tcp_8443` or `hysteria2_udp_hop` check is healthy. Timer activation requires four distinct matching proofs from the latest attempts within 24 hours. Legacy success records without this closed proof, failed rotations, and unknown results do not qualify. The earlier 2026-09-23 rollout record captures the state before the first dedicated test credential was installed; current acceptance status is below. The production timers remain disabled.
 
-Current acceptance status (2026-09-23): one owner-confirmed NL-to-DE VLESS
-test credential is installed. Its original install/probe action is still
-`unknown`; the corresponding systemd attempt failed while loading credentials.
-Do not replay that request, reinstall the key, or rotate it to recover. The
-owner can select the NL-to-DE VLESS recheck in the private Telegram VPN
-external-check menu and confirm its fresh request. That action runs only one
-read-only `vless_tcp_8443` check with the existing test key. Three other fixed
-bindings still need separate owner-confirmed checks. See
+Current acceptance status (2026-09-24): one owner-confirmed NL-to-DE VLESS
+test credential is installed. Its original install/probe action remains
+`unknown`; the systemd attempt failed while loading credentials. A separate
+owner-confirmed recheck later completed at 20:30 UTC but failed with
+`EXIT_MISMATCH` for VLESS TCP 443 and 8443. The unit ran successfully; the
+credential was not changed. Source inspection found the checker deriving its
+expected exit from the VLESS connection address even though DE's direct egress
+is different. The explicit-egress-baseline correction is implemented in the
+current source but is not yet deployed. Until deployment and a fresh
+owner-confirmed VLESS 8443 recheck pass, do not treat the VPN path as accepted.
+Do not replay the original request, reinstall the key, or rotate it. Three
+other fixed bindings still need separate owner-confirmed checks. See
 [`2026-09-23 VPN probe recheck rollout`](updates/2026-09-23-vpn-probe-credential-recheck-rollout.md)
-for live deployment evidence and remaining acceptance steps.
+for live deployment evidence and
+[`VPN probe egress baseline design`](superpowers/specs/2026-09-23-vpn-probe-egress-baseline-design.md)
+for the correction. Both production timers remain disabled.
 
 Timer activation enables the NL-to-DE timer first and the DE-to-NL timer second. A first-side failure stops before the second command. If the second command fails or has an unknown outcome, the server sends one closed disable command for the confirmed first timer. A failed or uncertain compensation, or an uncertain second enable, leaves the overall state unknown: inspect both actual systemd timer states before a later owner-confirmed action. Never retry an uncertain enable under a new request ID. This behavior was deployed on 2026-09-23, but no live activation has occurred.
 

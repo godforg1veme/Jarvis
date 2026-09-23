@@ -202,6 +202,15 @@ See `docs/README.md` for current implementation status and historical records.
   device. The systemd unit and Host Agent use the same root-only
   `/etc/jarvis-vpn/probes` directory; the installer may create only a missing
   empty mode-0600 counterpart file and must refuse unsafe paths or overwrite.
+  Host Agent `probeTarget` keeps the VLESS/Hysteria2 connection endpoints
+  separate from a required `expectedExitIp`; generated probe environments use
+  only that explicit egress baseline. The source/config schema correction is
+  implemented but remains pending production config/environment migration and
+  deployment. A 2026-09-23 NL-to-DE VLESS recheck completed with
+  `EXIT_MISMATCH`; the original install remains `unknown`, keys were not
+  changed, and no data-plane acceptance is claimed. Timers stay disabled until
+  the corrected fresh owner-confirmed result and all other proof gates pass.
+  See `docs/superpowers/specs/2026-09-23-vpn-probe-egress-baseline-design.md`.
   `/vpn_health` reports results separately and treats missing, stale, mismatched,
   or ambiguous checks as unknown. External probe failures do not authorize an
   LLM repair or key rotation. The 2026-09-23 deployed server source now

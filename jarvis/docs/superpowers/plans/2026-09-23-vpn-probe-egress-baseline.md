@@ -193,7 +193,7 @@ git commit -m "test(vpn): cover independent probe egress baseline"
 **Interfaces:**
 - Documents the same config field and safety boundary as Tasks 1–3; no runtime API or Telegram contract changes.
 
-- [ ] **Step 1: Update runbook configuration and current acceptance status**
+- [x] **Step 1: Update runbook configuration and current acceptance status**
 
 State that connection addresses and expected egress are separate values and
 that an unknown/unstable expected egress blocks acceptance. Record the latest
@@ -202,7 +202,7 @@ one-shot as failed with `EXIT_MISMATCH`, keep the original install as
 keys were not changed and timers remain disabled. Preserve the four-proof and
 fresh owner-confirmation gates.
 
-- [ ] **Step 2: Update architecture/status references**
+- [x] **Step 2: Update architecture/status references**
 
 Add to `AGENTS.md` that each Host Agent `probeTarget` has separate service
 endpoints and a required root-managed expected egress IP; only the configured
@@ -210,7 +210,7 @@ IP is used as the comparison baseline, and results never reveal observed
 addresses. In `docs/README.md`, link to the runbook and clearly state that
 first binding acceptance remains failed/pending correction, not healthy.
 
-- [ ] **Step 3: Run the complete Host Agent suite and diff checks**
+- [x] **Step 3: Run the complete Host Agent suite and diff checks**
 
 ```powershell
 $env:PYTHONPATH = "host-agent"
