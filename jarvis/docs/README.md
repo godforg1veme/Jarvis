@@ -6,15 +6,16 @@ future-tense wording does not override the current architecture in `AGENTS.md`.
 
 Status snapshot: 2026-09-23.
 
-VPN external-probe acceptance gate, local integration source 2026-09-23:
+VPN external-probe acceptance gate, deployed integration source 2026-09-23:
 credential installation is counted only after a fresh, node-matched VLESS 8443
 or Hysteria2 hopping check succeeds. Only four distinct recent accepted proofs
 from the latest attempts can unlock timer activation; legacy success records
 and failed rotations cannot. Local tests and a read-only production SQL parse
-passed. Local activation now enables timers sequentially, compensates a
-second-side failure with one closed first-side disable, and never claims success
-for an uncertain outcome. These changes are not deployed, no test credential
-is installed, and both external-probe timers remain disabled.
+passed. Activation enables timers sequentially, compensates a second-side
+failure with one closed first-side disable, and never claims success for an
+uncertain outcome. This integrated server source was deployed on 2026-09-23;
+no test credential is installed, and both external-probe timers remain disabled.
+See `updates/2026-09-23-vpn-probe-gate-and-monitor-rollout.md`.
 
 VPN Supervisor owner-approved restarts, 2026-09-23: the deployed server may
 propose only a matching Xray or Hysteria2 service restart after bounded
@@ -51,8 +52,9 @@ safe reply and retain only closed route/outcome/failure codes; raw dialogue,
 callback payloads, exception text, and credentials are excluded from these
 diagnostics. Production already has migrations 024/025 and the general
 classified fallback path. A specific Telegram voice-ASR failure reply now
-correctly says that its transcript was not saved; this last refinement is
-locally tested but not deployed. A real owner text question about the user's
+correctly says that its transcript was not saved; this refinement was deployed
+with the integrated server but has not been tested during a real ASR outage.
+A real owner text question about the user's
 name and a Telegram voice note were accepted on 2026-09-23: both updates
 completed without failure codes, the voice persisted only as `voice_transcript`,
 and the replies did not assert the VPN-profile name as the user's identity.
@@ -279,6 +281,7 @@ attachment ingestion.
 | `updates/2026-09-15-vpn-supervisor-classifier.md` | Deterministic VPN diagnosis, incident integration, E2E fault simulations, and production rollout record |
 | `VPN_SUPERVISOR_REPAIR_GUIDE.md` | Closed AI proposal, owner confirmation, one-shot restart and recovery rules |
 | `updates/2026-09-23-vpn-supervisor-owner-approved-restarts.md` | Real-restart deployment and acceptance boundary |
+| `updates/2026-09-23-vpn-probe-gate-and-monitor-rollout.md` | Verified external-probe gate deployment, disabled timers, and remaining owner acceptance |
 | `VPN_PC_SETUP.md` | Руководство по настройке Hysteria 2 и VLESS на ПК (Windows / macOS) и устранению неполадок |
 | `VPN_RESILIENCE_RUNBOOK.md` | Current Hysteria2/Happ/VLESS diagnostic and acceptance procedure |
 | `CLAUDE.md`, `gemini.md` | Thin pointers to the authoritative agent context |

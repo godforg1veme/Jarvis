@@ -1,9 +1,11 @@
 # Telegram dialogue and button-chain acceptance, 2026-09-23
 
-Status: implementation branch verified locally; production text and voice
-accepted; full real-client menu acceptance and the branch's remaining server
-patch are not yet deployed/accepted. This record separates evidence from
-assumptions.
+Status: the integrated server source containing this branch's remaining patch
+was deployed on 2026-09-23 after 544/544 server tests, production preflight,
+container health, and public smoke passed. Earlier production owner text and
+voice were accepted; post-release live client acceptance, full real-client
+menu acceptance, and member-client checks remain open. This record separates
+evidence from assumptions.
 
 ## What was tested
 
@@ -25,18 +27,16 @@ separately without logging transport exception text or bot-token URLs.
 
 ## Remaining release and client gates
 
-1. Integrate this branch with the concurrent Supervisor source before any
-   server rebuild; a stale Telegram image would overwrite deployed migration
-   026 and real-restart logic. Do not deploy from this branch as-is.
-2. Deploy the branch's voice-ASR failure wording and delivery-failure codes
-   only from a tested integrated source, then run preflight, Compose health,
-   public smoke, and post-deploy log/outcome checks.
-3. The owner tapped the eight non-changing lower-menu paths. Recheck a specific
+1. The Telegram branch was integrated with Supervisor and the combined server
+   source was deployed from `codex/vpn-supervisor-integration` at `f7af2a7`.
+   Preflight, Compose health, public smoke, and a bounded post-release error
+   count passed; no real post-release Telegram delivery was claimed.
+2. The owner tapped the eight non-changing lower-menu paths. Recheck a specific
    inline Back/Cancel only if that user-visible control is in scope for a
    future change; it was not confirmed by the 2026-09-23 evidence. Do not
    issue or confirm VPN/remote/delete actions merely for this acceptance.
-4. A family/member account must separately check its three-row keyboard and
+3. A family/member account must separately check its three-row keyboard and
    owner-only VPN/Operations denial. Fixture tests are not a real member test.
-5. A true Telegram delivery outage and true ASR outage are deliberately not
+4. A true Telegram delivery outage and true ASR outage are deliberately not
    induced in production. Their error paths are covered by isolated E2E tests,
    not claimed as live incident acceptance.

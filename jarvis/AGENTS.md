@@ -191,12 +191,12 @@ See `docs/README.md` for current implementation status and historical records.
   fixed test-device bindings and an origin-bound owner confirmation for each.
   `/vpn_health` reports results separately and treats missing, stale, mismatched,
   or ambiguous checks as unknown. External probe failures do not authorize an
-  LLM repair or key rotation. The 2026-09-23 local integration source now
+  LLM repair or key rotation. The 2026-09-23 deployed server source now
   requires a fresh, node-matched VLESS 8443 or Hysteria2 hopping success before
   an owner-confirmed probe install is accepted. Timer activation counts only
   four distinct latest attempts with matching closed proof in the last 24 hours;
   legacy success records and failed rotations do not qualify. This extra gate
-  is locally tested but not yet deployed. The local activation path enables
+  was deployed with the integrated server on 2026-09-23. Activation enables
   timers sequentially and sends one closed first-side disable if the second
   enable does not confirm success; uncertain outcomes require actual timer-state
   inspection, never blind retry. Production probe timers remain off.
