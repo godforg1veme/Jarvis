@@ -142,7 +142,7 @@ git commit -m "fix(vpn): generate probe exit baseline from config"
 - Consumes: existing `expected_exit_ip` arguments to `run_checks` and `_run_client`.
 - Produces: healthy only when proxied `api.ipify.org` exactly returns that expected IP; a different result stays `EXIT_MISMATCH`.
 
-- [ ] **Step 1: Make runner test fixtures use distinct endpoint and exit IPs**
+- [x] **Step 1: Make runner test fixtures use distinct endpoint and exit IPs**
 
 Set the shared `run_checks` fixture's `expected_exit_ip` to
 `198.51.100.24` while its synthetic VLESS endpoint remains `203.0.113.10`.
@@ -151,7 +151,7 @@ receives `198.51.100.24`. Add a `_run_client` case returning that expected IP
 as healthy and a separate case showing that the endpoint IP
 `203.0.113.10` remains `EXIT_MISMATCH` when it is not the expected egress.
 
-- [ ] **Step 2: Run the focused test to check the new contract**
+- [x] **Step 2: Run the focused test to check the new contract**
 
 ```powershell
 $env:PYTHONPATH = "host-agent"
@@ -162,7 +162,7 @@ Expected: tests demonstrate `run_checks` forwards its explicit expected IP
 independently of both connection hosts. They may already pass because the
 runner accepts this argument today.
 
-- [ ] **Step 3: Make the smallest required runner correction**
+- [x] **Step 3: Make the smallest required runner correction**
 
 Keep `vless_host` and `hysteria_host` only for URI host validation and client
 configuration. Verify `expected_exit_ip` is passed unchanged to every
@@ -170,7 +170,7 @@ configuration. Verify `expected_exit_ip` is passed unchanged to every
 coupling. Never add the observed IP to return values, logs, result files, or
 exceptions.
 
-- [ ] **Step 4: Verify fixed, hop, and closed-result cases**
+- [x] **Step 4: Verify fixed, hop, and closed-result cases**
 
 Run the same focused command. Expected: matching configured egress is healthy,
 wrong egress is `EXIT_MISMATCH`, and serialized results contain only existing

@@ -38,7 +38,7 @@ class ProbeRunnerTests(unittest.TestCase):
     def _run(self):
         return runner.run_checks(target="nl", credential_dir=Path("/not-used"),
                                  vless_host="203.0.113.10", hysteria_host="vpn.example.test",
-                                 expected_exit_ip="203.0.113.10", xray_bin="/usr/local/bin/xray",
+                                 expected_exit_ip="198.51.100.24", xray_bin="/usr/local/bin/xray",
                                  hysteria_bin="/usr/local/bin/hysteria")
 
     def test_runs_fixed_and_hopping_client_probes_and_returns_only_closed_status(self):
@@ -58,6 +58,7 @@ class ProbeRunnerTests(unittest.TestCase):
              patch.object(runner, "_run_client", side_effect=client):
             result = self._run()
         self.assertEqual(len(calls), 4)
+        self.assertEqual({call[2] for call in calls}, {"198.51.100.24"})
         self.assertEqual(calls[0][0]["outbounds"][0]["settings"]["vnext"][0]["port"], 443)
         self.assertEqual(calls[1][0]["outbounds"][0]["settings"]["vnext"][0]["port"], 8443)
         self.assertEqual(calls[2][1][-1], "--config")
@@ -83,11 +84,33 @@ class ProbeRunnerTests(unittest.TestCase):
         config = {"socks5": {"listen": "127.0.0.1:18080"}}
         with patch.object(runner.subprocess, "Popen", return_value=FakeProcess()), \
              patch.object(runner, "_wait_for_proxy", return_value=True), \
-             patch.object(runner, "_curl_ip", side_effect=["203.0.113.10", "203.0.113.10"]), \
+             patch.object(runner, "_curl_ip", side_effect=["198.51.100.24", "198.51.100.24"]), \
              patch.object(runner, "_sleep_for_hop") as sleep:
-            result = runner._run_client(config, ["/usr/local/bin/hysteria", "client"], "203.0.113.10", hop_interval_seconds=5)
+            result = runner._run_client(config, ["/usr/local/bin/hysteria", "client"], "198.51.100.24", hop_interval_seconds=5)
         self.assertEqual(result, {"status": "healthy", "failureCode": None})
         sleep.assert_called_once_with(5)
+
+    def test_client_rejects_endpoint_address_when_expected_egress_is_different(self):
+        class FakeProcess:
+            def poll(self):
+                return None
+
+            def terminate(self):
+                pass
+
+            def wait(self, timeout):
+                return 0
+
+        config = {"inbounds": [{"port": 18080}]}
+        with patch.object(runner.subprocess, "Popen", return_value=FakeProcess()), \
+             patch.object(runner, "_wait_for_proxy", return_value=True), \
+             patch.object(runner, "_curl_ip", return_value="203.0.113.10"):
+            result = runner._run_client(
+                config,
+                ["/usr/local/bin/xray", "run", "-c"],
+                "198.51.100.24",
+            )
+        self.assertEqual(result, {"status": "failed", "failureCode": "EXIT_MISMATCH"})
 
     def test_hop_check_fails_when_second_proxy_request_fails(self):
         class FakeProcess:
