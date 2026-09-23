@@ -58,7 +58,10 @@ See `docs/README.md` for current implementation status and historical records.
   carry only closed source identifiers and bounded page state; bytes, storage
   keys, and paths must not enter callbacks or conversation history. Owner-only
   VPN and Operations entries remain authorization-checked on every action; menu
-  labels are presentation, not authority. Navigation, migration 015, the VPN
+  labels are presentation, not authority. Telegram update diagnostics may
+  retain only a closed update kind, outcome, and failure code; dialogue text,
+  callback payloads, exception details, and credentials are forbidden in update
+  diagnostics and Operations logs. Navigation, migration 015, the VPN
   owner-context fix, and the memory gallery were deployed on 2026-09-14; live
   owner/member media and deletion acceptance remains manual.
 - PostgreSQL with pgvector is the source of truth for cloud identity,

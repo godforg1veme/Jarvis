@@ -4,7 +4,17 @@ This file is the status authority for project documentation. Specifications and
 plans under `docs/superpowers/` are preserved as decision history; their old
 future-tense wording does not override the current architecture in `AGENTS.md`.
 
-Status snapshot: 2026-09-17.
+Status snapshot: 2026-09-23.
+
+Telegram dialogue resilience and identity guard, source update 2026-09-23:
+assistant output and persisted history reject unverified claims about the
+owner's identity. Message and callback processing failures return a bounded
+safe reply and retain only closed route/outcome/failure codes; raw dialogue,
+callback payloads, exception text, and credentials are excluded from these
+diagnostics. Production already has migrations 024/025 and the general
+classified fallback path. A specific Telegram voice-ASR failure reply now
+correctly says that its transcript was not saved; this last refinement is
+locally tested but not deployed. Real-owner Telegram acceptance remains manual.
 
 Dynamic VPN Subscription Network & Port Hopping rollout, 2026-09-16: Jarvis
 now generates dynamic Sing-box/Happ subscriptions with four endpoints

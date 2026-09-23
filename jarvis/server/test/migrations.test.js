@@ -32,7 +32,24 @@ test('migration files are ordered and narrowly named', () => {
     '021_vpn_probe_credentials.sql',
     '022_vpn_subscriptions.sql',
     '023_vpn_subscription_repair_action.sql',
+    '024_telegram_update_outcomes.sql',
+    '025_telegram_update_kind.sql',
   ]);
+});
+
+test('Telegram update route migration retains only a closed route kind', () => {
+  const migration = fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, '025_telegram_update_kind.sql'), 'utf8');
+  assert.match(migration, /update_kind IN \('message', 'callback'\)/);
+  assert.match(migration, /telegram_updates_kind_idx/);
+  assert.doesNotMatch(migration, /content|body|token|credential|secret/i);
+});
+
+test('Telegram update outcome migration stores only closed operational status and codes', () => {
+  const migration = fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, '024_telegram_update_outcomes.sql'), 'utf8');
+  assert.match(migration, /status IN \('processing', 'completed', 'failed'\)/);
+  assert.match(migration, /failure_code IS NULL OR failure_code ~ '\^\[A-Z\]\[A-Z0-9_\]\{2,79\}\$'/);
+  assert.match(migration, /telegram_updates_failed_idx/);
+  assert.doesNotMatch(migration, /message|content|body|token|credential|secret/i);
 });
 
 test('VPN subscription migration creates owner-scoped subscription table without sensitive secret storage', () => {

@@ -616,6 +616,7 @@ async function createRuntime(config, overrides = {}) {
         lifeProposalService: proposalService,
         lifeReminderService,
         menuService,
+        logger: app.log,
       });
       bot = createTelegramBot({
         token: config.telegramBotToken,

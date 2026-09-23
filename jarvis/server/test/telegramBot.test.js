@@ -1,7 +1,9 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { TELEGRAM_CALLBACK_RE, downloadTelegramAttachment, replyWithChunks, sendResult, splitTelegramText, validatedMedia, validatedReplyKeyboard, vpnReplyMarkup } = require('../src/telegram/bot');
+const { TELEGRAM_CALLBACK_RE, createTelegramBot, downloadTelegramAttachment, replyWithChunks, sendResult, splitTelegramText, validatedMedia, validatedReplyKeyboard, vpnReplyMarkup } = require('../src/telegram/bot');
 const { formatTelegramHtml } = require('../src/telegram/telegramFormatting');
+const { createTelegramAccessPolicy } = require('../src/telegram/accessPolicy');
+const { TelegramMessageService } = require('../src/telegram/messageService');
 
 test('splits long Telegram replies without losing text', () => {
   const text = `${'а'.repeat(2500)} ${'б'.repeat(2500)}`;
@@ -159,4 +161,100 @@ test('sends bounded gallery media with decision buttons and does not send duplic
   assert.throws(() => validatedMedia({ kind: 'photo', content: Buffer.from('not-a-jpeg'), contentType: 'image/jpeg', filename: 'photo.jpg' }), /photo/);
   assert.throws(() => validatedMedia({ kind: 'document', content, contentType: 'application/pdf', filename: '../secret' }), /filename/);
   assert.throws(() => validatedMedia({ kind: 'document', content: Buffer.alloc(2), contentType: 'application/pdf', filename: 'a.pdf' }, { mediaMaxBytes: 1 }), /media/);
+});
+
+test('incoming Telegram message reaches the sender with a safe model-failure fallback', async () => {
+  const persistedUpdates = new Map();
+  const logs = [];
+  const outbound = [];
+  const rawInput = 'содержимое личного сообщения';
+  const rawProviderError = 'OpenRouter private diagnostic and secret detail';
+  const messageService = new TelegramMessageService({
+    accessPolicy: createTelegramAccessPolicy(['101']),
+    updateRepository: {
+      async claim(updateId, telegramUserId, updateKind) {
+        persistedUpdates.set(updateId, { telegramUserId, updateKind, status: 'processing' });
+        return true;
+      },
+      async markCompleted(updateId) { persistedUpdates.get(updateId).status = 'completed'; },
+      async markFailed(updateId, failureCode) {
+        persistedUpdates.set(updateId, { ...persistedUpdates.get(updateId), status: 'failed', failureCode });
+      },
+    },
+    userRepository: { async findOrCreateTelegramUser() { return { id: 'owner-1' }; } },
+    conversationRepository: {
+      async getOrCreate() { return { id: 'conversation-1' }; },
+      async appendMessage() {},
+      async recentMessages() { return []; },
+    },
+    assistant: { async answer() { throw new Error(rawProviderError); } },
+    menuService: {
+      async handleMenuAction() { return null; },
+      async handlePendingText() { return null; },
+      async handleCallback() { throw new Error('menu private backend detail'); },
+    },
+    logger: { warn(entry) { logs.push(entry); } },
+  });
+  const bot = createTelegramBot({
+    token: '123456:TESTTOKEN',
+    messageService,
+    logger: { error(entry) { logs.push(entry); }, warn(entry) { logs.push(entry); } },
+  });
+  bot.api.config.use(async (_previous, method, payload) => {
+    if (method === 'getMe') {
+      return { ok: true, result: { id: 123456, is_bot: true, first_name: 'Jarvis', username: 'test_jarvis_bot' } };
+    }
+    if (method === 'sendMessage') {
+      outbound.push(payload.text);
+      return { ok: true, result: { message_id: 99, date: 0, chat: { id: payload.chat_id, type: 'private' }, text: payload.text } };
+    }
+    return { ok: true, result: true };
+  });
+
+  await bot.init();
+  await bot.handleUpdate({
+    update_id: 9901,
+    message: {
+      message_id: 11,
+      date: 0,
+      from: { id: 101, first_name: 'Owner' },
+      chat: { id: 101, type: 'private' },
+      text: rawInput,
+    },
+  });
+  await bot.handleUpdate({
+    update_id: 9902,
+    callback_query: {
+      id: 'callback-9902',
+      from: { id: 101, first_name: 'Owner' },
+      message: { message_id: 12, date: 0, chat: { id: 101, type: 'private' } },
+      data: 'mem:menu',
+    },
+  });
+
+  assert.equal(outbound.length, 2);
+  assert.match(outbound[0], /Модель сейчас временно недоступна/);
+  assert.match(outbound[1], /Не удалось завершить это сообщение/);
+  assert.equal(outbound[0].includes(rawProviderError), false);
+  assert.equal(outbound[1].includes('menu private backend detail'), false);
+  assert.deepEqual(persistedUpdates.get(9901), {
+    telegramUserId: '101',
+    updateKind: 'message',
+    status: 'failed',
+    failureCode: 'MODEL_UNAVAILABLE',
+  });
+  assert.equal(JSON.stringify(logs).includes(rawProviderError), false);
+  assert.equal(JSON.stringify(logs).includes(rawInput), false);
+  assert.deepEqual(logs[0], {
+    telegramFailureCode: 'MODEL_UNAVAILABLE',
+    telegramFailurePhase: 'message',
+    updateId: 9901,
+  });
+  assert.deepEqual(persistedUpdates.get(9902), {
+    telegramUserId: '101',
+    updateKind: 'callback',
+    status: 'failed',
+    failureCode: 'DIALOGUE_UNAVAILABLE',
+  });
+  assert.equal(JSON.stringify(logs).includes('menu private backend detail'), false);
 });

@@ -2,6 +2,7 @@ const { Bot, InputFile } = require('grammy');
 const { sendTelegramText, splitTelegramText } = require('./telegramFormatting');
 const { isLifeCallback } = require('./telegramLifeOsService');
 const { isVpnCallback } = require('../vpn/vpnCommandService');
+const { classifyTelegramFailure, telegramFailureReply } = require('./telegramFailure');
 
 const VPN_CALLBACK_RE = /^vpn:(?:menu|status|health|clients|new|restart|routing|pc|sub:(?:menu|new|(?:view|rotate|revoke|repair):[a-f0-9-]{36})|c:(?:de|nl)|p:[vh]|(?:(?:de|nl):)?[vh]:(?:menu|status|clients|new|restart|routing|pc|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12})|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12}|(?:confirm|reject):[a-f0-9-]{36})$/i;
 const TELEGRAM_CALLBACK_RE = /^(?:vpn:(?:menu|status|health|clients|new|restart|routing|pc|sub:(?:menu|new|(?:view|rotate|revoke|repair):[a-f0-9-]{36})|c:(?:de|nl)|p:[vh]|(?:(?:de|nl):)?[vh]:(?:menu|status|clients|new|restart|routing|pc|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12})|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12}|(?:confirm|reject):[a-f0-9-]{36})|vpsup:(?:allow|reject|details):[a-f0-9-]{36}|cmd:(?:confirm|reject):[a-f0-9-]{36}|life:(?:confirm|dismiss):[a-f0-9-]{36}|mem:(?:menu|list|add|correct|forget|(?:edit|forget_prompt|forget_confirm):[a-f0-9-]{36})|doc:(?:menu|add|cancel|(?:del_prompt|delete):[a-f0-9-]{36})|dev:(?:menu|list|pair|cancel|(?:(?:select|task|revoke_prompt|revoke):[a-f0-9-]{36}))|flow:cancel:[a-f0-9-]{36}|gallery:(?:(?:page|keep):[0-9]{1,4}|(?:open|delete):[dv]:[a-f0-9-]{36}:[0-9]{1,4}))$/i;
@@ -171,11 +172,12 @@ function createTelegramBot(options) {
 
   bot.catch(async (error) => {
     const updateId = error.ctx && error.ctx.update && error.ctx.update.update_id;
-    options.logger.error({ err: error.error, updateId }, 'Telegram update failed');
+    const failureCode = classifyTelegramFailure(error.error);
+    options.logger.error({ telegramFailureCode: failureCode, updateId }, 'Telegram update delivery failed');
     try {
-      await error.ctx.reply('Не удалось обработать сообщение. Попробуйте ещё раз позже.');
+      await error.ctx.reply(telegramFailureReply(failureCode));
     } catch (replyError) {
-      options.logger.warn({ err: replyError, updateId }, 'Telegram error reply failed');
+      options.logger.warn({ telegramFailureCode: classifyTelegramFailure(replyError), updateId }, 'Telegram fallback reply delivery failed');
     }
   });
 
