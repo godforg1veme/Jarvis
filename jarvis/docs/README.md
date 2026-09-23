@@ -13,11 +13,17 @@ from the latest attempts can unlock timer activation; legacy success records
 and failed rotations cannot. Local tests and a read-only production SQL parse
 passed. Activation enables timers sequentially, compensates a second-side
 failure with one closed first-side disable, and never claims success for an
-uncertain outcome. This integrated server source was deployed on 2026-09-23;
-no test credential is installed, and both external-probe timers remain disabled.
+uncertain outcome. The initial integrated server was deployed on 2026-09-23.
+One owner-confirmed NL-to-DE VLESS test key is now installed, but its original
+probe outcome remains unknown; a new private-chat recheck button is deployed
+and requires separate owner confirmation. No retry, reinstall, or rotation of
+that uncertain action occurred. Three other bindings still require their own
+owner-confirmed checks, and both external-probe timers remain disabled.
 The deployed DE/NL timer units were changed to an approximately 15-minute
 repeat interval on 2026-09-23 and verified while still disabled.
 See `updates/2026-09-23-vpn-probe-gate-and-monitor-rollout.md`.
+The credential-safe recheck deployment and current manual acceptance step are
+recorded in `updates/2026-09-23-vpn-probe-credential-recheck-rollout.md`.
 
 VPN Supervisor owner-approved restarts, 2026-09-23: the deployed server may
 propose only a matching Xray or Hysteria2 service restart after bounded
@@ -284,6 +290,7 @@ attachment ingestion.
 | `VPN_SUPERVISOR_REPAIR_GUIDE.md` | Closed AI proposal, owner confirmation, one-shot restart and recovery rules |
 | `updates/2026-09-23-vpn-supervisor-owner-approved-restarts.md` | Real-restart deployment and acceptance boundary |
 | `updates/2026-09-23-vpn-probe-gate-and-monitor-rollout.md` | Verified external-probe gate deployment, disabled timers, and remaining owner acceptance |
+| `updates/2026-09-23-vpn-probe-credential-recheck-rollout.md` | Corrected probe credential paths, owner-confirmed recheck deployment, and current acceptance state |
 | `VPN_PC_SETUP.md` | Руководство по настройке Hysteria 2 и VLESS на ПК (Windows / macOS) и устранению неполадок |
 | `VPN_RESILIENCE_RUNBOOK.md` | Current Hysteria2/Happ/VLESS diagnostic and acceptance procedure |
 | `CLAUDE.md`, `gemini.md` | Thin pointers to the authoritative agent context |

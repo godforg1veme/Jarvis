@@ -45,7 +45,7 @@
 - [x] Implement a helper that creates an absent counterpart atomically as a root-owned empty mode-0600 file, refuses symlink/non-regular paths, and never replaces an existing regular file. Invoke it from the existing validated install operation.
 - [x] Update the service template to use `/etc/jarvis-vpn/probes/probe-%i.env`, `/etc/jarvis-vpn/probes/probe-%i-vless.uri`, and `/etc/jarvis-vpn/probes/probe-%i-hysteria2.uri`.
 - [x] Extend unit-file tests to assert these exact paths plus DynamicUser, credential loading, and sandbox directives remain present; focused tests pass.
-- [ ] Commit the Host Agent and unit-path fix.
+- [x] Commit the Host Agent and unit-path fix (`a9046d5`).
 
 ## Task 2: Add the closed owner-confirmed probe recheck action
 
@@ -71,12 +71,12 @@
 
 ## Task 4: Verify, deploy safely, and record actual status
 
-- [x] Run required Telegram focused suite (63/63), full server suite (548/548), and Host Agent unit suite (111 tests; one symlink case skipped on Windows). Linux symlink and production unit checks remain.
-- [ ] Inspect production playbook flags and owner-acceptance record, current backup/image state, and both probe timer states before deployment.
-- [ ] On NL, inspect the installed credential path using metadata only. Verify the file is a root-owned regular mode-0600 file without reading contents. Create only the missing empty counterpart if the corrected Host Agent installer has not done so. Keep timers disabled.
-- [ ] Deploy unit source and server source with timestamped recoverable backups; apply migration 027; run unit verification, preflight, Compose health, and public smoke.
-- [ ] Verify both service instances can start without revealing credential values, both VPN services remain healthy, and both probe timers remain inactive/disabled.
-- [ ] Update rollout record, `AGENTS.md`, and `docs/README.md` with verified deployed revision and checks; commit documentation.
+- [x] Run required Telegram focused suite (63/63), full server suite (558/558), and Host Agent suite on Linux (111/111, including the symlink case).
+- [x] Inspect production playbook flags and owner-acceptance record, current backup/image state, and both probe timer states before deployment.
+- [x] On NL, inspect the installed credential path using metadata only. The existing VLESS source was root-owned mode 0600; created only its missing empty counterpart with the safe helper. Kept timers disabled.
+- [x] Deploy unit source and server source with recoverable backups; migration 027 applied; unit verification, preflight, Compose health, and public readiness checks passed.
+- [x] Verify both Host Agents and both VPN services are active, both probe timers remain inactive/disabled, and the recheck command is present in the healthy production image. Do not start a probe service without its fresh owner confirmation.
+- [x] Update rollout record, `AGENTS.md`, and `docs/README.md` with the deployed revision and verified checks.
 - [ ] Wait for the owner to use the new NL-to-DE VLESS recheck button. Record only its closed proof outcome. Continue other bindings only when individually confirmed; never enable timers during this task without all four proofs and a separate explicit owner confirmation.
 
 ## Rollback

@@ -179,8 +179,13 @@ See `docs/README.md` for current implementation status and historical records.
   real-restart source was deployed on 2026-09-23 with migration 026, but no
   real restart has yet been accepted during a live incident.
   Cross-node probe units and the owner-confirmed transient credential handoff
-  are deployed, but no test credential is installed and both timers remain
-  disabled until four successful owner-approved one-shot checks. The already
+  are deployed. One owner-confirmed NL-to-DE VLESS test credential is already
+  installed; its original `probe.install` outcome remains `unknown` and must
+  never be replayed, reinstalled, or rotated for recovery. The private-chat
+  `probe.recheck` action is deployed and requires its own fresh confirmation;
+  it runs only one read-only test with that existing credential. The other
+  three bindings still need separate owner-confirmed installs/checks. Both
+  timers remain disabled until four fresh successful one-shot checks. The already
   accepted `supervisor_acceptance_noop` never calls Host Agent. Before changing
   this production boundary, verify the running playbook flags and owner
   acceptance record; readiness alone does not prove a real repair.
