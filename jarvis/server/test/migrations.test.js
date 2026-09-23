@@ -36,6 +36,7 @@ test('migration files are ordered and narrowly named', () => {
     '024_vpn_hysteria_port_pools.sql',
     '025_telegram_update_kind.sql',
     '025_vpn_hysteria_port_pool_hop_interval.sql',
+    '026_vpn_supervisor_owner_approved_repairs.sql',
   ]);
 });
 
@@ -52,6 +53,15 @@ test('Hysteria port-pool migration stores only bounded public routing metadata',
   assert.match(migration, /hop_interval_seconds SMALLINT NOT NULL CHECK \(hop_interval_seconds BETWEEN 5 AND 45\)/);
   assert.match(migration, /node_code IN \('de', 'nl'\)/);
   assert.doesNotMatch(migration, /hostname|share_uri|password|credential|secret|token/i);
+});
+
+test('owner-approved Supervisor repair migration bounds active runs and one-shot incident attempts', () => {
+  const migration = fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, '026_vpn_supervisor_owner_approved_repairs.sql'), 'utf8');
+  assert.match(migration, /'executing', 'verifying'/);
+  assert.match(migration, /vpn_supervisor_one_active_per_host_idx/);
+  assert.match(migration, /vpn_supervisor_one_repair_attempt_per_incident_idx/);
+  assert.match(migration, /safe_metadata \? 'repairRequestId'/);
+  assert.doesNotMatch(migration, /credential|raw_log|command_text/i);
 });
 
 test('Telegram update route migration retains only a closed route kind', () => {

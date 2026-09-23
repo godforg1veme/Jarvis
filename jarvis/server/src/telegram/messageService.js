@@ -225,6 +225,7 @@ class TelegramMessageService {
       const result = await this.vpnSupervisorService.handleCallback({
         data: input.data,
         telegramUserId: input.telegramUserId,
+        telegramChatId: input.chatId,
       });
       if (!result) return { status: 'ignored' };
       await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: result.answer });

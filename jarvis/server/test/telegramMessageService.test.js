@@ -153,6 +153,7 @@ test('routes the closed VPN Supervisor command and callbacks without invoking th
   assert.equal(assistantCalls.length, 0);
   assert.equal(calls[0][1].telegramUserId, '101');
   assert.equal(calls[1][1].telegramUserId, '101');
+  assert.equal(calls[1][1].telegramChatId, '101');
 });
 
 test('rejects a disallowed identity before persistence', async () => {

@@ -6,6 +6,16 @@ future-tense wording does not override the current architecture in `AGENTS.md`.
 
 Status snapshot: 2026-09-23.
 
+VPN Supervisor owner-approved restarts, 2026-09-23: the deployed server may
+propose only a matching Xray or Hysteria2 service restart after bounded
+diagnosis. Execution requires fresh owner confirmation in the originating
+private Telegram chat, repeats deterministic checks, uses the closed Host
+Agent operation once, and verifies both stacks. Uncertain results reconcile
+under the same request ID without retry. Migration 026 is applied; restore
+playbooks remain disabled, and no real restart has yet been accepted during a
+live incident. See `updates/2026-09-23-vpn-supervisor-owner-approved-restarts.md`
+and `VPN_SUPERVISOR_REPAIR_GUIDE.md`.
+
 Happ resilient port-pool deployment, 2026-09-18: Jarvis now has
 a closed DE/NL public Hysteria2 port-pool contract, an exact two-request hopping
 probe, and migration 024. Ordinary Happ output uses only a validated finite port
@@ -16,6 +26,7 @@ smoke, and disabled probe timers were verified. The real Happ port-hopping and
 split-routing acceptance remains mandatory. The current
 [VPN resilience runbook](VPN_RESILIENCE_RUNBOOK.md) defines the evidence order
 and the no-timer safety boundary.
+
 The active Telegram button architecture guide and shipped-menu contract are
 `telegram-button-architecture.md` and `telegram-menu-contract.md`. An automated
 contract test checks owner/member keyboard rows and agent-document links.
@@ -80,8 +91,9 @@ Agent sockets. Telegram requires an explicit country choice before protocol
 actions, while `/vpn_health` reads both nodes. Operations persists both hosts,
 polls DE normally and NL with a VPN-only collector, and runs the deterministic
 incident classifier plus isolated LLM advisory against the affected node's
-sanitized logs. Real repair playbooks remain disabled; the only executable
-Supervisor playbook is the synthetic owner-approved no-op. The deployed model
+sanitized logs. At this 2026-09-16 milestone real repair playbooks were disabled;
+the only executable Supervisor playbook was the synthetic owner-approved no-op.
+The deployed model
 contract, two-node Host Agent path, TCP 443/8443 reachability, production image,
 public smoke, and unchanged VPN service uptimes are verified. The real owner
 approved the synthetic no-op in Telegram; PostgreSQL recorded `succeeded` and
@@ -93,8 +105,8 @@ planner can request one closed read-only snapshot from the incident's own node.
 The server validates the fresh diagnosis, provides only typed check statuses
 to a second planner call, and stops on stale, invalid, or repeated requests.
 Simulated DE/Xray and NL/Hysteria2 fault E2E and the full 461-test server suite
-passed; 33 focused tests passed in the production image. Real repair remains
-disabled. Cross-node client probe code and its read-only result operation are
+passed; 33 focused tests passed in the production image. Real repair was still
+disabled at this milestone. Cross-node client probe code and its read-only result operation are
 deployed on both nodes with root-only transient credential handoff, but no
 test credential is installed and both timers remain disabled; each of the four
 fixed test devices still requires owner Telegram confirmation. See
@@ -108,7 +120,8 @@ Telegram `/vpn_health`. Local suites passed 79 Host Agent and 430 server tests;
 36 focused tests passed inside the built production image. Public smoke and
 live Xray/Hysteria/Host Agent health passed, and the healthy production snapshot
 opened no false incident. The LLM advisory and remote-node enrollment milestones
-were implemented on 2026-09-16; real repair execution remains disabled. See
+were implemented on 2026-09-16; real repair execution was disabled at that
+milestone. See
 `updates/2026-09-15-vpn-supervisor-classifier.md`.
 
 Happ VPN routing default-proxy correction, 2026-09-15: the `Jarvis RU Direct`
@@ -254,6 +267,8 @@ attachment ingestion.
 | `updates/2026-09-15-jarvis-life-os-v2.md` | Implementation, Desktop installation, production rollout, and verification record for Life OS v2 |
 | `updates/2026-09-15-telegram-life-os-parity.md` | Native Telegram Life OS control surface, migration 019, production rollout, and verification record |
 | `updates/2026-09-15-vpn-supervisor-classifier.md` | Deterministic VPN diagnosis, incident integration, E2E fault simulations, and production rollout record |
+| `VPN_SUPERVISOR_REPAIR_GUIDE.md` | Closed AI proposal, owner confirmation, one-shot restart and recovery rules |
+| `updates/2026-09-23-vpn-supervisor-owner-approved-restarts.md` | Real-restart deployment and acceptance boundary |
 | `VPN_PC_SETUP.md` | Руководство по настройке Hysteria 2 и VLESS на ПК (Windows / macOS) и устранению неполадок |
 | `VPN_RESILIENCE_RUNBOOK.md` | Current Hysteria2/Happ/VLESS diagnostic and acceptance procedure |
 | `CLAUDE.md`, `gemini.md` | Thin pointers to the authoritative agent context |
@@ -281,7 +296,7 @@ attachment ingestion.
 | `superpowers/plans/2026-09-14-jarvis-life-os-v2.md` | Code checkpoints, local checks, Desktop installation, complete real-PostgreSQL workflow acceptance, and production server rollout completed after explicit owner approval; external accounts were not connected. |
 | `superpowers/specs/2026-09-15-telegram-life-os-parity-design.md` | Implemented and production-deployed: native 11-section Telegram hierarchy, closed callbacks, owner/revision/replay boundaries, guided mutations, and confirmed family sharing. Real owner/member client taps remain manual. |
 | `superpowers/plans/2026-09-15-telegram-life-os-parity.md` | Completed with full local regression, production-image callback tests, migration 019, public smoke, and unchanged VPN/Host Agent service health. |
-| `superpowers/specs/2026-09-15-vpn-supervisor-classifier-design.md` | Implemented and production-deployed: deterministic single-cause classification, strict cross-validation, three-observation debounce, and shared Operations/Telegram diagnosis. LLM and repair remain disabled. |
+| `superpowers/specs/2026-09-15-vpn-supervisor-classifier-design.md` | Historical classifier milestone: deterministic single-cause classification, strict cross-validation, three-observation debounce, and shared Operations/Telegram diagnosis. See the 2026-09-23 Supervisor update for owner-approved restarts. |
 | `superpowers/plans/2026-09-15-vpn-supervisor-classifier.md` | Completed with simulated fault E2E coverage, full local regression, production-image tests, and live healthy snapshot acceptance. |
 | `superpowers/plans/2026-09-09-jarvis-vision.md` | Execution plan adapted to the current cloud-brain/local-hands architecture; first camera + two-display + memory slice implemented and locally accepted |
 | `plans/2026-09-01-jarvis-family-cloud-assistant.md` | Active roadmap; Milestones 0–3 are partial, later milestones are not complete |

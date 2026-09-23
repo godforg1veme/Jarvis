@@ -8,6 +8,7 @@ class VpnRecoveryWorker {
     this.repository = options.repository;
     this.client = options.client;
     this.clients = options.clients || (options.client ? { de: options.client } : {});
+    this.supervisorServices = Array.isArray(options.supervisorServices) ? options.supervisorServices : [];
     this.logger = options.logger || { warn() {}, info() {} };
     this.intervalMs = Math.min(Math.max(Number(options.intervalMs || 30_000), 5_000), 300_000);
     this.now = options.now || (() => new Date());
@@ -78,6 +79,11 @@ class VpnRecoveryWorker {
         } catch (error) {
           this.logger.warn({ err: error, requestId: record.id }, 'VPN action reconciliation failed');
         }
+      }
+      for (const service of this.supervisorServices) {
+        if (!service || typeof service.reconcilePending !== 'function') continue;
+        try { await service.reconcilePending(); }
+        catch (_) { this.logger.warn('VPN Supervisor repair reconciliation failed'); }
       }
     } finally {
       this.running = false;

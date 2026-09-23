@@ -169,12 +169,21 @@ See `docs/README.md` for current implementation status and historical records.
   one closed read-only `vpn.health.snapshot` against the same node; a changed
   incident revision, invalid snapshot, or second request stops planning. The
   response must match a strict seven-field schema and a closed playbook catalog.
+  The current local source enables only `restart_xray` and
+  `restart_hysteria2`, only for their matching service-failure incidents with
+  healthy host/network, valid target config, and a healthy opposite stack.
+  A fresh private Telegram owner confirmation is required. Execution rechecks
+  the incident, claims one durable request ID, invokes only the closed restart
+  operation, and verifies both stacks. Uncertain outcomes reconcile by that
+  same ID and are never retried; restore playbooks remain disabled. This
+  real-restart source was deployed on 2026-09-23 with migration 026, but no
+  real restart has yet been accepted during a live incident.
   Cross-node probe units and the owner-confirmed transient credential handoff
   are deployed, but no test credential is installed and both timers remain
-  disabled until four successful owner-approved one-shot checks. Real repair
-  playbooks remain disabled. Only
-  `supervisor_acceptance_noop` can execute, after a fresh owner Telegram
-  confirmation, and it never calls Host Agent.
+  disabled until four successful owner-approved one-shot checks. The already
+  accepted `supervisor_acceptance_noop` never calls Host Agent. Before changing
+  this production boundary, verify the running playbook flags and owner
+  acceptance record; readiness alone does not prove a real repair.
 - Cross-node client probe code, root-only credential installer and disabled
   units are deployed on DE and NL. A one-time URI may travel only through the
   authenticated Host Agent socket; it is neither journaled nor returned to

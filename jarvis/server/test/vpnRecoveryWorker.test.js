@@ -78,3 +78,13 @@ test('never infers a four-host subscription repair from the parent action id', a
   });
   assert.equal(await worker.reconcile({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', action: 'subscription.repair' }), false);
 });
+
+test('recovery tick reconciles pending VPN Supervisor runs without replaying actions', async () => {
+  let reconciled = 0;
+  const worker = new VpnRecoveryWorker({
+    repository: { async recoverable() { return []; } },
+    supervisorServices: [{ async reconcilePending() { reconciled += 1; } }],
+  });
+  await worker.tick();
+  assert.equal(reconciled, 1);
+});

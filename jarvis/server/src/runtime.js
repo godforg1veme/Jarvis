@@ -465,6 +465,9 @@ async function createRuntime(config, overrides = {}) {
           logger: app.log,
         });
       }
+      if (vpnRecoveryWorker) {
+        vpnRecoveryWorker.supervisorServices = [vpnSupervisorService, vpnSupervisorServiceNl].filter(Boolean);
+      }
     }
     if (typeof pool.query === 'function') {
       const knowledgeRepository = overrides.knowledgeRepository || new DocumentRepository(pool);

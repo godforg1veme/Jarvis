@@ -12,6 +12,13 @@ disabled after this plan.
 verification and the live provider contract passed; the owner-button result is
 recorded in `docs/updates/2026-09-16-vpn-supervisor-multinode-rollout.md`.
 
+**Historical status note (2026-09-23):** this plan records the deployed advisory
+and no-op milestone as of 2026-09-16. A later owner-approved restart
+implementation is tracked in `docs/updates/2026-09-23-vpn-supervisor-owner-approved-restarts.md`;
+it was deployed briefly, rolled back, and redeployed after owner authorization.
+Migration 026 is applied. The running production catalog enables the two closed
+restart playbooks, with first real-incident acceptance still pending.
+
 ## 1. Define prompt, evidence, catalog, and response contracts
 
 - Add a versioned Supervisor system policy separate from the Jarvis persona.
