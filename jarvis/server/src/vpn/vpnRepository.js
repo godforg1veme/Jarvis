@@ -96,10 +96,26 @@ class VpnRepository {
 
   async hasVerifiedProbeBindings() {
     const result = await this.pool.query(`
-      SELECT COUNT(DISTINCT (arguments->>'sourceNode', arguments->>'protocol'))::int AS count
-      FROM vpn_action_requests
-      WHERE action='probe.install' AND status='succeeded'
-        AND completed_at>now()-interval '24 hours'
+      WITH latest AS (
+        SELECT DISTINCT ON (arguments->>'sourceNode', arguments->>'protocol')
+          arguments, result, status, completed_at
+        FROM vpn_action_requests
+        WHERE action IN ('probe.install', 'probe.rotate')
+          AND (arguments->>'sourceNode', arguments->>'runnerNode', arguments->>'protocol') IN (
+            ('de', 'nl', 'vless'), ('de', 'nl', 'hysteria2'),
+            ('nl', 'de', 'vless'), ('nl', 'de', 'hysteria2')
+          )
+        ORDER BY arguments->>'sourceNode', arguments->>'protocol', created_at DESC, id DESC
+      )
+      SELECT COUNT(*)::int AS count FROM latest
+      WHERE status='succeeded' AND completed_at>now()-interval '24 hours'
+        AND result->>'targetNode'=arguments->>'sourceNode'
+        AND result->>'runnerNode'=arguments->>'runnerNode'
+        AND result->>'protocol'=arguments->>'protocol'
+        AND result->>'acceptedCheck'=CASE arguments->>'protocol'
+          WHEN 'vless' THEN 'vless_tcp_8443'
+          WHEN 'hysteria2' THEN 'hysteria2_udp_hop'
+          ELSE NULL END
     `);
     return result.rows[0]?.count === 4;
   }

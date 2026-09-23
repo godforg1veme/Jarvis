@@ -179,7 +179,7 @@ test('probe credential handoff requires the normal owner confirmation and persis
   const { service, calls, records } = harness();
   service.probeWorkflow = {
     async install() {
-      return { targetNode: 'de', runnerNode: 'nl', protocol: 'vless', installedAt: '2026-09-16T12:00:00Z' };
+      return { targetNode: 'de', runnerNode: 'nl', protocol: 'vless', installedAt: '2026-09-16T12:00:00Z', acceptedCheck: 'vless_tcp_8443', probe: { secret: 'never-persist' } };
     },
   };
   const context = { userId: USER_ID, conversationId: 'conversation', originChannel: 'telegram' };
@@ -195,7 +195,19 @@ test('probe credential handoff requires the normal owner confirmation and persis
   const stored = records.get(REQUEST_ID);
   assert.equal(JSON.stringify(stored.arguments).includes('vless://'), false);
   const completion = calls.find(([type]) => type === 'complete')[1];
-  assert.deepEqual(completion.result, { targetNode: 'de', runnerNode: 'nl', protocol: 'vless', installedAt: '2026-09-16T12:00:00Z' });
+  assert.deepEqual(completion.result, { targetNode: 'de', runnerNode: 'nl', protocol: 'vless', installedAt: '2026-09-16T12:00:00Z', acceptedCheck: 'vless_tcp_8443' });
+  assert.equal(JSON.stringify(completion.result).includes('never-persist'), false);
+});
+
+test('a probe workflow without accepted proof cannot mark installation successful', async () => {
+  const { service, calls } = harness();
+  service.probeWorkflow = { async install() { return { targetNode: 'de', runnerNode: 'nl', protocol: 'vless' }; } };
+  const context = { userId: USER_ID, conversationId: 'conversation', originChannel: 'telegram' };
+  const binding = { sourceNode: 'de', runnerNode: 'nl', protocol: 'vless', clientId: 'vpn-0123456789ab', label: 'Probe NL to DE VLESS' };
+  await service.requestAction({ ...context, action: 'probe.install', arguments: binding });
+  const result = await service.handle({ ...context, text: '/vpn_confirm' });
+  assert.doesNotMatch(result.answer, /Разовая внешняя проверка/);
+  assert.equal(calls.find(([type]) => type === 'complete')[1].status, 'unknown');
 });
 
 test('Hysteria2 confirmation stays protocol-bound and never sends protocol to Host Agent arguments', async () => {

@@ -6,6 +6,14 @@ future-tense wording does not override the current architecture in `AGENTS.md`.
 
 Status snapshot: 2026-09-23.
 
+VPN external-probe acceptance gate, local integration source 2026-09-23:
+credential installation is counted only after a fresh, node-matched VLESS 8443
+or Hysteria2 hopping check succeeds. Only four distinct recent accepted proofs
+from the latest attempts can unlock timer activation; legacy success records
+and failed rotations cannot. Local tests and a read-only production SQL parse
+passed. This gate is not deployed, no test credential is installed, and both
+external-probe timers remain disabled.
+
 VPN Supervisor owner-approved restarts, 2026-09-23: the deployed server may
 propose only a matching Xray or Hysteria2 service restart after bounded
 diagnosis. Execution requires fresh owner confirmation in the originating

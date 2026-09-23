@@ -3,6 +3,26 @@ const assert = require('node:assert/strict');
 const { ConversationRepository } = require('../src/conversations/conversationRepository');
 const { DocumentRepository } = require('../src/knowledge/documentRepository');
 const { TelegramUpdateRepository } = require('../src/telegram/telegramUpdateRepository');
+const { VpnRepository } = require('../src/vpn/vpnRepository');
+
+test('probe timer gate counts only latest protocol-matched proof for each of four bindings', async () => {
+  let sql;
+  const repository = new VpnRepository({ async query(statement) { sql = statement; return { rows: [{ count: 0 }] }; } });
+  assert.equal(await repository.hasVerifiedProbeBindings(), false);
+  assert.match(sql, /DISTINCT ON/);
+  assert.match(sql, /probe\.install/);
+  assert.match(sql, /probe\.rotate/);
+  assert.match(sql, /result->>'acceptedCheck'/);
+  assert.match(sql, /vless_tcp_8443/);
+  assert.match(sql, /hysteria2_udp_hop/);
+  assert.match(sql, /completed_at>now\(\)-interval '24 hours'/);
+  assert.match(sql, /status='succeeded'/);
+  assert.match(sql, /result->>'targetNode'=arguments->>'sourceNode'/);
+  assert.match(sql, /result->>'runnerNode'=arguments->>'runnerNode'/);
+  assert.match(sql, /result->>'protocol'=arguments->>'protocol'/);
+  assert.match(sql, /'de', 'nl', 'vless'/);
+  assert.match(sql, /'nl', 'de', 'hysteria2'/);
+});
 
 test('Telegram update claim uses parameterized SQL', async () => {
   const calls = [];

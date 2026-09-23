@@ -30,11 +30,11 @@
 - Consumes: `vpn.external_probe.run` result data and `validateExternalProbe(value, sourceNode, now)`.
 - Produces: `{ targetNode, runnerNode, protocol, installedAt, acceptedCheck }` or a closed `ProbeWorkflowError`.
 
-- [ ] **Step 1: Write failing tests** for fresh VLESS 8443 success, fresh Hysteria hop success, and rejection of failed/unknown/stale/wrong-node/malformed results. A successful fixture must include all four closed checks, `version: 1`, matching `targetNode`, and `sampledAt` equal to the injected clock.
-- [ ] **Step 2: Run** `node --test server/test/vpnProbeCredentialWorkflow.test.js`; expect the unsafe current implementation to accept at least one failure fixture.
-- [ ] **Step 3: Implement** a closed mapping `{ vless: 'vless_tcp_8443', hysteria2: 'hysteria2_udp_hop' }`, validate the whole snapshot with `validateExternalProbe`, reject `unknown` as `PROBE_ACCEPTANCE_UNKNOWN` and `failed` as `PROBE_ACCEPTANCE_FAILED`, and return no raw probe object.
-- [ ] **Step 4: Re-run** the focused test; require pass.
-- [ ] **Step 5: Commit** the workflow and its tests.
+- [x] **Step 1: Write failing tests** for fresh VLESS 8443 success, fresh Hysteria hop success, and rejection of failed/unknown/stale/wrong-node/malformed results. A successful fixture must include all four closed checks, `version: 1`, matching `targetNode`, and `sampledAt` equal to the injected clock.
+- [x] **Step 2: Run** `node --test server/test/vpnProbeCredentialWorkflow.test.js`; the unsafe implementation accepted failure fixtures.
+- [x] **Step 3: Implement** a closed mapping `{ vless: 'vless_tcp_8443', hysteria2: 'hysteria2_udp_hop' }`, validate the whole snapshot with `validateExternalProbe`, reject `unknown` as `PROBE_ACCEPTANCE_UNKNOWN` and `failed` as `PROBE_ACCEPTANCE_FAILED`, and return no raw probe object.
+- [x] **Step 4: Re-run** the focused test; passed.
+- [x] **Step 5: Commit** the workflow and its tests (`1fb2109`).
 
 ### Task 2: Persist only accepted proof and guard timer activation
 
@@ -48,8 +48,8 @@
 - Consumes: Task 1's `acceptedCheck`.
 - Produces: a bounded JSONB action result with a matching accepted check; `hasVerifiedProbeBindings()` returns true only for four recent, distinct and matched proofs.
 
-- [ ] **Step 1: Write failing tests** showing a legacy `succeeded` install without `acceptedCheck` does not unlock timers, four correctly paired proof rows do, and the sanitized action result contains no URI or raw probe body.
-- [ ] **Step 2: Run** `node --test server/test/vpnCommandService.test.js server/test/repositories.test.js`; expect failure on the new proof assertions.
-- [ ] **Step 3: Implement** closed serialization of `acceptedCheck` and a parameter-free SQL predicate requiring `result->>'acceptedCheck'` to match the protocol's required check, while matching result node/runner/protocol to the confirmed action arguments. Keep the existing 24-hour and distinct-pair bounds.
-- [ ] **Step 4: Run** the focused tests, then `npm test` in `server/`, the Host Agent suite, and `git diff --check`.
-- [ ] **Step 5: Commit** the repository/service changes and tests. Do not deploy or enable timers without separate owner acceptance.
+- [x] **Step 1: Write failing tests** asserting that the timer-gate SQL selects only the latest four closed node/protocol pairs with matching `acceptedCheck`, and that sanitized action results contain no URI or raw probe body. A real four-row PostgreSQL acceptance fixture is still a separate pre-deployment check.
+- [x] **Step 2: Run** `node --test server/test/vpnCommandService.test.js server/test/repositories.test.js`; the new proof assertions failed against old code.
+- [x] **Step 3: Implement** closed serialization of `acceptedCheck` and a parameter-free SQL predicate requiring `result->>'acceptedCheck'` to match the protocol's required check, while matching result node/runner/protocol to the confirmed action arguments. The latest attempt per pair controls acceptance, so a failed rotation blocks stale proof.
+- [x] **Step 4: Run** the focused tests, then `npm test` in `server/` (539 passed), the Host Agent suite (107 passed), and `git diff --check`. The exact SQL parsed read-only against production PostgreSQL and returned zero qualifying records.
+- [x] **Step 5: Commit** the repository/service changes and tests. Do not deploy or enable timers without separate owner acceptance.

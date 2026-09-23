@@ -325,11 +325,13 @@ function safeProbeWorkflowData(data = {}) {
   const targetNode = NODES[data.targetNode] ? data.targetNode : null;
   const runnerNode = NODES[data.runnerNode] ? data.runnerNode : null;
   const protocol = PROTOCOLS[data.protocol] ? data.protocol : null;
+  const expectedCheck = protocol === 'vless' ? 'vless_tcp_8443' : protocol === 'hysteria2' ? 'hysteria2_udp_hop' : null;
   if (typeof data.monitoring === 'boolean') return { monitoring: data.monitoring };
   return {
     ...(targetNode ? { targetNode } : {}),
     ...(runnerNode ? { runnerNode } : {}),
     ...(protocol ? { protocol } : {}),
+    ...(data.acceptedCheck === expectedCheck ? { acceptedCheck: expectedCheck } : {}),
     ...(typeof data.installedAt === 'string' && data.installedAt.length <= 40 ? { installedAt: data.installedAt } : {}),
   };
 }
@@ -741,11 +743,19 @@ class VpnCommandService {
 
   async _decideProbe(record, context) {
     let data;
+    let metadata;
     try {
       if (record.action === 'probe.install') data = await this.probeWorkflow.install(record.arguments);
       else if (record.action === 'probe.rotate') data = await this.probeWorkflow.rotate(record.arguments);
       else if (record.action === 'probe.enable') data = await this.probeWorkflow.enable();
       else data = await this.probeWorkflow.disable();
+      metadata = safeProbeWorkflowData(data);
+      if (record.action === 'probe.install' || record.action === 'probe.rotate') {
+        if (!metadata.acceptedCheck || metadata.targetNode !== record.arguments.sourceNode
+          || metadata.runnerNode !== record.arguments.runnerNode || metadata.protocol !== record.arguments.protocol) {
+          throw new ProbeWorkflowError('PROBE_ACCEPTANCE_UNKNOWN');
+        }
+      }
     } catch (error) {
       const code = error instanceof ProbeWorkflowError ? error.code : 'PROBE_WORKFLOW_UNAVAILABLE';
       const unknown = code.endsWith('_UNKNOWN') || code === 'PROBE_WORKFLOW_UNAVAILABLE';
@@ -756,7 +766,6 @@ class VpnCommandService {
         buttons: [[{ text: '← Внешние проверки', data: 'vpn:probe:menu' }]],
       };
     }
-    const metadata = safeProbeWorkflowData(data);
     await this.repository.complete({ requestId: record.id, status: 'succeeded', result: metadata });
     await this.repository.audit({ userId: context.userId, requestId: record.id, type: 'vpn.action.succeeded', metadata: { action: record.action, ...metadata } });
     const answer = record.action === 'probe.enable' ? 'Периодические внешние проверки включены.'

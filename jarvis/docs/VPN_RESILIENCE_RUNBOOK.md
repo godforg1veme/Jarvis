@@ -34,6 +34,8 @@ The pool has exactly a node code, generation UUID, four to twelve unique increas
 
 For a per-port restriction, retain the subscription URL and use the active port list after its refresh. For a broad UDP restriction, choose a VLESS 8443 entry; a server-side port change cannot bypass an access network that blocks all QUIC/UDP. A changed pool, credentials, DNS, firewall, or probe scheduling requires the existing owner-confirmation boundary. Timers stay disabled until the documented dedicated-credential acceptance has succeeded.
 
+In the current integration source, each owner-confirmed credential installation counts only after a fresh, node-matched authenticated `vless_tcp_8443` or `hysteria2_udp_hop` check is healthy. Timer activation requires four distinct matching proofs from the latest attempts within 24 hours. Legacy success records without this closed proof, failed rotations, and unknown results do not qualify. This gate has not yet been deployed; the production timers remain disabled.
+
 ## What never enters logs, databases, callbacks, or chat
 
 Never write subscription tokens, full subscription URLs, VPN URIs, credentials, obfuscation values, packet captures, local temp paths, Host Agent payloads, or raw process output. Probe and Operations output is limited to node, check name, timestamp, closed status, and closed failure code.
