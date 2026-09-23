@@ -17,11 +17,19 @@ class ProbeWorkflowError extends Error {
 }
 
 function probeBindingFor({ sourceNode, protocol, clientId, label }) {
-  const binding = PROBE_BINDINGS[`${sourceNode}:${protocol}`];
+  const binding = probeRouteFor({ sourceNode, protocol });
   if (!binding || !CLIENT_ID.test(String(clientId || '')) || label !== binding.label) {
     throw new ProbeWorkflowError('PROBE_BINDING_INVALID');
   }
-  return Object.freeze({ sourceNode, runnerNode: binding.runnerNode, protocol, clientId, label });
+  return Object.freeze({ ...binding, clientId, label });
+}
+
+function probeRouteFor({ sourceNode, protocol, runnerNode }) {
+  const binding = PROBE_BINDINGS[`${sourceNode}:${protocol}`];
+  if (!binding || (runnerNode !== undefined && runnerNode !== binding.runnerNode)) {
+    throw new ProbeWorkflowError('PROBE_BINDING_INVALID');
+  }
+  return Object.freeze({ sourceNode, runnerNode: binding.runnerNode, protocol, label: binding.label });
 }
 
 function uriForProtocol(value, protocol) {
@@ -99,6 +107,24 @@ class ProbeCredentialWorkflow {
   install(binding) { return this._transfer(binding, 'export'); }
   rotate(binding) { return this._transfer(binding, 'rotate'); }
 
+  async recheck(binding) {
+    const route = probeRouteFor(binding);
+    const response = await this._request(route.runnerNode, 'vpn.external_probe.run', { targetNode: route.sourceNode });
+    const probeData = resultOrThrow(response, 'PROBE_RUN_UNKNOWN', 'PROBE_RUN_FAILED');
+    const snapshot = validateExternalProbe(probeData, route.sourceNode, this.now());
+    const acceptedCheck = ACCEPTED_CHECK[route.protocol];
+    const status = snapshot.checks[acceptedCheck].status;
+    if (status !== 'healthy') {
+      throw new ProbeWorkflowError(status === 'failed' ? 'PROBE_ACCEPTANCE_FAILED' : 'PROBE_ACCEPTANCE_UNKNOWN');
+    }
+    return {
+      targetNode: route.sourceNode,
+      runnerNode: route.runnerNode,
+      protocol: route.protocol,
+      acceptedCheck,
+    };
+  }
+
   async enable() {
     if (!await this.verifiedBindings()) throw new ProbeWorkflowError('PROBE_ACCEPTANCE_INCOMPLETE');
     const first = await this._request('nl', 'vpn.external_probe.monitor.enable', { targetNode: 'de' });
@@ -133,4 +159,4 @@ class ProbeCredentialWorkflow {
   }
 }
 
-module.exports = { PROBE_BINDINGS, ProbeCredentialWorkflow, ProbeWorkflowError, probeBindingFor };
+module.exports = { PROBE_BINDINGS, ProbeCredentialWorkflow, ProbeWorkflowError, probeBindingFor, probeRouteFor };

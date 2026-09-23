@@ -18,6 +18,7 @@ function telegramMenuContext({ user, conversation, input }) {
     conversationId: conversation.id,
     telegramUserId: input.telegramUserId,
     chatId: input.chatId,
+    chatType: input.chatType,
     originChannel: 'telegram',
     originDeviceId: null,
   };
@@ -87,6 +88,7 @@ function normalizeTelegramMessage(update) {
     updateId,
     telegramUserId,
     chatId,
+    chatType: String(message.chat.type || ''),
     messageId: String(message.message_id),
     displayName,
     text,
@@ -108,6 +110,7 @@ function normalizeTelegramCallbackUpdate(update) {
     updateId,
     telegramUserId,
     chatId,
+    chatType: String(query.message.chat.type || ''),
     data,
     displayName: [query.from.first_name, query.from.last_name].filter(Boolean).join(' ').trim().slice(0, 100) || `Telegram ${telegramUserId}`,
   };

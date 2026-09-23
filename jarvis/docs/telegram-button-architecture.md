@@ -41,6 +41,16 @@ atomically before mutation. A stale, foreign, revoked, or replayed control
 fails closed. Family sharing and remote/VPN changes retain their separate
 confirmation boundaries. An uncertain Host Agent result is reconciled by its
 original operation ID; never repeat it under a fresh ID merely to get a reply.
+VPN action confirmations are bound to the originating conversation, channel,
+and device; a confirmation copied into another chat must fail.
+
+The owner-only external-probe menu uses fixed
+`vpn:probe:recheck:<de|nl>:<v|h>` callbacks. Recheck controls require a private
+Telegram chat, followed by a separate confirmation bound to that conversation.
+One confirmed recheck performs exactly one closed read-only
+`vpn.external_probe.run`; it cannot install, rotate, export, or reveal a test
+credential. Duplicate Telegram updates and consumed confirmations do not run it
+again.
 
 ## Failure and diagnostic contract
 

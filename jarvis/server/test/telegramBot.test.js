@@ -64,6 +64,7 @@ test('renders only closed bounded VPN inline buttons on the final reply', async 
   assert.doesNotThrow(() => vpnReplyMarkup([[{ text: 'Hysteria2', data: 'vpn:p:h' }], [{ text: 'Статус', data: 'vpn:h:status' }]]));
   assert.doesNotThrow(() => vpnReplyMarkup([[{ text: 'Диагностика', data: 'vpn:health' }]]));
   assert.doesNotThrow(() => vpnReplyMarkup([[{ text: 'Экспорт', data: 'vpn:h:export:vpn-0123456789ab' }]]));
+  assert.doesNotThrow(() => vpnReplyMarkup([[{ text: 'Проверить ключ', data: 'vpn:probe:recheck:nl:h' }]]));
   assert.doesNotThrow(() => vpnReplyMarkup([[{ text: 'Память', data: 'mem:edit:33333333-3333-4333-8333-333333333333' }]]));
   assert.doesNotThrow(() => vpnReplyMarkup([[{ text: 'Устройство', data: 'dev:task:33333333-3333-4333-8333-333333333333' }]]));
   assert.doesNotThrow(() => vpnReplyMarkup([[{ text: 'Отмена', data: 'flow:cancel:33333333-3333-4333-8333-333333333333' }]]));
@@ -82,6 +83,8 @@ test('renders only closed bounded VPN inline buttons on the final reply', async 
   assert.equal(TELEGRAM_CALLBACK_RE.test('vpn:nl:h:status'), true);
   assert.equal(TELEGRAM_CALLBACK_RE.test('vpn:de:v:clients'), true);
   assert.equal(TELEGRAM_CALLBACK_RE.test('vpn:nl:h:export:vpn-0123456789ab'), true);
+  assert.equal(TELEGRAM_CALLBACK_RE.test('vpn:probe:recheck:nl:h'), true);
+  assert.equal(TELEGRAM_CALLBACK_RE.test('vpn:probe:recheck:xx:h'), false);
   assert.equal(TELEGRAM_CALLBACK_RE.test('vpn:c:invalid'), false);
 });
 

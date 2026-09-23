@@ -125,6 +125,40 @@ def _atomic_root_file(path: Path, value: str) -> None:
         raise ProbeCredentialError() from None
 
 
+def _ensure_empty_root_file(path: Path) -> None:
+    """Create a missing systemd credential source without replacing an existing key."""
+    try:
+        if os.name != "nt" and os.geteuid() != 0:
+            raise ProbeCredentialError()
+        parent = path.parent
+        parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        parent_info = os.lstat(parent)
+        if not stat.S_ISDIR(parent_info.st_mode) or stat.S_ISLNK(parent_info.st_mode):
+            raise ProbeCredentialError()
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+        flags |= getattr(os, "O_NOFOLLOW", 0)
+        try:
+            descriptor = os.open(path, flags, 0o600)
+        except FileExistsError:
+            existing = os.lstat(path)
+            if not stat.S_ISREG(existing.st_mode) or stat.S_ISLNK(existing.st_mode):
+                raise ProbeCredentialError()
+            if os.name != "nt" and (existing.st_uid != 0 or stat.S_IMODE(existing.st_mode) != 0o600):
+                raise ProbeCredentialError()
+            return
+        try:
+            if os.name != "nt":
+                os.fchmod(descriptor, 0o600)
+                os.fchown(descriptor, 0, 0)
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+    except ProbeCredentialError:
+        raise
+    except (OSError, AttributeError):
+        raise ProbeCredentialError() from None
+
+
 def install_probe_credential(config: object, *, target_node: str, protocol: str, credential: object) -> dict:
     """Validate and atomically install one credential without returning it."""
     _validate(config, target_node, protocol, credential)
@@ -132,5 +166,7 @@ def install_probe_credential(config: object, *, target_node: str, protocol: str,
     if not isinstance(root, Path):
         raise ProbeCredentialError()
     install_probe_environment(config, target_node=target_node)
+    other_protocol = "hysteria2" if protocol == "vless" else "vless"
+    _ensure_empty_root_file(_credential_path(root, target_node, other_protocol))
     _atomic_root_file(_credential_path(root, target_node, protocol), credential)
     return {"targetNode": target_node, "protocol": protocol, "installedAt": utc_now()}

@@ -19,7 +19,8 @@ class VpnRecoveryWorker {
   async reconcile(record) {
     // Probe credential handoff spans two hosts.  A connection loss can leave
     // either side changed, so it is intentionally never replayed or inferred.
-    if (record.action === 'probe.install' || record.action === 'probe.rotate' || record.action === 'subscription.repair') return false;
+    if (record.action === 'probe.install' || record.action === 'probe.rotate'
+      || record.action === 'probe.recheck' || record.action === 'subscription.repair') return false;
     const node = record.arguments?.node === 'nl' ? 'nl' : 'de';
     const client = this.clients[node] || (node === 'de' ? this.client : null);
     if (!client) throw new Error(`VPN recovery client unavailable for ${node}`);

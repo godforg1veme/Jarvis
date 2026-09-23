@@ -6,6 +6,7 @@ const { TELEGRAM_FAILURE_CODES } = require('../src/telegram/telegramFailure');
 const {
   MAX_TELEGRAM_VOICE_BYTES,
   TelegramMessageService,
+  normalizeTelegramCallbackUpdate,
   normalizeTelegramMessage,
   parseRemoteCommand,
 } = require('../src/telegram/messageService');
@@ -28,11 +29,18 @@ function callbackUpdate(id, userId, chatId, data) {
     callback_query: {
       id: `callback-${id}`,
       from: { id: userId, first_name: `User ${userId}` },
-      message: { message_id: id + 100, chat: { id: chatId } },
+      message: { message_id: id + 100, chat: { id: chatId, type: chatId < 0 ? 'group' : 'private' } },
       data,
     },
   };
 }
+
+test('callback context preserves the Telegram chat type for private-only actions', () => {
+  const privateInput = normalizeTelegramCallbackUpdate(callbackUpdate(3, 101, 101, 'vpn:probe:recheck:de:v'));
+  const groupInput = normalizeTelegramCallbackUpdate(callbackUpdate(4, 101, -101, 'vpn:probe:recheck:de:v'));
+  assert.equal(privateInput.chatType, 'private');
+  assert.equal(groupInput.chatType, 'group');
+});
 
 function voiceUpdate(id, userId, chatId, overrides = {}) {
   return {

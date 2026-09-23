@@ -189,6 +189,14 @@ See `docs/README.md` for current implementation status and historical records.
   authenticated Host Agent socket; it is neither journaled nor returned to
   Telegram, PostgreSQL, logs, prompts or telemetry. Telegram offers only four
   fixed test-device bindings and an origin-bound owner confirmation for each.
+  The dedicated `probe.recheck` action runs only in the owner's private
+  Telegram chat and requires a separate confirmation in that same conversation.
+  It invokes exactly one read-only `vpn.external_probe.run` and cannot issue,
+  rotate, export, reinstall, or reveal the existing test key. VPN action
+  confirmations are bound to the creating conversation as well as channel and
+  device. The systemd unit and Host Agent use the same root-only
+  `/etc/jarvis-vpn/probes` directory; the installer may create only a missing
+  empty mode-0600 counterpart file and must refuse unsafe paths or overwrite.
   `/vpn_health` reports results separately and treats missing, stale, mismatched,
   or ambiguous checks as unknown. External probe failures do not authorize an
   LLM repair or key rotation. The 2026-09-23 deployed server source now

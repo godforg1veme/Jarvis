@@ -63,12 +63,14 @@ test('routes Netherlands recovery to the Netherlands Host Agent only', async () 
   assert.equal(calls[0].arguments.requestId, requestId);
 });
 
-test('never replays a cross-node probe credential handoff', async () => {
+test('never replays cross-node probe operations', async () => {
   const worker = new VpnRecoveryWorker({
     repository: { complete: async () => assert.fail('must not complete'), audit: async () => assert.fail('must not audit') },
     client: { request: async () => assert.fail('must not contact Host Agent') },
   });
-  assert.equal(await worker.reconcile({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', user_id: 'u1', action: 'probe.install' }), false);
+  for (const action of ['probe.install', 'probe.rotate', 'probe.recheck']) {
+    assert.equal(await worker.reconcile({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', user_id: 'u1', action }), false);
+  }
 });
 
 test('never infers a four-host subscription repair from the parent action id', async () => {

@@ -39,6 +39,14 @@ paths, storage keys, tokens, credentials, or unchecked user text may appear.
 
 - `life:*`: Life OS hierarchy and proposals; mutable values use scoped guided input.
 - `vpn:*`: country/protocol menus, subscriptions, and origin-bound confirmation.
+  The owner-only external-checks menu adds `Проверить ключ` for each fixed
+  DE/NL and VLESS/Hysteria2 binding using
+  `vpn:probe:recheck:<de|nl>:<v|h>`. It is available only in a private Telegram
+  chat and requires separate confirmation in that same conversation. It runs
+  exactly one existing read-only external probe with the already-installed
+  credential and stores only closed proof metadata; it never installs, rotates,
+  exports, or reveals a key. Callback bytes contain only the fixed source node
+  and protocol code.
 - `mem:*`, `doc:*`, `dev:*`, `gallery:*`, `flow:*`: scoped controls, lookup, and expiry.
 - `cmd:*`, `vpsup:*`: changing remote/VPN actions with originating-client confirmation.
 
@@ -65,6 +73,8 @@ forms require parser, handler, authorization, and test before allowlisting.
 4. VPN credentials and subscription URLs are delivery-only, not history,
    telemetry, prompts, logs, or callback data.
 5. A keyboard row never grants authority; every owner-only action rechecks it.
+   VPN confirmation also rechecks the originating conversation, channel, and
+   device so a copied confirmation cannot execute from another chat.
 6. `telegram_updates.status` describes service processing, not Bot API delivery.
    Delivery and fallback-send failures have distinct closed diagnostic codes;
    neither authorizes automatic replay of a changing action.

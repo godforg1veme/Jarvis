@@ -12,6 +12,7 @@ test('probe timer gate counts only latest protocol-matched proof for each of fou
   assert.match(sql, /DISTINCT ON/);
   assert.match(sql, /probe\.install/);
   assert.match(sql, /probe\.rotate/);
+  assert.match(sql, /probe\.recheck/);
   assert.match(sql, /result->>'acceptedCheck'/);
   assert.match(sql, /vless_tcp_8443/);
   assert.match(sql, /hysteria2_udp_hop/);
@@ -22,6 +23,22 @@ test('probe timer gate counts only latest protocol-matched proof for each of fou
   assert.match(sql, /result->>'protocol'=arguments->>'protocol'/);
   assert.match(sql, /'de', 'nl', 'vless'/);
   assert.match(sql, /'nl', 'de', 'hysteria2'/);
+});
+
+test('VPN confirmation lookup, approval, and rejection stay in the originating conversation', async () => {
+  const calls = [];
+  const repository = new VpnRepository({ async query(statement, values) {
+    calls.push({ statement, values });
+    return { rows: [] };
+  } });
+  const origin = { userId: 'user', originChannel: 'telegram', originDeviceId: null, conversationId: '11111111-1111-4111-8111-111111111111' };
+  await repository.latestPending(origin);
+  await repository.approve({ ...origin, requestId: '22222222-2222-4222-8222-222222222222' });
+  await repository.reject({ ...origin, requestId: '33333333-3333-4333-8333-333333333333' });
+  for (const call of calls) {
+    assert.match(call.statement, /conversation_id IS NOT DISTINCT FROM/);
+    assert.equal(call.values.at(-1), origin.conversationId);
+  }
 });
 
 test('Telegram update claim uses parameterized SQL', async () => {

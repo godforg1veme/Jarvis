@@ -37,6 +37,7 @@ test('migration files are ordered and narrowly named', () => {
     '025_telegram_update_kind.sql',
     '025_vpn_hysteria_port_pool_hop_interval.sql',
     '026_vpn_supervisor_owner_approved_repairs.sql',
+    '027_vpn_probe_recheck_action.sql',
   ]);
 });
 
@@ -95,6 +96,13 @@ test('subscription repair is an allowed confirmed VPN action', () => {
     assert.ok(migration.includes(`'${action}'`));
   }
   assert.doesNotMatch(migration, /credential|share_uri|password|secret/i);
+});
+
+test('probe recheck adds one closed confirmed action kind', () => {
+  const migration = fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, '027_vpn_probe_recheck_action.sql'), 'utf8');
+  assert.match(migration, /'probe\.recheck'/);
+  assert.match(migration, /'subscription\.repair'/);
+  assert.doesNotMatch(migration, /credential|share_uri|password|secret|uri/i);
 });
 
 test('probe credential migration adds only closed VPN action kinds', () => {

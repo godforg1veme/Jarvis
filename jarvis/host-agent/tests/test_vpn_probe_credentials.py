@@ -41,13 +41,38 @@ class ProbeCredentialStoreTests(unittest.TestCase):
             root = Path(directory)
             result = install_probe_credential(config_for(root), target_node="de", protocol="vless", credential=VLESS_DE)
             path = root / "probe-de-vless.uri"
+            placeholder = root / "probe-de-hysteria2.uri"
             self.assertEqual(result["targetNode"], "de")
             self.assertEqual(result["protocol"], "vless")
+            self.assertTrue(placeholder.is_file())
+            self.assertEqual(placeholder.read_bytes(), b"")
             if os.name != "nt":
                 self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
+                self.assertEqual(stat.S_IMODE(placeholder.stat().st_mode), 0o600)
             else:
                 self.assertTrue(path.is_file())
             self.assertNotIn("vless://", str(result))
+
+    def test_creating_missing_counterpart_preserves_existing_regular_credential(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            counterpart = root / "probe-de-hysteria2.uri"
+            counterpart.write_text(HYSTERIA_DE, encoding="utf-8")
+            if os.name != "nt":
+                counterpart.chmod(0o600)
+            install_probe_credential(config_for(root), target_node="de", protocol="vless", credential=VLESS_DE)
+            self.assertEqual(counterpart.read_text(encoding="utf-8"), HYSTERIA_DE)
+
+    def test_refuses_symlink_counterpart(self):
+        if os.name == "nt":
+            self.skipTest("symlink creation permissions vary on Windows")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "outside"
+            target.write_text("synthetic", encoding="utf-8")
+            (root / "probe-de-hysteria2.uri").symlink_to(target)
+            with self.assertRaises(ProbeCredentialError):
+                install_probe_credential(config_for(root), target_node="de", protocol="vless", credential=VLESS_DE)
 
     def test_installs_public_probe_environment_without_uri_or_credential(self):
         with tempfile.TemporaryDirectory() as directory:

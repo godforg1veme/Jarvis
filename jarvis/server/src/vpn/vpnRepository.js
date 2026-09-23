@@ -31,33 +31,36 @@ class VpnRepository {
     return result.rows[0] || null;
   }
 
-  async latestPending({ userId, originChannel, originDeviceId = null }) {
+  async latestPending({ userId, originChannel, originDeviceId = null, conversationId = null }) {
     const result = await this.pool.query(`
       SELECT * FROM vpn_action_requests
       WHERE user_id=$1 AND origin_channel=$2 AND origin_device_id IS NOT DISTINCT FROM $3::uuid
+        AND conversation_id IS NOT DISTINCT FROM $4::uuid
         AND status='awaiting_confirmation' AND expires_at>now()
       ORDER BY created_at DESC LIMIT 1
-    `, [userId, originChannel, originDeviceId]);
+    `, [userId, originChannel, originDeviceId, conversationId]);
     return result.rows[0] || null;
   }
 
-  async approve({ userId, requestId, originChannel, originDeviceId = null }) {
+  async approve({ userId, requestId, originChannel, originDeviceId = null, conversationId = null }) {
     const result = await this.pool.query(`
       UPDATE vpn_action_requests SET status='running',updated_at=now()
       WHERE id=$1 AND user_id=$2 AND status='awaiting_confirmation' AND expires_at>now()
         AND origin_channel=$3 AND origin_device_id IS NOT DISTINCT FROM $4::uuid
+        AND conversation_id IS NOT DISTINCT FROM $5::uuid
       RETURNING *
-    `, [requestId, userId, originChannel, originDeviceId]);
+    `, [requestId, userId, originChannel, originDeviceId, conversationId]);
     return result.rows[0] || null;
   }
 
-  async reject({ userId, requestId, originChannel, originDeviceId = null }) {
+  async reject({ userId, requestId, originChannel, originDeviceId = null, conversationId = null }) {
     const result = await this.pool.query(`
       UPDATE vpn_action_requests SET status='cancelled',updated_at=now(),completed_at=now()
       WHERE id=$1 AND user_id=$2 AND status='awaiting_confirmation' AND expires_at>now()
         AND origin_channel=$3 AND origin_device_id IS NOT DISTINCT FROM $4::uuid
+        AND conversation_id IS NOT DISTINCT FROM $5::uuid
       RETURNING *
-    `, [requestId, userId, originChannel, originDeviceId]);
+    `, [requestId, userId, originChannel, originDeviceId, conversationId]);
     return result.rows[0] || null;
   }
 
@@ -100,7 +103,7 @@ class VpnRepository {
         SELECT DISTINCT ON (arguments->>'sourceNode', arguments->>'protocol')
           arguments, result, status, completed_at
         FROM vpn_action_requests
-        WHERE action IN ('probe.install', 'probe.rotate')
+        WHERE action IN ('probe.install', 'probe.rotate', 'probe.recheck')
           AND (arguments->>'sourceNode', arguments->>'runnerNode', arguments->>'protocol') IN (
             ('de', 'nl', 'vless'), ('de', 'nl', 'hysteria2'),
             ('nl', 'de', 'vless'), ('nl', 'de', 'hysteria2')
