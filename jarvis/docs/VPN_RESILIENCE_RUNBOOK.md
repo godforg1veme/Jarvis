@@ -34,7 +34,18 @@ The pool has exactly a node code, generation UUID, four to twelve unique increas
 
 For a per-port restriction, retain the subscription URL and use the active port list after its refresh. For a broad UDP restriction, choose a VLESS 8443 entry; a server-side port change cannot bypass an access network that blocks all QUIC/UDP. A changed pool, credentials, DNS, firewall, or probe scheduling requires the existing owner-confirmation boundary. Timers stay disabled until the documented dedicated-credential acceptance has succeeded.
 
-In the deployed server source, each owner-confirmed credential installation counts only after a fresh, node-matched authenticated `vless_tcp_8443` or `hysteria2_udp_hop` check is healthy. Timer activation requires four distinct matching proofs from the latest attempts within 24 hours. Legacy success records without this closed proof, failed rotations, and unknown results do not qualify. No test credential is installed; the production timers remain disabled.
+In the deployed server source, each owner-confirmed credential installation counts only after a fresh, node-matched authenticated `vless_tcp_8443` or `hysteria2_udp_hop` check is healthy. Timer activation requires four distinct matching proofs from the latest attempts within 24 hours. Legacy success records without this closed proof, failed rotations, and unknown results do not qualify. At the initial 2026-09-23 rollout no dedicated test credential had yet been installed; current acceptance status is below. The production timers remain disabled.
+
+Current acceptance status (2026-09-23): one owner-confirmed NL-to-DE VLESS
+test credential is installed. Its original install/probe action is still
+`unknown`; the corresponding systemd attempt failed while loading credentials.
+Do not replay that request, reinstall the key, or rotate it to recover. The
+owner can select the NL-to-DE VLESS recheck in the private Telegram VPN
+external-check menu and confirm its fresh request. That action runs only one
+read-only `vless_tcp_8443` check with the existing test key. Three other fixed
+bindings still need separate owner-confirmed checks. See
+[`2026-09-23 VPN probe recheck rollout`](updates/2026-09-23-vpn-probe-credential-recheck-rollout.md)
+for live deployment evidence and remaining acceptance steps.
 
 Timer activation enables the NL-to-DE timer first and the DE-to-NL timer second. A first-side failure stops before the second command. If the second command fails or has an unknown outcome, the server sends one closed disable command for the confirmed first timer. A failed or uncertain compensation, or an uncertain second enable, leaves the overall state unknown: inspect both actual systemd timer states before a later owner-confirmed action. Never retry an uncertain enable under a new request ID. This behavior was deployed on 2026-09-23, but no live activation has occurred.
 

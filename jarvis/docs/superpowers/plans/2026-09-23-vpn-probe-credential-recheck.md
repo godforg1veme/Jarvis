@@ -34,7 +34,7 @@
 - `server/src/vpn/vpnRecoveryWorker.js`: block automatic replay of rechecks.
 - `server/src/telegram/messageService.js` and `server/src/vpn/vpnRepository.js`: carry Telegram chat type and bind action confirmation/rejection to the originating conversation.
 - `server/test/migrations.test.js`, `server/test/repositories.test.js`, `server/test/vpnCommandService.test.js`, workflow-focused tests: schema, proof gate, access, replay, and no-install assertions.
-- `docs/telegram-menu-contract.md`, `AGENTS.md`, `docs/README.md`, and a dated rollout record: visible callback/action contract and deployment state.
+- `docs/telegram-menu-contract.md`, `AGENTS.md`, `docs/README.md`, `docs/VPN_RESILIENCE_RUNBOOK.md`, and a dated rollout record: visible callback/action contract and deployment state.
 
 ## Task 1: Make Host Agent credentials and systemd paths agree
 
@@ -76,7 +76,7 @@
 - [x] On NL, inspect the installed credential path using metadata only. The existing VLESS source was root-owned mode 0600; created only its missing empty counterpart with the safe helper. Kept timers disabled.
 - [x] Deploy unit source and server source with recoverable backups; migration 027 applied; unit verification, preflight, Compose health, and public readiness checks passed.
 - [x] Verify both Host Agents and both VPN services are active, both probe timers remain inactive/disabled, and the recheck command is present in the healthy production image. Do not start a probe service without its fresh owner confirmation.
-- [x] Update rollout record, `AGENTS.md`, and `docs/README.md` with the deployed revision and verified checks.
+- [x] Update rollout record, `AGENTS.md`, `docs/README.md`, and `docs/VPN_RESILIENCE_RUNBOOK.md` with the deployed revision and verified checks.
 - [ ] Wait for the owner to use the new NL-to-DE VLESS recheck button. Record only its closed proof outcome. Continue other bindings only when individually confirmed; never enable timers during this task without all four proofs and a separate explicit owner confirmation.
 
 ## Rollback

@@ -56,3 +56,7 @@ credential installs and successful one-shot checks. Keep both 15-minute timers
 disabled until all four fresh checks succeed and the owner separately confirms
 timer activation. This monitoring setup is not a 99.9% uptime guarantee; the
 first live probe and timer acceptance are still outstanding.
+
+The current operational status is also reflected in
+`docs/VPN_RESILIENCE_RUNBOOK.md` so its older pre-install status is not mistaken
+for today's production state.

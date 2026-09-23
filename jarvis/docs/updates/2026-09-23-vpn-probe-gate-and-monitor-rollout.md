@@ -34,9 +34,12 @@ the new running container. No `.env` or secret file was copied.
 - A bounded error-level log count for the new server's first five minutes was
   zero. This does not prove live Telegram delivery or VPN repair acceptance.
 
-## Not yet accepted
+## Not yet accepted at this rollout snapshot
 
-No dedicated test credential has been installed. The four owner-confirmed
+At this rollout snapshot, no dedicated test credential had yet been installed.
+The later NL-to-DE VLESS install/recheck state is recorded in
+[`2026-09-23-vpn-probe-credential-recheck-rollout.md`](2026-09-23-vpn-probe-credential-recheck-rollout.md).
+The four owner-confirmed
 one-shot checks, actual timer activation, Happ phone traffic and split-routing
 checks, and the first real owner-confirmed restart remain unverified. A healthy
 server container does not establish any of these outcomes or a 99.9% service
