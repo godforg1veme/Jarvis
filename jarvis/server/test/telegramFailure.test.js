@@ -23,6 +23,10 @@ test('Telegram failure classifier keeps a closed fallback for infrastructure fai
   assert.match(telegramFailureReply(code), /меню и остальные разделы Jarvis продолжают работать/);
 });
 
+test('typed Telegram delivery failures are classified without reading transport details', () => {
+  assert.equal(classifyTelegramFailure({ name: 'TelegramDeliveryError', message: 'secret token in URL' }), TELEGRAM_FAILURE_CODES.TELEGRAM_DELIVERY_FAILED);
+});
+
 test('Telegram voice transcription failures do not claim that the message was accepted', () => {
   const error = new Error('private ASR provider response');
   error.name = 'TelegramVoiceTranscriptionError';

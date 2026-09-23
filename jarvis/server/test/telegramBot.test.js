@@ -167,12 +167,14 @@ test('incoming Telegram message reaches the sender with a safe model-failure fal
   const persistedUpdates = new Map();
   const logs = [];
   const outbound = [];
+  const apiMethods = [];
   const rawInput = 'содержимое личного сообщения';
   const rawProviderError = 'OpenRouter private diagnostic and secret detail';
   const messageService = new TelegramMessageService({
     accessPolicy: createTelegramAccessPolicy(['101']),
     updateRepository: {
       async claim(updateId, telegramUserId, updateKind) {
+        if (persistedUpdates.has(updateId)) return false;
         persistedUpdates.set(updateId, { telegramUserId, updateKind, status: 'processing' });
         return true;
       },
@@ -201,6 +203,7 @@ test('incoming Telegram message reaches the sender with a safe model-failure fal
     logger: { error(entry) { logs.push(entry); }, warn(entry) { logs.push(entry); } },
   });
   bot.api.config.use(async (_previous, method, payload) => {
+    apiMethods.push(method);
     if (method === 'getMe') {
       return { ok: true, result: { id: 123456, is_bot: true, first_name: 'Jarvis', username: 'test_jarvis_bot' } };
     }
@@ -212,7 +215,7 @@ test('incoming Telegram message reaches the sender with a safe model-failure fal
   });
 
   await bot.init();
-  await bot.handleUpdate({
+  const messageUpdate = {
     update_id: 9901,
     message: {
       message_id: 11,
@@ -221,7 +224,9 @@ test('incoming Telegram message reaches the sender with a safe model-failure fal
       chat: { id: 101, type: 'private' },
       text: rawInput,
     },
-  });
+  };
+  await bot.handleUpdate(messageUpdate);
+  await bot.handleUpdate(messageUpdate);
   await bot.handleUpdate({
     update_id: 9902,
     callback_query: {
@@ -231,8 +236,21 @@ test('incoming Telegram message reaches the sender with a safe model-failure fal
       data: 'mem:menu',
     },
   });
+  await bot.handleUpdate({
+    update_id: 9903,
+    message: {
+      message_id: 13,
+      date: 0,
+      from: { id: 999, first_name: 'Denied' },
+      chat: { id: 999, type: 'private' },
+      text: 'untrusted private input',
+    },
+  });
 
-  assert.equal(outbound.length, 2);
+  assert.equal(outbound.length, 3);
+  assert.equal(apiMethods.filter((method) => method === 'answerCallbackQuery').length, 1);
+  assert.equal(persistedUpdates.has(9903), false);
+  assert.equal(outbound[2], 'Доступ к этому Jarvis не разрешён.');
   assert.match(outbound[0], /Модель сейчас временно недоступна/);
   assert.match(outbound[1], /Не удалось завершить это сообщение/);
   assert.equal(outbound[0].includes(rawProviderError), false);
@@ -257,4 +275,56 @@ test('incoming Telegram message reaches the sender with a safe model-failure fal
     failureCode: 'DIALOGUE_UNAVAILABLE',
   });
   assert.equal(JSON.stringify(logs).includes('menu private backend detail'), false);
+});
+
+test('Telegram delivery failure uses a safe fallback and logs no reply or transport secret', async () => {
+  const logs = [];
+  const sent = [];
+  const bot = createTelegramBot({
+    token: '123456:TESTTOKEN',
+    messageService: { async handle() { return { status: 'answered', answer: 'private answer' }; } },
+    logger: { error(entry) { logs.push(entry); }, warn(entry) { logs.push(entry); } },
+  });
+  bot.api.config.use(async (_previous, method, payload) => {
+    if (method === 'getMe') return { ok: true, result: { id: 123456, is_bot: true, first_name: 'Jarvis', username: 'test_jarvis_bot' } };
+    if (method === 'sendMessage') {
+      sent.push(payload.text);
+      if (sent.length === 1) throw new Error('transport URL with 123456:TESTTOKEN');
+      return { ok: true, result: { message_id: 99, date: 0, chat: { id: payload.chat_id, type: 'private' }, text: payload.text } };
+    }
+    return { ok: true, result: true };
+  });
+  await bot.init();
+  await bot.handleUpdates([{
+    update_id: 9904,
+    message: { message_id: 14, date: 0, from: { id: 101, first_name: 'Owner' }, chat: { id: 101, type: 'private' }, text: 'private input' },
+  }]);
+  assert.deepEqual(sent, ['private answer', 'Не удалось завершить это сообщение. Попробуй ещё раз; меню и остальные разделы Jarvis продолжают работать.']);
+  assert.equal(logs.length, 1);
+  assert.deepEqual(logs[0], { telegramFailureCode: 'TELEGRAM_DELIVERY_FAILED', updateId: 9904 });
+  assert.equal(JSON.stringify(logs).includes('123456:TESTTOKEN'), false);
+  assert.equal(JSON.stringify(logs).includes('private input'), false);
+});
+
+test('failed fallback delivery logs a distinct closed code without leaking the token', async () => {
+  const logs = [];
+  const bot = createTelegramBot({
+    token: '123456:TESTTOKEN',
+    messageService: { async handle() { return { status: 'answered', answer: 'private answer' }; } },
+    logger: { error(entry) { logs.push(entry); }, warn(entry) { logs.push(entry); } },
+  });
+  bot.api.config.use(async (_previous, method) => {
+    if (method === 'getMe') return { ok: true, result: { id: 123456, is_bot: true, first_name: 'Jarvis', username: 'test_jarvis_bot' } };
+    throw new Error('transport URL with 123456:TESTTOKEN');
+  });
+  await bot.init();
+  await bot.handleUpdates([{
+    update_id: 9905,
+    message: { message_id: 15, date: 0, from: { id: 101, first_name: 'Owner' }, chat: { id: 101, type: 'private' }, text: 'private input' },
+  }]);
+  assert.deepEqual(logs, [
+    { telegramFailureCode: 'TELEGRAM_DELIVERY_FAILED', updateId: 9905 },
+    { telegramFailureCode: 'TELEGRAM_FALLBACK_DELIVERY_FAILED', updateId: 9905 },
+  ]);
+  assert.equal(JSON.stringify(logs).includes('123456:TESTTOKEN'), false);
 });

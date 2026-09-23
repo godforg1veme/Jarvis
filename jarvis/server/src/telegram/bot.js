@@ -2,7 +2,7 @@ const { Bot, InputFile } = require('grammy');
 const { sendTelegramText, splitTelegramText } = require('./telegramFormatting');
 const { isLifeCallback } = require('./telegramLifeOsService');
 const { isVpnCallback } = require('../vpn/vpnCommandService');
-const { classifyTelegramFailure, telegramFailureReply } = require('./telegramFailure');
+const { TELEGRAM_FAILURE_CODES, classifyTelegramFailure, telegramFailureReply } = require('./telegramFailure');
 
 const VPN_CALLBACK_RE = /^vpn:(?:menu|status|health|clients|new|restart|routing|pc|sub:(?:menu|new|(?:view|rotate|revoke|repair):[a-f0-9-]{36})|c:(?:de|nl)|p:[vh]|(?:(?:de|nl):)?[vh]:(?:menu|status|clients|new|restart|routing|pc|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12})|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12}|(?:confirm|reject):[a-f0-9-]{36})$/i;
 const TELEGRAM_CALLBACK_RE = /^(?:vpn:(?:menu|status|health|clients|new|restart|routing|pc|sub:(?:menu|new|(?:view|rotate|revoke|repair):[a-f0-9-]{36})|c:(?:de|nl)|p:[vh]|(?:(?:de|nl):)?[vh]:(?:menu|status|clients|new|restart|routing|pc|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12})|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12}|(?:confirm|reject):[a-f0-9-]{36})|vpsup:(?:allow|reject|details):[a-f0-9-]{36}|cmd:(?:confirm|reject):[a-f0-9-]{36}|life:(?:confirm|dismiss):[a-f0-9-]{36}|mem:(?:menu|list|add|correct|forget|(?:edit|forget_prompt|forget_confirm):[a-f0-9-]{36})|doc:(?:menu|add|cancel|(?:del_prompt|delete):[a-f0-9-]{36})|dev:(?:menu|list|pair|cancel|(?:(?:select|task|revoke_prompt|revoke):[a-f0-9-]{36}))|flow:cancel:[a-f0-9-]{36}|gallery:(?:(?:page|keep):[0-9]{1,4}|(?:open|delete):[dv]:[a-f0-9-]{36}:[0-9]{1,4}))$/i;
@@ -134,6 +134,17 @@ async function downloadTelegramAttachment(ctx, token, maxBytes = 20 * 1024 * 102
   }
 }
 
+async function deliverResult(ctx, result, options) {
+  try {
+    await sendResult(ctx, result, options);
+  } catch (_) {
+    // Telegram API errors may contain the bot-token URL; keep only a closed type.
+    const error = new Error('Telegram delivery failed');
+    error.name = 'TelegramDeliveryError';
+    throw error;
+  }
+}
+
 function createTelegramBot(options) {
   const bot = new Bot(options.token);
   const messageService = options.messageService;
@@ -155,7 +166,7 @@ function createTelegramBot(options) {
     const result = typeof messageService.handleCallback === 'function'
       ? await messageService.handleCallback(ctx.update)
       : (data.startsWith('vpn:') ? await messageService.handleVpnCallback(ctx.update) : null);
-    if (result) await sendResult(ctx, result, { operationsPanelUrl: options.operationsPanelUrl, mediaMaxBytes: options.documentMaxBytes });
+    if (result) await deliverResult(ctx, result, { operationsPanelUrl: options.operationsPanelUrl, mediaMaxBytes: options.documentMaxBytes });
   });
 
   if (typeof options.approvalHandler === 'function') {
@@ -167,7 +178,7 @@ function createTelegramBot(options) {
       downloadAttachment: () => downloadTelegramAttachment(ctx, options.token, options.documentMaxBytes, options.fetchImpl),
       downloadVoice: () => downloadTelegramAttachment(ctx, options.token, options.voiceMaxBytes, options.fetchImpl),
     });
-    await sendResult(ctx, result, { operationsPanelUrl: options.operationsPanelUrl, mediaMaxBytes: options.documentMaxBytes });
+    await deliverResult(ctx, result, { operationsPanelUrl: options.operationsPanelUrl, mediaMaxBytes: options.documentMaxBytes });
   });
 
   bot.catch(async (error) => {
@@ -176,8 +187,8 @@ function createTelegramBot(options) {
     options.logger.error({ telegramFailureCode: failureCode, updateId }, 'Telegram update delivery failed');
     try {
       await error.ctx.reply(telegramFailureReply(failureCode));
-    } catch (replyError) {
-      options.logger.warn({ telegramFailureCode: classifyTelegramFailure(replyError), updateId }, 'Telegram fallback reply delivery failed');
+    } catch (_) {
+      options.logger.warn({ telegramFailureCode: TELEGRAM_FAILURE_CODES.TELEGRAM_FALLBACK_DELIVERY_FAILED, updateId }, 'Telegram fallback reply delivery failed');
     }
   });
 

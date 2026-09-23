@@ -4,6 +4,8 @@ const TELEGRAM_FAILURE_CODES = Object.freeze({
   RATE_LIMITED: 'RATE_LIMITED',
   VOICE_INVALID: 'VOICE_INVALID',
   VOICE_TRANSCRIPTION_FAILED: 'VOICE_TRANSCRIPTION_FAILED',
+  TELEGRAM_DELIVERY_FAILED: 'TELEGRAM_DELIVERY_FAILED',
+  TELEGRAM_FALLBACK_DELIVERY_FAILED: 'TELEGRAM_FALLBACK_DELIVERY_FAILED',
   DIALOGUE_UNAVAILABLE: 'DIALOGUE_UNAVAILABLE',
 });
 
@@ -11,6 +13,7 @@ function classifyTelegramFailure(error) {
   const message = String(error?.message || '');
   if (error?.name === 'RateLimitError') return TELEGRAM_FAILURE_CODES.RATE_LIMITED;
   if (error?.name === 'TelegramVoiceTranscriptionError') return TELEGRAM_FAILURE_CODES.VOICE_TRANSCRIPTION_FAILED;
+  if (error?.name === 'TelegramDeliveryError') return TELEGRAM_FAILURE_CODES.TELEGRAM_DELIVERY_FAILED;
   if (/^Telegram voice (?:is too large|duration is invalid)$/i.test(message)) {
     return TELEGRAM_FAILURE_CODES.VOICE_INVALID;
   }
