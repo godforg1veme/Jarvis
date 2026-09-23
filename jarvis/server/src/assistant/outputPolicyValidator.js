@@ -9,6 +9,12 @@ const TOOL_SUCCESS_PATTERNS = [
   /(?:^|\s)(?:готово|выполнено)[:,.!]?\s+(?:файл|приложение|компьютер|устройство|настройк)/i,
 ];
 
+const UNVERIFIED_USER_IDENTITY_PATTERNS = [
+  /(?:тебя|вас)\s+зовут\s+[А-ЯЁ][а-яё-]{1,}/iu,
+  /(?:ты|вы)\s*[—–-]\s*[А-ЯЁ][а-яё-]{1,}/iu,
+  /(?:владелец|пользователь)[^.!?\n]{0,80}(?:ты|вы)[^.!?\n]{0,40}\s[А-ЯЁ][а-яё-]{1,}/iu,
+];
+
 function normalizeForPolicy(value) {
   return String(value || '').replace(/[\\*_`~\[\]()]/g, ' ').replace(/\s+/g, ' ').trim();
 }
@@ -18,11 +24,17 @@ function hasProviderIdentity(answer) {
   return PROVIDER_IDENTITY_PATTERNS.some((pattern) => pattern.test(text));
 }
 
+function hasUnverifiedUserIdentity(answer) {
+  const text = normalizeForPolicy(answer);
+  return UNVERIFIED_USER_IDENTITY_PATTERNS.some((pattern) => pattern.test(text));
+}
+
 function validateOutput(answer, context = {}) {
   const text = String(answer || '').trim();
   const violations = [];
   if (!text) violations.push('empty_answer');
   if (hasProviderIdentity(text)) violations.push('provider_identity');
+  if (hasUnverifiedUserIdentity(text)) violations.push('unverified_user_identity');
   if (/<\/?JARVIS_(?:TRUSTED_POLICY|UNTRUSTED_USER_REQUEST_JSON)(?:\s[^>]*)?>/i.test(text)) violations.push('trusted_prompt_leak');
   if (!context.hasVerifiedToolResults && TOOL_SUCCESS_PATTERNS.some((pattern) => pattern.test(text))) {
     violations.push('unverified_tool_success');
@@ -33,7 +45,9 @@ function validateOutput(answer, context = {}) {
 module.exports = {
   PROVIDER_IDENTITY_PATTERNS,
   TOOL_SUCCESS_PATTERNS,
+  UNVERIFIED_USER_IDENTITY_PATTERNS,
   hasProviderIdentity,
+  hasUnverifiedUserIdentity,
   normalizeForPolicy,
   validateOutput,
 };

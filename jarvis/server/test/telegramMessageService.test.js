@@ -1,7 +1,8 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const { createTelegramAccessPolicy } = require('../src/telegram/accessPolicy');
-const { FixedWindowRateLimiter, RateLimitError } = require('../src/http/rateLimiter');
+const { FixedWindowRateLimiter } = require('../src/http/rateLimiter');
+const { TELEGRAM_FAILURE_CODES } = require('../src/telegram/telegramFailure');
 const {
   MAX_TELEGRAM_VOICE_BYTES,
   TelegramMessageService,
@@ -75,16 +76,19 @@ test('normalizes a Telegram voice note separately from ordinary attachments', ()
 });
 
 function harness(allowedIds = ['101', '202'], devices = null, commandService = null, options = {}) {
-  const state = { updates: new Set(), users: new Map(), conversations: new Map(), messages: [] };
+  const state = { updates: new Set(), updateOutcomes: new Map(), updateKinds: new Map(), users: new Map(), conversations: new Map(), messages: [] };
   const assistantCalls = [];
   const service = new TelegramMessageService({
     accessPolicy: createTelegramAccessPolicy(allowedIds),
     updateRepository: {
-      async claim(updateId) {
+      async claim(updateId, _telegramUserId, updateKind) {
         if (state.updates.has(updateId)) return false;
         state.updates.add(updateId);
+        state.updateKinds.set(updateId, updateKind);
         return true;
       },
+      async markCompleted(updateId) { state.updateOutcomes.set(updateId, { status: 'completed' }); },
+      async markFailed(updateId, failureCode) { state.updateOutcomes.set(updateId, { status: 'failed', failureCode }); },
     },
     userRepository: {
       async findOrCreateTelegramUser({ telegramUserId, displayName }) {
@@ -108,7 +112,7 @@ function harness(allowedIds = ['101', '202'], devices = null, commandService = n
           .slice(-limit);
       },
     },
-    assistant: {
+    assistant: options.assistant || {
       async answer(input) {
         assistantCalls.push(input);
         return `answer:${input.currentRequest}`;
@@ -130,6 +134,7 @@ function harness(allowedIds = ['101', '202'], devices = null, commandService = n
     ...(options.menuService ? { menuService: options.menuService } : {}),
     ...(options.orchestrator ? { orchestrator: options.orchestrator } : {}),
     ...(options.lifeReminderService ? { lifeReminderService: options.lifeReminderService } : {}),
+    ...(options.logger ? { logger: options.logger } : {}),
   });
   return { service, state, assistantCalls };
 }
@@ -164,6 +169,38 @@ test('deduplicates Telegram updates', async () => {
   assert.equal((await service.handle(update(2, 101, 101, 'hello'))).status, 'answered');
   assert.equal((await service.handle(update(2, 101, 101, 'hello'))).status, 'duplicate');
   assert.equal(state.messages.length, 2);
+});
+
+test('turns an unavailable model into a safe Telegram reply and records only a closed failure code', async () => {
+  const warnings = [];
+  const { service, state } = harness(['101'], null, null, {
+    assistant: { async answer() { throw new Error('openrouter request failed with HTTP 503'); } },
+    logger: { warn(entry) { warnings.push(entry); } },
+  });
+  const result = await service.handle(update(902, 101, 101, 'private question that must not enter telemetry'));
+  assert.equal(result.status, 'answered');
+  assert.match(result.answer, /Модель сейчас временно недоступна/);
+  assert.equal(result.answer.includes('openrouter'), false);
+  assert.deepEqual(state.updateOutcomes.get(902), { status: 'failed', failureCode: 'MODEL_UNAVAILABLE' });
+  assert.equal(JSON.stringify(warnings).includes('private question'), false);
+  assert.deepEqual(warnings[0], {
+    telegramFailureCode: 'MODEL_UNAVAILABLE', telegramFailurePhase: 'message', updateId: 902,
+  });
+});
+
+test('contains menu and callback failures so they cannot fall through to the generic bot catch', async () => {
+  const menuService = {
+    async handleMenuAction() { throw new Error('menu backing service unavailable'); },
+    async handlePendingText() { return null; },
+    async handleCallback() { throw new Error('callback backing service unavailable'); },
+  };
+  const { service, state } = harness(['101'], null, null, { menuService });
+  const menu = await service.handle(update(903, 101, 101, '🔐 VPN'));
+  const callback = await service.handleCallback(callbackUpdate(904, 101, 101, 'mem:menu'));
+  assert.match(menu.answer, /Не удалось завершить это сообщение/);
+  assert.match(callback.answer, /Не удалось завершить это сообщение/);
+  assert.deepEqual(state.updateOutcomes.get(903), { status: 'failed', failureCode: 'DIALOGUE_UNAVAILABLE' });
+  assert.deepEqual(state.updateOutcomes.get(904), { status: 'failed', failureCode: 'DIALOGUE_UNAVAILABLE' });
 });
 
 test('Telegram reminder acknowledgement is bound to the authenticated owner and conversation', async () => {
@@ -220,6 +257,26 @@ test('transcribes an allowed Telegram voice without storing raw audio', async ()
   assert.equal(assistantCalls[0].currentRequest, 'открой список задач');
 });
 
+test('reports a failed Telegram voice transcription without claiming the transcript was saved', async () => {
+  const rawAudio = Buffer.from('private-voice-bytes');
+  const { service, state, assistantCalls } = harness(['101'], null, null, {
+    asr: {
+      async transcribe() { throw new Error('private ASR provider response'); },
+    },
+  });
+
+  const result = await service.handle(voiceUpdate(39, 101, 101), {
+    async downloadVoice() { return rawAudio; },
+  });
+
+  assert.match(result.answer, /текст не сохранён/);
+  assert.doesNotMatch(result.answer, /сообщение принято/i);
+  assert.equal(state.messages.some((message) => String(message.content).includes(rawAudio.toString())), false);
+  assert.equal(state.messages.some((message) => message.contentType === 'voice_transcript'), false);
+  assert.equal(assistantCalls.length, 0);
+  assert.deepEqual(state.updateOutcomes.get(39), { status: 'failed', failureCode: TELEGRAM_FAILURE_CODES.VOICE_TRANSCRIPTION_FAILED });
+});
+
 test('keeps a Telegram voice in attachment ingestion while voice ASR is disabled', async () => {
   const ingested = [];
   const { service, state } = harness(['101'], null, null, {
@@ -241,23 +298,19 @@ test('keeps a Telegram voice in attachment ingestion while voice ASR is disabled
   assert.equal(state.messages[0].contentType, 'document');
 });
 
-test('rejects oversized or over-duration Telegram voice before downloading it', async () => {
+test('answers safely for oversized or over-duration Telegram voice before downloading it', async () => {
   let downloads = 0;
   const { service } = harness(['101'], null, null, {
     asr: { async transcribe() { return { text: 'unused' }; } },
   });
-  await assert.rejects(
-    service.handle(voiceUpdate(33, 101, 101, { duration: 121 }), {
-      async downloadVoice() { downloads += 1; return Buffer.from('unused'); },
-    }),
-    /duration is invalid/,
-  );
-  await assert.rejects(
-    service.handle(voiceUpdate(34, 101, 101, { file_size: MAX_TELEGRAM_VOICE_BYTES + 1 }), {
-      async downloadVoice() { downloads += 1; return Buffer.from('unused'); },
-    }),
-    /too large/,
-  );
+  const longVoice = await service.handle(voiceUpdate(33, 101, 101, { duration: 121 }), {
+    async downloadVoice() { downloads += 1; return Buffer.from('unused'); },
+  });
+  const largeVoice = await service.handle(voiceUpdate(34, 101, 101, { file_size: MAX_TELEGRAM_VOICE_BYTES + 1 }), {
+    async downloadVoice() { downloads += 1; return Buffer.from('unused'); },
+  });
+  assert.match(longVoice.answer, /до 120 секунд/);
+  assert.match(largeVoice.answer, /до 5 МБ/);
   assert.equal(downloads, 0);
 });
 
@@ -273,12 +326,10 @@ test('throttles Telegram voice per owner before additional downloads', async () 
       async downloadVoice() { downloads += 1; return Buffer.from('voice'); },
     });
   }
-  await assert.rejects(
-    service.handle(voiceUpdate(38, 101, 101), {
-      async downloadVoice() { downloads += 1; return Buffer.from('voice'); },
-    }),
-    (error) => error instanceof RateLimitError,
-  );
+  const limited = await service.handle(voiceUpdate(38, 101, 101), {
+    async downloadVoice() { downloads += 1; return Buffer.from('voice'); },
+  });
+  assert.match(limited.answer, /до трёх голосовых в минуту/);
   assert.equal(downloads, 3);
 });
 
@@ -329,6 +380,14 @@ test('routes validated menu callbacks before legacy callback handlers', async ()
   const result = await service.handleCallback(callbackUpdate(72, 101, 101, 'mem:list'));
   assert.equal(result.answer, 'Память открыта.');
   assert.equal(state.messages.at(-1).content, 'Память открыта.');
+  assert.equal(state.updateKinds.get(72), 'callback');
+});
+
+test('records the closed message route without retaining message text in update diagnostics', async () => {
+  const { service, state } = harness(['101']);
+  await service.handle(update(74, 101, 101, 'обычный диалог'));
+  assert.equal(state.updateKinds.get(74), 'message');
+  assert.equal([...state.updateKinds.values()].includes('обычный диалог'), false);
 });
 
 test('guided Desktop text reaches the orchestrator with the selected owned device', async () => {

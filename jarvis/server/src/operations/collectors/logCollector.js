@@ -6,9 +6,15 @@ const crypto = require('node:crypto');
 function normalizeOperationalLogs(output, now = new Date()) {
   const entries = [];
   for (const line of String(output || '').split(/\r?\n/).slice(-100)) {
-    let body = line; let level = null;
+    let body = line; let level = null; let telegramFailureCode = null;
     const start = line.indexOf('{');
-    if (start >= 0) try { const row = JSON.parse(line.slice(start)); level = row.level; body = String(row.msg || ''); } catch (_) {}
+    if (start >= 0) try {
+      const row = JSON.parse(line.slice(start));
+      level = row.level;
+      body = String(row.msg || '');
+      const candidate = String(row.telegramFailureCode || '');
+      if (/^[A-Z][A-Z0-9_]{2,79}$/.test(candidate)) telegramFailureCode = candidate;
+    } catch (_) {}
     const error = Number(level) >= 50 || /\b(error|fatal|critical|failed|panic)\b/i.test(body);
     const warning = Number(level) === 40 || /\bwarn(?:ing)?\b/i.test(body);
     const lifecycle = /\b(started|starting|stopped|shutdown|listening|connected|disconnected)\b/i.test(body);
@@ -16,7 +22,9 @@ function normalizeOperationalLogs(output, now = new Date()) {
     const match = line.match(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|[+-]\d\d:\d\d)/);
     const parsed = match ? new Date(match[0]) : now;
     const observedAt = Number.isNaN(parsed.getTime()) ? now : parsed;
-    const message = error ? 'В журнале сервиса зафиксирована ошибка' : warning ? 'В журнале сервиса зафиксировано предупреждение' : 'Изменение состояния процесса';
+    const message = telegramFailureCode
+      ? `Telegram update: ${telegramFailureCode}`
+      : error ? 'В журнале сервиса зафиксирована ошибка' : warning ? 'В журнале сервиса зафиксировано предупреждение' : 'Изменение состояния процесса';
     entries.push({ observedAt, message, priority: error ? 3 : warning ? 4 : 6,
       byteSize: Buffer.byteLength(message), fingerprint: crypto.createHash('sha256').update(`${observedAt.toISOString()}:${message}`).digest('hex') });
   }

@@ -8,6 +8,7 @@ const { publicDocumentStatus, renderDocumentCitations } = require('../knowledge/
 const { parseRemoteCommand, remoteCommandReply } = require('../commands/commandText');
 const { recordMessageEvent } = require('../life/lifeSourceEvents');
 const { menuAction } = require('./telegramMenu');
+const { classifyTelegramFailure, telegramFailureReply } = require('./telegramFailure');
 
 function telegramMenuContext({ user, conversation, input }) {
   return {
@@ -166,6 +167,27 @@ class TelegramMessageService {
     this.lifeProposalService = options.lifeProposalService || null;
     this.lifeReminderService = options.lifeReminderService || null;
     this.menuService = options.menuService || null;
+    this.logger = options.logger || null;
+  }
+
+  async markCompleted(updateId) {
+    if (typeof this.updateRepository?.markCompleted !== 'function') return;
+    await this.updateRepository.markCompleted(updateId);
+  }
+
+  async failureResult({ updateId, error, phase }) {
+    const failureCode = classifyTelegramFailure(error);
+    try {
+      if (typeof this.updateRepository?.markFailed === 'function') {
+        await this.updateRepository.markFailed(updateId, failureCode);
+      }
+    } catch (_) {
+      // A diagnostic write must never hide the safe reply for the Telegram user.
+    }
+    if (this.logger && typeof this.logger.warn === 'function') {
+      this.logger.warn({ telegramFailureCode: failureCode, telegramFailurePhase: phase, updateId }, 'Telegram update recovered with fallback reply');
+    }
+    return { status: 'answered', answer: telegramFailureReply(failureCode) };
   }
 
   async remoteCommandReply({ text, user, conversationId }) {
@@ -182,8 +204,18 @@ class TelegramMessageService {
   async handleCallback(update) {
     const input = normalizeTelegramCallbackUpdate(update);
     if (!this.accessPolicy.isAllowed(input.telegramUserId)) return { status: 'forbidden' };
-    const claimed = await this.updateRepository.claim(input.updateId, input.telegramUserId);
+    const claimed = await this.updateRepository.claim(input.updateId, input.telegramUserId, 'callback');
     if (!claimed) return { status: 'duplicate' };
+    try {
+      const result = await this.handleClaimedCallback(input);
+      await this.markCompleted(input.updateId);
+      return result;
+    } catch (error) {
+      return this.failureResult({ updateId: input.updateId, error, phase: 'callback' });
+    }
+  }
+
+  async handleClaimedCallback(input) {
     const user = await this.userRepository.findOrCreateTelegramUser({ telegramUserId: input.telegramUserId, displayName: input.displayName });
     const conversation = await this.conversationRepository.getOrCreate({ userId: user.id, channel: 'telegram', externalChatId: input.chatId });
     const menuContext = telegramMenuContext({ user, conversation, input });
@@ -477,9 +509,19 @@ class TelegramMessageService {
     }
     if (input.ignored) return { status: 'ignored' };
 
-    const claimed = await this.updateRepository.claim(input.updateId, input.telegramUserId);
+    const claimed = await this.updateRepository.claim(input.updateId, input.telegramUserId, 'message');
     if (!claimed) return { status: 'duplicate' };
 
+    try {
+      const result = await this.handleClaimedMessage(input, options);
+      await this.markCompleted(input.updateId);
+      return result;
+    } catch (error) {
+      return this.failureResult({ updateId: input.updateId, error, phase: 'message' });
+    }
+  }
+
+  async handleClaimedMessage(input, options = {}) {
     const user = await this.userRepository.findOrCreateTelegramUser({
       telegramUserId: input.telegramUserId,
       displayName: input.displayName,
@@ -524,11 +566,18 @@ class TelegramMessageService {
         this.voiceLimiter.check(`telegram-voice:${user.id}`, { limit: 3, windowMs: 60000 });
       }
       const audio = await options.downloadVoice(input.voice);
-      const transcription = await this.asr.transcribe({
-        audio,
-        mimeType: input.voice.mediaType,
-        languageHint: 'ru',
-      });
+      let transcription;
+      try {
+        transcription = await this.asr.transcribe({
+          audio,
+          mimeType: input.voice.mediaType,
+          languageHint: 'ru',
+        });
+      } catch (_) {
+        const error = new Error('Telegram voice transcription failed');
+        error.name = 'TelegramVoiceTranscriptionError';
+        throw error;
+      }
       const transcript = String(transcription && transcription.text || '').trim();
       if (!transcript || transcript.length > MAX_TEXT_LENGTH) throw new Error('invalid Telegram voice transcription');
       input.text = transcript;

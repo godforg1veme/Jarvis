@@ -17,9 +17,9 @@ Jarvis is a hybrid personal and family AI-assistant platform:
 - PWA remains planned. Server ASR is deployed as a private GigaAM
   `v3_e2e_rnnt` ONNX worker on DE-4. Allowlisted Telegram `voice` notes route
   through it, persist only a `voice_transcript`, and retain no raw audio.
-  The deployed synthetic OGG service-to-worker contract is verified; a real
-  inbound owner Telegram voice and a paired-Desktop voice remain manual client
-  acceptance checks. Telegram `audio` and other media retain attachment
+  The deployed synthetic OGG service-to-worker contract and a real inbound
+  owner Telegram voice were verified on 2026-09-23; paired-Desktop voice remains
+  a manual client acceptance check. Telegram `audio` and other media retain attachment
   ingestion. The first camera/screen
   Vision vertical slice is implemented locally and in the control plane: explicit
   local leases, Camo-compatible camera discovery, a two-display workspace,
@@ -58,7 +58,10 @@ See `docs/README.md` for current implementation status and historical records.
   carry only closed source identifiers and bounded page state; bytes, storage
   keys, and paths must not enter callbacks or conversation history. Owner-only
   VPN and Operations entries remain authorization-checked on every action; menu
-  labels are presentation, not authority. Navigation, migration 015, the VPN
+  labels are presentation, not authority. Telegram update diagnostics may
+  retain only a closed update kind, outcome, and failure code; dialogue text,
+  callback payloads, exception details, and credentials are forbidden in update
+  diagnostics and Operations logs. Navigation, migration 015, the VPN
   owner-context fix, and the memory gallery were deployed on 2026-09-14; live
   owner/member media and deletion acceptance remains manual.
 - PostgreSQL with pgvector is the source of truth for cloud identity,
@@ -350,6 +353,21 @@ with its validation tests.
   changes.
 - Ask before adding a new production dependency.
 
+## Telegram Menu Contract
+
+- Before changing any Telegram button, keyboard label or row, callback grammar,
+  route, guided input, visibility rule, or confirmation path, read
+  `docs/telegram-button-architecture.md` and `docs/telegram-menu-contract.md`
+  in full. Send the pre-edit change notice required by the architecture guide.
+- Do not change the observable menu/callback contract or a confirmation/security
+  boundary without explicit owner approval in the current task, matching tests,
+  and synchronized updates to the menu contract. Internal fixes must preserve
+  the documented owner/user/conversation/chat scopes, deduplication, closed
+  grammar, and origin-bound confirmation.
+- Telegram update diagnostics may retain only closed route kind, phase, outcome,
+  and failure code. Never log dialogue text, transcripts, callback payloads,
+  raw Telegram file URLs, credentials, or exception messages.
+
 ## Commands and Verification
 
 Windows client:
@@ -398,6 +416,9 @@ cd server
 npm test
 npm start
 ```
+
+Telegram menu changes: run the focused suite in
+`docs/telegram-menu-contract.md`, then full `server/npm test` before deployment.
 
 Run the smallest relevant checks first, then adjacent regression suites. For
 configured model changes, test missing-key behavior, fake transport, and a

@@ -1,5 +1,5 @@
 const { PERSONA_POLICY_ID, PERSONA_POLICY_TEXT } = require('./personaPolicy');
-const { hasProviderIdentity } = require('../assistant/outputPolicyValidator');
+const { hasProviderIdentity, hasUnverifiedUserIdentity } = require('../assistant/outputPolicyValidator');
 const { normalizeDevicePromptContext } = require('../devices/devicePromptContext');
 const {
   normalizeCommunicationGuidance,
@@ -12,7 +12,7 @@ function normalizeHistory(history, limit = 30) {
   if (!Array.isArray(history)) return [];
   return history
     .filter((message) => message && ALLOWED_HISTORY_ROLES.has(message.role) && typeof message.content === 'string')
-    .filter((message) => message.role !== 'assistant' || !hasProviderIdentity(message.content))
+    .filter((message) => message.role !== 'assistant' || (!hasProviderIdentity(message.content) && !hasUnverifiedUserIdentity(message.content)))
     .slice(-limit)
     .map((message) => ({ role: message.role, content: message.content }));
 }

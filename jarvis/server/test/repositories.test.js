@@ -12,9 +12,26 @@ test('Telegram update claim uses parameterized SQL', async () => {
       return { rowCount: 1, rows: [{ update_id: values[0] }] };
     },
   });
-  assert.equal(await repository.claim(42, '123'), true);
-  assert.deepEqual(calls[0].values, [42, '123']);
+  assert.equal(await repository.claim(42, '123', 'message'), true);
+  assert.deepEqual(calls[0].values, [42, '123', 'message']);
   assert.equal(calls[0].sql.includes('123'), false);
+  await assert.rejects(repository.claim(43, '123', 'unknown'), /invalid Telegram update kind/);
+});
+
+test('Telegram update outcomes use parameterized IDs and bounded failure codes', async () => {
+  const calls = [];
+  const repository = new TelegramUpdateRepository({
+    query: async (sql, values) => { calls.push({ sql, values }); return { rowCount: 1, rows: [] }; },
+  });
+
+  await repository.markCompleted(42);
+  await repository.markFailed(43, 'MODEL_UNAVAILABLE');
+
+  assert.match(calls[0].sql, /status='completed'/);
+  assert.deepEqual(calls[0].values, [42]);
+  assert.match(calls[1].sql, /status='failed'/);
+  assert.deepEqual(calls[1].values, [43, 'MODEL_UNAVAILABLE']);
+  await assert.rejects(repository.markFailed(44, 'provider secret'), /invalid Telegram failure code/);
 });
 
 test('message insert scopes the conversation by user ID', async () => {

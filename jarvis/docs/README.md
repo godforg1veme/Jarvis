@@ -4,7 +4,7 @@ This file is the status authority for project documentation. Specifications and
 plans under `docs/superpowers/` are preserved as decision history; their old
 future-tense wording does not override the current architecture in `AGENTS.md`.
 
-Status snapshot: 2026-09-18.
+Status snapshot: 2026-09-23.
 
 Happ resilient port-pool deployment, 2026-09-18: Jarvis now has
 a closed DE/NL public Hysteria2 port-pool contract, an exact two-request hopping
@@ -16,6 +16,25 @@ smoke, and disabled probe timers were verified. The real Happ port-hopping and
 split-routing acceptance remains mandatory. The current
 [VPN resilience runbook](VPN_RESILIENCE_RUNBOOK.md) defines the evidence order
 and the no-timer safety boundary.
+The active Telegram button architecture guide and shipped-menu contract are
+`telegram-button-architecture.md` and `telegram-menu-contract.md`. An automated
+contract test checks owner/member keyboard rows and agent-document links.
+The 2026-09-23 live owner text/voice and bottom-menu acceptance, one inline
+callback, and remaining integration/member-client gates are recorded in
+`updates/2026-09-23-telegram-dialogue-acceptance.md`.
+
+Telegram dialogue resilience and identity guard, source update 2026-09-23:
+assistant output and persisted history reject unverified claims about the
+owner's identity. Message and callback processing failures return a bounded
+safe reply and retain only closed route/outcome/failure codes; raw dialogue,
+callback payloads, exception text, and credentials are excluded from these
+diagnostics. Production already has migrations 024/025 and the general
+classified fallback path. A specific Telegram voice-ASR failure reply now
+correctly says that its transcript was not saved; this last refinement is
+locally tested but not deployed. A real owner text question about the user's
+name and a Telegram voice note were accepted on 2026-09-23: both updates
+completed without failure codes, the voice persisted only as `voice_transcript`,
+and the replies did not assert the VPN-profile name as the user's identity.
 
 Dynamic VPN Subscription Network & Port Hopping rollout, 2026-09-16: Jarvis
 now generates dynamic Sing-box/Happ subscriptions with four endpoints
@@ -213,8 +232,8 @@ The server ASR interface is deployed with a private Russian-only GigaAM
 `v3_e2e_rnnt` ONNX worker on DE-4. Allowlisted Telegram `voice` notes are
 bounded, transcribed through that private worker, and saved only as
 `voice_transcript`; a deployed synthetic OGG service-to-worker contract is
-accepted. Real inbound owner Telegram voice and paired-Desktop client
-acceptance remain manual checks. Telegram `audio` and other media remain
+accepted. Real inbound owner Telegram voice passed on 2026-09-23; paired-Desktop
+client acceptance remains manual. Telegram `audio` and other media remain
 attachment ingestion.
 
 ## Authoritative current documents
@@ -223,6 +242,9 @@ attachment ingestion.
 | --- | --- |
 | `README.md` | Product overview, current capabilities, architecture, setup |
 | `AGENTS.md` | Authoritative runtime, safety, code, and verification rules |
+| `telegram-button-architecture.md` | Mandatory Telegram route, trust-boundary, failure, and agent change-control guide |
+| `telegram-menu-contract.md` | Shipped Telegram keyboard, callback, confirmation, and focused regression contract |
+| `updates/2026-09-23-telegram-dialogue-acceptance.md` | Live owner text/voice evidence, automated E2E matrix, and remaining release/client gates |
 | `deploy/README.md` | Current Ubuntu 24.04 and Cloudflare Tunnel operations |
 | `updates/2026-09-01-cloud-desktop-memory-rollout.md` | Итог текущего развёртывания Desktop, памяти, устройств и известных ограничений |
 | `updates/2026-09-14-telegram-button-navigation.md` | Production rollout record for button-first navigation in Telegram |
