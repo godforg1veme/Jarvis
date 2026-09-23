@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,6 +24,7 @@ class ProbeTarget:
     node_code: str
     vless_host: str
     hysteria_host: str
+    expected_exit_ip: str
 
 
 @dataclass(frozen=True)
@@ -44,11 +46,26 @@ def load_config(path: str | Path) -> HostAgentConfig:
         raise ProtocolError("Host Agent config is invalid")
     node_code = raw["nodeCode"]
     target = raw["probeTarget"]
-    if node_code not in {"de", "nl"} or not isinstance(target, dict) or set(target) != {"nodeCode", "vlessHost", "hysteriaHost"}:
+    if (
+        node_code not in {"de", "nl"}
+        or not isinstance(target, dict)
+        or set(target) != {"nodeCode", "vlessHost", "hysteriaHost", "expectedExitIp"}
+    ):
         raise ProtocolError("probe target is invalid")
     if target["nodeCode"] not in {"de", "nl"} or target["nodeCode"] == node_code:
         raise ProtocolError("probe target is invalid")
-    if any(not isinstance(target[field], str) or not 1 <= len(target[field]) <= 253 for field in ("vlessHost", "hysteriaHost")):
+    if any(
+        not isinstance(target[field], str) or not 1 <= len(target[field]) <= 253
+        for field in ("vlessHost", "hysteriaHost")
+    ):
+        raise ProtocolError("probe target is invalid")
+    if not isinstance(target["expectedExitIp"], str):
+        raise ProtocolError("probe target is invalid")
+    try:
+        expected_exit_ip = str(ipaddress.ip_address(target["expectedExitIp"]))
+    except ValueError:
+        raise ProtocolError("probe target is invalid") from None
+    if "%" in expected_exit_ip:
         raise ProtocolError("probe target is invalid")
     credential_dir = raw["probeCredentialDir"]
     if not isinstance(credential_dir, str) or not credential_dir.startswith("/etc/jarvis-vpn/") or len(credential_dir) > 512:
@@ -78,6 +95,10 @@ def load_config(path: str | Path) -> HostAgentConfig:
         if service_id in services:
             raise ProtocolError("managed service id is duplicated")
         services[service_id] = ManagedService(service_id, source_type, service_target, frozenset(actions))
-    return HostAgentConfig(Path(raw["authenticatorPath"]), Path(raw["stateDir"]), services, node_code,
-                           ProbeTarget(target["nodeCode"], target["vlessHost"], target["hysteriaHost"]),
-                           Path(credential_dir))
+    probe_target = ProbeTarget(
+        target["nodeCode"], target["vlessHost"], target["hysteriaHost"], expected_exit_ip
+    )
+    return HostAgentConfig(
+        Path(raw["authenticatorPath"]), Path(raw["stateDir"]), services, node_code,
+        probe_target, Path(credential_dir)
+    )
