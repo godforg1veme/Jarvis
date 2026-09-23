@@ -38,6 +38,8 @@ In the deployed server source, each owner-confirmed credential installation coun
 
 Timer activation enables the NL-to-DE timer first and the DE-to-NL timer second. A first-side failure stops before the second command. If the second command fails or has an unknown outcome, the server sends one closed disable command for the confirmed first timer. A failed or uncertain compensation, or an uncertain second enable, leaves the overall state unknown: inspect both actual systemd timer states before a later owner-confirmed action. Never retry an uncertain enable under a new request ID. This behavior was deployed on 2026-09-23, but no live activation has occurred.
 
+The external probe timer source schedules the next run 15 minutes after the previous activation, with up to 30 seconds of randomized delay and 15 seconds of systemd accuracy. A previously enabled timer may first run about two minutes after boot. This is an approximate cadence, not an exact quarter-hour wall-clock schedule. Both production timers remain disabled until four separate owner-approved one-shot checks pass.
+
 ## What never enters logs, databases, callbacks, or chat
 
 Never write subscription tokens, full subscription URLs, VPN URIs, credentials, obfuscation values, packet captures, local temp paths, Host Agent payloads, or raw process output. Probe and Operations output is limited to node, check name, timestamp, closed status, and closed failure code.

@@ -3,7 +3,7 @@ Description=Schedule Jarvis external VPN client probe for %i
 
 [Timer]
 OnBootSec=2min
-OnUnitActiveSec=3min
+OnUnitActiveSec=15min
 RandomizedDelaySec=30s
 AccuracySec=15s
 Persistent=false
