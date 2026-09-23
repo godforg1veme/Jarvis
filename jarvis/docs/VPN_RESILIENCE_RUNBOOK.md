@@ -36,6 +36,8 @@ For a per-port restriction, retain the subscription URL and use the active port 
 
 In the current integration source, each owner-confirmed credential installation counts only after a fresh, node-matched authenticated `vless_tcp_8443` or `hysteria2_udp_hop` check is healthy. Timer activation requires four distinct matching proofs from the latest attempts within 24 hours. Legacy success records without this closed proof, failed rotations, and unknown results do not qualify. This gate has not yet been deployed; the production timers remain disabled.
 
+Timer activation in the integration source enables the NL-to-DE timer first and the DE-to-NL timer second. A first-side failure stops before the second command. If the second command fails or has an unknown outcome, the server sends one closed disable command for the confirmed first timer. A failed or uncertain compensation, or an uncertain second enable, leaves the overall state unknown: inspect both actual systemd timer states before a later owner-confirmed action. Never retry an uncertain enable under a new request ID. This behavior has not yet been deployed.
+
 ## What never enters logs, databases, callbacks, or chat
 
 Never write subscription tokens, full subscription URLs, VPN URIs, credentials, obfuscation values, packet captures, local temp paths, Host Agent payloads, or raw process output. Probe and Operations output is limited to node, check name, timestamp, closed status, and closed failure code.

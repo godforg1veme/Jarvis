@@ -101,12 +101,24 @@ class ProbeCredentialWorkflow {
 
   async enable() {
     if (!await this.verifiedBindings()) throw new ProbeWorkflowError('PROBE_ACCEPTANCE_INCOMPLETE');
-    const [de, nl] = await Promise.all([
-      this._request('nl', 'vpn.external_probe.monitor.enable', { targetNode: 'de' }),
-      this._request('de', 'vpn.external_probe.monitor.enable', { targetNode: 'nl' }),
-    ]);
-    resultOrThrow(de, 'PROBE_MONITOR_UNKNOWN', 'PROBE_MONITOR_FAILED');
-    resultOrThrow(nl, 'PROBE_MONITOR_UNKNOWN', 'PROBE_MONITOR_FAILED');
+    const first = await this._request('nl', 'vpn.external_probe.monitor.enable', { targetNode: 'de' });
+    resultOrThrow(first, 'PROBE_MONITOR_UNKNOWN', 'PROBE_MONITOR_FAILED');
+    let secondError;
+    try {
+      const second = await this._request('de', 'vpn.external_probe.monitor.enable', { targetNode: 'nl' });
+      resultOrThrow(second, 'PROBE_MONITOR_UNKNOWN', 'PROBE_MONITOR_FAILED');
+    } catch (error) {
+      secondError = error;
+    }
+    if (secondError) {
+      try {
+        const compensation = await this._request('nl', 'vpn.external_probe.monitor.disable', { targetNode: 'de' });
+        resultOrThrow(compensation, 'PROBE_MONITOR_UNKNOWN', 'PROBE_MONITOR_FAILED');
+      } catch {
+        throw new ProbeWorkflowError('PROBE_MONITOR_UNKNOWN');
+      }
+      throw new ProbeWorkflowError(secondError?.code === 'PROBE_MONITOR_FAILED' ? 'PROBE_MONITOR_FAILED' : 'PROBE_MONITOR_UNKNOWN');
+    }
     return { monitoring: true };
   }
 

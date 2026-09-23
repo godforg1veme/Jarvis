@@ -95,3 +95,80 @@ test('failed export or installation cannot run a probe and surfaces no secret', 
   const binding = probeBindingFor({ sourceNode: 'de', protocol: 'vless', clientId: CLIENT_ID, label: 'Probe NL to DE VLESS' });
   await assert.rejects(workflow.install(binding), /PROBE_EXPORT_UNKNOWN/);
 });
+
+function monitorHarness(responses = {}) {
+  const calls = [];
+  const clients = Object.fromEntries(['de', 'nl'].map((node) => [node, {
+    async request(request) {
+      calls.push({ node, operation: request.operation, targetNode: request.arguments.targetNode });
+      return responses[node]?.shift() || { result: { state: 'succeeded', data: {} } };
+    },
+  }]));
+  return {
+    calls,
+    workflow: new ProbeCredentialWorkflow({ clients, verifiedBindings: async () => true }),
+  };
+}
+
+test('monitor activation confirms both runners in order', async () => {
+  const { workflow, calls } = monitorHarness();
+  assert.deepEqual(await workflow.enable(), { monitoring: true });
+  assert.deepEqual(calls.map(({ node, operation, targetNode }) => [node, operation, targetNode]), [
+    ['nl', 'vpn.external_probe.monitor.enable', 'de'],
+    ['de', 'vpn.external_probe.monitor.enable', 'nl'],
+  ]);
+});
+
+test('first monitor failure or unknown outcome never dispatches the second enable', async () => {
+  for (const state of ['failed', 'unknown']) {
+    const { workflow, calls } = monitorHarness({ nl: [{ result: { state } }] });
+    await assert.rejects(workflow.enable(), new RegExp(state === 'unknown' ? 'PROBE_MONITOR_UNKNOWN' : 'PROBE_MONITOR_FAILED'));
+    assert.deepEqual(calls.map(({ node, operation }) => [node, operation]), [
+      ['nl', 'vpn.external_probe.monitor.enable'],
+    ]);
+  }
+});
+
+test('second monitor failure compensates the first exactly once', async () => {
+  const { workflow, calls } = monitorHarness({ de: [{ result: { state: 'failed' } }] });
+  await assert.rejects(workflow.enable(), /PROBE_MONITOR_FAILED/);
+  assert.deepEqual(calls.map(({ node, operation }) => [node, operation]), [
+    ['nl', 'vpn.external_probe.monitor.enable'],
+    ['de', 'vpn.external_probe.monitor.enable'],
+    ['nl', 'vpn.external_probe.monitor.disable'],
+  ]);
+});
+
+test('unknown second outcome or unconfirmed compensation stays unknown', async () => {
+  for (const [second, compensation] of [['unknown', 'succeeded'], ['failed', 'unknown']]) {
+    const { workflow, calls } = monitorHarness({
+      de: [{ result: { state: second } }],
+      nl: [{ result: { state: 'succeeded' } }, { result: { state: compensation } }],
+    });
+    await assert.rejects(workflow.enable(), /PROBE_MONITOR_UNKNOWN/);
+    assert.equal(calls.filter(({ operation }) => operation === 'vpn.external_probe.monitor.disable').length, 1);
+  }
+});
+
+test('second-runner transport loss compensates the first and never retries activation', async () => {
+  const calls = [];
+  const workflow = new ProbeCredentialWorkflow({
+    verifiedBindings: async () => true,
+    clients: {
+      nl: { async request(request) {
+        calls.push(['nl', request.operation]);
+        return { result: { state: 'succeeded', data: {} } };
+      } },
+      de: { async request(request) {
+        calls.push(['de', request.operation]);
+        throw new Error('synthetic transport loss');
+      } },
+    },
+  });
+  await assert.rejects(workflow.enable(), /PROBE_MONITOR_UNKNOWN/);
+  assert.deepEqual(calls, [
+    ['nl', 'vpn.external_probe.monitor.enable'],
+    ['de', 'vpn.external_probe.monitor.enable'],
+    ['nl', 'vpn.external_probe.monitor.disable'],
+  ]);
+});

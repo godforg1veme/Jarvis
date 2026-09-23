@@ -196,7 +196,10 @@ See `docs/README.md` for current implementation status and historical records.
   an owner-confirmed probe install is accepted. Timer activation counts only
   four distinct latest attempts with matching closed proof in the last 24 hours;
   legacy success records and failed rotations do not qualify. This extra gate
-  is locally tested but not yet deployed; production probe timers remain off.
+  is locally tested but not yet deployed. The local activation path enables
+  timers sequentially and sends one closed first-side disable if the second
+  enable does not confirm success; uncertain outcomes require actual timer-state
+  inspection, never blind retry. Production probe timers remain off.
 - Host Agent mutation claims are persisted before execution. An interrupted
   command has an unknown outcome and is reconciled; never retry it under a new
   identifier merely because its connection was lost. Discovery is read-only.

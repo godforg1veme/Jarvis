@@ -11,8 +11,10 @@ credential installation is counted only after a fresh, node-matched VLESS 8443
 or Hysteria2 hopping check succeeds. Only four distinct recent accepted proofs
 from the latest attempts can unlock timer activation; legacy success records
 and failed rotations cannot. Local tests and a read-only production SQL parse
-passed. This gate is not deployed, no test credential is installed, and both
-external-probe timers remain disabled.
+passed. Local activation now enables timers sequentially, compensates a
+second-side failure with one closed first-side disable, and never claims success
+for an uncertain outcome. These changes are not deployed, no test credential
+is installed, and both external-probe timers remain disabled.
 
 VPN Supervisor owner-approved restarts, 2026-09-23: the deployed server may
 propose only a matching Xray or Hysteria2 service restart after bounded
