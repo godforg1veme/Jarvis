@@ -94,7 +94,7 @@ git commit -m "fix(vpn): separate probe egress from endpoint"
 - Consumes: `ProbeTarget.expected_exit_ip` from Task 1.
 - Produces: `VPN_PROBE_EXPECTED_EXIT_IP=<expected_exit_ip>` in the same root-only environment file; endpoint fields remain their corresponding host variables.
 
-- [ ] **Step 1: Write a failing distinct-address environment test**
+- [x] **Step 1: Write a failing distinct-address environment test**
 
 Change the test fixture to use `vless_host="203.0.113.10"` and
 `expected_exit_ip="198.51.100.24"`. Assert the generated `probe-de.env`
@@ -102,7 +102,7 @@ contains `VPN_PROBE_VLESS_HOST=203.0.113.10` and
 `VPN_PROBE_EXPECTED_EXIT_IP=198.51.100.24`, and does not contain
 `VPN_PROBE_EXPECTED_EXIT_IP=203.0.113.10`.
 
-- [ ] **Step 2: Run the focused test and verify it fails**
+- [x] **Step 2: Run the focused test and verify it fails**
 
 ```powershell
 $env:PYTHONPATH = "host-agent"
@@ -112,7 +112,7 @@ python -m unittest discover -s host-agent/tests -p "test_vpn_probe_credentials.p
 Expected: it fails because the current generator derives the expected IP from
 `vless_host`.
 
-- [ ] **Step 3: Change only the expected-exit source**
+- [x] **Step 3: Change only the expected-exit source**
 
 In `_public_probe_environment`, read `expected_exit_ip` from the validated
 `probe_target` and serialize it into `VPN_PROBE_EXPECTED_EXIT_IP`. Keep
@@ -120,7 +120,7 @@ In `_public_probe_environment`, read `expected_exit_ip` from the validated
 connection fields. Do not alter credential validation, placeholder creation,
 or URI file write ordering.
 
-- [ ] **Step 4: Verify credential and environment tests**
+- [x] **Step 4: Verify credential and environment tests**
 
 Run the focused test command above. Expected: all pass; root-only file semantics
 and checks that generated metadata contains no URI/password remain intact.

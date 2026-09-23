@@ -49,14 +49,17 @@ def _public_probe_environment(config: object, target_node: str) -> str:
         raise ProbeCredentialError()
     vless_host = getattr(target, "vless_host", "")
     hysteria_host = getattr(target, "hysteria_host", "")
+    expected_exit_ip = getattr(target, "expected_exit_ip", "")
     if not isinstance(vless_host, str) or not isinstance(hysteria_host, str) or any(
             not value or len(value) > 253 or any(character in value for character in "\r\n'\\")
             for value in (vless_host, hysteria_host)):
         raise ProbeCredentialError()
     try:
-        expected_exit = str(ipaddress.ip_address(vless_host))
-    except ValueError:
+        expected_exit = str(ipaddress.ip_address(expected_exit_ip))
+    except (TypeError, ValueError):
         raise ProbeCredentialError() from None
+    if "%" in expected_exit:
+        raise ProbeCredentialError()
     pool = _BOOTSTRAP_HOP_POOLS[target_node]
     return "\n".join((
         f"VPN_PROBE_VLESS_HOST={vless_host}",

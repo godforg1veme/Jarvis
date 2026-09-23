@@ -30,7 +30,12 @@ def config_for(root: Path, node_code: str = "nl"):
     target = "de" if node_code == "nl" else "nl"
     return SimpleNamespace(
         node_code=node_code,
-        probe_target=SimpleNamespace(node_code=target, vless_host="203.0.113.10", hysteria_host="vpn.example.test"),
+        probe_target=SimpleNamespace(
+            node_code=target,
+            vless_host="203.0.113.10",
+            hysteria_host="vpn.example.test",
+            expected_exit_ip="198.51.100.24",
+        ),
         probe_credential_dir=root,
     )
 
@@ -81,8 +86,20 @@ class ProbeCredentialStoreTests(unittest.TestCase):
             content = (root / "probe-de.env").read_text(encoding="utf-8")
             self.assertIn("VPN_PROBE_HYSTERIA_HOP_POOL=", content)
             self.assertIn('"hopIntervalSeconds":30', content)
+            self.assertIn("VPN_PROBE_VLESS_HOST=203.0.113.10", content)
+            self.assertIn("VPN_PROBE_EXPECTED_EXIT_IP=198.51.100.24", content)
+            self.assertNotIn("VPN_PROBE_EXPECTED_EXIT_IP=203.0.113.10", content)
             self.assertNotIn("vless://", content)
             self.assertNotIn("synthetic-password", content)
+
+    def test_rejects_invalid_expected_exit_ip_without_writing_environment(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = config_for(root)
+            config.probe_target.expected_exit_ip = "203.0.113.10\nUNSAFE=value"
+            with self.assertRaises(ProbeCredentialError):
+                install_probe_environment(config, target_node="de")
+            self.assertFalse((root / "probe-de.env").exists())
 
     def test_rejects_same_node_mismatched_host_and_symlink_without_echoing_input(self):
         with tempfile.TemporaryDirectory() as directory:
