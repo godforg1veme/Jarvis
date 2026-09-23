@@ -14,7 +14,10 @@ callback payloads, exception text, and credentials are excluded from these
 diagnostics. Production already has migrations 024/025 and the general
 classified fallback path. A specific Telegram voice-ASR failure reply now
 correctly says that its transcript was not saved; this last refinement is
-locally tested but not deployed. Real-owner Telegram acceptance remains manual.
+locally tested but not deployed. A real owner text question about the user's
+name and a Telegram voice note were accepted on 2026-09-23: both updates
+completed without failure codes, the voice persisted only as `voice_transcript`,
+and the replies did not assert the VPN-profile name as the user's identity.
 
 Dynamic VPN Subscription Network & Port Hopping rollout, 2026-09-16: Jarvis
 now generates dynamic Sing-box/Happ subscriptions with four endpoints
@@ -212,8 +215,8 @@ The server ASR interface is deployed with a private Russian-only GigaAM
 `v3_e2e_rnnt` ONNX worker on DE-4. Allowlisted Telegram `voice` notes are
 bounded, transcribed through that private worker, and saved only as
 `voice_transcript`; a deployed synthetic OGG service-to-worker contract is
-accepted. Real inbound owner Telegram voice and paired-Desktop client
-acceptance remain manual checks. Telegram `audio` and other media remain
+accepted. Real inbound owner Telegram voice passed on 2026-09-23; paired-Desktop
+client acceptance remains manual. Telegram `audio` and other media remain
 attachment ingestion.
 
 ## Authoritative current documents

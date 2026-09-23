@@ -17,9 +17,9 @@ Jarvis is a hybrid personal and family AI-assistant platform:
 - PWA remains planned. Server ASR is deployed as a private GigaAM
   `v3_e2e_rnnt` ONNX worker on DE-4. Allowlisted Telegram `voice` notes route
   through it, persist only a `voice_transcript`, and retain no raw audio.
-  The deployed synthetic OGG service-to-worker contract is verified; a real
-  inbound owner Telegram voice and a paired-Desktop voice remain manual client
-  acceptance checks. Telegram `audio` and other media retain attachment
+  The deployed synthetic OGG service-to-worker contract and a real inbound
+  owner Telegram voice were verified on 2026-09-23; paired-Desktop voice remains
+  a manual client acceptance check. Telegram `audio` and other media retain attachment
   ingestion. The first camera/screen
   Vision vertical slice is implemented locally and in the control plane: explicit
   local leases, Camo-compatible camera discovery, a two-display workspace,
