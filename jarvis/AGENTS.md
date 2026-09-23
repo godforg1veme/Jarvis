@@ -349,6 +349,21 @@ with its validation tests.
   changes.
 - Ask before adding a new production dependency.
 
+## Telegram Menu Contract
+
+- Before changing any Telegram button, keyboard label or row, callback grammar,
+  route, guided input, visibility rule, or confirmation path, read
+  `docs/telegram-button-architecture.md` and `docs/telegram-menu-contract.md`
+  in full. Send the pre-edit change notice required by the architecture guide.
+- Do not change the observable menu/callback contract or a confirmation/security
+  boundary without explicit owner approval in the current task, matching tests,
+  and synchronized updates to the menu contract. Internal fixes must preserve
+  the documented owner/user/conversation/chat scopes, deduplication, closed
+  grammar, and origin-bound confirmation.
+- Telegram update diagnostics may retain only closed route kind, phase, outcome,
+  and failure code. Never log dialogue text, transcripts, callback payloads,
+  raw Telegram file URLs, credentials, or exception messages.
+
 ## Commands and Verification
 
 Windows client:
@@ -397,6 +412,9 @@ cd server
 npm test
 npm start
 ```
+
+Telegram menu changes: run the focused suite in
+`docs/telegram-menu-contract.md`, then full `server/npm test` before deployment.
 
 Run the smallest relevant checks first, then adjacent regression suites. For
 configured model changes, test missing-key behavior, fake transport, and a

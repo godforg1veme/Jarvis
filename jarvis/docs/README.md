@@ -6,6 +6,13 @@ future-tense wording does not override the current architecture in `AGENTS.md`.
 
 Status snapshot: 2026-09-23.
 
+The active Telegram button architecture guide and shipped-menu contract are
+`telegram-button-architecture.md` and `telegram-menu-contract.md`. An automated
+contract test checks owner/member keyboard rows and agent-document links.
+The 2026-09-23 live owner text/voice acceptance and remaining integration and
+real-client menu gates are recorded in
+`updates/2026-09-23-telegram-dialogue-acceptance.md`.
+
 Telegram dialogue resilience and identity guard, source update 2026-09-23:
 assistant output and persisted history reject unverified claims about the
 owner's identity. Message and callback processing failures return a bounded
@@ -225,6 +232,9 @@ attachment ingestion.
 | --- | --- |
 | `README.md` | Product overview, current capabilities, architecture, setup |
 | `AGENTS.md` | Authoritative runtime, safety, code, and verification rules |
+| `telegram-button-architecture.md` | Mandatory Telegram route, trust-boundary, failure, and agent change-control guide |
+| `telegram-menu-contract.md` | Shipped Telegram keyboard, callback, confirmation, and focused regression contract |
+| `updates/2026-09-23-telegram-dialogue-acceptance.md` | Live owner text/voice evidence, automated E2E matrix, and remaining release/client gates |
 | `deploy/README.md` | Current Ubuntu 24.04 and Cloudflare Tunnel operations |
 | `updates/2026-09-01-cloud-desktop-memory-rollout.md` | Итог текущего развёртывания Desktop, памяти, устройств и известных ограничений |
 | `updates/2026-09-14-telegram-button-navigation.md` | Production rollout record for button-first navigation in Telegram |

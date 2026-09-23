@@ -4,6 +4,11 @@ Status: proposed design for owner review. This document is not yet an active
 runtime contract. It describes the guide and agent workflow to adopt after
 approval; it does not authorize changes to Telegram behavior or production code.
 
+Adoption note, 2026-09-23: the owner subsequently requested completion of this
+design. The active guide is `docs/telegram-button-architecture.md` and the
+current shipped UI contract is `docs/telegram-menu-contract.md`; this spec is
+retained as decision history.
+
 Date: 2026-09-23
 
 ## 1. Purpose and outcome
