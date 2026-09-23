@@ -292,19 +292,22 @@ after DE passes. If any step fails, restore that node's exact config,
 environment, and source backups while its service is stopped, restart the
 restored service, and stop the rollout.
 
-The atomic config helper reads the peer egress from stdin, verifies the
-opposite target node, updates only `expectedExitIp`, validates it via
-`ipaddress` and `is_global`, writes a mode-0600 temporary JSON file in
-`/etc/jarvis-host-agent`, fsyncs it, then uses `os.replace`. Run as root; never
-print the value. Verify the saved value by boolean comparison only:
+The atomic config helper verifies the opposite target node, updates only
+`expectedExitIp`, validates it via `ipaddress` and `is_global`, writes a
+mode-0600 temporary JSON file in `/etc/jarvis-host-agent`, fsyncs it, then uses
+`os.replace`. Build the script locally with the closed target code and verified
+egress substituted into the two quoted constants, then pipe that script to
+`sudo python3 -` over authenticated SSH. Do not put the egress in a remote
+command argument or print it. Verify the saved value by boolean comparison
+only:
 
 ```python
-import ipaddress, json, os, sys, tempfile
+import ipaddress, json, os, tempfile
 from pathlib import Path
 
 path = Path("/etc/jarvis-host-agent/config.json")
-expected_target = sys.argv[1]
-address = ipaddress.ip_address(sys.stdin.read(128).strip())
+expected_target = "nl"  # For the NL runner, use "de".
+address = ipaddress.ip_address("198.51.100.24")
 if not address.is_global:
     raise SystemExit(2)
 data = json.loads(path.read_text(encoding="utf-8"))
@@ -323,6 +326,16 @@ try:
 finally:
     if os.path.exists(temporary):
         os.unlink(temporary)
+```
+
+For the DE deployment, locally replace the sample expected IP with the verified
+NL egress; for the NL deployment, replace it with verified DE egress and set
+`expected_target` to `de`. Pipe the generated source to SSH without displaying
+the value:
+
+```powershell
+$update = $update.Replace('"198.51.100.24"', ('"' + $expectedExit + '"'))
+$update | ssh jarvis-vps 'sudo -n /usr/bin/python3 -'
 ```
 
 - [ ] **Step 6: Regenerate and validate public environment metadata**
