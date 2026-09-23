@@ -239,11 +239,11 @@ git commit -m "fix(vpn): validate independent probe egress baseline"
 - DE `probeTarget.expectedExitIp` equals independently observed stable NL direct egress; NL `probeTarget.expectedExitIp` equals independently observed stable DE direct egress.
 - The systemd environment file reflects its matching Host Agent configuration.
 
-- [ ] **Step 1: Verify a clean candidate and run pre-deploy tests**
+- [x] **Step 1: Verify a clean candidate and run pre-deploy tests**
 
 Check `git status --short`, run `$env:PYTHONPATH="host-agent"; python -m unittest discover -s host-agent/tests`, and record the candidate commit. Use read-only checks to confirm both timers remain disabled/inactive and both VPN services remain active.
 
-- [ ] **Step 2: Back up production config, environment, and Host Agent source**
+- [x] **Step 2: Back up production config, environment, and Host Agent source**
 
 On both nodes, create `/root/jarvis-vpn-probe-egress-<commit>/` root-only and
 copy the Host Agent config, peer `probe-<peer>.env`, and complete
@@ -251,7 +251,7 @@ copy the Host Agent config, peer `probe-<peer>.env`, and complete
 open, hash, or print `.uri` files. Verify the backup contains exactly the two
 named metadata files plus the source tree.
 
-- [ ] **Step 3: Measure and validate both nodes' direct egress**
+- [x] **Step 3: Measure and validate both nodes' direct egress**
 
 Make two bounded IPv4 `api.ipify.org` requests on each node, separated by at
 least 30 seconds. Keep output in local variables, compare repeats without
@@ -260,21 +260,22 @@ node differs between observations, cannot be associated with its active
 outbound path, or differs by protocol, stop without updating config or running
 a probe.
 
-- [ ] **Step 4: Stage the tested Host Agent release on both nodes**
+- [x] **Step 4: Stage the tested Host Agent release on both nodes**
 
 Create a temporary archive locally and upload it only after tests pass:
 
 ```powershell
 $candidate = git rev-parse --short HEAD
 $archivePath = Join-Path $env:TEMP "jarvis-host-agent-$candidate.tar"
-git archive --format=tar --output="$archivePath" HEAD host-agent deploy/host-agent/deploy.sh
+git archive --format=tar --output="$archivePath" HEAD host-agent deploy/host-agent/deploy.sh deploy/vpn/jarvis-vpn-probe@.service deploy/vpn/jarvis-vpn-probe@.timer
 scp $archivePath "jarvis-vps:/tmp/jarvis-host-agent-$candidate.tar"
 scp $archivePath "jarvis-vps-new:/tmp/jarvis-host-agent-$candidate.tar"
 ```
 
 On each node, extract it under a unique
-`/tmp/jarvis-host-agent-$candidate/` directory. Staging must not stop or change
-the active service.
+`/tmp/jarvis-host-agent-$candidate/` directory. Include the two `deploy/vpn`
+unit templates because Host Agent regression tests read them from the staged
+repository root. Staging must not stop or change the active service.
 
 - [ ] **Step 5: Update and restart DE, verify, then update and restart NL**
 
