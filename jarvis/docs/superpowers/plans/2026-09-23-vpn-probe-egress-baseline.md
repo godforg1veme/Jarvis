@@ -221,7 +221,7 @@ git diff --check
 Expected: all Host Agent tests pass and `git diff --check` reports no whitespace
 errors.
 
-- [ ] **Step 4: Commit the tested implementation and documentation**
+- [x] **Step 4: Commit the tested implementation and documentation**
 
 ```powershell
 git add host-agent deploy/host-agent/config.example.json docs/VPN_RESILIENCE_RUNBOOK.md docs/README.md AGENTS.md
@@ -243,12 +243,13 @@ git commit -m "fix(vpn): validate independent probe egress baseline"
 
 Check `git status --short`, run `$env:PYTHONPATH="host-agent"; python -m unittest discover -s host-agent/tests`, and record the candidate commit. Use read-only checks to confirm both timers remain disabled/inactive and both VPN services remain active.
 
-- [ ] **Step 2: Back up exact production metadata files**
+- [ ] **Step 2: Back up production config, environment, and Host Agent source**
 
 On both nodes, create `/root/jarvis-vpn-probe-egress-<commit>/` root-only and
-copy only the Host Agent config and peer `probe-<peer>.env`, retaining owner
-and mode. Do not copy, open, hash, or print `.uri` files. Verify each backup
-contains exactly those two metadata files.
+copy the Host Agent config, peer `probe-<peer>.env`, and complete
+`/opt/jarvis-host-agent/` source tree, retaining owner and mode. Do not copy,
+open, hash, or print `.uri` files. Verify the backup contains exactly the two
+named metadata files plus the source tree.
 
 - [ ] **Step 3: Measure and validate both nodes' direct egress**
 
@@ -259,25 +260,56 @@ node differs between observations, cannot be associated with its active
 outbound path, or differs by protocol, stop without updating config or running
 a probe.
 
-- [ ] **Step 4: Atomically set peer baselines**
+- [ ] **Step 4: Stage the tested Host Agent release on both nodes**
 
-Use a root-run Python helper over authenticated SSH to read the validated peer
-egress from stdin, update only `config["probeTarget"]["expectedExitIp"]`,
-validate via `ipaddress`, write a mode-0600 temporary JSON file in
-`/etc/jarvis-host-agent`, `fsync`, then `os.replace`. Do not print the value.
-Verify the field by boolean comparison only. Use this helper body on each
-node, passing the measured peer egress on stdin:
+Create a temporary archive locally and upload it only after tests pass:
+
+```powershell
+$candidate = git rev-parse --short HEAD
+$archivePath = Join-Path $env:TEMP "jarvis-host-agent-$candidate.tar"
+git archive --format=tar --output="$archivePath" HEAD host-agent deploy/host-agent/deploy.sh
+scp $archivePath "jarvis-vps:/tmp/jarvis-host-agent-$candidate.tar"
+scp $archivePath "jarvis-vps-new:/tmp/jarvis-host-agent-$candidate.tar"
+```
+
+On each node, extract it under a unique
+`/tmp/jarvis-host-agent-$candidate/` directory. Staging must not stop or change
+the active service.
+
+- [ ] **Step 5: Update and restart DE, verify, then update and restart NL**
+
+Keep the other node and both VPN stacks active. Reconfirm the target node's
+probe timer is disabled/inactive. Before stopping either Host Agent, use a
+read-only database count to confirm no `vpn_action_requests` are `running` and
+no `ops_operation_runs` are `pending` or `accepted`; stop and wait for the
+owner if any such operation exists. Stop only that node's
+`jarvis-host-agent.service`, atomically set its `probeTarget.expectedExitIp` to
+the peer egress from Step 3, and invoke the staged `deploy.sh` with that staged
+app root. Its full Host Agent suite must pass before its systemd restart.
+Regenerate the root-only environment using Step 6 and verify the Host Agent,
+Xray, Hysteria2, config, and timer states. Do this first on DE; update NL only
+after DE passes. If any step fails, restore that node's exact config,
+environment, and source backups while its service is stopped, restart the
+restored service, and stop the rollout.
+
+The atomic config helper reads the peer egress from stdin, verifies the
+opposite target node, updates only `expectedExitIp`, validates it via
+`ipaddress` and `is_global`, writes a mode-0600 temporary JSON file in
+`/etc/jarvis-host-agent`, fsyncs it, then uses `os.replace`. Run as root; never
+print the value. Verify the saved value by boolean comparison only:
 
 ```python
 import ipaddress, json, os, sys, tempfile
 from pathlib import Path
 
 path = Path("/etc/jarvis-host-agent/config.json")
-value = sys.stdin.read(128).strip()
-address = ipaddress.ip_address(value)
+expected_target = sys.argv[1]
+address = ipaddress.ip_address(sys.stdin.read(128).strip())
 if not address.is_global:
     raise SystemExit(2)
 data = json.loads(path.read_text(encoding="utf-8"))
+if data.get("probeTarget", {}).get("nodeCode") != expected_target:
+    raise SystemExit(3)
 data["probeTarget"]["expectedExitIp"] = str(address)
 fd, temporary = tempfile.mkstemp(prefix="config.", suffix=".json", dir=path.parent)
 try:
@@ -292,34 +324,6 @@ finally:
     if os.path.exists(temporary):
         os.unlink(temporary)
 ```
-
-- [ ] **Step 5: Deploy Host Agent to DE, verify, then deploy NL**
-
-Create a temporary extraction directory on the node, stream only the candidate
-`host-agent/` and `deploy/host-agent/deploy.sh` files from `git archive HEAD`,
-then invoke `deploy.sh` with that extraction directory as `app_root`. Redirect
-its health snapshot body to `/dev/null` while preserving the process exit
-status. On DE, verify `jarvis-host-agent.service`, Xray, and Hysteria2 active;
-config parses; timers remain disabled/inactive. Repeat on NL only after DE
-passes. Stop and restore the affected node's exact backup if health changes or
-validation fails.
-
-Use a temporary archive, not a PowerShell binary pipeline:
-
-```powershell
-$candidate = git rev-parse --short HEAD
-$archivePath = Join-Path $env:TEMP "jarvis-host-agent-$candidate.tar"
-$remoteStage = "/tmp/jarvis-host-agent-$candidate"
-git archive --format=tar --output="$archivePath" HEAD host-agent deploy/host-agent/deploy.sh
-scp $archivePath "jarvis-vps:/tmp/jarvis-host-agent-$candidate.tar"
-ssh jarvis-vps "mkdir -p '$remoteStage'"
-ssh jarvis-vps "tar -xf '/tmp/jarvis-host-agent-$candidate.tar' -C '$remoteStage'"
-ssh jarvis-vps "sudo bash '$remoteStage/deploy/host-agent/deploy.sh' '$remoteStage' >/dev/null"
-```
-
-Repeat the `scp`/`tar`/`deploy.sh` commands with `jarvis-vps-new` only after
-DE passes. Remove the exact temporary archive and extraction paths only after
-both deployments and verifications succeed; retain the production backups.
 
 - [ ] **Step 6: Regenerate and validate public environment metadata**
 
@@ -346,6 +350,13 @@ Check both timers disabled/inactive, Host Agent/Xray/Hysteria2 active on both
 nodes, server health and `/health/ready`. Query current probe audit rows and
 verify install remains `unknown` and recheck remains failed. Do not call
 `vpn.external_probe.run`, enable timers, or claim acceptance.
+
+- [ ] **Step 8: Remove exact staging artifacts after verified rollout**
+
+After both nodes pass Step 7, remove only the named local tar archive and the
+two exact `/tmp/jarvis-host-agent-<commit>` extraction/archive paths after
+checking the expanded paths equal those expected. Retain root production
+backups for rollback.
 
 ### Task 6: Owner-confirmed live acceptance
 
