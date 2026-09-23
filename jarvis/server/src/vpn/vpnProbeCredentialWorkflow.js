@@ -1,8 +1,10 @@
 const crypto = require('node:crypto');
+const { validateExternalProbe } = require('../operations/vpnSupervisor/externalProbeMonitor');
 
 const CLIENT_ID = /^vpn-[a-f0-9]{12}$/;
 const NODES = new Set(['de', 'nl']);
 const PROTOCOLS = new Set(['vless', 'hysteria2']);
+const ACCEPTED_CHECK = Object.freeze({ vless: 'vless_tcp_8443', hysteria2: 'hysteria2_udp_hop' });
 const PROBE_BINDINGS = Object.freeze({
   'de:vless': Object.freeze({ runnerNode: 'nl', label: 'Probe NL to DE VLESS' }),
   'de:hysteria2': Object.freeze({ runnerNode: 'nl', label: 'Probe NL to DE Hysteria' }),
@@ -76,12 +78,18 @@ class ProbeCredentialWorkflow {
       const installData = resultOrThrow(installed, 'PROBE_INSTALL_UNKNOWN', 'PROBE_INSTALL_FAILED');
       const probed = await this._request(verified.runnerNode, 'vpn.external_probe.run', { targetNode: verified.sourceNode });
       const probeData = resultOrThrow(probed, 'PROBE_RUN_UNKNOWN', 'PROBE_RUN_FAILED');
+      const snapshot = validateExternalProbe(probeData, verified.sourceNode, this.now());
+      const acceptedCheck = ACCEPTED_CHECK[verified.protocol];
+      const status = snapshot.checks[acceptedCheck].status;
+      if (status !== 'healthy') {
+        throw new ProbeWorkflowError(status === 'failed' ? 'PROBE_ACCEPTANCE_FAILED' : 'PROBE_ACCEPTANCE_UNKNOWN');
+      }
       return {
         targetNode: verified.sourceNode,
         runnerNode: verified.runnerNode,
         protocol: verified.protocol,
         installedAt: String(installData.installedAt || '').slice(0, 40),
-        probe: probeData,
+        acceptedCheck,
       };
     } finally {
       credential = null;
