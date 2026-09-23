@@ -43,6 +43,6 @@
 
 - [x] Run focused Telegram tests, full `server/npm test`, and targeted security cases: denied identity, foreign scope, replay, stale confirmation, voice failure, fallback delivery, and no secret-bearing diagnostics.
 - [x] Verify live owner text and voice metadata already observed on 2026-09-23 and check fresh production health, migrations, closed outcomes, and both VPS units without printing private content.
-- [ ] Compare production source and the current Supervisor rollout before deciding whether a server deploy is needed; never overwrite newer Supervisor changes with a stale branch image.
+- [x] Compare production source and the current Supervisor rollout before deciding whether a server deploy is needed; never overwrite newer Supervisor changes with a stale branch image. Decision: integration with the active Supervisor work is required before deploy.
 - [ ] If a safe deploy is needed, use deployment preflight, Compose health, public readiness/smoke, and a real owner test; otherwise document precisely what remains undeployed.
 - [ ] Give the owner a short ordered Telegram tap-through checklist; mark every item as automated, production-observed, or still requiring a real client.

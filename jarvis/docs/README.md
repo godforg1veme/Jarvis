@@ -9,8 +9,8 @@ Status snapshot: 2026-09-23.
 The active Telegram button architecture guide and shipped-menu contract are
 `telegram-button-architecture.md` and `telegram-menu-contract.md`. An automated
 contract test checks owner/member keyboard rows and agent-document links.
-The 2026-09-23 live owner text/voice acceptance and remaining integration and
-real-client menu gates are recorded in
+The 2026-09-23 live owner text/voice and bottom-menu acceptance, one inline
+callback, and remaining integration/member-client gates are recorded in
 `updates/2026-09-23-telegram-dialogue-acceptance.md`.
 
 Telegram dialogue resilience and identity guard, source update 2026-09-23:
