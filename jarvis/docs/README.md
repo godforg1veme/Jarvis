@@ -15,6 +15,8 @@ passed. Activation enables timers sequentially, compensates a second-side
 failure with one closed first-side disable, and never claims success for an
 uncertain outcome. This integrated server source was deployed on 2026-09-23;
 no test credential is installed, and both external-probe timers remain disabled.
+The deployed DE/NL timer units were changed to an approximately 15-minute
+repeat interval on 2026-09-23 and verified while still disabled.
 See `updates/2026-09-23-vpn-probe-gate-and-monitor-rollout.md`.
 
 VPN Supervisor owner-approved restarts, 2026-09-23: the deployed server may

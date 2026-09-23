@@ -83,14 +83,14 @@ State that this is an approximate 15-minute interval with the existing jitter an
 - Consumes: verified source timer from Task 1 and existing disabled systemd units.
 - Produces: the same verified `15min` effective unit on both nodes, still disabled/inactive.
 
-- [ ] **Step 1: Check both live timer states and exact old unit paths**
+- [x] **Step 1: Check both live timer states and exact old unit paths**
 
 ```sh
-ssh jarvis-vps 'systemctl is-enabled jarvis-vpn-probe@nl.timer; systemctl is-active jarvis-vpn-probe@nl.timer; systemctl show -p FragmentPath -p OnUnitActiveUSec jarvis-vpn-probe@nl.timer'
-ssh jarvis-vps-new 'systemctl is-enabled jarvis-vpn-probe@de.timer; systemctl is-active jarvis-vpn-probe@de.timer; systemctl show -p FragmentPath -p OnUnitActiveUSec jarvis-vpn-probe@de.timer'
+ssh jarvis-vps 'systemctl is-enabled jarvis-vpn-probe@nl.timer; systemctl is-active jarvis-vpn-probe@nl.timer; systemctl show -p FragmentPath -p TimersMonotonic jarvis-vpn-probe@nl.timer'
+ssh jarvis-vps-new 'systemctl is-enabled jarvis-vpn-probe@de.timer; systemctl is-active jarvis-vpn-probe@de.timer; systemctl show -p FragmentPath -p TimersMonotonic jarvis-vpn-probe@de.timer'
 ```
 
-- [ ] **Step 2: Back up and install the verified unit on each node**
+- [x] **Step 2: Back up and install the verified unit on each node**
 
 ```sh
 ssh jarvis-vps 'sudo install -m 0644 /etc/systemd/system/jarvis-vpn-probe@.timer /etc/systemd/system/jarvis-vpn-probe@.timer.pre-15min-20260923'
@@ -101,13 +101,13 @@ ssh jarvis-vps 'sudo install -m 0644 /home/deploy/apps/jarvis/deploy/vpn/jarvis-
 ssh jarvis-vps-new 'sudo install -m 0644 /home/deploy/apps/jarvis/deploy/vpn/jarvis-vpn-probe@.timer /etc/systemd/system/jarvis-vpn-probe@.timer && sudo systemd-analyze verify /etc/systemd/system/jarvis-vpn-probe@.timer && sudo systemctl daemon-reload'
 ```
 
-- [ ] **Step 3: Read back both effective intervals and disabled states**
+- [x] **Step 3: Read back both effective intervals and disabled states**
 
 ```sh
-ssh jarvis-vps 'systemctl show -p OnUnitActiveUSec jarvis-vpn-probe@nl.timer; systemctl is-enabled jarvis-vpn-probe@nl.timer; systemctl is-active jarvis-vpn-probe@nl.timer; sha256sum /etc/systemd/system/jarvis-vpn-probe@.timer'
-ssh jarvis-vps-new 'systemctl show -p OnUnitActiveUSec jarvis-vpn-probe@de.timer; systemctl is-enabled jarvis-vpn-probe@de.timer; systemctl is-active jarvis-vpn-probe@de.timer; sha256sum /etc/systemd/system/jarvis-vpn-probe@.timer'
+ssh jarvis-vps 'systemctl show -p TimersMonotonic jarvis-vpn-probe@nl.timer; systemctl is-enabled jarvis-vpn-probe@nl.timer; systemctl is-active jarvis-vpn-probe@nl.timer; sha256sum /etc/systemd/system/jarvis-vpn-probe@.timer'
+ssh jarvis-vps-new 'systemctl show -p TimersMonotonic jarvis-vpn-probe@de.timer; systemctl is-enabled jarvis-vpn-probe@de.timer; systemctl is-active jarvis-vpn-probe@de.timer; sha256sum /etc/systemd/system/jarvis-vpn-probe@.timer'
 ```
 
-- [ ] **Step 4: Update rollout status and commit documentation**
+- [x] **Step 4: Update rollout status and commit documentation**
 
 Record observed DE/NL properties, unchanged disabled/inactive states, backup locations, and that no live one-shot acceptance or timer activation occurred. Run `git diff --check` before committing documentation.

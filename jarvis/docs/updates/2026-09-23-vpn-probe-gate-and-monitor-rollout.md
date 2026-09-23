@@ -46,3 +46,23 @@ If a monitor activation returns unknown, inspect both timer states and the
 original Host Agent request outcomes before any new owner-confirmed action;
 never retry an uncertain enable under a new request ID merely because its
 connection failed.
+
+## Fifteen-minute schedule update
+
+After the owner's separate approval, the shared probe timer was changed from
+`OnUnitActiveSec=3min` to `15min`. `OnBootSec=2min`, 30-second randomized
+delay, 15-second accuracy, `Persistent=false`, and the service binding were
+left unchanged. The new static test failed against the old source, passed
+after the change, and the 108-test Host Agent suite passed under root (two
+root-only temporary-file tests cannot pass as unprivileged `deploy`).
+
+The exact same unit hash (`e9ff8e88ee760219cba01eabe43c60109ea0e1d66bd133a9daf91a51aa18ef08`)
+was installed on DE and NL. `systemd-analyze verify` and `daemon-reload`
+passed on both. Effective systemd properties reported `OnUnitActiveUSec=15min`,
+`OnBootUSec=2min`, 30-second jitter and 15-second accuracy. Both instance
+timers remained `disabled/inactive`; Xray and Hysteria2 remained active on both
+nodes. The previous installed unit was retained at
+`/etc/systemd/system/jarvis-vpn-probe@.timer.pre-15min-20260923` on each node.
+Production preflight, public smoke, and server container health passed after
+the unit update. No probe service ran, credential was installed, or timer was
+enabled as part of this rollout.

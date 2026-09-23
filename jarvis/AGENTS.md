@@ -200,6 +200,10 @@ See `docs/README.md` for current implementation status and historical records.
   timers sequentially and sends one closed first-side disable if the second
   enable does not confirm success; uncertain outcomes require actual timer-state
   inspection, never blind retry. Production probe timers remain off.
+  Their deployed systemd unit now uses an approximately 15-minute repeat
+  interval with up to 30 seconds of jitter and a two-minute post-boot first
+  run if later enabled; both DE and NL effective units were verified on
+  2026-09-23 without enabling either timer.
 - Host Agent mutation claims are persisted before execution. An interrupted
   command has an unknown outcome and is reconciled; never retry it under a new
   identifier merely because its connection was lost. Discovery is read-only.
