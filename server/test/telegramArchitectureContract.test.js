@@ -28,7 +28,7 @@ test('documented owner and member keyboard rows match shipped source exactly', (
 
 test('agents and status index link the architecture and menu authorities', () => {
   const agents = read('AGENTS.md');
-  const rootAgents = fs.readFileSync(path.resolve(root, '../AGENTS.md'), 'utf8');
+  const rootAgents = fs.readFileSync(path.resolve(root, 'AGENTS.md'), 'utf8');
   const index = read('docs/README.md');
   const architecture = read('docs/telegram-button-architecture.md');
   const menu = read('docs/telegram-menu-contract.md');
@@ -36,7 +36,8 @@ test('agents and status index link the architecture and menu authorities', () =>
     assert.ok(agents.includes(`docs/${name}`));
     assert.ok(index.includes(`| \`${name}\` |`));
   }
-  assert.match(rootAgents, /jarvis\/AGENTS\.md/);
+  assert.equal(rootAgents, agents, 'the only authoritative agent guide must live at the repository root');
+  assert.doesNotMatch(rootAgents, /jarvis\/AGENTS\.md/);
   assert.match(agents, /explicit owner approval in the current task/i);
   assert.match(architecture, /telegram-menu-contract\.md/);
   assert.match(menu, /telegram-button-architecture\.md/);

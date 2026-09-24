@@ -1,6 +1,6 @@
 {
   "name": "jarvis",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Cloud-first Windows client for the Jarvis personal assistant",
   "main": "main.js",
   "scripts": {

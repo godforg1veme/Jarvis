@@ -4,7 +4,7 @@ This file is the status authority for project documentation. Specifications and
 plans under `docs/superpowers/` are preserved as decision history; their old
 future-tense wording does not override the current architecture in `AGENTS.md`.
 
-Status snapshot: 2026-09-24.
+Status snapshot: 2026-09-25.
 
 Current VPN acceptance: all four owner-confirmed cross-node test bindings have
 fresh healthy proofs. The owner separately enabled both approximately
@@ -29,15 +29,13 @@ Operations separately alerts on persistent local node/service diagnoses.
 Only an owner-confirmed Xray/Hysteria2 service restart is enabled. See
 `updates/2026-09-24-vpn-supervisor-host-bound-callback-routing.md` and
 `updates/2026-09-24-vpn-monitoring-alerting-and-repair-scope.md` and
-`updates/2026-09-24-vpn-probe-timers-and-nl-dns-acme.md`
-Telegram Happ profile creation and rename fix, source only (2026-09-24): guided
-interaction kinds are now authorized in the repository and PostgreSQL migration
-`028_telegram_subscription_interaction_kinds.sql`. An end-to-end Telegram-handler
-test covers creation, invalid-input retry, client binding, rename, owner/chat
-scope, and token redaction. This consolidation has not deployed the change or
-applied migration 028 to production; the production flow still needs rollout
-and a real Telegram tap-through.
-.
+`updates/2026-09-24-vpn-probe-timers-and-nl-dns-acme.md`.
+Telegram Happ profile creation and rename fix, source only (2026-09-25): guided
+interaction kinds are allowed by the repository and PostgreSQL migration
+`028_telegram_subscription_interaction_kinds.sql`. The Telegram-handler E2E
+covers creation, invalid-input retry, client binding, rename, owner/chat scope,
+and token redaction. Production still needs the release and migration; a real
+Telegram tap-through remains a separate client check.
 
 The following dated rollout paragraphs describe their respective earlier
 milestones and are superseded by this current-status paragraph where noted.
@@ -369,6 +367,10 @@ attachment ingestion.
 | `updates/2026-09-24-vpn-hysteria2-probe-button-fix.md` | Hysteria2 probe-button/parser fixes and subsequent accepted Hysteria2 bindings |
 | `updates/2026-09-24-vpn-probe-timers-and-nl-dns-acme.md` | Four-probe gate, enabled timers, dual-name NL DNS-01 certificate, and follow-up Supervisor acceptance |
 | `updates/2026-09-24-vpn-supervisor-host-bound-callback-routing.md` | Cross-node Supervisor button routing defect, host-bound source fix, and live repair acceptance status |
+| `superpowers/specs/2026-09-25-github-jarvis-cleanup-design.md` | Approved scope for the repository root, one permanent branch, documentation, local checkout, and deployment boundaries |
+| `superpowers/plans/2026-09-25-jarvis-repository-consolidation.md` | Execution record for branch review, source flattening, GitHub cleanup, and canonical local checkout |
+| `superpowers/plans/2026-09-25-vpn-subscription-flow-verification.md` | Creation and rename failure analysis with Telegram-handler E2E coverage and rollout plan |
+| `superpowers/plans/2026-09-25-vps-and-desktop-rollout.md` | Verification and release plan for the Windows client and required VPS services |
 | `updates/2026-09-24-vpn-monitoring-alerting-and-repair-scope.md` | Current four-path external probe coverage, Telegram alert boundaries, limited restart scope, and live acceptance matrix |
 | `VPN_PC_SETUP.md` | Руководство по настройке Hysteria 2 и VLESS на ПК (Windows / macOS) и устранению неполадок |
 | `VPN_RESILIENCE_RUNBOOK.md` | Current Hysteria2/Happ/VLESS diagnostic and acceptance procedure |
@@ -407,6 +409,10 @@ attachment ingestion.
 | `specs/2026-09-02-desktop-natural-tool-orchestrator-design.md` | Implemented in the first Desktop vertical slice; live paired-device acceptance remains |
 | `specs/2026-09-02-action-orchestrator-platform-foundation-design.md` | Platform foundation implemented for device executors; server workers, schedules and account connectors remain future modules |
 | `plans/2026-09-02-action-orchestrator-foundation.md` | Implemented and deployed to the VPS; final installed-Desktop acceptance is tracked separately |
+| `superpowers/specs/2026-09-25-github-jarvis-cleanup-design.md` | Approved; repository consolidation is underway without changing the Telegram menu contract. |
+| `superpowers/plans/2026-09-25-vpn-subscription-flow-verification.md` | Local Telegram-handler E2E passes; production migration and a real Telegram client check remain outstanding. |
+| `superpowers/plans/2026-09-25-jarvis-repository-consolidation.md` | In progress; the final branch disposition and publication will be recorded after verification. |
+| `superpowers/plans/2026-09-25-vps-and-desktop-rollout.md` | In progress; release completion requires migration, health, and client verification. |
 
 The cloud design originally selected Ubuntu 22.04 and direct Caddy ingress.
 Production reality supersedes those deployment details: the current VPS is

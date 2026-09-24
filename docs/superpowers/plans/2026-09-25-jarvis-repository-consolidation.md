@@ -1,6 +1,6 @@
 # Jarvis GitHub and workspace consolidation Implementation Plan
 
-> **For agentic workers:** Execute inline, one task at a time. Keep the temporary worktree and branch until the completed `main` has been pushed and verified, then remove them.
+> **For agentic workers:** Execute inline, one task at a time. Keep the temporary worktree and local-only branch until the completed `main` has been pushed and verified, then remove both.
 
 **Goal:** Leave one clear Jarvis project at the root of `godforg1veme/Jarvis`, with `main` as its only permanent branch and `F:\test\jarvis` as the canonical local checkout.
 
@@ -41,12 +41,12 @@ Expected: no open PR depends on a topic branch, or any open PR is resolved befor
 
 **Files:** Git worktree metadata only.
 
-- [ ] Confirm `F:\test` `main` is clean and points to the approved spec commits.
-- [ ] Create one temporary local branch and worktree from that exact `main`; do not push the temporary branch:
+- [x] Confirm `F:\test` `main` was clean and pointed to approved spec/plan commit `5c5374e`.
+- [x] Use the native Codex worktree tool, then create the planned local-only branch at that exact commit. The actual worktree is `C:\Users\maxob\.codex\worktrees\jarvis-consolidation\test`; do not push this temporary branch:
 
 ```powershell
-git worktree add F:\test\.worktrees\jarvis-consolidation -b codex/jarvis-consolidation main
-git -C F:\test\.worktrees\jarvis-consolidation status --short --branch
+git -C C:\Users\maxob\.codex\worktrees\jarvis-consolidation\test switch -c codex/jarvis-consolidation
+git -C C:\Users\maxob\.codex\worktrees\jarvis-consolidation\test status --short --branch
 ```
 
 Expected: the new worktree is clean and its `HEAD` equals the current local `main`.
@@ -55,7 +55,7 @@ Expected: the new worktree is clean and its `HEAD` equals the current local `mai
 
 **Files:** Move tracked paths from `jarvis/` to repository root. Reconcile `.gitignore`, `README.md`, `AGENTS.md`, `CLAUDE.md`, and `gemini.md` explicitly. Update active references in documentation, package/deploy scripts, and `server/test/telegramArchitectureContract.test.js`.
 
-- [ ] Inventory top-level collisions and capture the full inner `.gitignore` before moving files:
+- [x] Inventory top-level collisions and capture the full inner `.gitignore` before moving files:
 
 ```powershell
 Get-ChildItem -LiteralPath .\jarvis -Force | Select-Object Name,Mode
@@ -63,13 +63,13 @@ Get-Content .\.gitignore
 Get-Content .\jarvis\.gitignore
 ```
 
-- [ ] Merge the inner ignore rules into the root `.gitignore`, retaining `.worktrees/` and every rule that excludes secrets, generated state, user data, build output, and downloaded assets.
-- [ ] Replace the outer pointer `AGENTS.md` and wrapper `README.md` with the inner authoritative files. Keep the inner `CLAUDE.md` and `gemini.md` as thin pointers to root `AGENTS.md`.
-- [ ] Move each remaining top-level entry from `jarvis/` to the root. Abort on any collision outside the three explicitly reconciled files; do not overwrite an unexpected target.
-- [ ] Remove the empty wrapper directory only after `git status` and `git diff --summary` show every tracked source file at the root.
-- [ ] Search active source and docs for stale `jarvis/` root assumptions and update them. Preserve references inside historical documents when they describe the old layout at that time.
-- [ ] Update `server/test/telegramArchitectureContract.test.js` to require root `AGENTS.md` and the root-level `docs/telegram-menu-contract.md` path.
-- [ ] Run the architecture contract and migration/Telegram contract tests from the new root layout:
+- [x] Merge the inner ignore rules into the root `.gitignore`, retaining `.worktrees/` and every rule that excludes secrets, generated state, user data, build output, and downloaded assets.
+- [x] Replace the outer pointer `AGENTS.md` and wrapper `README.md` with the authoritative root files. Keep `CLAUDE.md` and `gemini.md` as thin pointers to root `AGENTS.md`.
+- [x] Move the tracked project entries from `jarvis/` to the root. No unexpected path collision was found.
+- [x] Remove the empty wrapper directory after confirming every tracked source path is at the root.
+- [x] Search active source and docs for stale `jarvis/` root assumptions and update them. Historical records remain unchanged.
+- [x] Update `server/test/telegramArchitectureContract.test.js` to require root `AGENTS.md` and the root-level `docs/telegram-menu-contract.md` path.
+- [x] Run the architecture contract and migration/Telegram contract tests from the new root layout as part of the complete server suite:
 
 ```powershell
 Push-Location .\server
@@ -83,19 +83,19 @@ Expected: all selected tests pass, and no secret or generated data file is stage
 
 **Files:** Root `README.md`, `docs/README.md`, root `AGENTS.md`; GitHub About text and topics.
 
-- [ ] Read the current product entry point and documentation index after the move. Retain only claims supported by current source or verified deployment records.
-- [ ] Rewrite root `README.md` in Russian with the project purpose, cloud service, Telegram entry point, Windows client, current verified capabilities, a short local quick start, and links to architecture, security, and documentation status.
-- [ ] Apply the `humanizer` skill to the named root `README.md` in file mode. Preserve technical facts, commands, paths, code, and link targets; remove generic promotional wording and repeated claims.
-- [ ] Update `docs/README.md` and other active READMEs only where they contain stale paths or contradicted status. Keep historical records intact.
-- [ ] Add this approved specification and the three execution plans to the appropriate `docs/README.md` tables with their current status.
-- [ ] Add the permanent branch rule and the Telegram guided-input invariant to root `AGENTS.md`: a new interaction kind must be added to the repository allowlist, its bounded context validator, the final PostgreSQL kind constraint, and the contract tests in the same change.
-- [ ] Run `git diff --check`, inspect the rendered Markdown structure, and search root docs for the obsolete “project lives in `jarvis/`” wording.
+- [x] Read the current product entry point and documentation index after the move. Retain only claims supported by current source or verified deployment records.
+- [x] Rewrite root `README.md` in Russian with the project purpose, cloud service, Telegram entry point, Windows client, current verified capabilities, a short local quick start, and links to architecture and documentation status.
+- [x] Apply the `humanizer` skill to root `README.md` in file mode. Preserve technical facts, commands, paths, code, and link targets; remove generic promotional wording and repeated claims.
+- [x] Update `docs/README.md` and active `CLAUDE.md` status only where they contained stale layout or status wording. Historical records remain intact.
+- [x] Add this approved specification and the three execution plans to the `docs/README.md` tables with their current status.
+- [x] Add the permanent branch rule to root `AGENTS.md`. The existing Telegram guided-input invariant already requires repository, context, PostgreSQL, and E2E contract parity, so it was retained rather than duplicated.
+- [x] Run `git diff --check`, inspect the Markdown structure, and search active root docs for the obsolete nested-project wording.
 
 ### Task 5: Verify the flattened source and commit repository changes
 
 **Files:** All moved/edited root paths and the root-level server contract tests.
 
-- [ ] Run the complete cloud-server suite:
+- [x] Run the complete cloud-server suite:
 
 ```powershell
 Push-Location .\server
@@ -105,8 +105,8 @@ Pop-Location
 
 Expected: zero failed tests. Record any skipped tests and their reasons.
 
-- [ ] Run `git diff --check`, `git status --short`, and a secret/state path audit before staging.
-- [ ] Review rename detection and all deletions with `git diff --summary` and `git diff --name-status`; restore any source or historical document removed accidentally.
+- [x] Run `git diff --check`, `git status --short`, and a secret/state path audit before staging.
+- [x] Review rename detection and all deletions with `git diff --summary` and `git diff --name-status`; only the old wrapper files were deleted as they were replaced at the root.
 - [ ] Commit the verified root move and documentation as focused Conventional Commits. Keep the approved spec and plan with the completed history.
 
 ### Task 6: Publish `main`, rename the repository, and set the branch policy

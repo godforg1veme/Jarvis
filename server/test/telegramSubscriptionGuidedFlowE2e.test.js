@@ -295,7 +295,18 @@ test('Telegram button path creates, binds, and renames a Happ subscription profi
   assert.equal(pendingRename.kind, 'vpn_subscription_rename_label');
   assert.deepEqual(pendingRename.context, { subscriptionId: SUBSCRIPTION_ID });
 
-  const renamed = await telegram.handle(messageUpdate(8, 'Рабочий iPhone'));
+  const invalidRename = await telegram.handle(messageUpdate(8, 'Слишком длинное имя подписки для Happ'));
+  assert.equal(invalidRename.status, 'answered');
+  assert.match(invalidRename.answer, /25/);
+  assert.equal([...database.interactions.values()].at(-1).status, 'active');
+  assert.equal(database.subscriptions.size, 1);
+  assert.equal(database.findSubscription(SUBSCRIPTION_ID).label, 'Мой iPhone');
+  assert.equal(database.findSubscription(SUBSCRIPTION_ID).token_hash, tokenHash);
+  assert.deepEqual(JSON.parse(database.findSubscription(SUBSCRIPTION_ID).client_id_de), boundDe);
+  assert.deepEqual(JSON.parse(database.findSubscription(SUBSCRIPTION_ID).client_id_nl), boundNl);
+  assert.equal(state.failureCode, undefined);
+
+  const renamed = await telegram.handle(messageUpdate(9, 'Рабочий iPhone'));
   assert.equal(renamed.status, 'answered');
   assert.match(renamed.answer, /Подписка переименована/);
   assert.equal(database.findSubscription(SUBSCRIPTION_ID).label, 'Рабочий iPhone');
@@ -303,9 +314,9 @@ test('Telegram button path creates, binds, and renames a Happ subscription profi
   assert.deepEqual(JSON.parse(database.findSubscription(SUBSCRIPTION_ID).client_id_de), boundDe);
   assert.deepEqual(JSON.parse(database.findSubscription(SUBSCRIPTION_ID).client_id_nl), boundNl);
 
-  const renamedProfile = await telegram.handleCallback(callbackUpdate(9, 'vpn:sub:view:' + SUBSCRIPTION_ID));
+  const renamedProfile = await telegram.handleCallback(callbackUpdate(10, 'vpn:sub:view:' + SUBSCRIPTION_ID));
   assert.match(renamedProfile.answer, /Рабочий iPhone/);
-  const unauthorized = await telegram.handleCallback(callbackUpdate(10, 'vpn:sub:rename:' + SUBSCRIPTION_ID, '202'));
+  const unauthorized = await telegram.handleCallback(callbackUpdate(11, 'vpn:sub:rename:' + SUBSCRIPTION_ID, '202'));
   assert.equal(unauthorized.status, 'forbidden');
   assert.equal(database.findSubscription(SUBSCRIPTION_ID).label, 'Рабочий iPhone');
   assert.equal(state.failureCode, undefined);
