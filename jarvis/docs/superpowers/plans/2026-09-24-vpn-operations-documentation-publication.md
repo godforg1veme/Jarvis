@@ -2,7 +2,7 @@
 
 > **For agentic workers:** Execute this plan inline in the current task. Preserve unrelated changes; do not alter runtime behavior.
 
-> **Execution note:** Documentation reconciled against production code and acceptance. The complete server suite passes 587/587. The local Windows Python launcher is unavailable, so the Host Agent Python suite was not rerun here; the prior production rollout already passed staged Host Agent suites on both nodes.
+> **Execution note:** Completed on 2026-09-24. Documentation reconciled against production code and acceptance; the complete server suite passed 587/587. The local Windows Python launcher was unavailable, so the Host Agent Python suite was not rerun here; the prior production rollout passed staged Host Agent suites on both nodes. Commit `6dc0409` was published to `origin/codex/vpn-supervisor-integration`. The complete Markdown tree was copied without overwriting existing files to `/home/deploy/apps/jarvis/docs/releases/vpn-ops-2026-09-24/`; file count and key hashes matched.
 
 **Goal:** Publish an accurate operational description of VPN monitoring, alerts, owner-confirmed repair scope, and unhandled failures to the project Markdown authorities, production DE checkout, and GitHub.
 
@@ -54,7 +54,7 @@
 **Files:**
 - Commit the complete in-scope VPN acceptance worktree and this documentation update.
 
-- [ ] Create one descriptive Conventional Commit including a body explaining the distinction between monitoring, alerting, and owner-confirmed repair.
-- [ ] Push the feature branch to the sole configured remote `origin` without force.
-- [ ] Copy the finalized Markdown files to the verified production DE checkout without overwriting unrelated user changes.
-- [ ] Verify the remote commit, server-side file hashes/status, and public service health; do not rebuild/restart the already healthy production service for Markdown-only changes.
+- [x] Create one descriptive Conventional Commit including a body explaining the distinction between monitoring, alerting, and owner-confirmed repair.
+- [x] Push the feature branch to the sole configured remote `origin` without force.
+- [x] Copy the finalized Markdown files to the verified production DE checkout without overwriting unrelated user changes.
+- [x] Verify the remote commit, server-side file hashes/status, and public service health; do not rebuild/restart the already healthy production service for Markdown-only changes.
