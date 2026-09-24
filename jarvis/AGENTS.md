@@ -169,28 +169,52 @@ See `docs/README.md` for current implementation status and historical records.
   one closed read-only `vpn.health.snapshot` against the same node; a changed
   incident revision, invalid snapshot, or second request stops planning. The
   response must match a strict seven-field schema and a closed playbook catalog.
-  The current local source enables only `restart_xray` and
+  The running production catalog enables only `restart_xray` and
   `restart_hysteria2`, only for their matching service-failure incidents with
   healthy host/network, valid target config, and a healthy opposite stack.
   A fresh private Telegram owner confirmation is required. Execution rechecks
   the incident, claims one durable request ID, invokes only the closed restart
   operation, and verifies both stacks. Uncertain outcomes reconcile by that
   same ID and are never retried; restore playbooks remain disabled. This
-  real-restart source was deployed on 2026-09-23 with migration 026, but no
-  real restart has yet been accepted during a live incident.
+  real-restart source was deployed on 2026-09-23 with migration 026. A
+  2026-09-24 NL drill exposed that Telegram Supervisor callbacks were routed to
+  DE even when their durable run belonged to NL; the first approval was safely
+  rejected and no restart was dispatched. The host-bound fix now routes by the
+  durable run's persisted host ID to exactly one configured service, and each
+  service independently checks ownership before details or action. After
+  deployment, a second owner-approved NL Xray failure drill completed the
+  limited restart with `POSTCHECK_PASSED`; both VPN stacks remained healthy,
+  open VPN incidents returned to zero, and scheduled post-repair cross-node
+  probes at 2026-09-24 13:53:25 and 13:54:35 UTC passed VLESS 443/8443 and
+  Hysteria2 443/hopping checks. Restore playbooks remain disabled. This proves
+  the tested repair path, not 99.9% availability or automatic repair of other
+  failure classes.
+  Operations samples each node's local `vpn.health.snapshot` at the configured
+  polling interval (30 seconds by default). The VPN incident adapter requires
+  three consecutive observations of the same primary diagnosis before opening
+  an incident and sending the owner a Telegram alert. This local service/host
+  alert path is separate from the cross-node external-probe timers: a failed
+  timer probe does not currently feed the incident notifier or automatically
+  create a Telegram alert. `/vpn_health` displays those external statuses, and
+  subscription generation may demote a node on failed VLESS 8443 or Hysteria2
+  hopping checks. Unknown probe results are not evidence of a healthy route.
   Cross-node probe units and the owner-confirmed transient credential handoff
-  are deployed. One owner-confirmed NL-to-DE VLESS test credential is already
-  installed; its original `probe.install` outcome remains `unknown` and must
-  never be replayed, reinstalled, or rotated for recovery. The private-chat
-  `probe.recheck` action is deployed and requires its own fresh confirmation;
-  it runs only one read-only test with that existing credential. The other
-  three bindings still need separate owner-confirmed installs/checks. Both
-  timers remain disabled until four fresh successful one-shot checks. The already
+  are deployed. All four fixed test-device bindings have distinct, fresh
+  owner-confirmed healthy proofs as of 2026-09-24. The private-chat
+  `probe.recheck` action can perform one read-only test of an existing key;
+  it must never replay an unknown install or rotate a key for recovery. Both
+  approximately 15-minute timers were enabled by an originating private-chat
+  owner confirmation on 2026-09-24 and have completed healthy scheduled runs
+  on DE and NL. The already
   accepted `supervisor_acceptance_noop` never calls Host Agent. Before changing
   this production boundary, verify the running playbook flags and owner
   acceptance record; readiness alone does not prove a real repair.
-- Cross-node client probe code, root-only credential installer and disabled
-  units are deployed on DE and NL. A one-time URI may travel only through the
+- Cross-node client probe code, root-only credential installer and systemd
+  units are deployed on DE and NL; both approximately 15-minute timers are
+  enabled after four fresh owner-confirmed proofs and a separate owner action.
+  The runners cover NL→DE and DE→NL for both VLESS and Hysteria2; snapshots
+  expose VLESS TCP 443/8443 and Hysteria2 UDP fixed-443/hopping checks. A
+  one-time URI may travel only through the
   authenticated Host Agent socket; it is neither journaled nor returned to
   Telegram, PostgreSQL, logs, prompts or telemetry. Telegram offers only four
   fixed test-device bindings and an origin-bound owner confirmation for each.
@@ -204,12 +228,31 @@ See `docs/README.md` for current implementation status and historical records.
   empty mode-0600 counterpart file and must refuse unsafe paths or overwrite.
   Host Agent `probeTarget` keeps the VLESS/Hysteria2 connection endpoints
   separate from a required `expectedExitIp`; generated probe environments use
-  only that explicit egress baseline. The source/config schema correction is
-  implemented but remains pending production config/environment migration and
-  deployment. A 2026-09-23 NL-to-DE VLESS recheck completed with
-  `EXIT_MISMATCH`; the original install remains `unknown`, keys were not
-  changed, and no data-plane acceptance is claimed. Timers stay disabled until
-  the corrected fresh owner-confirmed result and all other proof gates pass.
+  only that explicit egress baseline. The correction was deployed on DE and NL
+  on 2026-09-24: both nodes now keep listener endpoints separate from their
+  peer's configured expected egress, and the generated root-only probe
+  environments match. The Host Agent regression suite and
+  `vpn.health.snapshot` passed on each node; Xray/Hysteria2 stayed active.
+  The earlier NL-to-DE VLESS recheck returned
+  `EXIT_MISMATCH` before the baseline correction. A later owner-confirmed
+  recheck was actually the opposite DE-to-NL VLESS direction and returned
+  `unknown` (`PROBE_RUN_UNKNOWN`); DE systemd exited 243/CREDENTIALS because
+  no NL test-key file was installed there. It does not establish health of the
+  installed NL-to-DE route. No credential changed. The recheck menu and server
+  now gate directions on a prior install/rotate attempt; Host Agent checks only
+  root-only credential metadata before systemd and fails closed for a missing
+  requested key. At 03:00 Moscow on 2026-09-24, the owner separately confirmed
+  a new NL-to-DE VLESS test-key install; its durable action succeeded with a
+  fresh `vless_tcp_8443` proof. A Telegram callback bug then surfaced: the
+  normalized `chatType` was not forwarded to the VPN handler, so valid private
+  recheck taps got a generic error before confirmation. The route now forwards
+  it without changing the private-chat guard. Subsequent owner-approved
+  installations and checks completed the remaining three bindings.
+  The Host Agent deploy script runs tests from the complete staged source tree
+  before copying files into `/opt/jarvis-host-agent`, because deployment tests
+  also validate sibling `deploy/vpn` unit templates that are not installed in
+  `/opt`. See `docs/updates/2026-09-24-vpn-probe-egress-baseline-deployment.md`
+  for the rollout record.
   See `docs/superpowers/specs/2026-09-23-vpn-probe-egress-baseline-design.md`.
   `/vpn_health` reports results separately and treats missing, stale, mismatched,
   or ambiguous checks as unknown. External probe failures do not authorize an
@@ -221,11 +264,23 @@ See `docs/README.md` for current implementation status and historical records.
   was deployed with the integrated server on 2026-09-23. Activation enables
   timers sequentially and sends one closed first-side disable if the second
   enable does not confirm success; uncertain outcomes require actual timer-state
-  inspection, never blind retry. Production probe timers remain off.
+  inspection, never blind retry. Production probe timers are now on after
+  four fresh proofs and a separate owner confirmation.
   Their deployed systemd unit now uses an approximately 15-minute repeat
   interval with up to 30 seconds of jitter and a two-minute post-boot first
-  run if later enabled; both DE and NL effective units were verified on
-  2026-09-23 without enabling either timer.
+  run; both DE and NL effective units were verified on 2026-09-23 and later
+  enabled on 2026-09-24.
+  Later on 2026-09-24, both VLESS directions had fresh owner-confirmed proofs
+  and the corrected recheck button passed a live tap. The Hysteria2 install
+  button initially failed before confirmation because creation replaced its
+  selected protocol with VLESS. That server fix is deployed and tested. The
+  next confirmed tap reached Host Agent but failed installation because the
+  parser required the Hysteria2 IP endpoint to equal its DNS TLS name. The
+  parser fix is deployed and tested on both nodes. Subsequent fresh owner
+  confirmations completed both Hysteria2 proofs, reaching four of four.
+  A later `probe.enable` callback fix stopped passing unsupported protocol/node
+  fields to its empty action schema; its real owner tap succeeded, and both
+  timers have produced healthy scheduled results.
 - Host Agent mutation claims are persisted before execution. An interrupted
   command has an unknown outcome and is reconciled; never retry it under a new
   identifier merely because its connection was lost. Discovery is read-only.
@@ -326,12 +381,18 @@ See `docs/README.md` for current implementation status and historical records.
   interval parameter. A two-request
   cross-node hopping probe is required before Hysteria is considered healthy;
   host data-plane checks and phone-side Happ traffic remain separate acceptance
-  evidence. Probe timers remain disabled.
-  NL currently uses a `vpn.rilora.ru` certificate, but public DNS for that name
-  points to DE. The existing NL certificate expires on 2026-12-12; unattended
-  HTTP-01 renewal on NL is not established. Provision a distinct DNS-only NL
-  hostname and matching certificate before that date. The Hysteria installer
-  now rejects DNS/address mismatches even when cached ACME files exist.
+  evidence. Probe timers are enabled after four owner-approved healthy proofs.
+  NL now has a distinct DNS-only `vpn-nl.rilora.ru` A record pointing to
+  `94.183.208.56`. Its root-only optional DNS-01 settings cause Hysteria2 to
+  maintain certificates for both `vpn.rilora.ru` and `vpn-nl.rilora.ru` through
+  a limited Cloudflare token; DE retains its old HTTP-01 behavior. The new NL
+  certificate expires 2026-12-23; the older one expires 2026-12-12. Real
+  strict-TLS Hysteria2 client probes from DE succeeded for both SNI values
+  before and after changing only NL's advertised `serverName` to the new name.
+  All six NL client credentials and the active generated VPN configuration were
+  preserved during that state switch. Renewal remains future operational
+  evidence, not an already observed event. The Hysteria installer rejects
+  DNS/address mismatches even when cached ACME files exist.
 - PostgreSQL must never be published publicly.
 - The DE-4 runs the private `gigaam-asr` service for Russian server ASR with a
   four-CPU/8-GiB cap and no host port. Its observed steady-state RSS is about

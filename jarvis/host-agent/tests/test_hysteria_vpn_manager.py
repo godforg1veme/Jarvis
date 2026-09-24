@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import socket
 import tempfile
 import unittest
@@ -81,6 +82,44 @@ class HysteriaVpnManagerTests(unittest.TestCase):
         self.assertEqual(config["auth"]["http"]["url"], DEFAULT_AUTH_URL)
         self.assertEqual(config["obfs"]["type"], "salamander")
         self.assertNotIn("log", config)
+
+    def test_optional_nl_dns_acme_keeps_both_tls_names_and_private_status(self):
+        state = base_state()
+        state["serverName"] = "vpn.rilora.ru"
+        self.state_path.write_text(json.dumps(state), encoding="utf-8")
+        settings = {"domains": ["vpn.rilora.ru", "vpn-nl.rilora.ru"], "cloudflareApiToken": "A" * 40}
+        settings_path = self.state_path.parent / "hysteria2-acme-dns.json"
+        settings_path.write_text(json.dumps(settings), encoding="utf-8")
+        if os.name != "nt":
+            settings_path.chmod(0o600)
+        self.manager.acme_dns_path = settings_path
+        config = hysteria_config(state, acme_dns=settings)
+        self.config_path.write_text(json.dumps(config), encoding="utf-8")
+        self.assertEqual(config["acme"]["domains"], ["vpn.rilora.ru", "vpn-nl.rilora.ru"])
+        self.assertEqual(config["acme"]["type"], "dns")
+        self.assertEqual(config["acme"]["dns"]["name"], "cloudflare")
+        self.assertNotIn("http", config["acme"])
+        self.assertTrue(self.manager.status()["configValid"])
+        self.assertNotIn("A" * 40, json.dumps(self.manager.status()))
+        self.manager.issue("iPhone")
+        self.assertEqual([call for call in self.calls if call[0][:2] == ["/usr/bin/systemctl", "restart"]], [])
+
+    def test_dns_acme_rejects_bad_schema_or_unprotected_secret(self):
+        state = base_state()
+        state["serverName"] = "vpn.rilora.ru"
+        settings = {"domains": ["vpn.rilora.ru", "vpn-nl.rilora.ru"], "cloudflareApiToken": "A" * 40}
+        for bad in ({**settings, "domains": ["vpn-nl.rilora.ru"]},
+                    {**settings, "cloudflareApiToken": "short"},
+                    {**settings, "extra": "not-allowed"}):
+            with self.assertRaises(VpnManagerError) as caught:
+                hysteria_config(state, acme_dns=bad)
+            self.assertNotIn("A" * 40, str(caught.exception))
+        settings_path = self.state_path.parent / "hysteria2-acme-dns.json"
+        settings_path.write_text(json.dumps(settings), encoding="utf-8")
+        self.manager.acme_dns_path = settings_path
+        if os.name != "nt":
+            settings_path.chmod(0o644)
+            self.assertFalse(self.manager.status()["configValid"])
 
     def test_issue_does_not_restart_service_when_config_is_valid(self):
         result = self.manager.issue("iPhone")

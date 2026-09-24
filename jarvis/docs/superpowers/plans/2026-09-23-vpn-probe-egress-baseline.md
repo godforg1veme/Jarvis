@@ -277,7 +277,7 @@ On each node, extract it under a unique
 unit templates because Host Agent regression tests read them from the staged
 repository root. Staging must not stop or change the active service.
 
-- [ ] **Step 5: Update and restart DE, verify, then update and restart NL**
+- [x] **Step 5: Update and restart DE, verify, then update and restart NL**
 
 Keep the other node and both VPN stacks active. Reconfirm the target node's
 probe timer is disabled/inactive. Before stopping either Host Agent, use a
@@ -339,7 +339,7 @@ $update = $update.Replace('"198.51.100.24"', ('"' + $expectedExit + '"'))
 $update | ssh jarvis-vps 'sudo -n /usr/bin/python3 -'
 ```
 
-- [ ] **Step 6: Regenerate and validate public environment metadata**
+- [x] **Step 6: Regenerate and validate public environment metadata**
 
 On each node use the deployed module to regenerate the matching environment
 from trusted config:
@@ -358,7 +358,7 @@ Confirm only the matching `probe-<peer>.env` metadata changed and owner/mode
 remain root:root 0600. Compare `VPN_PROBE_EXPECTED_EXIT_IP` to config by
 boolean only. Confirm URI file metadata is unchanged without reading contents.
 
-- [ ] **Step 7: Verify production health and acceptance state without probes**
+- [x] **Step 7: Verify production health and acceptance state without probes**
 
 Check both timers disabled/inactive, Host Agent/Xray/Hysteria2 active on both
 nodes, server health and `/health/ready`. Query current probe audit rows and
@@ -371,6 +371,35 @@ After both nodes pass Step 7, remove only the named local tar archive and the
 two exact `/tmp/jarvis-host-agent-<commit>` extraction/archive paths after
 checking the expanded paths equal those expected. Retain root production
 backups for rollback.
+
+### Task 5 rollout record (2026-09-24)
+
+The initial deployment attempts failed before restarting the candidate Host
+Agent and were rolled back from the exact root-only backups. The cause was the
+deploy script running tests after copying the Host Agent into `/opt`; one
+regression test intentionally reads the sibling `deploy/vpn` systemd templates,
+which are not part of the installed tree. The script now runs the complete
+suite against the staged source before copying, with a regression test for
+that ordering.
+The Linux release archive used LF line endings for the Bash script and passed
+`bash -n`.
+
+The validated package was then deployed one node at a time. Each node passed
+116 Host Agent tests and `vpn.health.snapshot`; both configs now name the
+opposite node's independently measured stable egress, and each generated
+root-only environment matches. Host Agent, Xray, and Hysteria2 are active on
+both nodes; both probe timers remain disabled/inactive. Public `/health/ready`
+returned HTTP 200. No probe URI was read or changed and no credential-backed
+check was run. The database still shows the original `probe.install` as
+`unknown` and the separate `probe.recheck` as `failed`; no path is accepted.
+
+Execution generated and verified each public probe environment from the staged
+module after updating config and before the agent restart, so the restart saw a
+matched pair. The root-only backups remain on both nodes at
+`/root/jarvis-vpn-probe-egress-da93244/`. Remote staging artifacts were
+removed. The local Windows temporary archive/package cleanup was refused by
+the desktop command safety layer; those code-only files remain in `%TEMP%` and
+are not used at runtime. Step 8 is therefore still pending local cleanup.
 
 ### Task 6: Owner-confirmed live acceptance
 
@@ -407,3 +436,13 @@ those conditions are met. Do not claim a 99.9% guarantee.
   condition is named.
 - Type consistency: `ProbeTarget.expected_exit_ip` maps to the existing
   `VPN_PROBE_EXPECTED_EXIT_IP` variable and the runner's `expected_exit_ip: str`.
+
+### Manual acceptance status update (2026-09-24)
+
+The fresh owner-confirmed NL-to-DE VLESS recheck at 2026-09-23 23:26 UTC
+returned `unknown` (`PROBE_RUN_UNKNOWN`) and persisted no probe result. Telegram
+reported that the uncertain operation was not retried. This supersedes only
+the plan's earlier current-status note that the separate recheck was `failed`
+with `EXIT_MISMATCH`; that earlier result predates the deployed egress-baseline
+correction. No credential changed, and both probe timers remain disabled.
+Diagnose the unknown outcome before another fresh owner-confirmed check.

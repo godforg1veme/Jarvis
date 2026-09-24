@@ -90,8 +90,6 @@ def parse_hysteria_uri(uri: str, *, expected_host: str) -> dict:
     if any(ord(ch) < 33 or ord(ch) > 126 for ch in password + obfs_password):
         raise ProbeConfigError()
     sni = _host(fields["sni"])
-    if sni != host:
-        raise ProbeConfigError()
     return {"host": host, "port": port, "auth": f"{user}:{password}", "sni": sni,
             "obfsPassword": obfs_password}
 

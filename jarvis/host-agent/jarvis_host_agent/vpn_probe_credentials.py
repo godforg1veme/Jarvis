@@ -173,3 +173,43 @@ def install_probe_credential(config: object, *, target_node: str, protocol: str,
     _ensure_empty_root_file(_credential_path(root, target_node, other_protocol))
     _atomic_root_file(_credential_path(root, target_node, protocol), credential)
     return {"targetNode": target_node, "protocol": protocol, "installedAt": utc_now()}
+
+
+def probe_credential_readiness(config: object, *, target_node: str, protocol: str) -> str:
+    """Inspect only fixed file metadata before systemd loads a test credential."""
+    root = getattr(config, "probe_credential_dir", None)
+    target = getattr(config, "probe_target", None)
+    if (not isinstance(root, Path) or target_node not in {"de", "nl"}
+            or protocol not in _PROTOCOLS or target_node != getattr(target, "node_code", None)
+            or target_node == getattr(config, "node_code", None)):
+        raise ProbeCredentialError()
+
+    try:
+        directory = os.lstat(root)
+        if not stat.S_ISDIR(directory.st_mode) or stat.S_ISLNK(directory.st_mode):
+            return "configuration_invalid"
+        if os.name != "nt" and (directory.st_uid != os.geteuid() or stat.S_IMODE(directory.st_mode) & 0o077):
+            return "configuration_invalid"
+
+        def file_info(path: Path):
+            try:
+                info = os.lstat(path)
+            except FileNotFoundError:
+                return None
+            if (not stat.S_ISREG(info.st_mode) or stat.S_ISLNK(info.st_mode) or info.st_size > 4096):
+                raise ProbeCredentialError()
+            if os.name != "nt" and (info.st_uid != os.geteuid() or stat.S_IMODE(info.st_mode) != 0o600):
+                raise ProbeCredentialError()
+            return info
+
+        requested = file_info(_credential_path(root, target_node, protocol))
+        if requested is None or requested.st_size == 0:
+            return "not_installed"
+        other = "hysteria2" if protocol == "vless" else "vless"
+        counterpart = file_info(_credential_path(root, target_node, other))
+        environment = file_info(_environment_path(root, target_node))
+        if counterpart is None or environment is None or environment.st_size == 0:
+            return "configuration_invalid"
+        return "ready"
+    except (OSError, ProbeCredentialError):
+        return "configuration_invalid"

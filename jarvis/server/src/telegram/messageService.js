@@ -165,6 +165,7 @@ class TelegramMessageService {
     this.voiceLimiter = options.voiceLimiter || null;
     this.vpnService = options.vpnService || null;
     this.vpnSupervisorService = options.vpnSupervisorService || null;
+    this.vpnSupervisorCallbackRouter = options.vpnSupervisorCallbackRouter || null;
     this.lifeEventGateway = options.lifeEventGateway || null;
     this.lifeMissionControlService = options.lifeMissionControlService || null;
     this.lifeProposalService = options.lifeProposalService || null;
@@ -224,8 +225,9 @@ class TelegramMessageService {
     const menuContext = telegramMenuContext({ user, conversation, input });
 
     if (input.data.startsWith('vpsup:')) {
-      if (!this.vpnSupervisorService) return { status: 'ignored' };
-      const result = await this.vpnSupervisorService.handleCallback({
+      const supervisorCallbackHandler = this.vpnSupervisorCallbackRouter || this.vpnSupervisorService;
+      if (!supervisorCallbackHandler) return { status: 'ignored' };
+      const result = await supervisorCallbackHandler.handleCallback({
         data: input.data,
         telegramUserId: input.telegramUserId,
         telegramChatId: input.chatId,
@@ -259,6 +261,7 @@ class TelegramMessageService {
           conversationId: conversation.id,
           originChannel: 'telegram',
           originDeviceId: null,
+          chatType: input.chatType,
         });
       } catch (error) {
         result = vpnPublicError(error);

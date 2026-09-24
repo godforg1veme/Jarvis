@@ -1,8 +1,11 @@
 # VPN Supervisor: guide and execution rules
 
-Status: the owner-approved real restart path is deployed as of 2026-09-23
-after a brief rollback and verified redeployment. Migration 026 is applied.
-No real repair has yet executed on a live incident.
+Status (2026-09-24): the limited owner-approved real-restart path is deployed;
+migration 026 is applied. A genuine NL Xray service-failure drill passed with
+`POSTCHECK_PASSED` after a host-bound callback routing fix. This validates that
+case only: DE Xray, DE Hysteria2, and NL Hysteria2 have not each been exercised
+by a live service outage. No autonomous restart, broad repair, or 99.9%
+availability guarantee is claimed.
 
 ## What the Supervisor is
 
@@ -19,6 +22,25 @@ cause, binds it to a diagnosis revision, and requires repeated observations
 before creating an incident. The model may request one bounded read-only
 observation round. A second request, invalid snapshot, or changed diagnosis
 stops planning.
+
+## Monitoring and Telegram alerts
+
+Operations polls each node's local health snapshot at the configured interval
+(30 seconds by default). The VPN incident adapter requires three consecutive
+observations of the same primary diagnosis before opening an incident; the
+owner receives a Telegram incident alert when it opens. Supervisor analysis
+then may produce a separate repair proposal, but does not itself change VPN
+state.
+
+This alert path is distinct from the two cross-node systemd external-probe
+timers, which run approximately every 15 minutes. They cover NL→DE and DE→NL
+for both VLESS and Hysteria2; each snapshot has VLESS TCP 443/8443 and
+Hysteria2 UDP fixed-443/hopping statuses. A failed scheduled external probe
+does not currently enter the Operations incident notifier, so it does not
+promise a proactive Telegram alert for that route. The result is visible in
+`/vpn_health`; profile generation may demote a node on failed VLESS 8443 or
+Hysteria2 hopping checks. Unknown or stale external data is not proof of a
+healthy route.
 
 ## Current decision tree
 
@@ -40,6 +62,13 @@ stops planning.
    proposal, no action button is sent. Restore-known-good playbooks remain
    disabled.
 5. A valid proposal is only a request for owner approval. It is not an action.
+
+The enabled playbooks are intentionally limited to the two service failures
+above. `XRAY_CONFIG_FAILURE`, `XRAY_LISTENER_FAILURE`, all Hysteria2 config,
+listener, auth endpoint and credential failures, DNS/outbound/host failures,
+multi-stack incidents, invalid/unknown health, and external route-probe
+failures do not authorize a restart. They remain incidents for diagnosis. The
+known-good restore playbooks are disabled.
 
 ## Confirmation and fixed operations
 
@@ -84,6 +113,8 @@ configuration contents must not be persisted or sent in Telegram diagnostics.
 Migration 026 is applied in production. The running server catalog enables
 only the matching Xray and Hysteria2 restarts and the synthetic no-op; restore
 playbooks remain disabled. The owner accepted the synthetic no-op on
-2026-09-16. Local fault simulations and deployment health checks have passed,
-but a real owner-confirmed repair has not yet executed. Its first eligible
-incident remains the live acceptance check for this workflow.
+2026-09-16. The first NL live drill safely dispatched no restart because the
+callback was routed to DE; the host-bound routing correction was then deployed.
+The repeated owner-approved NL Xray drill restarted only NL Xray and passed the
+target/opposite-stack postchecks. DE Xray, DE Hysteria2, and NL Hysteria2 live
+failure drills remain unaccepted; local fault simulations are not substitutes.

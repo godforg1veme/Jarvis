@@ -687,14 +687,25 @@ class VpnCommandService {
     if (command.action === 'probe.recheck' && (context.originChannel !== 'telegram' || context.chatType !== 'private')) {
       throw publicError('VPN_PRIVATE_CHAT_REQUIRED');
     }
-    const protocol = normalizeProtocol(command.protocol);
+    const protocol = normalizeProtocol(command.protocol ?? command.arguments?.protocol);
     const node = normalizeNode(command.node || 'de');
-    let rawArgs = { ...command.arguments, protocol, node };
+    let rawArgs = command.action === 'probe.enable' || command.action === 'probe.disable'
+      ? { ...command.arguments }
+      : { ...command.arguments, protocol, node };
     if (['revoke', 'rotate', 'export'].includes(command.action) && !rawArgs.clientId) {
       const client = await this._resolveClient(rawArgs.label, protocol, node);
       rawArgs = { clientId: client.id, protocol, node };
     }
     const args = validateAction(command.action, rawArgs);
+    if (command.action === 'probe.recheck') {
+      const candidates = await this._probeRecheckCandidates(context.userId);
+      if (!candidates.has(`${args.sourceNode}:${args.protocol}`)) {
+        return {
+          answer: 'Тестовый ключ для этого направления ещё не устанавливали. Выбери «Установить» в меню внешних проверок.',
+          buttons: [[{ text: '← Внешние проверки', data: 'vpn:probe:menu' }]],
+        };
+      }
+    }
     const id = crypto.randomUUID();
     const fingerprint = crypto.createHash('sha256').update(JSON.stringify({ action: command.action, args })).digest();
     const record = await this.repository.create({
@@ -730,18 +741,28 @@ class VpnCommandService {
     });
   }
 
-  async _probeMenu() {
+  async _probeRecheckCandidates(userId) {
+    if (typeof this.repository.probeRecheckCandidates !== 'function') return new Set();
+    const rows = await this.repository.probeRecheckCandidates({ userId });
+    return new Set((Array.isArray(rows) ? rows : [])
+      .filter((row) => NODES[row.sourceNode] && PROTOCOLS[row.protocol])
+      .map((row) => `${row.sourceNode}:${row.protocol}`));
+  }
+
+  async _probeMenu(context) {
     const resolved = await Promise.allSettled([
       this._probeBinding('de', 'vless'), this._probeBinding('de', 'hysteria2'),
       this._probeBinding('nl', 'vless'), this._probeBinding('nl', 'hysteria2'),
     ]);
     const bindings = resolved.filter((item) => item.status === 'fulfilled').map((item) => item.value);
+    const recheckCandidates = await this._probeRecheckCandidates(context.userId);
     const canEnable = typeof this.repository.hasVerifiedProbeBindings === 'function'
       && await this.repository.hasVerifiedProbeBindings();
     return {
       answer: [
         '🧪 **Внешние проверки VPN**',
         'Каждая операция требует отдельного подтверждения владельца. URI тестовых ключей не выводятся и не сохраняются в Jarvis.',
+        'Проверить существующий ключ можно после попытки его установки для выбранного направления.',
         bindings.length === 4
           ? (canEnable ? 'Все четыре разовые проверки подтверждены. Таймеры можно включить отдельным действием.' : 'Сначала установи и проверь все четыре направления, затем отдельно включи таймеры.')
           : `Доступно направлений: ${bindings.length} из 4. Недостающие тестовые устройства нужно создать или проверить отдельно.`,
@@ -755,7 +776,7 @@ class VpnCommandService {
           text: `Обновить ключ: ${NODES[binding.runnerNode].flag} → ${NODES[binding.sourceNode].flag} ${PROTOCOLS[binding.protocol].title}`,
           data: `vpn:probe:rotate:${binding.sourceNode}:${PROTOCOLS[binding.protocol].code}`,
         }]),
-        ...bindings.map((binding) => [{
+        ...bindings.filter((binding) => recheckCandidates.has(`${binding.sourceNode}:${binding.protocol}`)).map((binding) => [{
           text: `Проверить ключ: ${NODES[binding.runnerNode].flag} → ${NODES[binding.sourceNode].flag} ${PROTOCOLS[binding.protocol].title}`,
           data: `vpn:probe:recheck:${binding.sourceNode}:${PROTOCOLS[binding.protocol].code}`,
         }]),
@@ -787,7 +808,10 @@ class VpnCommandService {
       await this.repository.complete({ requestId: record.id, status: unknown ? 'unknown' : 'failed', errorCode: code });
       await this.repository.audit({ userId: context.userId, requestId: record.id, type: 'vpn.action.failed', metadata: { action: record.action, errorCode: code } });
       return {
-        answer: unknown ? 'Результат внешней проверки пока неизвестен; повторно она не запускалась.' : `Внешняя проверка не выполнена: ${code}.`,
+        answer: unknown ? 'Результат внешней проверки пока неизвестен; повторно она не запускалась.'
+          : code === 'PROBE_CREDENTIAL_NOT_INSTALLED'
+            ? 'Тестовый ключ для этого направления не установлен. Выбери «Установить» в меню внешних проверок.'
+            : `Внешняя проверка не выполнена: ${code}.`,
         buttons: [[{ text: '← Внешние проверки', data: 'vpn:probe:menu' }]],
       };
     }
@@ -858,7 +882,7 @@ class VpnCommandService {
     if (!callback) return null;
     await this._requireOwner(context.userId);
     const node = callback.node || 'de';
-    if (callback.action === 'probe-menu') return this._probeMenu();
+    if (callback.action === 'probe-menu') return this._probeMenu(context);
     if (callback.action === 'probe-install' || callback.action === 'probe-rotate') {
       const binding = await this._probeBinding(callback.sourceNode, callback.protocol);
       return this._create({ action: callback.action === 'probe-install' ? 'probe.install' : 'probe.rotate', arguments: binding }, context);

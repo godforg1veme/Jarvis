@@ -123,6 +123,21 @@ class VpnRepository {
     return result.rows[0]?.count === 4;
   }
 
+  async probeRecheckCandidates({ userId }) {
+    const result = await this.pool.query(`
+      SELECT DISTINCT arguments->>'sourceNode' AS "sourceNode",
+        arguments->>'protocol' AS protocol
+      FROM vpn_action_requests
+      WHERE user_id=$1 AND action IN ('probe.install', 'probe.rotate')
+        AND status IN ('succeeded', 'failed', 'unknown')
+        AND (arguments->>'sourceNode', arguments->>'runnerNode', arguments->>'protocol') IN (
+          ('de', 'nl', 'vless'), ('de', 'nl', 'hysteria2'),
+          ('nl', 'de', 'vless'), ('nl', 'de', 'hysteria2')
+        )
+    `, [userId]);
+    return result.rows;
+  }
+
   async audit({ userId, requestId = null, type, metadata = {} }) {
     await this.pool.query(`
       INSERT INTO vpn_audit_events (user_id,action_request_id,event_type,metadata)

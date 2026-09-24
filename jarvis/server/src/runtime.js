@@ -49,6 +49,7 @@ const { OperationsRepository } = require('./operations/repositories/operationsRe
 const { VpnSupervisorPlanner } = require('./operations/vpnSupervisor/planner');
 const { VpnSupervisorRepository } = require('./operations/vpnSupervisor/repository');
 const { VpnSupervisorService } = require('./operations/vpnSupervisor/service');
+const { VpnSupervisorCallbackRouter } = require('./operations/vpnSupervisor/callbackRouter');
 const { VpnEvidenceCollector } = require('./operations/vpnSupervisor/evidenceCollector');
 const { HostAgentClient } = require('./operations/hostAgentClient');
 const { VpnRepository } = require('./vpn/vpnRepository');
@@ -137,6 +138,7 @@ async function createRuntime(config, overrides = {}) {
   let vpnRecoveryWorker = null;
   let vpnSupervisorService = null;
   let vpnSupervisorServiceNl = null;
+  let vpnSupervisorCallbackRouter = null;
   let vpnOperationsClients = null;
   let lifeEventGateway = null;
   let lifeProjectionWorker = null;
@@ -446,7 +448,7 @@ async function createRuntime(config, overrides = {}) {
       vpnSupervisorService = overrides.vpnSupervisorService || new VpnSupervisorService({
         repository: supervisorRepository,
         planner: supervisorPlanner,
-        hostIdProvider: () => supervisorOperationsRepository.ensureHost({ hostKey: config.operationsHostKey, label: config.operationsHostLabel }),
+        hostIdProvider: () => supervisorOperationsRepository.findHostByKey(config.operationsHostKey),
         ownerTelegramId: config.operationsOwnerTelegramId,
         acceptanceEnabled: config.vpnSupervisorAcceptanceEnabled,
         evidenceCollector: new VpnEvidenceCollector({ client: vpnHostAgentClient }),
@@ -457,7 +459,7 @@ async function createRuntime(config, overrides = {}) {
         vpnSupervisorServiceNl = overrides.vpnSupervisorServiceNl || new VpnSupervisorService({
           repository: supervisorRepository,
           planner: supervisorPlanner,
-          hostIdProvider: () => supervisorOperationsRepository.ensureHost({ hostKey: config.operationsNlHostKey, label: config.operationsNlHostLabel }),
+          hostIdProvider: () => supervisorOperationsRepository.findHostByKey(config.operationsNlHostKey),
           ownerTelegramId: config.operationsOwnerTelegramId,
           acceptanceEnabled: false,
           evidenceCollector: new VpnEvidenceCollector({ client: vpnHostAgentClientNl }),
@@ -465,6 +467,11 @@ async function createRuntime(config, overrides = {}) {
           logger: app.log,
         });
       }
+      vpnSupervisorCallbackRouter = overrides.vpnSupervisorCallbackRouter || new VpnSupervisorCallbackRouter({
+        repository: supervisorRepository,
+        services: [vpnSupervisorService, vpnSupervisorServiceNl].filter(Boolean),
+        ownerTelegramId: config.operationsOwnerTelegramId,
+      });
       if (vpnRecoveryWorker) {
         vpnRecoveryWorker.supervisorServices = [vpnSupervisorService, vpnSupervisorServiceNl].filter(Boolean);
       }
@@ -620,6 +627,7 @@ async function createRuntime(config, overrides = {}) {
         voiceLimiter: overrides.telegramVoiceLimiter || new FixedWindowRateLimiter(),
         vpnService,
         vpnSupervisorService,
+        vpnSupervisorCallbackRouter,
         lifeEventGateway,
         lifeMissionControlService: missionControlService,
         lifeProposalService: proposalService,
@@ -697,6 +705,7 @@ async function createRuntime(config, overrides = {}) {
     vpnService,
     vpnSupervisorService,
     vpnSupervisorServiceNl,
+    vpnSupervisorCallbackRouter,
     vpnSubscriptionService,
     vpnSubscriptionRepository,
     lifeEventGateway,

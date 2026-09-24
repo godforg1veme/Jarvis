@@ -54,6 +54,15 @@ class ExternalProbeContractTests(unittest.TestCase):
         self.assertEqual(config["obfs"]["type"], "salamander")
         self.assertEqual(config["auth"], "vpn-0123456789ab:synthetic-password")
 
+    def test_hysteria_ip_endpoint_uses_distinct_certificate_name(self):
+        uri = HYSTERIA.replace("@vpn.example.test:443", "@203.0.113.10:443")
+        parsed = parse_hysteria_uri(uri, expected_host="203.0.113.10")
+        config = build_hysteria_client_config(parsed, 18081)
+        self.assertEqual(config["server"], "203.0.113.10:443")
+        self.assertEqual(config["tls"], {"sni": "vpn.example.test"})
+        with self.assertRaises(ProbeConfigError):
+            parse_hysteria_uri(uri, expected_host="198.51.100.7")
+
     def test_hysteria_rejects_missing_auth_obfs_and_duplicate_query(self):
         for bad in (HYSTERIA.replace("synthetic-password", ""), HYSTERIA.replace("obfs=salamander", "obfs=none"),
                     HYSTERIA.replace("&sni=", "&obfs=salamander&sni=")):

@@ -11,6 +11,7 @@ from jarvis_host_agent.vpn_probe_credentials import (
     _atomic_root_file,
     install_probe_credential,
     install_probe_environment,
+    probe_credential_readiness,
 )
 
 
@@ -41,6 +42,32 @@ def config_for(root: Path, node_code: str = "nl"):
 
 
 class ProbeCredentialStoreTests(unittest.TestCase):
+    @unittest.skipIf(os.name == "nt", "root-only metadata is verified on Linux")
+    def test_readiness_requires_requested_key_and_complete_private_metadata(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "credentials"
+            config = config_for(root)
+            install_probe_environment(config, target_node="de")
+            self.assertEqual(probe_credential_readiness(config, target_node="de", protocol="vless"), "not_installed")
+            install_probe_credential(config, target_node="de", protocol="vless", credential=VLESS_DE)
+            self.assertEqual(probe_credential_readiness(config, target_node="de", protocol="vless"), "ready")
+            self.assertEqual(probe_credential_readiness(config, target_node="de", protocol="hysteria2"), "not_installed")
+            (root / "probe-de.env").unlink()
+            self.assertEqual(probe_credential_readiness(config, target_node="de", protocol="vless"), "configuration_invalid")
+
+    @unittest.skipIf(os.name == "nt", "root-only metadata is verified on Linux")
+    def test_readiness_refuses_unsafe_metadata_without_reading_credential(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "credentials"
+            config = config_for(root)
+            install_probe_credential(config, target_node="de", protocol="vless", credential=VLESS_DE)
+            requested = root / "probe-de-vless.uri"
+            requested.chmod(0o644)
+            self.assertEqual(probe_credential_readiness(config, target_node="de", protocol="vless"), "configuration_invalid")
+            requested.chmod(0o600)
+            root.chmod(0o755)
+            self.assertEqual(probe_credential_readiness(config, target_node="de", protocol="vless"), "configuration_invalid")
+
     def test_installs_only_opposite_node_validated_credential_with_root_only_mode(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -57,6 +84,17 @@ class ProbeCredentialStoreTests(unittest.TestCase):
             else:
                 self.assertTrue(path.is_file())
             self.assertNotIn("vless://", str(result))
+
+    def test_installs_hysteria_ip_endpoint_with_distinct_tls_name(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = config_for(root)
+            config.probe_target.hysteria_host = "203.0.113.10"
+            credential = HYSTERIA_DE.replace("@vpn.example.test:443", "@203.0.113.10:443")
+            result = install_probe_credential(config, target_node="de", protocol="hysteria2", credential=credential)
+            self.assertEqual(result["protocol"], "hysteria2")
+            self.assertEqual((root / "probe-de-hysteria2.uri").read_text(encoding="utf-8"), credential)
+            self.assertNotIn("hy2://", str(result))
 
     def test_creating_missing_counterpart_preserves_existing_regular_credential(self):
         with tempfile.TemporaryDirectory() as directory:

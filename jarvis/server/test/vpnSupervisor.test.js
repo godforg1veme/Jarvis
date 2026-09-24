@@ -146,6 +146,41 @@ test('planner accepts strict JSON and retries schema formatting exactly once', a
   assert.doesNotMatch(calls[1].messages[3].content, /```json/);
 });
 
+test('planner corrects invented closed values with bounded schema hints, never raw output', async () => {
+  const calls = [];
+  const malformed = {
+    version: 1, decision: 'propose', playbookId: 'restart_xray',
+    reasonCode: 'UNDECLARED_CAUSE', confidence: 'high',
+    requiredChecks: ['nonexistent_check'], evidenceRefs: ['F1'],
+  };
+  const corrected = { ...malformed, reasonCode: 'SERVICE_FAILED', requiredChecks: [] };
+  const provider = { async answer(input) {
+    calls.push(input);
+    return JSON.stringify(calls.length === 1 ? malformed : corrected);
+  } };
+  const proposal = await new VpnSupervisorPlanner({ provider }).plan(prepared().context);
+  assert.equal(proposal.playbookId, 'restart_xray');
+  assert.equal(calls.length, 2);
+  const correction = calls[1].messages[3].content;
+  assert.match(correction, /SERVICE_FAILED/);
+  assert.match(correction, /xray_config/);
+  assert.match(correction, /reasonCode:invalid_value/);
+  assert.match(correction, /requiredChecks\.0:invalid_value/);
+  assert.doesNotMatch(correction, /UNDECLARED_CAUSE|nonexistent_check/);
+});
+
+test('planner still rejects a second schema-invalid response', async () => {
+  let calls = 0;
+  const provider = { async answer() {
+    calls += 1;
+    return JSON.stringify({ version: 1, decision: 'stop', playbookId: null,
+      reasonCode: 'UNDECLARED_CAUSE', confidence: 'high', requiredChecks: [], evidenceRefs: [] });
+  } };
+  await assert.rejects(new VpnSupervisorPlanner({ provider }).plan(prepared().context),
+    { code: 'VPN_SUPERVISOR_RESPONSE_INVALID' });
+  assert.equal(calls, 2);
+});
+
 test('planner rejects invented evidence and provider failures without exposing provider errors', async () => {
   const invented = { async answer() { return JSON.stringify(validProposal({ evidenceRefs: ['E999'] })); } };
   await assert.rejects(new VpnSupervisorPlanner({ provider: invented }).plan(prepared().context), { code: 'VPN_SUPERVISOR_EVIDENCE_INVALID' });
@@ -246,6 +281,39 @@ test('safe acceptance completes only after owner approval and rejects other iden
   assert.match(completed.answer, /E2E-тест завершён/);
   assert.equal(harness.rows.get(id).status, 'succeeded');
   assert.equal(harness.hostAgentCalls, 0);
+});
+
+test('direct callbacks for another registered host disclose nothing and never change the run', async (t) => {
+  for (const action of ['details', 'reject', 'allow']) {
+    await t.test(action, async () => {
+      const harness = serviceHarness();
+      const foreign = {
+        id: RUN_ID,
+        host_id: '33333333-3333-4333-8333-333333333333',
+        synthetic: false,
+        status: 'awaiting_owner',
+        incident_code: 'XRAY_SERVICE_FAILURE',
+        incident_revision: 'foreign-revision',
+        expires_at: new Date(Date.now() + 60_000),
+        safe_metadata: { nodeLabel: 'Foreign host secret label', scope: 'xray' },
+        playbook_id: 'restart_xray',
+        prompt_version: 1,
+        catalog_version: 1,
+        confidence: 'high',
+        reason_code: 'SERVICE_FAILED',
+      };
+      harness.rows.set(RUN_ID, foreign);
+      const result = await harness.service.handleCallback({
+        data: `vpsup:${action}:${RUN_ID}`,
+        telegramUserId: '101',
+        telegramChatId: '101',
+      });
+      assert.match(result.answer, /не найден или уже недействителен/);
+      assert.doesNotMatch(result.answer, /XRAY_SERVICE_FAILURE|Foreign host secret label|restart_xray/);
+      assert.equal(foreign.status, 'awaiting_owner');
+      assert.equal(harness.hostAgentCalls, 0);
+    });
+  }
 });
 
 test('acceptance remains fail-closed when disabled or model policy fails', async () => {

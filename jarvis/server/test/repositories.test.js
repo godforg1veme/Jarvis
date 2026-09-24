@@ -25,6 +25,23 @@ test('probe timer gate counts only latest protocol-matched proof for each of fou
   assert.match(sql, /'nl', 'de', 'hysteria2'/);
 });
 
+test('probe recheck menu candidates are owner-scoped fixed install attempts', async () => {
+  let query;
+  const repository = new VpnRepository({ async query(statement, values) {
+    query = { statement, values };
+    return { rows: [{ sourceNode: 'de', protocol: 'vless' }] };
+  } });
+  assert.deepEqual(await repository.probeRecheckCandidates({ userId: 'owner-a' }),
+    [{ sourceNode: 'de', protocol: 'vless' }]);
+  assert.deepEqual(query.values, ['owner-a']);
+  assert.match(query.statement, /user_id=\$1/);
+  assert.match(query.statement, /probe\.install/);
+  assert.match(query.statement, /probe\.rotate/);
+  assert.match(query.statement, /status IN \('succeeded', 'failed', 'unknown'\)/);
+  assert.match(query.statement, /\('de', 'nl', 'vless'\)/);
+  assert.match(query.statement, /\('nl', 'de', 'hysteria2'\)/);
+});
+
 test('VPN confirmation lookup, approval, and rejection stay in the originating conversation', async () => {
   const calls = [];
   const repository = new VpnRepository({ async query(statement, values) {

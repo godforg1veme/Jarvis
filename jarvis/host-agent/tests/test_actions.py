@@ -66,10 +66,20 @@ class ActionsTests(unittest.TestCase):
         config = SimpleNamespace(node_code="nl", probe_target=SimpleNamespace(node_code="de"))
         run.return_value = {"state": "succeeded", "data": {"output": ""}}
         read_result.return_value = {"targetNode": "de", "checks": {}}
-        response = execute(config, "vpn.external_probe.run", {"targetNode": "de"})
+        with patch("jarvis_host_agent.actions.probe_credential_readiness", return_value="ready") as readiness:
+            response = execute(config, "vpn.external_probe.run", {"targetNode": "de", "protocol": "vless"})
         self.assertEqual(response["state"], "succeeded")
         self.assertEqual(response["data"]["targetNode"], "de")
+        readiness.assert_called_once_with(config, target_node="de", protocol="vless")
         run.assert_called_once_with(["/usr/bin/systemctl", "start", "jarvis-vpn-probe@de.service"], timeout=75)
+
+    @patch("jarvis_host_agent.actions._run")
+    def test_missing_probe_credential_fails_before_systemd_start(self, run):
+        config = SimpleNamespace(node_code="de", probe_target=SimpleNamespace(node_code="nl"))
+        with patch("jarvis_host_agent.actions.probe_credential_readiness", return_value="not_installed"):
+            response = execute(config, "vpn.external_probe.run", {"targetNode": "nl", "protocol": "vless"})
+        self.assertEqual(response, {"state": "failed", "errorCode": "VPN_PROBE_CREDENTIAL_NOT_INSTALLED"})
+        run.assert_not_called()
 
     @patch("jarvis_host_agent.actions._run")
     def test_external_probe_monitor_lifecycle_never_targets_vpn_services(self, run):

@@ -15,11 +15,11 @@ const PROOF = {
   },
 };
 
-function workflow({ state = 'succeeded', data = PROOF } = {}) {
+function workflow({ state = 'succeeded', data = PROOF, errorCode } = {}) {
   const calls = [];
   const client = { async request(request) {
     calls.push(request);
-    return { result: { state, data } };
+    return { result: { state, data, ...(errorCode ? { errorCode } : {}) } };
   } };
   return { calls, service: new ProbeCredentialWorkflow({ clients: { nl: client, de: client }, now: () => NOW }) };
 }
@@ -32,7 +32,7 @@ test('recheck runs one read-only probe and returns only the closed target proof'
   });
   assert.equal(calls.length, 1);
   assert.equal(calls[0].operation, 'vpn.external_probe.run');
-  assert.deepEqual(calls[0].arguments, { targetNode: 'de' });
+  assert.deepEqual(calls[0].arguments, { targetNode: 'de', protocol: 'vless' });
 });
 
 test('recheck refuses a mismatched runner without making a request', async () => {
@@ -69,6 +69,13 @@ test('unknown Host Agent outcome remains unknown and is never reissued', async (
   const { service, calls } = workflow({ state: 'unknown' });
   await assert.rejects(service.recheck({ sourceNode: 'de', runnerNode: 'nl', protocol: 'vless' }),
     (error) => error instanceof ProbeWorkflowError && error.code === 'PROBE_RUN_UNKNOWN');
+  assert.equal(calls.length, 1);
+});
+
+test('missing requested credential fails clearly without a second probe request', async () => {
+  const { service, calls } = workflow({ state: 'failed', errorCode: 'VPN_PROBE_CREDENTIAL_NOT_INSTALLED' });
+  await assert.rejects(service.recheck({ sourceNode: 'de', runnerNode: 'nl', protocol: 'vless' }),
+    (error) => error instanceof ProbeWorkflowError && error.code === 'PROBE_CREDENTIAL_NOT_INSTALLED');
   assert.equal(calls.length, 1);
 });
 
@@ -120,6 +127,7 @@ test('installation forwards a transient export only to the opposite Host Agent',
   assert.deepEqual(nlCalls.map((item) => item.operation), ['vpn.external_probe.credential.install', 'vpn.external_probe.run']);
   assert.equal(nlCalls[0].arguments.targetNode, 'de');
   assert.equal(nlCalls[0].arguments.protocol, 'vless');
+  assert.deepEqual(nlCalls[1].arguments, { targetNode: 'de', protocol: 'vless' });
   assert.equal(result.acceptedCheck, 'vless_tcp_8443');
   assert.equal(result.probe, undefined);
   assert.doesNotMatch(JSON.stringify(result), /vless:\/\//i);

@@ -139,6 +139,7 @@ function harness(allowedIds = ['101', '202'], devices = null, commandService = n
     ...(options.voiceLimiter ? { voiceLimiter: options.voiceLimiter } : {}),
     ...(options.vpnService ? { vpnService: options.vpnService } : {}),
     ...(options.vpnSupervisorService ? { vpnSupervisorService: options.vpnSupervisorService } : {}),
+    ...(options.vpnSupervisorCallbackRouter ? { vpnSupervisorCallbackRouter: options.vpnSupervisorCallbackRouter } : {}),
     ...(options.menuService ? { menuService: options.menuService } : {}),
     ...(options.orchestrator ? { orchestrator: options.orchestrator } : {}),
     ...(options.lifeReminderService ? { lifeReminderService: options.lifeReminderService } : {}),
@@ -162,6 +163,21 @@ test('routes the closed VPN Supervisor command and callbacks without invoking th
   assert.equal(calls[0][1].telegramUserId, '101');
   assert.equal(calls[1][1].telegramUserId, '101');
   assert.equal(calls[1][1].telegramChatId, '101');
+});
+
+test('routes Supervisor buttons through the persisted-host callback router when configured', async () => {
+  const calls = [];
+  const router = { async handleCallback(input) { calls.push(input); return { answer: 'routed to persisted host' }; } };
+  const supervisor = { async handleCallback() { assert.fail('single-host fallback must not receive production callbacks'); } };
+  const { service } = harness(['101'], null, null, {
+    vpnSupervisorService: supervisor,
+    vpnSupervisorCallbackRouter: router,
+  });
+  const result = await service.handleCallback(callbackUpdate(882, 101, 101, 'vpsup:details:11111111-1111-4111-8111-111111111111'));
+  assert.equal(result.answer, 'routed to persisted host');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].telegramUserId, '101');
+  assert.equal(calls[0].telegramChatId, '101');
 });
 
 test('rejects a disallowed identity before persistence', async () => {
@@ -505,12 +521,24 @@ test('Telegram returns a VPN artifact without persisting its secret content', as
   assert.equal(assistantCalls.length, 0);
 });
 
+test('Telegram VPN callback forwards the actual group chat type to the domain guard', async () => {
+  const { service } = harness(['101'], null, null, {
+    vpnService: { async handleCallback(input) {
+      assert.equal(input.chatType, 'group');
+      return { answer: 'Групповой чат не может подтвердить проверку.' };
+    } },
+  });
+  const result = await service.handleVpnCallback(callbackUpdate(53, 101, -101, 'vpn:probe:recheck:de:v'));
+  assert.equal(result.status, 'answered');
+});
+
 test('Telegram VPN callback stays owner-scoped and persists no technical ID', async () => {
   const requestId = '33333333-3333-4333-8333-333333333333';
   const { service, state } = harness(['101'], null, null, {
     vpnService: { async handleCallback(input) {
       assert.equal(input.userId, 'user-101');
       assert.equal(input.originChannel, 'telegram');
+      assert.equal(input.chatType, 'private');
       assert.equal(input.data, `vpn:confirm:${requestId}`);
       return { answer: 'VPN-доступ создан.', buttons: [[{ text: 'В меню', data: 'vpn:menu' }]] };
     } },

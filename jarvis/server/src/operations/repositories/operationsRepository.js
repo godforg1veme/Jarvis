@@ -13,6 +13,14 @@ class OperationsRepository {
     return result.rows[0];
   }
 
+  async findHostByKey(hostKey) {
+    const result = await this.pool.query(`
+      SELECT id, host_key, label, status, last_contact_at
+      FROM ops_hosts WHERE host_key=$1
+    `, [hostKey]);
+    return result.rows[0] || null;
+  }
+
   async recordHostSnapshot({ hostId, state = 'healthy' }) {
     const result = await this.pool.query(`
       UPDATE ops_hosts SET status = $2, last_contact_at = now(), updated_at = now()

@@ -39,12 +39,21 @@ paths, storage keys, tokens, credentials, or unchecked user text may appear.
 
 - `life:*`: Life OS hierarchy and proposals; mutable values use scoped guided input.
 - `vpn:*`: country/protocol menus, subscriptions, and origin-bound confirmation.
-  The owner-only external-checks menu adds `Проверить ключ` for each fixed
-  DE/NL and VLESS/Hysteria2 binding using
+  `/vpn_health` shows the local Host Agent diagnosis and separate cross-node
+  VLESS/Hysteria2 probe results. External timer failures do not currently send
+  their own proactive Telegram incident message. Its «Автоматический ремонт»
+  label refers to autonomous action without owner approval: only a restricted
+  Xray/Hysteria2 service-restart proposal can be executed after a fresh owner
+  confirmation in the private chat.
+  The owner-only external-checks menu adds `Проверить ключ` only for fixed
+  DE/NL and VLESS/Hysteria2 bindings with a completed installation/rotation
+  attempt (including uncertain outcomes that require reconciliation), using
   `vpn:probe:recheck:<de|nl>:<v|h>`. It is available only in a private Telegram
-  chat and requires separate confirmation in that same conversation. It runs
-  exactly one existing read-only external probe with the already-installed
-  credential and stores only closed proof metadata; it never installs, rotates,
+  chat; the callback route forwards the normalized Telegram chat type to that
+  guard and requires separate confirmation in the same conversation. It runs
+  at most one existing read-only external probe after the Host Agent checks
+  private credential-file metadata. Missing requested credentials fail closed
+  without starting systemd. It stores only closed proof metadata; it never installs, rotates,
   exports, or reveals a key. Callback bytes contain only the fixed source node
   and protocol code.
 - `mem:*`, `doc:*`, `dev:*`, `gallery:*`, `flow:*`: scoped controls, lookup, and expiry.
@@ -57,8 +66,13 @@ from the owner's private Telegram chat after the current incident and closed
 policy are rechecked, and may invoke only the matching `vpn.restart` or
 `vpn.hysteria2.restart` operation. A post-action snapshot verifies both VPN
 stacks. Stale diagnosis cancels; uncertain outcome is reconciled by the
-original request ID without retry. The first live owner-confirmed restart
-remains unaccepted; synthetic no-op acceptance passed on 2026-09-16.
+original request ID without retry. A genuine owner-confirmed NL Xray restart
+passed live postchecks on 2026-09-24 after the host-bound callback fix; the
+synthetic no-op acceptance passed earlier on 2026-09-16.
+For every button action, the server resolves the run's persisted `host_id`
+to exactly one configured Supervisor service, and that service independently
+checks host ownership before handling the callback. This is an internal route
+fix; labels, row layout, callback bytes, and confirmation scope are unchanged.
 
 `server/src/telegram/bot.js` validates outbound inline buttons. New callback
 forms require parser, handler, authorization, and test before allowlisting.

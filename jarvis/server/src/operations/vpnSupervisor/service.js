@@ -401,6 +401,10 @@ class VpnSupervisorService {
     const [, action, id] = match;
     let current = await this.repository.find(id);
     if (!current) return { answer: 'Этот запрос не найден или уже недействителен.' };
+    const serviceHost = await this.hostIdProvider();
+    if (!serviceHost || current.host_id !== serviceHost.id) {
+      return { answer: 'Этот запрос не найден или уже недействителен.' };
+    }
     if (['planning', 'awaiting_owner'].includes(current.status) && new Date(current.expires_at).getTime() <= this.clock().getTime()) {
       if (typeof this.repository.expirePending === 'function') await this.repository.expirePending();
       current = await this.repository.find(id);

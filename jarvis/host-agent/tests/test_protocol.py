@@ -70,6 +70,13 @@ class ProtocolTests(unittest.TestCase):
                 "targetNode": "nl", "protocol": "wireguard", "credential": "synthetic",
             }))
         self.assertEqual(validate_request(request(operation="vpn.external_probe.run", arguments={"targetNode": "nl"}))["arguments"], {"targetNode": "nl"})
+        self.assertEqual(validate_request(request(operation="vpn.external_probe.run", arguments={
+            "targetNode": "nl", "protocol": "vless",
+        }))["arguments"], {"targetNode": "nl", "protocol": "vless"})
+        with self.assertRaises(ProtocolError):
+            validate_request(request(operation="vpn.external_probe.run", arguments={
+                "targetNode": "nl", "protocol": "wireguard",
+            }))
         self.assertEqual(validate_request(request(operation="vpn.external_probe.monitor.enable", arguments={"targetNode": "de"}))["arguments"], {"targetNode": "de"})
         with self.assertRaises(ProtocolError):
             validate_request(request(operation="vpn.external_probe.monitor.disable", arguments={"targetNode": "de", "unit": "xray"}))

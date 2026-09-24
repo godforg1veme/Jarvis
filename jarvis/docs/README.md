@@ -6,6 +6,34 @@ future-tense wording does not override the current architecture in `AGENTS.md`.
 
 Status snapshot: 2026-09-24.
 
+Current VPN acceptance: all four owner-confirmed cross-node test bindings have
+fresh healthy proofs. The owner separately enabled both approximately
+15-minute systemd probe timers in the originating private Telegram chat;
+scheduled DE and NL runs on 2026-09-24 reported healthy VLESS 443/8443 and
+Hysteria2 fixed-443/hopping checks. NL now has DNS-only
+`vpn-nl.rilora.ru -> 94.183.208.56`, a Let's Encrypt certificate for that
+name expiring 2026-12-23, and root-only Cloudflare DNS-01 settings that keep
+the old `vpn.rilora.ru` certificate alongside it. Real Hysteria2 clients
+validated both TLS names before and after switching NL's advertised SNI to
+the new name; six existing credentials and the generated VPN configuration
+were preserved. Supervisor repair acceptance completed on 2026-09-24: after a
+first safely rejected NL approval exposed cross-node callback routing to DE,
+the host-bound route fix was deployed and a second owner-approved NL Xray
+failure drill completed with `POSTCHECK_PASSED`. Both stacks were healthy
+afterward, open VPN incidents returned to zero, and scheduled post-repair
+DE↔NL probes passed all four VLESS/Hysteria2 endpoint checks. Automatic
+certificate renewal has not yet been observed, and no 99.9% availability
+guarantee has been demonstrated. External probe timers do not currently send
+their own Telegram incident alert; `/vpn_health` displays those results, while
+Operations separately alerts on persistent local node/service diagnoses.
+Only an owner-confirmed Xray/Hysteria2 service restart is enabled. See
+`updates/2026-09-24-vpn-supervisor-host-bound-callback-routing.md` and
+`updates/2026-09-24-vpn-monitoring-alerting-and-repair-scope.md` and
+`updates/2026-09-24-vpn-probe-timers-and-nl-dns-acme.md`.
+
+The following dated rollout paragraphs describe their respective earlier
+milestones and are superseded by this current-status paragraph where noted.
+
 VPN external-probe acceptance gate, deployed integration source 2026-09-23:
 credential installation is counted only after a fresh, node-matched VLESS 8443
 or Hysteria2 hopping check succeeds. Only four distinct recent accepted proofs
@@ -15,32 +43,57 @@ passed. Activation enables timers sequentially, compensates a second-side
 failure with one closed first-side disable, and never claims success for an
 uncertain outcome. The initial integrated server was deployed on 2026-09-23.
 One owner-confirmed NL-to-DE VLESS test key is installed; its original install
-outcome remains unknown. A separate confirmed recheck completed but returned
-`EXIT_MISMATCH`. The likely cause is that the checker derived expected egress
-from the VLESS endpoint while the node's direct egress differs; this mismatch
-is not proof that the tunnel is healthy. The separate expected-egress source
-fix is implemented locally but awaits production config/environment migration
-and deployment. No key was changed. A fresh owner-confirmed recheck is required
-after deployment. Three other bindings still need separate confirmed checks,
-and both timers remain disabled. No 99.9% uptime claim is made.
+outcome remains unknown. Its earlier confirmed recheck returned `EXIT_MISMATCH`
+before the expected-egress fix reached both nodes on 2026-09-24. A later
+owner-confirmed `unknown` (`PROBE_RUN_UNKNOWN`) was actually the opposite
+DE-to-NL VLESS direction. Read-only diagnosis on DE found no NL test key and
+systemd exit 243/CREDENTIALS. It says nothing about the installed NL-to-DE
+route. At 03:00 Moscow the owner confirmed a new NL-to-DE VLESS test-key
+installation, and its durable action succeeded with a fresh `vless_tcp_8443`
+proof. A separate Telegram callback bug caused generic errors on private
+recheck taps because `chatType` was not forwarded; the narrow route fix is
+deployed. That was the first of four required proofs. A later successful
+DE-to-NL VLESS installation/recheck brought the count at that milestone to two
+of four. Both Hysteria2 directions and timer activation were then pending; no
+99.9% uptime claim was or is made.
+The missing-credential recheck gate was deployed on both Host Agents and the
+server on 2026-09-24; the owner completed the NL-to-DE VLESS proof afterward.
 The deployed DE/NL timer units were changed to an approximately 15-minute
 repeat interval on 2026-09-23 and verified while still disabled.
 See `updates/2026-09-23-vpn-probe-gate-and-monitor-rollout.md`.
 The credential-safe recheck deployment and current manual acceptance step are
 recorded in `updates/2026-09-23-vpn-probe-credential-recheck-rollout.md`.
+The expected-egress baseline deployment and latest unknown manual acceptance
+outcome are recorded in `updates/2026-09-24-vpn-probe-egress-baseline-deployment.md`.
 The egress correction design and task plan are
 `superpowers/specs/2026-09-23-vpn-probe-egress-baseline-design.md` and
 `superpowers/plans/2026-09-23-vpn-probe-egress-baseline.md`.
+The 2026-09-24 Hysteria2 install-button fix preserves the selected protocol
+through confirmation creation. Its first real owner tap had failed before any
+action record or credential transfer. The next confirmed tap reached Host Agent
+but failed because its parser required the node IP and Hysteria2 TLS name to
+match. That parser is fixed on both nodes; the failed attempt installed no
+credential. Later owner taps completed both Hysteria2 proofs. See
+`updates/2026-09-24-vpn-hysteria2-probe-button-fix.md`.
 
-VPN Supervisor owner-approved restarts, 2026-09-23: the deployed server may
+VPN Supervisor owner-approved restarts, 2026-09-23 initial rollout: the deployed server may
 propose only a matching Xray or Hysteria2 service restart after bounded
 diagnosis. Execution requires fresh owner confirmation in the originating
 private Telegram chat, repeats deterministic checks, uses the closed Host
 Agent operation once, and verifies both stacks. Uncertain results reconcile
-under the same request ID without retry. Migration 026 is applied; restore
-playbooks remain disabled, and no real restart has yet been accepted during a
-live incident. See `updates/2026-09-23-vpn-supervisor-owner-approved-restarts.md`
-and `VPN_SUPERVISOR_REPAIR_GUIDE.md`.
+under the same request ID without retry. Migration 026 is applied and restore
+playbooks remain disabled. At this initial rollout milestone, no live restart
+had yet been accepted. The subsequent 2026-09-24 acceptance is recorded below
+and in `updates/2026-09-24-vpn-supervisor-host-bound-callback-routing.md`.
+See `updates/2026-09-23-vpn-supervisor-owner-approved-restarts.md` and
+`VPN_SUPERVISOR_REPAIR_GUIDE.md`.
+
+The 2026-09-24 NL drill identified and then cleared a callback-routing defect:
+shared run details were readable, but approval rechecked the DE Host Agent.
+The deployed fix routes `details`, `reject`, and `allow` by persisted run host
+ID and adds an independent host-ownership guard inside each node service. A
+genuine owner-approved NL Xray restart subsequently passed postchecks. See
+`updates/2026-09-24-vpn-supervisor-host-bound-callback-routing.md`.
 
 Happ resilient port-pool deployment, 2026-09-18: Jarvis now has
 a closed DE/NL public Hysteria2 port-pool contract, an exact two-request hopping
@@ -105,11 +158,9 @@ metadata and request a one-hour automatic update interval. A Happ display-name
 change still depends on a successful client refresh.
 Read-only production checks on 2026-09-17 verified the four generated URIs,
 node addresses, running services and UDP redirect rules; real Happ latency and
-traffic on Wi-Fi/mobile remain unverified. NL currently has a valid certificate
-for `vpn.rilora.ru` (expires 2026-12-12), but that name resolves to DE. NL's
-unattended HTTP-01 renewal is therefore not established. A distinct DNS-only NL
-hostname and matching certificate are required before expiry; do not present
-this as a completed redundant TLS deployment. See
+traffic on Wi-Fi/mobile remain unverified. At that earlier milestone, NL had
+only a `vpn.rilora.ru` certificate and lacked its own DNS hostname. The
+separate NL DNS and DNS-01 certificate were added later on 2026-09-24. See
 `updates/2026-09-16-happ-subscription-compatibility.md`.
 
 Multi-node VPN Supervisor rollout, 2026-09-16: Jarvis now manages separate
@@ -296,8 +347,14 @@ attachment ingestion.
 | `updates/2026-09-15-vpn-supervisor-classifier.md` | Deterministic VPN diagnosis, incident integration, E2E fault simulations, and production rollout record |
 | `VPN_SUPERVISOR_REPAIR_GUIDE.md` | Closed AI proposal, owner confirmation, one-shot restart and recovery rules |
 | `updates/2026-09-23-vpn-supervisor-owner-approved-restarts.md` | Real-restart deployment and acceptance boundary |
-| `updates/2026-09-23-vpn-probe-gate-and-monitor-rollout.md` | Verified external-probe gate deployment, disabled timers, and remaining owner acceptance |
-| `updates/2026-09-23-vpn-probe-credential-recheck-rollout.md` | Corrected probe credential paths, owner-confirmed recheck deployment, and current acceptance state |
+| `updates/2026-09-23-vpn-probe-gate-and-monitor-rollout.md` | Initial external-probe gate deployment; disabled-timer state was superseded by 2026-09-24 acceptance |
+| `updates/2026-09-23-vpn-probe-credential-recheck-rollout.md` | Historical credential recheck deployment; subsequent four-direction acceptance is in the 2026-09-24 records |
+| `updates/2026-09-24-vpn-probe-recheck-gate-rollout.md` | Missing-credential gate deployment, followed by completed four-binding owner acceptance |
+| `updates/2026-09-24-vpn-probe-egress-baseline-deployment.md` | Expected-egress baseline rollout and intermediate unknown result; superseded by later accepted checks |
+| `updates/2026-09-24-vpn-hysteria2-probe-button-fix.md` | Hysteria2 probe-button/parser fixes and subsequent accepted Hysteria2 bindings |
+| `updates/2026-09-24-vpn-probe-timers-and-nl-dns-acme.md` | Four-probe gate, enabled timers, dual-name NL DNS-01 certificate, and follow-up Supervisor acceptance |
+| `updates/2026-09-24-vpn-supervisor-host-bound-callback-routing.md` | Cross-node Supervisor button routing defect, host-bound source fix, and live repair acceptance status |
+| `updates/2026-09-24-vpn-monitoring-alerting-and-repair-scope.md` | Current four-path external probe coverage, Telegram alert boundaries, limited restart scope, and live acceptance matrix |
 | `VPN_PC_SETUP.md` | Руководство по настройке Hysteria 2 и VLESS на ПК (Windows / macOS) и устранению неполадок |
 | `VPN_RESILIENCE_RUNBOOK.md` | Current Hysteria2/Happ/VLESS diagnostic and acceptance procedure |
 | `CLAUDE.md`, `gemini.md` | Thin pointers to the authoritative agent context |

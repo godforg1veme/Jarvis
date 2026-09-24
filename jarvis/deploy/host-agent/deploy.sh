@@ -10,15 +10,15 @@ if [[ ! -d "${app_root}/host-agent/jarvis_host_agent" ]]; then
   exit 1
 fi
 
+echo "==> Running Host Agent unit tests from staged source..."
+sudo env PYTHONPATH="${app_root}/host-agent" /usr/bin/python3 -m unittest discover -s "${app_root}/host-agent/tests"
+
 echo "==> Syncing host-agent files to ${agent_root}..."
 sudo install -d -o root -g deploy -m 0750 "${agent_root}"
 sudo cp -a "${app_root}/host-agent/." "${agent_root}/"
 sudo chown -R deploy:deploy "${agent_root}"
 sudo find "${agent_root}" -type d -exec chmod 0755 {} +
 sudo find "${agent_root}" -type f -exec chmod 0644 {} +
-
-echo "==> Running Host Agent unit tests on VPS..."
-sudo env PYTHONPATH="${agent_root}" /usr/bin/python3 -m unittest discover -s "${agent_root}/tests"
 
 echo "==> Restarting jarvis-host-agent.service..."
 sudo systemctl restart jarvis-host-agent

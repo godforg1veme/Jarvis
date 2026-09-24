@@ -35,6 +35,14 @@ before changing the user-visible contract. Callback data is at most 64 UTF-8
 bytes and must never contain secrets, user text, document bodies, paths, or
 storage keys. URL buttons navigate; they never grant server authority.
 
+Supervisor callbacks retain the existing `vpsup:<action>:<run-uuid>` shape.
+After checking owner and private-chat scope, the callback router loads the
+durable run and selects exactly one configured Supervisor service by its
+trusted host ID. The selected service checks that same host ID again before
+showing details, rejecting, or approving. Missing runs, unknown or ambiguous
+hosts, and direct calls to the wrong service fail closed. Diagnosis type and
+button text never select the destination.
+
 Guided input is stored server-side with a typed state, owner/user,
 conversation/chat scope, and expiry. Validate input and consume the state
 atomically before mutation. A stale, foreign, revoked, or replayed control
@@ -47,9 +55,14 @@ and device; a confirmation copied into another chat must fail.
 The owner-only external-probe menu uses fixed
 `vpn:probe:recheck:<de|nl>:<v|h>` callbacks. Recheck controls require a private
 Telegram chat, followed by a separate confirmation bound to that conversation.
-One confirmed recheck performs exactly one closed read-only
+The normalized Telegram chat type must be forwarded to the VPN domain handler;
+otherwise this private-chat guard rejects a valid owner tap before confirmation.
+The menu shows a direction only after an installation/rotation attempt for it;
+stale callbacks cannot create a confirmation for other directions. A confirmed
+recheck performs at most one closed read-only
 `vpn.external_probe.run`; it cannot install, rotate, export, or reveal a test
-credential. Duplicate Telegram updates and consumed confirmations do not run it
+credential. The Host Agent rejects a missing or unsafe requested credential
+from file metadata before starting systemd. Duplicate Telegram updates and consumed confirmations do not run it
 again.
 
 ## Failure and diagnostic contract

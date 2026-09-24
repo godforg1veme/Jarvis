@@ -99,6 +99,13 @@ def _service_id(value: Any) -> str:
 def validate_arguments(operation: str, value: Any) -> dict[str, Any]:
     args = _require_mapping(value, "arguments")
     if operation in {"vpn.external_probe.snapshot", "vpn.external_probe.run", "vpn.external_probe.monitor.enable", "vpn.external_probe.monitor.disable"}:
+        if operation == "vpn.external_probe.run" and "protocol" in args:
+            _no_extra(args, {"targetNode", "protocol"}, "arguments")
+            if args.get("protocol") not in {"vless", "hysteria2"}:
+                raise ProtocolError("arguments.protocol is invalid")
+            if args.get("targetNode") not in {"de", "nl"}:
+                raise ProtocolError("arguments.targetNode is invalid")
+            return {"targetNode": args["targetNode"], "protocol": args["protocol"]}
         _no_extra(args, {"targetNode"}, "arguments")
         if args.get("targetNode") not in {"de", "nl"}:
             raise ProtocolError("arguments.targetNode is invalid")

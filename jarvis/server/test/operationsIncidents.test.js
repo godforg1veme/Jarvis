@@ -62,3 +62,16 @@ test('repository resolves only classified VPN incidents and preserves the curren
   assert.match(calls[0].sql, /failure_kind<>\$2/);
   assert.deepEqual(calls[0].parameters, ['host-1', 'vpn.xray.service_failure']);
 });
+
+test('Supervisor host routing can resolve host IDs without writing host status', async () => {
+  const calls = [];
+  const expectedHost = { id: 'host-nl', host_key: 'vpn-nl', label: 'Netherlands VPN VPS' };
+  const repository = new OperationsRepository({ async query(sql, parameters) {
+    calls.push({ sql, parameters });
+    return { rows: [expectedHost] };
+  } });
+  assert.equal(await repository.findHostByKey('vpn-nl'), expectedHost);
+  assert.match(calls[0].sql, /^\s*SELECT/);
+  assert.doesNotMatch(calls[0].sql, /UPDATE|INSERT|DELETE/i);
+  assert.deepEqual(calls[0].parameters, ['vpn-nl']);
+});

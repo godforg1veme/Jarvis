@@ -50,6 +50,14 @@ function resultOrThrow(response, unavailableCode, failedCode) {
   throw new ProbeWorkflowError(result?.state === 'unknown' ? unavailableCode : failedCode);
 }
 
+function probeResultOrThrow(response) {
+  if (response?.result?.state === 'failed'
+    && response.result.errorCode === 'VPN_PROBE_CREDENTIAL_NOT_INSTALLED') {
+    throw new ProbeWorkflowError('PROBE_CREDENTIAL_NOT_INSTALLED');
+  }
+  return resultOrThrow(response, 'PROBE_RUN_UNKNOWN', 'PROBE_RUN_FAILED');
+}
+
 class ProbeCredentialWorkflow {
   constructor({ clients, now = () => new Date(), verifiedBindings = async () => false }) {
     this.clients = clients || {};
@@ -84,8 +92,10 @@ class ProbeCredentialWorkflow {
         credential,
       });
       const installData = resultOrThrow(installed, 'PROBE_INSTALL_UNKNOWN', 'PROBE_INSTALL_FAILED');
-      const probed = await this._request(verified.runnerNode, 'vpn.external_probe.run', { targetNode: verified.sourceNode });
-      const probeData = resultOrThrow(probed, 'PROBE_RUN_UNKNOWN', 'PROBE_RUN_FAILED');
+      const probed = await this._request(verified.runnerNode, 'vpn.external_probe.run', {
+        targetNode: verified.sourceNode, protocol: verified.protocol,
+      });
+      const probeData = probeResultOrThrow(probed);
       const snapshot = validateExternalProbe(probeData, verified.sourceNode, this.now());
       const acceptedCheck = ACCEPTED_CHECK[verified.protocol];
       const status = snapshot.checks[acceptedCheck].status;
@@ -109,8 +119,10 @@ class ProbeCredentialWorkflow {
 
   async recheck(binding) {
     const route = probeRouteFor(binding);
-    const response = await this._request(route.runnerNode, 'vpn.external_probe.run', { targetNode: route.sourceNode });
-    const probeData = resultOrThrow(response, 'PROBE_RUN_UNKNOWN', 'PROBE_RUN_FAILED');
+    const response = await this._request(route.runnerNode, 'vpn.external_probe.run', {
+      targetNode: route.sourceNode, protocol: route.protocol,
+    });
+    const probeData = probeResultOrThrow(response);
     const snapshot = validateExternalProbe(probeData, route.sourceNode, this.now());
     const acceptedCheck = ACCEPTED_CHECK[route.protocol];
     const status = snapshot.checks[acceptedCheck].status;
