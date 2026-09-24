@@ -46,6 +46,8 @@ function harness(node, modelDecisions) {
   } };
   const supervisorRepository = {
     async createPlanning(input) { runs.set(input.id, { ...input, status: 'planning' }); },
+    async saveProposal(input) { const row = runs.get(input.id); Object.assign(row, { status: 'awaiting_owner', playbook_id: input.playbookId,
+      reason_code: input.reasonCode, confidence: input.confidence, safe_metadata: input.safeMetadata }); return row; },
     async fail(id, reason) { runs.get(id).status = 'failed'; runs.get(id).reason = reason; },
   };
   const provider = { async answer({ messages }) {
@@ -60,7 +62,7 @@ function harness(node, modelDecisions) {
     hostIdProvider: async () => ({ id: node.id, label: node.label }),
     ownerTelegramId: '101',
     evidenceCollector: new VpnEvidenceCollector({ client, clock: () => new Date('2026-09-16T12:00:00Z') }),
-    getBot: () => ({ api: { async sendMessage(chatId, message) { ownerMessages.push({ chatId, message }); } } }),
+    getBot: () => ({ api: { async sendMessage(chatId, message, options) { ownerMessages.push({ chatId, message, options }); } } }),
     clock: () => new Date('2026-09-16T12:00:00Z'),
   });
   const repository = {
@@ -90,22 +92,24 @@ function needObservation(node) {
 
 function proposal(node) {
   return { version: 1, decision: 'propose', playbookId: node.playbook, reasonCode: 'SERVICE_FAILED',
-    confidence: 'high', requiredChecks: [], evidenceRefs: ['F11'] };
+    confidence: 'high', requiredChecks: [], evidenceRefs: ['F15'] };
 }
 
 for (const [nodeCode, node] of Object.entries(NODES)) {
-  test(`${nodeCode} simulated fault traverses debounce, logs, observation, LLM and disabled repair`, async () => {
+  test(`${nodeCode} simulated fault reaches an owner approval and does not mutate before confirmation`, async () => {
     const run = harness(node, [needObservation(node), proposal(node)]);
     for (let index = 0; index < 4; index += 1) await run.adapter.observe(run.health);
     await Promise.all(run.pending);
     assert.equal(run.incidents.size, 1);
     assert.equal(run.pending.length, 1);
-    assert.equal(run.providerMessages.length, 2);
+    assert.equal(run.providerMessages.length, 2, JSON.stringify([...run.runs.values()]));
     assert.deepEqual(run.operationNames, ['service.logs.read', 'vpn.health.snapshot']);
     assert.equal(run.ownerMessages.length, 1);
     assert.equal(run.ownerMessages[0].chatId, '101');
     assert.match(run.ownerMessages[0].message, new RegExp(node.label));
-    assert.equal([...run.runs.values()][0].reason, 'REAL_EXECUTION_DISABLED');
+    assert.equal([...run.runs.values()][0].status, 'awaiting_owner');
+    assert.equal(run.ownerMessages[0].options.reply_markup.inline_keyboard[0][0].callback_data,
+      `vpsup:allow:${[...run.runs.values()][0].id}`);
     assert.equal(run.forbiddenMutations, 0);
     const serialized = JSON.stringify(run.providerMessages);
     assert.equal(/must-not-leak|vless:\/\/client@/i.test(serialized), false);

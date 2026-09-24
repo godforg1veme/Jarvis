@@ -3,11 +3,11 @@ const test = require('node:test');
 
 const { VpnRecoveryWorker } = require('../src/vpn/vpnRecoveryWorker');
 
-function original(requestId, state = 'succeeded') {
+function original(requestId, state = 'succeeded', operation = 'vpn.client.issue') {
   return {
     version: 1,
     requestId,
-    operation: 'vpn.client.issue',
+    operation,
     receivedAt: '2026-09-12T10:00:00.000Z',
     completedAt: '2026-09-12T10:00:01.000Z',
     result: {
@@ -63,13 +63,49 @@ test('routes Netherlands recovery to the Netherlands Host Agent only', async () 
   assert.equal(calls[0].arguments.requestId, requestId);
 });
 
-test('never replays a cross-node probe credential handoff', async () => {
+test('never replays cross-node probe credential writes', async () => {
   const worker = new VpnRecoveryWorker({
     repository: { complete: async () => assert.fail('must not complete'), audit: async () => assert.fail('must not audit') },
     client: { request: async () => assert.fail('must not contact Host Agent') },
   });
-  assert.equal(await worker.reconcile({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', user_id: 'u1', action: 'probe.install' }), false);
+  for (const action of ['probe.install', 'probe.rotate']) {
+    assert.equal(await worker.reconcile({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', user_id: 'u1', action }), false);
+  }
 });
+
+test('reconciles read-only probe rechecks through their runner and original action ID', async () => {
+  const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const completed = [];
+  const audited = [];
+  const requests = [];
+  const worker = new VpnRecoveryWorker({
+    repository: {
+      complete: async (value) => completed.push(value),
+      audit: async (value) => audited.push(value),
+    },
+    clients: {
+      de: { request: async () => assert.fail('DE must not receive an NL-runner recheck') },
+      nl: { request: async (request) => {
+        requests.push(request);
+        return { result: { state: 'succeeded', data: { response: original(request.arguments.requestId, 'succeeded', 'vpn.external_probe.run') } } };
+      } },
+    },
+  });
+
+  assert.equal(await worker.reconcile({
+    id,
+    user_id: 'u1',
+    action: 'probe.recheck',
+    arguments: { sourceNode: 'de', runnerNode: 'nl', protocol: 'vless' },
+  }), true);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].operation, 'operation.status');
+  assert.equal(requests[0].arguments.requestId, id);
+  assert.equal(completed[0].requestId, id);
+  assert.equal(completed[0].status, 'succeeded');
+  assert.equal(audited[0].type, 'vpn.action.recovered');
+});
+
 
 test('never infers a four-host subscription repair from the parent action id', async () => {
   const worker = new VpnRecoveryWorker({
@@ -77,4 +113,14 @@ test('never infers a four-host subscription repair from the parent action id', a
     client: { request: async () => assert.fail('must not contact a single Host Agent') },
   });
   assert.equal(await worker.reconcile({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', action: 'subscription.repair' }), false);
+});
+
+test('recovery tick reconciles pending VPN Supervisor runs without replaying actions', async () => {
+  let reconciled = 0;
+  const worker = new VpnRecoveryWorker({
+    repository: { async recoverable() { return []; } },
+    supervisorServices: [{ async reconcilePending() { reconciled += 1; } }],
+  });
+  await worker.tick();
+  assert.equal(reconciled, 1);
 });

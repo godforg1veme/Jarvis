@@ -43,3 +43,25 @@ test('only a synthetic approved no-op can transition to success', async () => {
   assert.match(calls[0].sql, /synthetic=true/);
   assert.match(calls[0].sql, /playbook_id='supervisor_acceptance_noop'/);
 });
+
+test('real repair claim is atomic, unexpired, same-ID and rate-limited per host', async () => {
+  const calls = [];
+  const repository = new VpnSupervisorRepository({ async query(sql, params) { calls.push({ sql: String(sql), params }); return { rows: [] }; } });
+  await repository.claimRepair({ id: '11111111-1111-4111-8111-111111111111', requestId: '11111111-1111-4111-8111-111111111111',
+    operation: 'vpn.restart', startedAt: new Date('2026-09-23T12:00:00Z').toISOString() });
+  assert.match(calls[0].sql, /status='approved' AND current\.expires_at>now\(\)/);
+  assert.match(calls[0].sql, /NOT \(current\.safe_metadata \? 'repairRequestId'\)/);
+  assert.match(calls[0].sql, /interval '15 minutes'/);
+  assert.deepEqual(calls[0].params.slice(0, 3), [
+    '11111111-1111-4111-8111-111111111111', '11111111-1111-4111-8111-111111111111', 'vpn.restart',
+  ]);
+});
+
+test('repair result state is closed and recovery enumerates only unresolved real repairs', async () => {
+  const calls = [];
+  const repository = new VpnSupervisorRepository({ async query(sql, params) { calls.push({ sql: String(sql), params }); return { rows: [] }; } });
+  await assert.rejects(repository.completeRepair({ id: '11111111-1111-4111-8111-111111111111', status: 'retry' }), /STATUS_INVALID/);
+  await repository.recoverableRepairs();
+  assert.match(calls[0].sql, /status IN \('approved','executing','verifying','unknown'\)/);
+  assert.match(calls[0].sql, /synthetic=false/);
+});

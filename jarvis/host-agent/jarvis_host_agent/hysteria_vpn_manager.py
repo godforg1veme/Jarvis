@@ -11,6 +11,7 @@ import os
 import re
 import secrets
 import socket
+import stat
 import tempfile
 import urllib.error
 import urllib.request
@@ -23,6 +24,7 @@ from .vpn_manager import CLIENT_ID_RE, MAX_CLIENTS, VpnManagerError, utc_now, va
 
 DEFAULT_STATE_PATH = Path("/etc/jarvis-vpn/hysteria2-state.json")
 DEFAULT_CONFIG_PATH = Path("/etc/hysteria/config.yaml")
+DEFAULT_ACME_DNS_PATH = Path("/etc/jarvis-vpn/hysteria2-acme-dns.json")
 DEFAULT_HYSTERIA_BIN = "/usr/local/bin/hysteria"
 DEFAULT_SERVICE = "hysteria-server.service"
 DEFAULT_AUTH_PORT = 3211
@@ -32,6 +34,8 @@ DEFAULT_AUTH_URL = f"http://{DEFAULT_AUTH_HOST}:{DEFAULT_AUTH_PORT}{DEFAULT_AUTH
 HOST_RE = re.compile(r"^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
 EMAIL_RE = re.compile(r"^[^\s@]{1,64}@[^\s@]{1,190}$")
 SECRET_RE = re.compile(r"^[A-Za-z0-9_-]{32,96}$")
+ACME_TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{30,128}$")
+NL_ACME_DOMAINS = ("vpn.rilora.ru", "vpn-nl.rilora.ru")
 
 
 def _valid_ip(value: Any) -> bool:
@@ -78,11 +82,23 @@ def validate_hysteria_state(value: Any) -> dict[str, Any]:
     return {**value, "clients": normalized}
 
 
-def hysteria_config(state: dict[str, Any], auth_url: str = DEFAULT_AUTH_URL) -> dict[str, Any]:
+def validate_acme_dns_settings(value: Any, state: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != {"domains", "cloudflareApiToken"}:
+        raise VpnManagerError("VPN_HYSTERIA_ACME_DNS_INVALID")
+    domains = value["domains"]
+    token = value["cloudflareApiToken"]
+    if domains != list(NL_ACME_DOMAINS) or state["serverName"] not in domains:
+        raise VpnManagerError("VPN_HYSTERIA_ACME_DNS_INVALID")
+    if not isinstance(token, str) or not ACME_TOKEN_RE.fullmatch(token):
+        raise VpnManagerError("VPN_HYSTERIA_ACME_DNS_INVALID")
+    return {"domains": domains, "cloudflareApiToken": token}
+
+
+def hysteria_config(state: dict[str, Any], auth_url: str = DEFAULT_AUTH_URL,
+                    acme_dns: dict[str, Any] | None = None) -> dict[str, Any]:
     state = validate_hysteria_state(state)
-    return {
-        "listen": f'{state["address"]}:{state["port"]}',
-        "acme": {
+    if acme_dns is None:
+        acme = {
             "domains": [state["serverName"]],
             "email": state["acmeEmail"],
             "ca": "letsencrypt",
@@ -90,7 +106,20 @@ def hysteria_config(state: dict[str, Any], auth_url: str = DEFAULT_AUTH_URL) -> 
             "type": "http",
             "http": {"altPort": 80},
             "dir": "/var/lib/hysteria/acme",
-        },
+        }
+    else:
+        settings = validate_acme_dns_settings(acme_dns, state)
+        acme = {
+            "domains": settings["domains"],
+            "email": state["acmeEmail"],
+            "ca": "letsencrypt",
+            "type": "dns",
+            "dns": {"name": "cloudflare", "config": {"cloudflare_api_token": settings["cloudflareApiToken"]}},
+            "dir": "/var/lib/hysteria/acme",
+        }
+    return {
+        "listen": f'{state["address"]}:{state["port"]}',
+        "acme": acme,
         "auth": {"type": "http", "http": {"url": auth_url}},
         "obfs": {"type": "salamander", "salamander": {"password": state["obfsPassword"]}},
         "disableUDP": False,
@@ -235,6 +264,7 @@ class HysteriaVpnManager:
         service: str = DEFAULT_SERVICE,
         auth_url: str = DEFAULT_AUTH_URL,
         auth_probe: Callable[[str, dict[str, Any], float], tuple[int, dict[str, Any]]] | None = None,
+        acme_dns_path: Path = DEFAULT_ACME_DNS_PATH,
     ) -> None:
         self.run = run
         self.state_path = Path(state_path)
@@ -243,6 +273,24 @@ class HysteriaVpnManager:
         self.service = service
         self.auth_url = auth_url
         self.auth_probe = auth_probe or _default_http_auth_probe
+        self.acme_dns_path = Path(acme_dns_path)
+
+    def _read_acme_dns(self, state: dict[str, Any]) -> dict[str, Any] | None:
+        try:
+            info = self.acme_dns_path.lstat()
+        except FileNotFoundError:
+            return None
+        except OSError as exc:
+            raise VpnManagerError("VPN_HYSTERIA_ACME_DNS_INVALID") from exc
+        if not stat.S_ISREG(info.st_mode) or info.st_size > 1024:
+            raise VpnManagerError("VPN_HYSTERIA_ACME_DNS_INVALID")
+        if os.name != "nt" and (info.st_uid != 0 or info.st_mode & 0o177 != 0 or info.st_mode & 0o400 == 0):
+            raise VpnManagerError("VPN_HYSTERIA_ACME_DNS_INVALID")
+        try:
+            value = json.loads(self.acme_dns_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raise VpnManagerError("VPN_HYSTERIA_ACME_DNS_INVALID") from exc
+        return validate_acme_dns_settings(value, state)
 
     def _read_state(self) -> dict[str, Any]:
         try:
@@ -271,7 +319,8 @@ class HysteriaVpnManager:
 
     def _config_valid(self, state: dict[str, Any] | None = None) -> bool:
         try:
-            expected = hysteria_config(state or self._read_state(), self.auth_url)
+            current = state or self._read_state()
+            expected = hysteria_config(current, self.auth_url, self._read_acme_dns(current))
             actual = json.loads(self.config_path.read_text(encoding="utf-8"))
             return actual == expected
         except (OSError, json.JSONDecodeError, VpnManagerError):
@@ -282,7 +331,7 @@ class HysteriaVpnManager:
         previous_state = self.state_path.read_bytes() if self.state_path.exists() else None
         previous_config = self.config_path.read_bytes() if self.config_path.exists() else None
         state_bytes = (json.dumps(state, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
-        config_bytes = (json.dumps(hysteria_config(state, self.auth_url), ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+        config_bytes = (json.dumps(hysteria_config(state, self.auth_url, self._read_acme_dns(state)), ensure_ascii=False, indent=2) + "\n").encode("utf-8")
         restarted_service = False
         try:
             self._write_atomic(self.state_path, state_bytes)

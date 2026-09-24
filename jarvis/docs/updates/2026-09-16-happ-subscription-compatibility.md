@@ -2,6 +2,12 @@
 
 Date: 2026-09-16
 
+> Status note (2026-09-18): This historical record predates the closed
+> finite-pool and two-request hopping-probe implementation. Its statement about
+> an interval URI parameter is superseded; see the current
+> [resilience runbook](../VPN_RESILIENCE_RUNBOOK.md). A fixed-443 or DNAT check
+> is not evidence that Happ traffic survives hopping.
+
 ## Outcome
 
 Jarvis VPN subscriptions now use one ordinary, auto-refreshing subscription URL
@@ -69,9 +75,9 @@ history. A live tap on the new Happ button remains a device acceptance check.
 Hysteria 2 follow-up on 2026-09-17: both server processes and UDP redirect rules
 were active, but the NL Host Agent exported the DE hostname while using NL
 credentials. Host Agent exports now connect to the node's own address with the
-certificate hostname in SNI. The Happ Base64 subscription keeps userpass as
-`username:password` and encodes the port-hopping interval with Happ's documented
-`mportHopInt` parameter. A real phone test is still required to confirm latency
+certificate hostname in SNI. The Happ Base64 subscription then kept userpass as
+`username:password` and encoded the port-hopping interval with a parameter now
+superseded by the finite-pool contract. A real phone test is still required to confirm latency
 and traffic on both mobile and Wi-Fi networks.
 The fix was deployed to both Host Agents and the DE server on 2026-09-17.
 Production read-only export verification returned four profiles, with distinct

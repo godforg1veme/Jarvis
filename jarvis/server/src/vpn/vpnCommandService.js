@@ -2,7 +2,7 @@ const crypto = require('node:crypto');
 const { buildRoutingArtifact, buildRoutingSummary } = require('./vpnRoutingService');
 const { parseVpnHealth } = require('./vpnHealthSchema');
 const { ExternalProbeMonitor } = require('../operations/vpnSupervisor/externalProbeMonitor');
-const { ProbeCredentialWorkflow, ProbeWorkflowError, probeBindingFor } = require('./vpnProbeCredentialWorkflow');
+const { ProbeCredentialWorkflow, ProbeWorkflowError, probeBindingFor, probeRouteFor } = require('./vpnProbeCredentialWorkflow');
 
 const CONFIRMATION_TTL_MS = 60 * 1000;
 const REQUEST_ID_RE = /^[a-f0-9-]{36}$/i;
@@ -113,9 +113,9 @@ function parseVpnCallback(value) {
   if (data === 'vpn:probe:enable') return { action: 'probe-enable' };
   if (data === 'vpn:probe:disable') return { action: 'probe-disable' };
 
-  match = /^vpn:probe:(install|rotate):(de|nl):(v|h)$/.exec(data);
+  match = /^vpn:probe:(install|rotate|recheck):(de|nl):(v|h)$/.exec(data);
   if (match) return {
-    action: match[1] === 'install' ? 'probe-install' : 'probe-rotate',
+    action: match[1] === 'install' ? 'probe-install' : match[1] === 'rotate' ? 'probe-rotate' : 'probe-recheck',
     sourceNode: match[2], protocol: match[3] === 'h' ? 'hysteria2' : 'vless',
   };
 
@@ -289,6 +289,18 @@ function validateAction(action, args) {
       throw publicError('PROBE_BINDING_INVALID');
     }
   }
+  if (action === 'probe.recheck') {
+    try {
+      const route = probeRouteFor({
+        sourceNode: String(args?.sourceNode || ''),
+        runnerNode: String(args?.runnerNode || ''),
+        protocol: String(args?.protocol || ''),
+      });
+      return { sourceNode: route.sourceNode, runnerNode: route.runnerNode, protocol: route.protocol };
+    } catch (_) {
+      throw publicError('PROBE_BINDING_INVALID');
+    }
+  }
   if (action === 'probe.enable' || action === 'probe.disable') {
     if (args && Object.keys(args).length > 0) throw publicError('VPN_ACTION_INVALID');
     return {};
@@ -325,11 +337,13 @@ function safeProbeWorkflowData(data = {}) {
   const targetNode = NODES[data.targetNode] ? data.targetNode : null;
   const runnerNode = NODES[data.runnerNode] ? data.runnerNode : null;
   const protocol = PROTOCOLS[data.protocol] ? data.protocol : null;
+  const expectedCheck = protocol === 'vless' ? 'vless_tcp_8443' : protocol === 'hysteria2' ? 'hysteria2_udp_hop' : null;
   if (typeof data.monitoring === 'boolean') return { monitoring: data.monitoring };
   return {
     ...(targetNode ? { targetNode } : {}),
     ...(runnerNode ? { runnerNode } : {}),
     ...(protocol ? { protocol } : {}),
+    ...(data.acceptedCheck === expectedCheck ? { acceptedCheck: expectedCheck } : {}),
     ...(typeof data.installedAt === 'string' && data.installedAt.length <= 40 ? { installedAt: data.installedAt } : {}),
   };
 }
@@ -401,6 +415,11 @@ function actionPrompt(action, args) {
     const runner = NODES[args.runnerNode];
     const verb = action === 'probe.install' ? 'Установить' : 'Обновить';
     return `${verb} тестовый ключ ${PROTOCOLS[args.protocol].title} для проверки ${runner.flag} ${runner.country} → ${source.flag} ${source.country}? Ключ не будет показан или сохранён в Jarvis.`;
+  }
+  if (action === 'probe.recheck') {
+    const source = NODES[args.sourceNode];
+    const runner = NODES[args.runnerNode];
+    return `Проверить уже установленный тестовый ключ ${PROTOCOLS[args.protocol].title}: ${runner.flag} ${runner.country} → ${source.flag} ${source.country}? Это запустит одну проверку без изменения ключа.`;
   }
   if (action === 'probe.enable') return 'Включить периодические внешние проверки между Германией и Нидерландами? Сначала должны успешно пройти все четыре разовые проверки.';
   if (action === 'probe.disable') return 'Отключить периодические внешние проверки между Германией и Нидерландами? VPN-службы и ключи пользователей не изменятся.';
@@ -604,7 +623,7 @@ class VpnCommandService {
         const formatExternal = (item) => item.status === 'healthy' ? '✅ OK'
           : item.status === 'failed' ? '❌ Не прошёл (требует проверки)' : '❓ Нет достоверного результата';
         const probeLines = probe ? [
-          `🌐 Внешняя проба с другого VPS: VLESS 443 ${formatExternal(probe.checks.vless_tcp_443)}, VLESS 8443 ${formatExternal(probe.checks.vless_tcp_8443)}, Hysteria2 443/UDP ${formatExternal(probe.checks.hysteria2_udp_443)}.`,
+          `🌐 Внешняя проба с другого VPS: VLESS 443 ${formatExternal(probe.checks.vless_tcp_443)}, VLESS 8443 ${formatExternal(probe.checks.vless_tcp_8443)}, Hysteria2 443/UDP ${formatExternal(probe.checks.hysteria2_udp_443)}, Hysteria2: hopping-путь ${formatExternal(probe.checks.hysteria2_udp_hop)}.`,
         ] : [];
         if (res.status === 'fulfilled') {
           return [renderNodeHealth(code, res.value.result), ...probeLines].join('\n');
@@ -665,14 +684,28 @@ class VpnCommandService {
   }
 
   async _create(command, context) {
-    const protocol = normalizeProtocol(command.protocol);
+    if (command.action === 'probe.recheck' && (context.originChannel !== 'telegram' || context.chatType !== 'private')) {
+      throw publicError('VPN_PRIVATE_CHAT_REQUIRED');
+    }
+    const protocol = normalizeProtocol(command.protocol ?? command.arguments?.protocol);
     const node = normalizeNode(command.node || 'de');
-    let rawArgs = { ...command.arguments, protocol, node };
+    let rawArgs = command.action === 'probe.enable' || command.action === 'probe.disable'
+      ? { ...command.arguments }
+      : { ...command.arguments, protocol, node };
     if (['revoke', 'rotate', 'export'].includes(command.action) && !rawArgs.clientId) {
       const client = await this._resolveClient(rawArgs.label, protocol, node);
       rawArgs = { clientId: client.id, protocol, node };
     }
     const args = validateAction(command.action, rawArgs);
+    if (command.action === 'probe.recheck') {
+      const candidates = await this._probeRecheckCandidates(context.userId);
+      if (!candidates.has(`${args.sourceNode}:${args.protocol}`)) {
+        return {
+          answer: 'Тестовый ключ для этого направления ещё не устанавливали. Выбери «Установить» в меню внешних проверок.',
+          buttons: [[{ text: '← Внешние проверки', data: 'vpn:probe:menu' }]],
+        };
+      }
+    }
     const id = crypto.randomUUID();
     const fingerprint = crypto.createHash('sha256').update(JSON.stringify({ action: command.action, args })).digest();
     const record = await this.repository.create({
@@ -708,18 +741,28 @@ class VpnCommandService {
     });
   }
 
-  async _probeMenu() {
+  async _probeRecheckCandidates(userId) {
+    if (typeof this.repository.probeRecheckCandidates !== 'function') return new Set();
+    const rows = await this.repository.probeRecheckCandidates({ userId });
+    return new Set((Array.isArray(rows) ? rows : [])
+      .filter((row) => NODES[row.sourceNode] && PROTOCOLS[row.protocol])
+      .map((row) => `${row.sourceNode}:${row.protocol}`));
+  }
+
+  async _probeMenu(context) {
     const resolved = await Promise.allSettled([
       this._probeBinding('de', 'vless'), this._probeBinding('de', 'hysteria2'),
       this._probeBinding('nl', 'vless'), this._probeBinding('nl', 'hysteria2'),
     ]);
     const bindings = resolved.filter((item) => item.status === 'fulfilled').map((item) => item.value);
+    const recheckCandidates = await this._probeRecheckCandidates(context.userId);
     const canEnable = typeof this.repository.hasVerifiedProbeBindings === 'function'
       && await this.repository.hasVerifiedProbeBindings();
     return {
       answer: [
         '🧪 **Внешние проверки VPN**',
         'Каждая операция требует отдельного подтверждения владельца. URI тестовых ключей не выводятся и не сохраняются в Jarvis.',
+        'Проверить существующий ключ можно после попытки его установки для выбранного направления.',
         bindings.length === 4
           ? (canEnable ? 'Все четыре разовые проверки подтверждены. Таймеры можно включить отдельным действием.' : 'Сначала установи и проверь все четыре направления, затем отдельно включи таймеры.')
           : `Доступно направлений: ${bindings.length} из 4. Недостающие тестовые устройства нужно создать или проверить отдельно.`,
@@ -733,6 +776,10 @@ class VpnCommandService {
           text: `Обновить ключ: ${NODES[binding.runnerNode].flag} → ${NODES[binding.sourceNode].flag} ${PROTOCOLS[binding.protocol].title}`,
           data: `vpn:probe:rotate:${binding.sourceNode}:${PROTOCOLS[binding.protocol].code}`,
         }]),
+        ...bindings.filter((binding) => recheckCandidates.has(`${binding.sourceNode}:${binding.protocol}`)).map((binding) => [{
+          text: `Проверить ключ: ${NODES[binding.runnerNode].flag} → ${NODES[binding.sourceNode].flag} ${PROTOCOLS[binding.protocol].title}`,
+          data: `vpn:probe:recheck:${binding.sourceNode}:${PROTOCOLS[binding.protocol].code}`,
+        }]),
         [{ ...(canEnable ? { text: '▶️ Включить таймеры', data: 'vpn:probe:enable' } : { text: '⏹ Отключить таймеры', data: 'vpn:probe:disable' }) }, ...(canEnable ? [{ text: '⏹ Отключить таймеры', data: 'vpn:probe:disable' }] : [])],
         [{ text: '← В меню VPN', data: 'vpn:menu' }],
       ],
@@ -741,26 +788,38 @@ class VpnCommandService {
 
   async _decideProbe(record, context) {
     let data;
+    let metadata;
     try {
       if (record.action === 'probe.install') data = await this.probeWorkflow.install(record.arguments);
       else if (record.action === 'probe.rotate') data = await this.probeWorkflow.rotate(record.arguments);
+      else if (record.action === 'probe.recheck') data = await this.probeWorkflow.recheck(record.arguments);
       else if (record.action === 'probe.enable') data = await this.probeWorkflow.enable();
       else data = await this.probeWorkflow.disable();
+      metadata = safeProbeWorkflowData(data);
+      if (record.action === 'probe.install' || record.action === 'probe.rotate' || record.action === 'probe.recheck') {
+        if (!metadata.acceptedCheck || metadata.targetNode !== record.arguments.sourceNode
+          || metadata.runnerNode !== record.arguments.runnerNode || metadata.protocol !== record.arguments.protocol) {
+          throw new ProbeWorkflowError('PROBE_ACCEPTANCE_UNKNOWN');
+        }
+      }
     } catch (error) {
       const code = error instanceof ProbeWorkflowError ? error.code : 'PROBE_WORKFLOW_UNAVAILABLE';
       const unknown = code.endsWith('_UNKNOWN') || code === 'PROBE_WORKFLOW_UNAVAILABLE';
       await this.repository.complete({ requestId: record.id, status: unknown ? 'unknown' : 'failed', errorCode: code });
       await this.repository.audit({ userId: context.userId, requestId: record.id, type: 'vpn.action.failed', metadata: { action: record.action, errorCode: code } });
       return {
-        answer: unknown ? 'Результат внешней проверки пока неизвестен; повторно она не запускалась.' : `Внешняя проверка не выполнена: ${code}.`,
+        answer: unknown ? 'Результат внешней проверки пока неизвестен; повторно она не запускалась.'
+          : code === 'PROBE_CREDENTIAL_NOT_INSTALLED'
+            ? 'Тестовый ключ для этого направления не установлен. Выбери «Установить» в меню внешних проверок.'
+            : `Внешняя проверка не выполнена: ${code}.`,
         buttons: [[{ text: '← Внешние проверки', data: 'vpn:probe:menu' }]],
       };
     }
-    const metadata = safeProbeWorkflowData(data);
     await this.repository.complete({ requestId: record.id, status: 'succeeded', result: metadata });
     await this.repository.audit({ userId: context.userId, requestId: record.id, type: 'vpn.action.succeeded', metadata: { action: record.action, ...metadata } });
     const answer = record.action === 'probe.enable' ? 'Периодические внешние проверки включены.'
       : record.action === 'probe.disable' ? 'Периодические внешние проверки отключены. VPN-службы и пользовательские ключи не менялись.'
+      : record.action === 'probe.recheck' ? `Проверка ключа ${NODES[metadata.runnerNode].flag} → ${NODES[metadata.targetNode].flag} (${PROTOCOLS[metadata.protocol].title}) завершена успешно.`
       : `Разовая внешняя проверка ${NODES[metadata.runnerNode].flag} → ${NODES[metadata.targetNode].flag} (${PROTOCOLS[metadata.protocol].title}) завершена.`;
     return { answer, buttons: [[{ text: '← Внешние проверки', data: 'vpn:probe:menu' }]] };
   }
@@ -768,17 +827,17 @@ class VpnCommandService {
   async _decide(command, context) {
     let requestId = command.requestId;
     if (!requestId && typeof this.repository.latestPending === 'function') {
-      const pending = await this.repository.latestPending({ userId: context.userId, originChannel: context.originChannel, originDeviceId: context.originDeviceId || null });
+      const pending = await this.repository.latestPending({ userId: context.userId, originChannel: context.originChannel, originDeviceId: context.originDeviceId || null, conversationId: context.conversationId || null });
       requestId = pending?.id || null;
     }
     if (!REQUEST_ID_RE.test(String(requestId || ''))) throw publicError('VPN_CONFIRMATION_UNAVAILABLE');
     if (command.decision === 'reject') {
-      const rejected = await this.repository.reject({ userId: context.userId, requestId, originChannel: context.originChannel, originDeviceId: context.originDeviceId || null });
+      const rejected = await this.repository.reject({ userId: context.userId, requestId, originChannel: context.originChannel, originDeviceId: context.originDeviceId || null, conversationId: context.conversationId || null });
       if (!rejected) throw publicError('VPN_CONFIRMATION_UNAVAILABLE');
       await this.repository.audit({ userId: context.userId, requestId: rejected.id, type: 'vpn.action.rejected', metadata: { action: rejected.action } });
       return { answer: 'VPN-действие отменено.', buttons: menuButtons() };
     }
-    const record = await this.repository.approve({ userId: context.userId, requestId, originChannel: context.originChannel, originDeviceId: context.originDeviceId || null });
+    const record = await this.repository.approve({ userId: context.userId, requestId, originChannel: context.originChannel, originDeviceId: context.originDeviceId || null, conversationId: context.conversationId || null });
     if (!record) throw publicError('VPN_CONFIRMATION_UNAVAILABLE');
     if (record.action === 'subscription.repair') return this._decideSubscriptionRepair(record, context);
     if (record.action.startsWith('probe.')) return this._decideProbe(record, context);
@@ -823,10 +882,18 @@ class VpnCommandService {
     if (!callback) return null;
     await this._requireOwner(context.userId);
     const node = callback.node || 'de';
-    if (callback.action === 'probe-menu') return this._probeMenu();
+    if (callback.action === 'probe-menu') return this._probeMenu(context);
     if (callback.action === 'probe-install' || callback.action === 'probe-rotate') {
       const binding = await this._probeBinding(callback.sourceNode, callback.protocol);
       return this._create({ action: callback.action === 'probe-install' ? 'probe.install' : 'probe.rotate', arguments: binding }, context);
+    }
+    if (callback.action === 'probe-recheck') {
+      if (context.originChannel !== 'telegram' || context.chatType !== 'private') throw publicError('VPN_PRIVATE_CHAT_REQUIRED');
+      const binding = await this._probeBinding(callback.sourceNode, callback.protocol);
+      return this._create({
+        action: 'probe.recheck',
+        arguments: { sourceNode: binding.sourceNode, runnerNode: binding.runnerNode, protocol: binding.protocol },
+      }, context);
     }
     if (callback.action === 'probe-enable' || callback.action === 'probe-disable') {
       return this._create({ action: callback.action === 'probe-enable' ? 'probe.enable' : 'probe.disable', arguments: {} }, context);

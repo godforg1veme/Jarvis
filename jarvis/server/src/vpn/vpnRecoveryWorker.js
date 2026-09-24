@@ -8,6 +8,7 @@ class VpnRecoveryWorker {
     this.repository = options.repository;
     this.client = options.client;
     this.clients = options.clients || (options.client ? { de: options.client } : {});
+    this.supervisorServices = Array.isArray(options.supervisorServices) ? options.supervisorServices : [];
     this.logger = options.logger || { warn() {}, info() {} };
     this.intervalMs = Math.min(Math.max(Number(options.intervalMs || 30_000), 5_000), 300_000);
     this.now = options.now || (() => new Date());
@@ -16,10 +17,12 @@ class VpnRecoveryWorker {
   }
 
   async reconcile(record) {
-    // Probe credential handoff spans two hosts.  A connection loss can leave
-    // either side changed, so it is intentionally never replayed or inferred.
-    if (record.action === 'probe.install' || record.action === 'probe.rotate' || record.action === 'subscription.repair') return false;
-    const node = record.arguments?.node === 'nl' ? 'nl' : 'de';
+    // Cross-node credential writes and a four-client subscription repair can
+    // leave remote state uncertain; never replay or infer them. A read-only
+    // probe.recheck is reconciled below with operation.status and its original ID.
+    if (record.action === 'probe.install' || record.action === 'probe.rotate'
+      || record.action === 'subscription.repair') return false;
+    const node = record.arguments?.node === 'nl' || record.arguments?.runnerNode === 'nl' ? 'nl' : 'de';
     const client = this.clients[node] || (node === 'de' ? this.client : null);
     if (!client) throw new Error(`VPN recovery client unavailable for ${node}`);
     const response = await client.request({
@@ -78,6 +81,11 @@ class VpnRecoveryWorker {
         } catch (error) {
           this.logger.warn({ err: error, requestId: record.id }, 'VPN action reconciliation failed');
         }
+      }
+      for (const service of this.supervisorServices) {
+        if (!service || typeof service.reconcilePending !== 'function') continue;
+        try { await service.reconcilePending(); }
+        catch (_) { this.logger.warn('VPN Supervisor repair reconciliation failed'); }
       }
     } finally {
       this.running = false;

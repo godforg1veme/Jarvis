@@ -31,33 +31,36 @@ class VpnRepository {
     return result.rows[0] || null;
   }
 
-  async latestPending({ userId, originChannel, originDeviceId = null }) {
+  async latestPending({ userId, originChannel, originDeviceId = null, conversationId = null }) {
     const result = await this.pool.query(`
       SELECT * FROM vpn_action_requests
       WHERE user_id=$1 AND origin_channel=$2 AND origin_device_id IS NOT DISTINCT FROM $3::uuid
+        AND conversation_id IS NOT DISTINCT FROM $4::uuid
         AND status='awaiting_confirmation' AND expires_at>now()
       ORDER BY created_at DESC LIMIT 1
-    `, [userId, originChannel, originDeviceId]);
+    `, [userId, originChannel, originDeviceId, conversationId]);
     return result.rows[0] || null;
   }
 
-  async approve({ userId, requestId, originChannel, originDeviceId = null }) {
+  async approve({ userId, requestId, originChannel, originDeviceId = null, conversationId = null }) {
     const result = await this.pool.query(`
       UPDATE vpn_action_requests SET status='running',updated_at=now()
       WHERE id=$1 AND user_id=$2 AND status='awaiting_confirmation' AND expires_at>now()
         AND origin_channel=$3 AND origin_device_id IS NOT DISTINCT FROM $4::uuid
+        AND conversation_id IS NOT DISTINCT FROM $5::uuid
       RETURNING *
-    `, [requestId, userId, originChannel, originDeviceId]);
+    `, [requestId, userId, originChannel, originDeviceId, conversationId]);
     return result.rows[0] || null;
   }
 
-  async reject({ userId, requestId, originChannel, originDeviceId = null }) {
+  async reject({ userId, requestId, originChannel, originDeviceId = null, conversationId = null }) {
     const result = await this.pool.query(`
       UPDATE vpn_action_requests SET status='cancelled',updated_at=now(),completed_at=now()
       WHERE id=$1 AND user_id=$2 AND status='awaiting_confirmation' AND expires_at>now()
         AND origin_channel=$3 AND origin_device_id IS NOT DISTINCT FROM $4::uuid
+        AND conversation_id IS NOT DISTINCT FROM $5::uuid
       RETURNING *
-    `, [requestId, userId, originChannel, originDeviceId]);
+    `, [requestId, userId, originChannel, originDeviceId, conversationId]);
     return result.rows[0] || null;
   }
 
@@ -96,12 +99,43 @@ class VpnRepository {
 
   async hasVerifiedProbeBindings() {
     const result = await this.pool.query(`
-      SELECT COUNT(DISTINCT (arguments->>'sourceNode', arguments->>'protocol'))::int AS count
-      FROM vpn_action_requests
-      WHERE action='probe.install' AND status='succeeded'
-        AND completed_at>now()-interval '24 hours'
+      WITH latest AS (
+        SELECT DISTINCT ON (arguments->>'sourceNode', arguments->>'protocol')
+          arguments, result, status, completed_at
+        FROM vpn_action_requests
+        WHERE action IN ('probe.install', 'probe.rotate', 'probe.recheck')
+          AND (arguments->>'sourceNode', arguments->>'runnerNode', arguments->>'protocol') IN (
+            ('de', 'nl', 'vless'), ('de', 'nl', 'hysteria2'),
+            ('nl', 'de', 'vless'), ('nl', 'de', 'hysteria2')
+          )
+        ORDER BY arguments->>'sourceNode', arguments->>'protocol', created_at DESC, id DESC
+      )
+      SELECT COUNT(*)::int AS count FROM latest
+      WHERE status='succeeded' AND completed_at>now()-interval '24 hours'
+        AND result->>'targetNode'=arguments->>'sourceNode'
+        AND result->>'runnerNode'=arguments->>'runnerNode'
+        AND result->>'protocol'=arguments->>'protocol'
+        AND result->>'acceptedCheck'=CASE arguments->>'protocol'
+          WHEN 'vless' THEN 'vless_tcp_8443'
+          WHEN 'hysteria2' THEN 'hysteria2_udp_hop'
+          ELSE NULL END
     `);
     return result.rows[0]?.count === 4;
+  }
+
+  async probeRecheckCandidates({ userId }) {
+    const result = await this.pool.query(`
+      SELECT DISTINCT arguments->>'sourceNode' AS "sourceNode",
+        arguments->>'protocol' AS protocol
+      FROM vpn_action_requests
+      WHERE user_id=$1 AND action IN ('probe.install', 'probe.rotate')
+        AND status IN ('succeeded', 'failed', 'unknown')
+        AND (arguments->>'sourceNode', arguments->>'runnerNode', arguments->>'protocol') IN (
+          ('de', 'nl', 'vless'), ('de', 'nl', 'hysteria2'),
+          ('nl', 'de', 'vless'), ('nl', 'de', 'hysteria2')
+        )
+    `, [userId]);
+    return result.rows;
   }
 
   async audit({ userId, requestId = null, type, metadata = {} }) {

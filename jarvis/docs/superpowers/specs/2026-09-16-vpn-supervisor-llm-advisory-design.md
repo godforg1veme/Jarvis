@@ -3,8 +3,19 @@
 **Date:** 2026-09-16
 
 **Status:** Implemented and production-deployed. The real model contract and
-two-node monitoring path are verified; final owner-button no-op acceptance is
-tracked in the 2026-09-16 rollout record. Real repair playbooks remain disabled.
+two-node monitoring path are verified; owner-button no-op acceptance is
+tracked in the 2026-09-16 rollout record. Real repair playbooks were disabled
+at that milestone; see the supersession note for current production status.
+
+**Supersession note (2026-09-23):** this status describes the 2026-09-16
+production milestone and remains true for production. Local source now adds the
+owner-confirmed Xray/Hysteria2 restart path described in
+`docs/updates/2026-09-23-vpn-supervisor-owner-approved-restarts.md` and
+`docs/VPN_SUPERVISOR_REPAIR_GUIDE.md`. The real-restart source was briefly
+deployed, rolled back, and redeployed on 2026-09-23 after owner authorization;
+migration 026 is applied. The running production catalog enables the two closed
+restart playbooks, while real-incident owner acceptance remains pending. Do not
+read the historical production boundary below as describing the newer rollout.
 
 **Milestone boundary:** use the same configured model path as Jarvis to analyze
 confirmed VPN incidents, request bounded diagnostics, and propose a closed

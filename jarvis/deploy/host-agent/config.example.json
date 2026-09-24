@@ -5,7 +5,8 @@
   "probeTarget": {
     "nodeCode": "nl",
     "vlessHost": "vpn-nl.example.invalid",
-    "hysteriaHost": "vpn-nl.example.invalid"
+    "hysteriaHost": "vpn-nl.example.invalid",
+    "expectedExitIp": "203.0.113.11"
   },
   "probeCredentialDir": "/etc/jarvis-vpn/probes",
   "managedServices": [

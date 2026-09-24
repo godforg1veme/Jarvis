@@ -30,13 +30,20 @@ function harness(options = {}) {
     },
     async approve(input) {
       const row = records.get(input.requestId);
-      if (!row || row.originChannel !== input.originChannel || (row.originDeviceId || null) !== (input.originDeviceId || null)) return null;
+      if (!row || row.status !== 'awaiting_confirmation' || row.originChannel !== input.originChannel
+        || (row.originDeviceId || null) !== (input.originDeviceId || null)) return null;
       row.status = 'running'; return row;
     },
     async reject(input) { return this.approve(input); },
     async latestPending() { return [...records.values()].at(-1) || null; },
     async complete(input) { calls.push(['complete', input]); return input; },
     async audit(input) { calls.push(['audit', input]); },
+    async probeRecheckCandidates({ userId }) {
+      assert.equal(userId, USER_ID);
+      return options.recheckCandidates === undefined
+        ? [{ sourceNode: 'de', protocol: 'vless' }]
+        : options.recheckCandidates;
+    },
   };
   const client = { async request(input) {
     calls.push(['request', input]);
@@ -97,6 +104,8 @@ test('parses only bounded VPN callback actions', () => {
   assert.deepEqual(parseVpnCallback(`vpn:confirm:${REQUEST_ID}`), { action: 'confirm', requestId: REQUEST_ID });
   assert.deepEqual(parseVpnCallback('vpn:probe:menu'), { action: 'probe-menu' });
   assert.deepEqual(parseVpnCallback('vpn:probe:install:de:v'), { action: 'probe-install', sourceNode: 'de', protocol: 'vless' });
+  assert.deepEqual(parseVpnCallback('vpn:probe:recheck:nl:h'), { action: 'probe-recheck', sourceNode: 'nl', protocol: 'hysteria2' });
+  assert.equal(parseVpnCallback('vpn:probe:recheck:xx:v'), null);
   assert.deepEqual(parseVpnCallback('vpn:probe:disable'), { action: 'probe-disable' });
   assert.equal(parseVpnCallback('ops:allow:anything'), null);
   assert.equal(parseVpnCallback('vpn:export:../../root'), null);
@@ -105,6 +114,10 @@ test('parses only bounded VPN callback actions', () => {
 test('rejects unsafe labels and client identifiers', () => {
   assert.throws(() => validateAction('issue', { label: '../../root' }), /VPN_LABEL_INVALID/);
   assert.throws(() => validateAction('revoke', { clientId: 'anything' }), /VPN_CLIENT_ID_INVALID/);
+  assert.deepEqual(validateAction('probe.recheck', { sourceNode: 'de', runnerNode: 'nl', protocol: 'vless' }), {
+    sourceNode: 'de', runnerNode: 'nl', protocol: 'vless',
+  });
+  assert.throws(() => validateAction('probe.recheck', { sourceNode: 'de', runnerNode: 'de', protocol: 'vless' }), /PROBE_BINDING_INVALID/);
 });
 
 test('owner can observe VPN without confirmation', async () => {
@@ -179,7 +192,7 @@ test('probe credential handoff requires the normal owner confirmation and persis
   const { service, calls, records } = harness();
   service.probeWorkflow = {
     async install() {
-      return { targetNode: 'de', runnerNode: 'nl', protocol: 'vless', installedAt: '2026-09-16T12:00:00Z' };
+      return { targetNode: 'de', runnerNode: 'nl', protocol: 'vless', installedAt: '2026-09-16T12:00:00Z', acceptedCheck: 'vless_tcp_8443', probe: { secret: 'never-persist' } };
     },
   };
   const context = { userId: USER_ID, conversationId: 'conversation', originChannel: 'telegram' };
@@ -195,7 +208,114 @@ test('probe credential handoff requires the normal owner confirmation and persis
   const stored = records.get(REQUEST_ID);
   assert.equal(JSON.stringify(stored.arguments).includes('vless://'), false);
   const completion = calls.find(([type]) => type === 'complete')[1];
-  assert.deepEqual(completion.result, { targetNode: 'de', runnerNode: 'nl', protocol: 'vless', installedAt: '2026-09-16T12:00:00Z' });
+  assert.deepEqual(completion.result, { targetNode: 'de', runnerNode: 'nl', protocol: 'vless', installedAt: '2026-09-16T12:00:00Z', acceptedCheck: 'vless_tcp_8443' });
+  assert.equal(JSON.stringify(completion.result).includes('never-persist'), false);
+});
+
+test('Hysteria2 probe install and rotate callbacks preserve the fixed protocol and direction', async () => {
+  for (const sourceNode of ['de', 'nl']) {
+    for (const action of ['install', 'rotate']) {
+      const { service, calls, records } = harness();
+      service._clients = async (protocol, node) => [{
+        id: 'vpn-0123456789ab',
+        label: node === 'de' ? 'Probe NL to DE Hysteria' : 'Probe DE to NL Hysteria',
+      }];
+      const context = { userId: USER_ID, conversationId: 'private-conversation', originChannel: 'telegram', chatType: 'private' };
+      const created = await service.handleCallback({ ...context, data: `vpn:probe:${action}:${sourceNode}:h` });
+      assert.match(created.answer, /Hysteria2/);
+      assert.match(created.buttons[0][0].data, /^vpn:confirm:/);
+      assert.deepEqual(records.get(REQUEST_ID).arguments, {
+        sourceNode,
+        runnerNode: sourceNode === 'de' ? 'nl' : 'de',
+        protocol: 'hysteria2',
+        clientId: 'vpn-0123456789ab',
+        label: sourceNode === 'de' ? 'Probe NL to DE Hysteria' : 'Probe DE to NL Hysteria',
+      });
+      assert.equal(calls.some(([type]) => type === 'request'), false);
+    }
+  }
+});
+
+test('probe timer callbacks create origin-bound confirmation with empty arguments', async () => {
+  for (const [callback, action] of [['vpn:probe:enable', 'probe.enable'], ['vpn:probe:disable', 'probe.disable']]) {
+    assert.throws(() => validateAction(action, { protocol: 'vless' }), /VPN_ACTION_INVALID/);
+    const { service, calls, records } = harness();
+    const context = { userId: USER_ID, conversationId: 'private-conversation', originChannel: 'telegram', chatType: 'private' };
+    const created = await service.handleCallback({ ...context, data: callback });
+    assert.match(created.buttons[0][0].data, /^vpn:confirm:/);
+    assert.equal(records.get(REQUEST_ID).action, action);
+    assert.deepEqual(records.get(REQUEST_ID).arguments, {});
+    assert.equal(calls.some(([type]) => type === 'request'), false);
+  }
+});
+
+test('probe recheck requires a private-chat owner confirmation and calls only the recheck workflow', async () => {
+  const { service, calls, records } = harness();
+  let rechecks = 0;
+  service.probeWorkflow = { async recheck(binding) {
+    rechecks += 1;
+    assert.deepEqual(binding, { sourceNode: 'de', runnerNode: 'nl', protocol: 'vless' });
+    return { targetNode: 'de', runnerNode: 'nl', protocol: 'vless', acceptedCheck: 'vless_tcp_8443' };
+  } };
+  service._clients = async (protocol, node) => [{
+    id: 'vpn-0123456789ab',
+    label: node === 'de' ? `Probe NL to DE ${protocol === 'vless' ? 'VLESS' : 'Hysteria'}` : `Probe DE to NL ${protocol === 'vless' ? 'VLESS' : 'Hysteria'}`,
+  }];
+  const context = { userId: USER_ID, conversationId: 'private-conversation', originChannel: 'telegram', chatType: 'private' };
+  const menu = await service.handleCallback({ ...context, data: 'vpn:probe:menu' });
+  assert.equal(menu.buttons.flat().some((button) => button.data === 'vpn:probe:recheck:de:v'), true);
+  const created = await service.handleCallback({ ...context, data: 'vpn:probe:recheck:de:v' });
+  assert.match(created.answer, /Проверить уже установленный тестовый ключ VLESS/);
+  const record = records.get(REQUEST_ID);
+  assert.deepEqual(record.arguments, { sourceNode: 'de', runnerNode: 'nl', protocol: 'vless' });
+  assert.match(created.buttons[0][0].data, /^vpn:confirm:/);
+  assert.equal(rechecks, 0);
+  const result = await service.handle({ ...context, text: '/vpn_confirm' });
+  assert.match(result.answer, /Проверка ключа 🇳🇱 → 🇩🇪 \(VLESS\) завершена успешно/);
+  assert.equal(rechecks, 1);
+  assert.equal(calls.some(([type]) => type === 'request'), false);
+  assert.equal(records.get(REQUEST_ID).status, 'running');
+  await assert.rejects(service.handle({ ...context, text: '/vpn_confirm' }),
+    (error) => error.publicCode === 'VPN_CONFIRMATION_UNAVAILABLE');
+  assert.equal(rechecks, 1);
+});
+
+test('uninstalled reverse probe is hidden and its stale callback creates no confirmation', async () => {
+  const { service, calls, records } = harness();
+  service._clients = async (protocol, node) => [{
+    id: 'vpn-0123456789ab',
+    label: node === 'de' ? `Probe NL to DE ${protocol === 'vless' ? 'VLESS' : 'Hysteria'}`
+      : `Probe DE to NL ${protocol === 'vless' ? 'VLESS' : 'Hysteria'}`,
+  }];
+  const context = { userId: USER_ID, conversationId: 'private-conversation', originChannel: 'telegram', chatType: 'private' };
+  const menu = await service.handleCallback({ ...context, data: 'vpn:probe:menu' });
+  const callbacks = menu.buttons.flat().map((button) => button.data);
+  assert.equal(callbacks.includes('vpn:probe:recheck:de:v'), true);
+  assert.equal(callbacks.includes('vpn:probe:recheck:nl:v'), false);
+  assert.equal(callbacks.includes('vpn:probe:install:nl:v'), true);
+  assert.equal(callbacks.includes('vpn:probe:rotate:nl:v'), true);
+  const stale = await service.handleCallback({ ...context, data: 'vpn:probe:recheck:nl:v' });
+  assert.match(stale.answer, /ещё не устанавливали/);
+  assert.equal(records.size, 0);
+  assert.equal(calls.some(([type]) => type === 'complete'), false);
+});
+
+test('probe recheck callback rejects non-private Telegram context', async () => {
+  const { service } = harness();
+  const context = { userId: USER_ID, conversationId: 'group', originChannel: 'telegram', chatType: 'group' };
+  await assert.rejects(service.handleCallback({ ...context, data: 'vpn:probe:recheck:de:v' }),
+    (error) => error.publicCode === 'VPN_PRIVATE_CHAT_REQUIRED');
+});
+
+test('a probe workflow without accepted proof cannot mark installation successful', async () => {
+  const { service, calls } = harness();
+  service.probeWorkflow = { async install() { return { targetNode: 'de', runnerNode: 'nl', protocol: 'vless' }; } };
+  const context = { userId: USER_ID, conversationId: 'conversation', originChannel: 'telegram' };
+  const binding = { sourceNode: 'de', runnerNode: 'nl', protocol: 'vless', clientId: 'vpn-0123456789ab', label: 'Probe NL to DE VLESS' };
+  await service.requestAction({ ...context, action: 'probe.install', arguments: binding });
+  const result = await service.handle({ ...context, text: '/vpn_confirm' });
+  assert.doesNotMatch(result.answer, /Разовая внешняя проверка/);
+  assert.equal(calls.find(([type]) => type === 'complete')[1].status, 'unknown');
 });
 
 test('Hysteria2 confirmation stays protocol-bound and never sends protocol to Host Agent arguments', async () => {

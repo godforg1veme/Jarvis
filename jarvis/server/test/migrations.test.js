@@ -33,12 +33,57 @@ test('migration files are ordered and narrowly named', () => {
     '021_vpn_probe_credentials.sql',
     '022_vpn_subscriptions.sql',
     '023_vpn_subscription_repair_action.sql',
-    '027_telegram_subscription_interaction_kinds.sql',
+    '024_telegram_update_outcomes.sql',
+    '024_vpn_hysteria_port_pools.sql',
+    '025_telegram_update_kind.sql',
+    '025_vpn_hysteria_port_pool_hop_interval.sql',
+    '026_vpn_supervisor_owner_approved_repairs.sql',
+    '027_vpn_probe_recheck_action.sql',
+    '028_telegram_subscription_interaction_kinds.sql',
   ]);
 });
 
+test('Hysteria port-pool interval correction is public-only and idempotent', () => {
+  const migration = fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, '025_vpn_hysteria_port_pool_hop_interval.sql'), 'utf8');
+  assert.match(migration, /SET hop_interval_seconds = 30/);
+  assert.match(migration, /AND hop_interval_seconds = 15/);
+  assert.doesNotMatch(migration, /hostname|share_uri|password|credential|secret|token/i);
+});
+
+test('Hysteria port-pool migration stores only bounded public routing metadata', () => {
+  const migration = fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, '024_vpn_hysteria_port_pools.sql'), 'utf8');
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS vpn_hysteria_port_pools/);
+  assert.match(migration, /hop_interval_seconds SMALLINT NOT NULL CHECK \(hop_interval_seconds BETWEEN 5 AND 45\)/);
+  assert.match(migration, /node_code IN \('de', 'nl'\)/);
+  assert.doesNotMatch(migration, /hostname|share_uri|password|credential|secret|token/i);
+});
+
+test('owner-approved Supervisor repair migration bounds active runs and one-shot incident attempts', () => {
+  const migration = fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, '026_vpn_supervisor_owner_approved_repairs.sql'), 'utf8');
+  assert.match(migration, /'executing', 'verifying'/);
+  assert.match(migration, /vpn_supervisor_one_active_per_host_idx/);
+  assert.match(migration, /vpn_supervisor_one_repair_attempt_per_incident_idx/);
+  assert.match(migration, /safe_metadata \? 'repairRequestId'/);
+  assert.doesNotMatch(migration, /credential|raw_log|command_text/i);
+});
+
+test('Telegram update route migration retains only a closed route kind', () => {
+  const migration = fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, '025_telegram_update_kind.sql'), 'utf8');
+  assert.match(migration, /update_kind IN \('message', 'callback'\)/);
+  assert.match(migration, /telegram_updates_kind_idx/);
+  assert.doesNotMatch(migration, /content|body|token|credential|secret/i);
+});
+
+test('Telegram update outcome migration stores only closed operational status and codes', () => {
+  const migration = fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, '024_telegram_update_outcomes.sql'), 'utf8');
+  assert.match(migration, /status IN \('processing', 'completed', 'failed'\)/);
+  assert.match(migration, /failure_code IS NULL OR failure_code ~ '\^\[A-Z\]\[A-Z0-9_\]\{2,79\}\$'/);
+  assert.match(migration, /telegram_updates_failed_idx/);
+  assert.doesNotMatch(migration, /message|content|body|token|credential|secret/i);
+});
+
 test('guided Telegram kinds emitted by VPN flows and the final database constraint stay in sync', () => {
-  const migration = fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, '027_telegram_subscription_interaction_kinds.sql'), 'utf8');
+  const migration = fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, '028_telegram_subscription_interaction_kinds.sql'), 'utf8');
   const constraint = /ADD CONSTRAINT telegram_interactions_kind_check CHECK \(kind IN \(([\s\S]*?)\)\);/.exec(migration);
   assert.ok(constraint, 'final Telegram interaction kind constraint must exist');
   const persistedKinds = Array.from(constraint[1].matchAll(/'([^']+)'/g), (match) => match[1]);
@@ -50,7 +95,6 @@ test('guided Telegram kinds emitted by VPN flows and the final database constrai
   assert.ok(emittedKinds.length > 0, 'VPN guided input kinds must be found');
   assert.deepEqual([...new Set(emittedKinds)].filter((kind) => !TELEGRAM_INTERACTION_KINDS.has(kind)), []);
 });
-
 test('VPN subscription migration creates owner-scoped subscription table without sensitive secret storage', () => {
   const migration = fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, '022_vpn_subscriptions.sql'), 'utf8');
   assert.match(migration, /CREATE TABLE IF NOT EXISTS vpn_subscriptions/);
@@ -67,6 +111,13 @@ test('subscription repair is an allowed confirmed VPN action', () => {
     assert.ok(migration.includes(`'${action}'`));
   }
   assert.doesNotMatch(migration, /credential|share_uri|password|secret/i);
+});
+
+test('probe recheck adds one closed confirmed action kind', () => {
+  const migration = fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, '027_vpn_probe_recheck_action.sql'), 'utf8');
+  assert.match(migration, /'probe\.recheck'/);
+  assert.match(migration, /'subscription\.repair'/);
+  assert.doesNotMatch(migration, /credential|share_uri|password|secret|uri/i);
 });
 
 test('probe credential migration adds only closed VPN action kinds', () => {

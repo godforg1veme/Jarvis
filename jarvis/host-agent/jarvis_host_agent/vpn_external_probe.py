@@ -18,7 +18,7 @@ class ProbeConfigError(ValueError):
         super().__init__("VPN_EXTERNAL_PROBE_INVALID")
 
 
-CHECK_NAMES = frozenset({"vless_tcp_443", "vless_tcp_8443", "hysteria2_udp_443"})
+CHECK_NAMES = frozenset({"vless_tcp_443", "vless_tcp_8443", "hysteria2_udp_443", "hysteria2_udp_hop"})
 FAILURE_CODES = frozenset({
     "NOT_CONFIGURED", "RUNNER_UNAVAILABLE", "CHECK_UNAVAILABLE", "EGRESS_UNAVAILABLE",
     "PROXY_CONNECT_FAILURE", "EXIT_MISMATCH", "HTTP_FAILURE",
@@ -90,8 +90,6 @@ def parse_hysteria_uri(uri: str, *, expected_host: str) -> dict:
     if any(ord(ch) < 33 or ord(ch) > 126 for ch in password + obfs_password):
         raise ProbeConfigError()
     sni = _host(fields["sni"])
-    if sni != host:
-        raise ProbeConfigError()
     return {"host": host, "port": port, "auth": f"{user}:{password}", "sni": sni,
             "obfsPassword": obfs_password}
 

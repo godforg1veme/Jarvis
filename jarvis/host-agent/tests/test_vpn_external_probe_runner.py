@@ -16,6 +16,13 @@ HYSTERIA = (
     "hy2://vpn-0123456789ab:synthetic-password@vpn.example.test:443/"
     "?obfs=salamander&obfs-password=synthetic-obfs&sni=vpn.example.test#Probe"
 )
+HOP_POOL = {
+    "version": 1,
+    "nodeCode": "nl",
+    "generation": "123e4567-e89b-42d3-a456-426614174000",
+    "ports": [20011, 22229, 26549, 30013],
+    "hopIntervalSeconds": 5,
+}
 
 
 class ProbeRunnerTests(unittest.TestCase):
@@ -31,32 +38,98 @@ class ProbeRunnerTests(unittest.TestCase):
     def _run(self):
         return runner.run_checks(target="nl", credential_dir=Path("/not-used"),
                                  vless_host="203.0.113.10", hysteria_host="vpn.example.test",
-                                 expected_exit_ip="203.0.113.10", xray_bin="/usr/local/bin/xray",
+                                 expected_exit_ip="198.51.100.24", xray_bin="/usr/local/bin/xray",
                                  hysteria_bin="/usr/local/bin/hysteria")
 
-    def test_runs_three_client_probes_and_returns_only_closed_status(self):
+    def test_runs_fixed_and_hopping_client_probes_and_returns_only_closed_status(self):
         calls = []
 
         def credential(_directory, name):
             return VLESS if name == "vless.uri" else HYSTERIA
 
-        def client(config, argv, expected_ip):
-            calls.append((config, argv, expected_ip))
+        def client(config, argv, expected_ip, **kwargs):
+            calls.append((config, argv, expected_ip, kwargs))
             return {"status": "healthy", "failureCode": None}
 
         with patch.object(runner, "_read_credential", side_effect=credential), \
              patch.object(runner, "_curl_ip", return_value="198.51.100.7"), \
-             patch.object(runner, "_free_port", side_effect=[18080, 18081, 18082]), \
+             patch.object(runner, "_read_hop_pool", return_value=HOP_POOL), \
+             patch.object(runner, "_free_port", side_effect=[18080, 18081, 18082, 18083]), \
              patch.object(runner, "_run_client", side_effect=client):
             result = self._run()
-        self.assertEqual(len(calls), 3)
+        self.assertEqual(len(calls), 4)
+        self.assertEqual({call[2] for call in calls}, {"198.51.100.24"})
         self.assertEqual(calls[0][0]["outbounds"][0]["settings"]["vnext"][0]["port"], 443)
         self.assertEqual(calls[1][0]["outbounds"][0]["settings"]["vnext"][0]["port"], 8443)
         self.assertEqual(calls[2][1][-1], "--config")
-        self.assertEqual(set(result["checks"]), {"vless_tcp_443", "vless_tcp_8443", "hysteria2_udp_443"})
+        self.assertEqual(calls[3][0]["server"], "vpn.example.test:20011,22229,26549,30013")
+        self.assertEqual(calls[3][0]["transport"]["udp"]["hopInterval"], "5s")
+        self.assertEqual(calls[3][3], {"hop_interval_seconds": 5})
+        self.assertEqual(set(result["checks"]), {"vless_tcp_443", "vless_tcp_8443", "hysteria2_udp_443", "hysteria2_udp_hop"})
         self.assertEqual({item["status"] for item in result["checks"].values()}, {"healthy"})
         self.assertNotIn("synthetic-password", json.dumps(result))
         self.assertNotIn("vless://", json.dumps(result))
+
+    def test_hop_check_requires_two_proxy_requests_separated_by_pool_interval(self):
+        class FakeProcess:
+            def poll(self):
+                return None
+
+            def terminate(self):
+                pass
+
+            def wait(self, timeout):
+                return 0
+
+        config = {"socks5": {"listen": "127.0.0.1:18080"}}
+        with patch.object(runner.subprocess, "Popen", return_value=FakeProcess()), \
+             patch.object(runner, "_wait_for_proxy", return_value=True), \
+             patch.object(runner, "_curl_ip", side_effect=["198.51.100.24", "198.51.100.24"]), \
+             patch.object(runner, "_sleep_for_hop") as sleep:
+            result = runner._run_client(config, ["/usr/local/bin/hysteria", "client"], "198.51.100.24", hop_interval_seconds=5)
+        self.assertEqual(result, {"status": "healthy", "failureCode": None})
+        sleep.assert_called_once_with(5)
+
+    def test_client_rejects_endpoint_address_when_expected_egress_is_different(self):
+        class FakeProcess:
+            def poll(self):
+                return None
+
+            def terminate(self):
+                pass
+
+            def wait(self, timeout):
+                return 0
+
+        config = {"inbounds": [{"port": 18080}]}
+        with patch.object(runner.subprocess, "Popen", return_value=FakeProcess()), \
+             patch.object(runner, "_wait_for_proxy", return_value=True), \
+             patch.object(runner, "_curl_ip", return_value="203.0.113.10"):
+            result = runner._run_client(
+                config,
+                ["/usr/local/bin/xray", "run", "-c"],
+                "198.51.100.24",
+            )
+        self.assertEqual(result, {"status": "failed", "failureCode": "EXIT_MISMATCH"})
+
+    def test_hop_check_fails_when_second_proxy_request_fails(self):
+        class FakeProcess:
+            def poll(self):
+                return None
+
+            def terminate(self):
+                pass
+
+            def wait(self, timeout):
+                return 0
+
+        config = {"socks5": {"listen": "127.0.0.1:18080"}}
+        with patch.object(runner.subprocess, "Popen", return_value=FakeProcess()), \
+             patch.object(runner, "_wait_for_proxy", return_value=True), \
+             patch.object(runner, "_curl_ip", side_effect=["203.0.113.10", None]), \
+             patch.object(runner, "_sleep_for_hop"):
+            result = runner._run_client(config, ["/usr/local/bin/hysteria", "client"], "203.0.113.10", hop_interval_seconds=5)
+        self.assertEqual(result, {"status": "unknown", "failureCode": "CHECK_UNAVAILABLE"})
 
     def test_missing_credentials_and_egress_outage_are_unknown_without_child_process(self):
         with patch.object(runner, "_read_credential", return_value=None), \

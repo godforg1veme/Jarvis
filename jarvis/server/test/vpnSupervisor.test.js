@@ -4,7 +4,7 @@ const { sanitizeEvidence } = require('../src/operations/vpnSupervisor/evidenceSa
 const { buildPlannerMessages, SYSTEM_POLICY } = require('../src/operations/vpnSupervisor/prompt');
 const { VpnSupervisorPlanner } = require('../src/operations/vpnSupervisor/planner');
 const { evaluateProposal } = require('../src/operations/vpnSupervisor/policy');
-const { VpnSupervisorService, acceptanceContext } = require('../src/operations/vpnSupervisor/service');
+const { VpnSupervisorService, acceptanceContext, factsFromHealth } = require('../src/operations/vpnSupervisor/service');
 const { VpnEvidenceCollector } = require('../src/operations/vpnSupervisor/evidenceCollector');
 const { collectObservationRound } = require('../src/operations/vpnSupervisor/observationRound');
 
@@ -23,6 +23,20 @@ function failedXrayHealth() {
       safeNextChecks: ['xray_service_status'],
     }, secondarySignals: [{ code: 'XRAY_PROTOCOL_UNVERIFIED', severity: 'info' }, { code: 'HYSTERIA2_PROTOCOL_UNVERIFIED', severity: 'info' }] },
   };
+}
+
+function failedHysteriaHealth() {
+  const health = failedXrayHealth();
+  health.xray = { service: 'healthy', config: 'healthy', listener: 'healthy', protocolProbe: 'unknown' };
+  health.hysteria2.service = 'unavailable';
+  health.hysteria2.listener = 'unavailable';
+  health.diagnosis.primary = {
+    code: 'HYSTERIA2_SERVICE_FAILURE', failureKind: 'vpn.hysteria2.service_failure', severity: 'error',
+    scope: 'hysteria2', confidence: 'high', likelyCause: 'hysteria2_service',
+    evidence: [{ path: 'hysteria2.config', status: 'healthy' }, { path: 'hysteria2.service', status: 'unavailable' }, { path: 'hysteria2.authEndpoint', status: 'healthy' }],
+    safeNextChecks: ['hysteria2_service_status'],
+  };
+  return health;
 }
 
 test('observation round maps only requested closed checks from one validated snapshot', async () => {
@@ -132,6 +146,41 @@ test('planner accepts strict JSON and retries schema formatting exactly once', a
   assert.doesNotMatch(calls[1].messages[3].content, /```json/);
 });
 
+test('planner corrects invented closed values with bounded schema hints, never raw output', async () => {
+  const calls = [];
+  const malformed = {
+    version: 1, decision: 'propose', playbookId: 'restart_xray',
+    reasonCode: 'UNDECLARED_CAUSE', confidence: 'high',
+    requiredChecks: ['nonexistent_check'], evidenceRefs: ['F1'],
+  };
+  const corrected = { ...malformed, reasonCode: 'SERVICE_FAILED', requiredChecks: [] };
+  const provider = { async answer(input) {
+    calls.push(input);
+    return JSON.stringify(calls.length === 1 ? malformed : corrected);
+  } };
+  const proposal = await new VpnSupervisorPlanner({ provider }).plan(prepared().context);
+  assert.equal(proposal.playbookId, 'restart_xray');
+  assert.equal(calls.length, 2);
+  const correction = calls[1].messages[3].content;
+  assert.match(correction, /SERVICE_FAILED/);
+  assert.match(correction, /xray_config/);
+  assert.match(correction, /reasonCode:invalid_value/);
+  assert.match(correction, /requiredChecks\.0:invalid_value/);
+  assert.doesNotMatch(correction, /UNDECLARED_CAUSE|nonexistent_check/);
+});
+
+test('planner still rejects a second schema-invalid response', async () => {
+  let calls = 0;
+  const provider = { async answer() {
+    calls += 1;
+    return JSON.stringify({ version: 1, decision: 'stop', playbookId: null,
+      reasonCode: 'UNDECLARED_CAUSE', confidence: 'high', requiredChecks: [], evidenceRefs: [] });
+  } };
+  await assert.rejects(new VpnSupervisorPlanner({ provider }).plan(prepared().context),
+    { code: 'VPN_SUPERVISOR_RESPONSE_INVALID' });
+  assert.equal(calls, 2);
+});
+
 test('planner rejects invented evidence and provider failures without exposing provider errors', async () => {
   const invented = { async answer() { return JSON.stringify(validProposal({ evidenceRefs: ['E999'] })); } };
   await assert.rejects(new VpnSupervisorPlanner({ provider: invented }).plan(prepared().context), { code: 'VPN_SUPERVISOR_EVIDENCE_INVALID' });
@@ -148,9 +197,35 @@ test('planner rejects invented evidence and provider failures without exposing p
 test('policy allows only the exact high-confidence synthetic no-op proposal', () => {
   const { context } = prepared();
   assert.equal(evaluateProposal({ context, proposal: validProposal() }).allowed, true);
-  assert.equal(evaluateProposal({ context, proposal: validProposal({ playbookId: 'restart_xray', reasonCode: 'SERVICE_FAILED' }) }).code, 'PLAYBOOK_DISABLED');
+  assert.equal(evaluateProposal({ context, proposal: validProposal({ playbookId: 'restart_xray', reasonCode: 'SERVICE_FAILED' }) }).code, 'ACCEPTANCE_MISMATCH');
   assert.equal(evaluateProposal({ context, proposal: validProposal({ confidence: 'medium' }) }).code, 'CONFIDENCE_TOO_LOW');
-  assert.equal(evaluateProposal({ context: { ...context, synthetic: false }, proposal: validProposal() }).code, 'REAL_EXECUTION_DISABLED');
+  assert.equal(evaluateProposal({ context: { ...context, synthetic: false }, proposal: validProposal() }).code, 'REPAIR_PRECONDITION_FAILED');
+});
+
+test('real restart policy requires matching service failure, valid config, and healthy other stack', () => {
+  const health = failedXrayHealth();
+  const context = {
+    synthetic: false,
+    incident: { code: 'XRAY_SERVICE_FAILURE' },
+    node: { capabilities: ['restart_xray', 'restart_hysteria2'] },
+    facts: factsFromHealth(health),
+  };
+  const allowed = evaluateProposal({ context, proposal: validProposal({ playbookId: 'restart_xray', reasonCode: 'SERVICE_FAILED', evidenceRefs: [] }) });
+  assert.equal(allowed.allowed, true);
+  assert.equal(allowed.code, 'OWNER_APPROVAL_REQUIRED');
+  const unhealthyFallback = { ...health, hysteria2: { ...health.hysteria2, listener: 'unknown' } };
+  assert.equal(evaluateProposal({ context: { ...context, facts: factsFromHealth(unhealthyFallback) },
+    proposal: validProposal({ playbookId: 'restart_xray', reasonCode: 'SERVICE_FAILED', evidenceRefs: [] }) }).code, 'REPAIR_PRECONDITION_FAILED');
+  assert.equal(evaluateProposal({ context: { ...context, incident: { code: 'XRAY_LISTENER_FAILURE' } },
+    proposal: validProposal({ playbookId: 'restart_xray', reasonCode: 'SERVICE_FAILED', evidenceRefs: [] }) }).code, 'REPAIR_PRECONDITION_FAILED');
+  assert.equal(evaluateProposal({ context: { ...context, facts: factsFromHealth({ ...health, network: { dns: 'degraded', outbound: 'healthy' } }) },
+    proposal: validProposal({ playbookId: 'restart_xray', reasonCode: 'SERVICE_FAILED', evidenceRefs: [] }) }).code, 'REPAIR_PRECONDITION_FAILED');
+  assert.equal(evaluateProposal({ context: { ...context, facts: factsFromHealth({ ...health,
+    xray: { ...health.xray, protocolProbe: 'unavailable' } }) },
+  proposal: validProposal({ playbookId: 'restart_xray', reasonCode: 'SERVICE_FAILED', evidenceRefs: [] }) }).code, 'REPAIR_PRECONDITION_FAILED');
+  assert.equal(evaluateProposal({ context: { ...context, facts: factsFromHealth({ ...health,
+    hysteria2: { ...health.hysteria2, auth: 'degraded' } }) },
+  proposal: validProposal({ playbookId: 'restart_xray', reasonCode: 'SERVICE_FAILED', evidenceRefs: [] }) }).code, 'REPAIR_PRECONDITION_FAILED');
 });
 
 function serviceHarness(options = {}) {
@@ -169,6 +244,11 @@ function serviceHarness(options = {}) {
     async decide({ id, approved }) { const row = rows.get(id); if (!row || row.status !== 'awaiting_owner') return null; row.status = approved ? 'approved' : 'rejected'; return row; },
     async markStale(id) { const row = rows.get(id); row.status = 'stale'; return row; },
     async completeNoop(id) { const row = rows.get(id); if (row.status !== 'approved' || !row.synthetic) return null; row.status = 'succeeded'; return row; },
+    async claimRepair({ id, requestId, operation }) { const row = rows.get(id); if (!row || row.status !== 'approved' || row.safe_metadata.repairRequestId) return null; row.status = 'executing'; row.safe_metadata = { ...row.safe_metadata, repairRequestId: requestId, repairOperation: operation }; return row; },
+    async failUnstartedRepair({ id, errorCode }) { const row = rows.get(id); if (!row || row.status !== 'approved') return null; row.status = 'failed'; row.safe_metadata.repairResultCode = errorCode; return row; },
+    async markVerifying(id) { const row = rows.get(id); if (!row || !['executing', 'verifying', 'unknown'].includes(row.status)) return null; row.status = 'verifying'; return row; },
+    async completeRepair({ id, status, errorCode }) { const row = rows.get(id); if (!row || !['executing', 'verifying', 'unknown'].includes(row.status)) return null; row.status = status; row.safe_metadata.repairResultCode = errorCode; return row; },
+    async recoverableRepairs() { return [...rows.values()].filter((row) => !row.synthetic && ['approved', 'executing', 'verifying', 'unknown'].includes(row.status)); },
   };
   const planner = options.planner || { async plan() { return validProposal(); } };
   const service = new VpnSupervisorService({
@@ -185,9 +265,9 @@ test('safe acceptance supports details, rejection, replay protection, and never 
   const started = await harness.service.handleCommand({ text: '/vpn_supervisor_test', telegramUserId: '101' });
   const id = /vpsup:allow:([a-f0-9-]{36})/.exec(started.buttons[0][0].data)[1];
   assert.match(started.answer, /no-op/);
-  assert.match((await harness.service.handleCallback({ data: `vpsup:details:${id}`, telegramUserId: '101' })).answer, /Host Agent не вызывается/);
-  assert.match((await harness.service.handleCallback({ data: `vpsup:reject:${id}`, telegramUserId: '101' })).answer, /отклонён/);
-  assert.match((await harness.service.handleCallback({ data: `vpsup:allow:${id}`, telegramUserId: '101' })).answer, /недействительным/);
+  assert.match((await harness.service.handleCallback({ data: `vpsup:details:${id}`, telegramUserId: '101', telegramChatId: '101' })).answer, /Host Agent не вызывается/);
+  assert.match((await harness.service.handleCallback({ data: `vpsup:reject:${id}`, telegramUserId: '101', telegramChatId: '101' })).answer, /отклонён/);
+  assert.match((await harness.service.handleCallback({ data: `vpsup:allow:${id}`, telegramUserId: '101', telegramChatId: '101' })).answer, /недействительным/);
   assert.equal(harness.rows.get(id).status, 'rejected');
   assert.equal(harness.hostAgentCalls, 0);
 });
@@ -196,11 +276,44 @@ test('safe acceptance completes only after owner approval and rejects other iden
   const harness = serviceHarness();
   const started = await harness.service.handleCommand({ text: '/vpn_supervisor_test', telegramUserId: '101' });
   const id = started.buttons[0][0].data.split(':').at(-1);
-  assert.match((await harness.service.handleCallback({ data: `vpsup:allow:${id}`, telegramUserId: '202' })).answer, /только владельцу/);
-  const completed = await harness.service.handleCallback({ data: `vpsup:allow:${id}`, telegramUserId: '101' });
+  assert.match((await harness.service.handleCallback({ data: `vpsup:allow:${id}`, telegramUserId: '202', telegramChatId: '202' })).answer, /только владельцу/);
+  const completed = await harness.service.handleCallback({ data: `vpsup:allow:${id}`, telegramUserId: '101', telegramChatId: '101' });
   assert.match(completed.answer, /E2E-тест завершён/);
   assert.equal(harness.rows.get(id).status, 'succeeded');
   assert.equal(harness.hostAgentCalls, 0);
+});
+
+test('direct callbacks for another registered host disclose nothing and never change the run', async (t) => {
+  for (const action of ['details', 'reject', 'allow']) {
+    await t.test(action, async () => {
+      const harness = serviceHarness();
+      const foreign = {
+        id: RUN_ID,
+        host_id: '33333333-3333-4333-8333-333333333333',
+        synthetic: false,
+        status: 'awaiting_owner',
+        incident_code: 'XRAY_SERVICE_FAILURE',
+        incident_revision: 'foreign-revision',
+        expires_at: new Date(Date.now() + 60_000),
+        safe_metadata: { nodeLabel: 'Foreign host secret label', scope: 'xray' },
+        playbook_id: 'restart_xray',
+        prompt_version: 1,
+        catalog_version: 1,
+        confidence: 'high',
+        reason_code: 'SERVICE_FAILED',
+      };
+      harness.rows.set(RUN_ID, foreign);
+      const result = await harness.service.handleCallback({
+        data: `vpsup:${action}:${RUN_ID}`,
+        telegramUserId: '101',
+        telegramChatId: '101',
+      });
+      assert.match(result.answer, /не найден или уже недействителен/);
+      assert.doesNotMatch(result.answer, /XRAY_SERVICE_FAILURE|Foreign host secret label|restart_xray/);
+      assert.equal(foreign.status, 'awaiting_owner');
+      assert.equal(harness.hostAgentCalls, 0);
+    });
+  }
 });
 
 test('acceptance remains fail-closed when disabled or model policy fails', async () => {
@@ -208,7 +321,7 @@ test('acceptance remains fail-closed when disabled or model policy fails', async
   assert.match((await serviceHarness().service.handleCommand({ text: '/vpn_supervisor_test', telegramUserId: '202' })).answer, /только владельцу/);
   const bad = serviceHarness({ planner: { async plan() { return validProposal({ playbookId: 'restart_xray', reasonCode: 'SERVICE_FAILED' }); } } });
   const result = await bad.service.handleCommand({ text: '/vpn_supervisor_test', telegramUserId: '101' });
-  assert.match(result.answer, /PLAYBOOK_DISABLED/);
+  assert.match(result.answer, /ACCEPTANCE_MISMATCH/);
   assert.equal([...bad.rows.values()][0].status, 'failed');
 });
 
@@ -237,20 +350,16 @@ test('real incident advisory sends only a validated matching high-confidence rec
   harness.service.evidenceCollector = { async collect() { return { evidence: [], truncated: false, digest: 'a'.repeat(64) }; } };
   harness.service.getBot = () => ({ api: { async sendMessage(chatId, text, options) { sent.push({ chatId, text, options }); } } });
   harness.service.planner = { async plan() { return validProposal({ playbookId: 'restart_xray', reasonCode: 'SERVICE_FAILED', evidenceRefs: [] }); } };
-  const health = {
-    host: 'healthy', network: { dns: 'healthy', outbound: 'healthy' },
-    xray: { service: 'unavailable', config: 'healthy', listener: 'unavailable' },
-    hysteria2: { service: 'healthy', config: 'healthy', listener: 'healthy', auth: 'healthy' },
-    diagnosis: { primary: { code: 'XRAY_SERVICE_FAILURE', scope: 'xray', severity: 'error', confidence: 'high' } },
-  };
+  const health = failedXrayHealth();
   const proposal = await harness.service.analyzeIncident({ incident: { id: '33333333-3333-4333-8333-333333333333' }, health });
   assert.equal(proposal.playbookId, 'restart_xray');
   assert.equal(sent.length, 1);
   assert.equal(sent[0].chatId, '101');
-  assert.match(sent[0].text, /restart_xray/);
-  assert.match(sent[0].text, /пока выключены/);
-  assert.equal([...harness.rows.values()][0].status, 'failed');
-  assert.equal([...harness.rows.values()][0].reason_code, 'REAL_EXECUTION_DISABLED');
+  assert.match(sent[0].text, /перезапустить только Xray/);
+  assert.match(sent[0].text, /Перезапуск ещё не выполнялся/);
+  assert.deepEqual(sent[0].options.reply_markup.inline_keyboard[0].map((button) => button.callback_data.startsWith('vpsup:allow:')), [true, false]);
+  assert.equal([...harness.rows.values()][0].status, 'awaiting_owner');
+  assert.equal([...harness.rows.values()][0].reason_code, 'SERVICE_FAILED');
 });
 
 test('real incident advisory suppresses a mismatched playbook recommendation', async () => {
@@ -284,16 +393,16 @@ test('real advisory performs one requested observation round on its node then pr
     contexts.push(context);
     return contexts.length === 1
       ? validProposal({ decision: 'need_observation', playbookId: null, reasonCode: 'INSUFFICIENT_EVIDENCE', requiredChecks: ['xray_config'], evidenceRefs: ['F1'] })
-      : validProposal({ playbookId: 'restart_xray', reasonCode: 'SERVICE_FAILED', evidenceRefs: ['F11'] });
+      : validProposal({ playbookId: 'restart_xray', reasonCode: 'SERVICE_FAILED', evidenceRefs: ['F15'] });
   } };
   harness.service.getBot = () => ({ api: { async sendMessage(chatId, message, options) { sent.push({ chatId, message, options }); } } });
   const proposal = await harness.service.analyzeIncident({ incident: { id: RUN_ID }, health });
   assert.equal(proposal.playbookId, 'restart_xray');
   assert.equal(contexts.length, 2);
   assert.deepEqual(operations, ['vpn.health.snapshot']);
-  assert.deepEqual(contexts[1].facts.at(-1), { id: 'F11', name: 'check.xray_config', status: 'healthy' });
+  assert.deepEqual(contexts[1].facts.at(-1), { id: 'F15', name: 'check.xray_config', status: 'healthy' });
   assert.equal(sent.length, 1);
-  assert.equal([...harness.rows.values()][0].reason_code, 'REAL_EXECUTION_DISABLED');
+  assert.equal([...harness.rows.values()][0].reason_code, 'SERVICE_FAILED');
   assert.equal(harness.hostAgentCalls, 0);
 });
 
@@ -318,4 +427,109 @@ test('real advisory stops on second observation request or stale diagnosis', asy
     assert.equal([...harness.rows.values()][0].reason_code, scenario === 'second' ? 'OBSERVATION_LIMIT' : 'INCIDENT_STALE');
     assert.equal(harness.hostAgentCalls, 0);
   }
+});
+
+test('real restart requires owner direct-chat confirmation, rechecks, and verifies both stacks', async () => {
+  for (const [health, operation] of [[failedXrayHealth(), 'vpn.restart'], [failedHysteriaHealth(), 'vpn.hysteria2.restart']]) {
+    const harness = serviceHarness();
+    const sent = [];
+    const requests = [];
+    const target = health.diagnosis.primary.scope;
+    const playbookId = target === 'xray' ? 'restart_xray' : 'restart_hysteria2';
+    const healthy = structuredClone(health);
+    healthy[target].service = 'healthy';
+    healthy[target].listener = 'healthy';
+    healthy.hysteria2.authCredentialProbe = 'unknown';
+    healthy.diagnosis = { version: 1, state: 'healthy', primary: null, secondarySignals: health.diagnosis.secondarySignals };
+    harness.service.evidenceCollector = {
+      async collect() { return { evidence: [], truncated: false, digest: 'a'.repeat(64) }; },
+      client: { async request(request) {
+        requests.push(request);
+        if (request.operation === 'vpn.health.snapshot') return { result: { state: 'succeeded', data: requests.length === 1 ? health : healthy } };
+        assert.equal(request.operation, operation);
+        assert.deepEqual(request.arguments, {});
+        return { result: { state: 'succeeded' } };
+      } },
+    };
+    harness.service.planner = { async plan() { return validProposal({ playbookId, reasonCode: 'SERVICE_FAILED', evidenceRefs: [] }); } };
+    harness.service.getBot = () => ({ api: { async sendMessage(chatId, text, options) { sent.push({ chatId, text, options }); } } });
+    await harness.service.analyzeIncident({ incident: { id: RUN_ID }, health });
+    const id = [...harness.rows.keys()][0];
+    const button = `vpsup:allow:${id}`;
+    const blocked = await harness.service.handleCallback({ data: button, telegramUserId: '101', telegramChatId: '-100123' });
+    assert.match(blocked.answer, /личном чате владельца/);
+    assert.equal(requests.length, 0);
+    const approved = await harness.service.handleCallback({ data: button, telegramUserId: '101', telegramChatId: '101' });
+    assert.match(approved.answer, /Проверка подтвердила/);
+    assert.deepEqual(requests.map((request) => request.operation), ['vpn.health.snapshot', operation, 'vpn.health.snapshot']);
+    assert.equal(harness.rows.get(id).status, 'succeeded');
+    assert.equal(harness.rows.get(id).safe_metadata.repairRequestId, id);
+    assert.equal(sent[0].chatId, '101');
+  }
+});
+
+test('real restart stops without dispatch when the incident changed before approval', async () => {
+  const harness = serviceHarness();
+  const requests = [];
+  harness.service.evidenceCollector = {
+    async collect() { return { evidence: [], truncated: false, digest: 'a'.repeat(64) }; },
+    client: { async request(request) {
+      requests.push(request);
+      return { result: { state: 'succeeded', data: { host: 'healthy', network: { dns: 'healthy', outbound: 'healthy' },
+        xray: { service: 'healthy', config: 'healthy', listener: 'healthy', protocolProbe: 'unknown' },
+        hysteria2: { service: 'healthy', config: 'healthy', listener: 'healthy', auth: 'healthy', authEndpoint: 'healthy', authCredentialProbe: 'healthy', protocolProbe: 'unknown' },
+        diagnosis: { version: 1, state: 'healthy', primary: null, secondarySignals: [
+          { code: 'XRAY_PROTOCOL_UNVERIFIED', severity: 'info' }, { code: 'HYSTERIA2_PROTOCOL_UNVERIFIED', severity: 'info' },
+        ] } } } };
+    } },
+  };
+  harness.service.planner = { async plan() { return validProposal({ playbookId: 'restart_xray', reasonCode: 'SERVICE_FAILED', evidenceRefs: [] }); } };
+  harness.service.getBot = () => ({ api: { async sendMessage() {} } });
+  await harness.service.analyzeIncident({ incident: { id: RUN_ID }, health: failedXrayHealth() });
+  const id = [...harness.rows.keys()][0];
+  const result = await harness.service.handleCallback({ data: `vpsup:allow:${id}`, telegramUserId: '101', telegramChatId: '101' });
+  assert.match(result.answer, /Диагноз изменился/);
+  assert.deepEqual(requests.map((request) => request.operation), ['vpn.health.snapshot']);
+  assert.equal(harness.rows.get(id).status, 'stale');
+});
+
+test('uncertain Host Agent restart reconciles by the original ID and never redispatches', async () => {
+  const harness = serviceHarness();
+  const calls = [];
+  let statusCalls = 0;
+  const healthy = structuredClone(failedXrayHealth());
+  healthy.xray.service = 'healthy';
+  healthy.xray.listener = 'healthy';
+  healthy.diagnosis = { version: 1, state: 'healthy', primary: null, secondarySignals: healthy.diagnosis.secondarySignals };
+  harness.service.evidenceCollector = {
+    async collect() { return { evidence: [], truncated: false, digest: 'a'.repeat(64) }; },
+    client: { async request(request) {
+      calls.push(request);
+      if (request.operation === 'vpn.health.snapshot') {
+        return { result: { state: 'succeeded', data: calls.length === 1 ? failedXrayHealth() : healthy } };
+      }
+      if (request.operation === 'vpn.restart') throw new Error('connection lost after dispatch');
+      assert.equal(request.operation, 'operation.status');
+      statusCalls += 1;
+      const status = statusCalls === 1
+        ? { state: 'unknown', errorCode: 'ACTION_OUTCOME_PENDING' }
+        : { state: 'succeeded' };
+      return { result: { state: 'succeeded', data: { found: true, response: {
+        version: 1, requestId: request.arguments.requestId, operation: 'vpn.restart',
+        receivedAt: '2026-09-23T12:00:00.000Z', completedAt: '2026-09-23T12:00:01.000Z', result: status,
+      } } } };
+    } },
+  };
+  harness.service.planner = { async plan() { return validProposal({ playbookId: 'restart_xray', reasonCode: 'SERVICE_FAILED', evidenceRefs: [] }); } };
+  harness.service.getBot = () => ({ api: { async sendMessage() {} } });
+  await harness.service.analyzeIncident({ incident: { id: RUN_ID }, health: failedXrayHealth() });
+  const id = [...harness.rows.keys()][0];
+  const pending = await harness.service.handleCallback({ data: `vpsup:allow:${id}`, telegramUserId: '101', telegramChatId: '101' });
+  assert.match(pending.answer, /Итог пока неизвестен/);
+  assert.equal(harness.rows.get(id).status, 'unknown');
+  assert.equal(calls.filter((request) => request.operation === 'vpn.restart').length, 1);
+  await harness.service.reconcilePending();
+  assert.equal(harness.rows.get(id).status, 'succeeded');
+  assert.equal(calls.filter((request) => request.operation === 'vpn.restart').length, 1);
+  assert.ok(calls.filter((request) => request.operation === 'operation.status').every((request) => request.arguments.requestId === id));
 });

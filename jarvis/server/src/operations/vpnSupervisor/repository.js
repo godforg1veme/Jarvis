@@ -76,6 +76,65 @@ class VpnSupervisorRepository {
     return result.rows[0] || null;
   }
 
+  async claimRepair({ id, requestId, operation, startedAt }) {
+    const result = await this.pool.query(`
+      UPDATE vpn_supervisor_runs AS current SET status='executing',
+        safe_metadata=current.safe_metadata || jsonb_build_object(
+          'repairRequestId',$2::text,'repairOperation',$3::text,'repairStartedAt',$4::text
+        ), updated_at=now()
+      WHERE current.id=$1 AND current.synthetic=false AND current.status='approved' AND current.expires_at>now()
+        AND NOT (current.safe_metadata ? 'repairRequestId')
+        AND NOT EXISTS (
+          SELECT 1 FROM vpn_supervisor_runs previous
+          WHERE previous.host_id=current.host_id AND previous.synthetic=false
+            AND previous.id<>current.id AND (previous.safe_metadata ? 'repairRequestId')
+            AND (previous.safe_metadata->>'repairStartedAt')::timestamptz > now()-interval '15 minutes'
+        )
+      RETURNING *
+    `, [id, requestId, operation, startedAt]);
+    return result.rows[0] || null;
+  }
+
+  async failUnstartedRepair({ id, errorCode }) {
+    const result = await this.pool.query(`
+      UPDATE vpn_supervisor_runs SET status='failed',
+        safe_metadata=safe_metadata || jsonb_build_object('repairResultCode',$2::text),
+        completed_at=now(),updated_at=now()
+      WHERE id=$1 AND status='approved' AND NOT (safe_metadata ? 'repairRequestId')
+      RETURNING *
+    `, [id, errorCode]);
+    return result.rows[0] || null;
+  }
+
+  async completeRepair({ id, status, errorCode = null }) {
+    if (!['succeeded', 'failed', 'unknown'].includes(status)) throw new Error('VPN_SUPERVISOR_REPAIR_STATUS_INVALID');
+    const result = await this.pool.query(`
+      UPDATE vpn_supervisor_runs SET status=$2,
+        safe_metadata=safe_metadata || jsonb_build_object('repairResultCode',$3::text),
+        completed_at=CASE WHEN $2='unknown' THEN NULL ELSE now() END,
+        updated_at=now()
+      WHERE id=$1 AND status IN ('executing','verifying','unknown') RETURNING *
+    `, [id, status, errorCode]);
+    return result.rows[0] || null;
+  }
+
+  async markVerifying(id) {
+    const result = await this.pool.query(`
+      UPDATE vpn_supervisor_runs SET status='verifying',updated_at=now()
+      WHERE id=$1 AND status IN ('executing','verifying','unknown') RETURNING *
+    `, [id]);
+    return result.rows[0] || null;
+  }
+
+  async recoverableRepairs() {
+    const result = await this.pool.query(`
+      SELECT * FROM vpn_supervisor_runs
+      WHERE synthetic=false AND status IN ('approved','executing','verifying','unknown')
+      ORDER BY created_at ASC LIMIT 20
+    `);
+    return result.rows;
+  }
+
   async expirePending() {
     const result = await this.pool.query(`
       UPDATE vpn_supervisor_runs SET status='expired',completed_at=now(),updated_at=now()

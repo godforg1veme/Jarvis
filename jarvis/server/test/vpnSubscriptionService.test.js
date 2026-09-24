@@ -6,8 +6,10 @@ const {
   hashToken,
   parseHysteriaUri,
   parseVlessUri,
-  DEFAULT_PORT_HOPPING_RANGE,
 } = require('../src/vpn/vpnSubscriptionService');
+
+const dePool = { nodeCode: 'de', generation: '123e4567-e89b-42d3-a456-426614174000', ports: [20011, 22229, 26549, 30013], hopIntervalSeconds: 30 };
+const nlPool = { nodeCode: 'nl', generation: '223e4567-e89b-42d3-a456-426614174000', ports: [20117, 23483, 27611, 31829], hopIntervalSeconds: 30 };
 
 test('generateToken produces sub_ prefixed 68 char token and valid sha256 hash', () => {
   const { token, tokenHash } = generateToken();
@@ -52,6 +54,7 @@ test('buildSingboxProfile builds valid sing-box JSON with exact priority and por
 
   const profile = service.buildSingboxProfile({
     nodes: { deHy2, nlHy2, deVless, nlVless },
+    portPools: { de: dePool, nl: nlPool },
   });
 
   assert.equal(profile.version, 1);
@@ -69,7 +72,8 @@ test('buildSingboxProfile builds valid sing-box JSON with exact priority and por
 
   // Check Hysteria port hopping attributes
   const deHy2Outbound = outbounds.find((o) => o.tag === '🇩🇪 Германия (Hysteria 2)');
-  assert.equal(deHy2Outbound.ports, DEFAULT_PORT_HOPPING_RANGE);
+  assert.equal(deHy2Outbound.server_port, 20011);
+  assert.equal(deHy2Outbound.ports, '20011,22229,26549,30013');
   assert.equal(deHy2Outbound.hop_interval, '30s');
   assert.equal(deHy2Outbound.obfs.type, 'salamander');
 
@@ -90,13 +94,13 @@ test('buildSingboxProfile demotes node when probe snapshot indicates failure', (
   const probeSnapshots = {
     de: {
       checks: {
-        hysteria2_udp_443: { status: 'failed', failureCode: 'PROXY_CONNECT_FAILURE' },
+        hysteria2_udp_hop: { status: 'failed', failureCode: 'PROXY_CONNECT_FAILURE' },
         vless_tcp_8443: { status: 'healthy', failureCode: null },
       },
     },
     nl: {
       checks: {
-        hysteria2_udp_443: { status: 'healthy', failureCode: null },
+        hysteria2_udp_hop: { status: 'healthy', failureCode: null },
       },
     },
   };
@@ -104,6 +108,7 @@ test('buildSingboxProfile demotes node when probe snapshot indicates failure', (
   const profile = service.buildSingboxProfile({
     nodes: { deHy2, nlHy2, deVless },
     probeSnapshots,
+    portPools: { de: dePool, nl: nlPool },
   });
 
   // Since DE Hy2 is failed, NL Hy2 is first, DE VLESS is second, DE Hy2 is demoted to last
@@ -121,16 +126,25 @@ test('buildBase64Profile outputs decodable URI list with port hopping and tags',
 
   const base64 = service.buildBase64Profile({
     nodes: { deHy2, deVless },
+    portPools: { de: dePool },
   });
 
   const decoded = Buffer.from(base64, 'base64').toString('utf8');
-  assert.equal(decoded.includes('vpn-de.rilora.ru:20000-50000'), true);
-  assert.equal(decoded.includes(':20000-50000/'), true);
-  assert.equal(decoded.includes('mportHopInt=30'), true);
+  assert.equal(decoded.includes('vpn-de.rilora.ru:20011,22229,26549,30013'), true);
+  assert.equal(decoded.includes('mportHopInt'), false);
   assert.equal(decoded.includes('u1:p1@'), true);
   assert.equal(decoded.includes('u1%3Ap1@'), false);
   assert.equal(decoded.includes('vless://uuid-de@jarvis.rilora.ru:8443'), true);
   assert.equal(decoded.includes(encodeURIComponent('🇩🇪 Германия (Hysteria 2)')), true);
+});
+
+test('buildBase64Profile omits Hysteria without a valid active pool', () => {
+  const service = new VpnSubscriptionService();
+  const base64 = service.buildBase64Profile({
+    nodes: { deHy2: 'hy2://u1:p1@vpn-de.rilora.ru:443?obfs=salamander&obfs-password=k1' },
+    portPools: { de: { ...dePool, ports: [20011, 20011, 26549, 30013] } },
+  });
+  assert.equal(Buffer.from(base64, 'base64').toString('utf8').includes('hy2://'), false);
 });
 
 test('renderHappLandingHtml produces the documented Happ deeplink and manual URL', () => {
@@ -196,6 +210,7 @@ test('resolveSubscription uses an explicit format and handles invalid tokens', a
   const service = new VpnSubscriptionService({
     repository: mockRepo,
     clients: mockClients,
+    portPoolService: { activeForSubscription: async () => ({ de: dePool, nl: nlPool }) },
   });
 
   // 1. Invalid token -> 404

@@ -1,8 +1,7 @@
 const crypto = require('node:crypto');
 const { URL, unquote } = require('node:url');
+const { publicPool } = require('./hysteriaPortPoolService');
 
-const DEFAULT_PORT_HOPPING_RANGE = '20000-50000';
-const DEFAULT_HOP_INTERVAL = '30s';
 const DEFAULT_TEST_URL = 'http://cp.cloudflare.com/generate_204';
 const DEFAULT_PUBLIC_URL = 'https://jarvis.rilora.ru';
 
@@ -92,8 +91,8 @@ function buildSingboxOutbound(item) {
       tag: item.tag,
       server: item.server,
       server_port: item.server_port || 443,
-      ports: item.ports || DEFAULT_PORT_HOPPING_RANGE,
-      hop_interval: item.hop_interval || DEFAULT_HOP_INTERVAL,
+      ports: item.ports,
+      hop_interval: item.hop_interval,
       password: item.auth,
       tls: {
         enabled: true,
@@ -167,6 +166,7 @@ class VpnSubscriptionService {
     this.repository = options.repository;
     this.clients = options.clients || {};
     this.externalProbeMonitor = options.externalProbeMonitor || null;
+    this.portPoolService = options.portPoolService || null;
     this.now = options.now || (() => new Date());
     this.publicUrl = (options.publicUrl || DEFAULT_PUBLIC_URL).replace(/\/+$/, '');
   }
@@ -180,26 +180,28 @@ class VpnSubscriptionService {
     return snapshot.checks[checkName].status !== 'failed';
   }
 
-  buildSingboxProfile({ nodes = {}, probeSnapshots = {} } = {}) {
+  buildSingboxProfile({ nodes = {}, probeSnapshots = {}, portPools = {} } = {}) {
     const deProbe = probeSnapshots.de || null;
     const nlProbe = probeSnapshots.nl || null;
+    const dePool = publicPool(portPools.de, 'de');
+    const nlPool = publicPool(portPools.nl, 'nl');
 
     const candidates = [];
 
     // 1. DE Hysteria 2
-    if (nodes.deHy2) {
+    if (nodes.deHy2 && dePool) {
       const parsed = typeof nodes.deHy2 === 'string' ? parseHysteriaUri(nodes.deHy2) : nodes.deHy2;
       if (parsed) {
-        const healthy = this._isProbeHealthy(deProbe, 'hysteria2_udp_443');
+        const healthy = this._isProbeHealthy(deProbe, 'hysteria2_udp_hop');
         candidates.push({
           key: 'de_hy2',
           priority: healthy ? 1 : 10,
           tag: '🇩🇪 Германия (Hysteria 2)',
           type: 'hysteria2',
           server: parsed.host,
-          server_port: parsed.port,
-          ports: parsed.ports || DEFAULT_PORT_HOPPING_RANGE,
-          hop_interval: parsed.hop_interval || DEFAULT_HOP_INTERVAL,
+          server_port: dePool.ports[0],
+          ports: dePool.ports.join(','),
+          hop_interval: `${dePool.hopIntervalSeconds}s`,
           auth: parsed.auth,
           obfs: parsed.obfs,
           obfsPassword: parsed.obfsPassword,
@@ -210,19 +212,19 @@ class VpnSubscriptionService {
     }
 
     // 2. NL Hysteria 2
-    if (nodes.nlHy2) {
+    if (nodes.nlHy2 && nlPool) {
       const parsed = typeof nodes.nlHy2 === 'string' ? parseHysteriaUri(nodes.nlHy2) : nodes.nlHy2;
       if (parsed) {
-        const healthy = this._isProbeHealthy(nlProbe, 'hysteria2_udp_443');
+        const healthy = this._isProbeHealthy(nlProbe, 'hysteria2_udp_hop');
         candidates.push({
           key: 'nl_hy2',
           priority: healthy ? 2 : 11,
           tag: '🇳🇱 Нидерланды (Hysteria 2)',
           type: 'hysteria2',
           server: parsed.host,
-          server_port: parsed.port,
-          ports: parsed.ports || DEFAULT_PORT_HOPPING_RANGE,
-          hop_interval: parsed.hop_interval || DEFAULT_HOP_INTERVAL,
+          server_port: nlPool.ports[0],
+          ports: nlPool.ports.join(','),
+          hop_interval: `${nlPool.hopIntervalSeconds}s`,
           auth: parsed.auth,
           obfs: parsed.obfs,
           obfsPassword: parsed.obfsPassword,
@@ -321,25 +323,26 @@ class VpnSubscriptionService {
     };
   }
 
-  buildBase64Profile({ nodes = {}, probeSnapshots = {} } = {}) {
+  buildBase64Profile({ nodes = {}, probeSnapshots = {}, portPools = {} } = {}) {
     const deProbe = probeSnapshots.de || null;
     const nlProbe = probeSnapshots.nl || null;
+    const dePool = publicPool(portPools.de, 'de');
+    const nlPool = publicPool(portPools.nl, 'nl');
     const lines = [];
 
     // Helper to format hy2 with port hopping and tag
-    const formatHy2 = (rawUri, tag, ports = DEFAULT_PORT_HOPPING_RANGE) => {
+    const formatHy2 = (rawUri, tag, pool) => {
       const parsed = parseHysteriaUri(rawUri);
-      if (!parsed) return '';
+      if (!parsed || !pool) return '';
       const query = new URLSearchParams();
       if (parsed.obfs) query.set('obfs', parsed.obfs);
       if (parsed.obfsPassword) query.set('obfs-password', parsed.obfsPassword);
       if (parsed.sni) query.set('sni', parsed.sni);
       if (parsed.insecure) query.set('insecure', '1');
-      query.set('mportHopInt', '30');
       const auth = parsed.user && parsed.password
         ? `${encodeURIComponent(parsed.user)}:${encodeURIComponent(parsed.password)}`
         : encodeURIComponent(parsed.auth);
-      return `hy2://${auth}@${parsed.host}:${ports}/?${query.toString()}#${encodeURIComponent(tag)}`;
+      return `hy2://${auth}@${parsed.host}:${pool.ports.join(',')}/?${query.toString()}#${encodeURIComponent(tag)}`;
     };
 
     // Helper to format vless with tag
@@ -360,11 +363,11 @@ class VpnSubscriptionService {
       return `vless://${encodeURIComponent(parsed.uuid)}@${parsed.host}:${parsed.port}?${query.toString()}#${encodeURIComponent(tag)}`;
     };
 
-    if (nodes.deHy2 && this._isProbeHealthy(deProbe, 'hysteria2_udp_443')) {
-      lines.push(formatHy2(nodes.deHy2, '🇩🇪 Германия (Hysteria 2)'));
+    if (nodes.deHy2 && dePool && this._isProbeHealthy(deProbe, 'hysteria2_udp_hop')) {
+      lines.push(formatHy2(nodes.deHy2, '🇩🇪 Германия (Hysteria 2)', dePool));
     }
-    if (nodes.nlHy2 && this._isProbeHealthy(nlProbe, 'hysteria2_udp_443')) {
-      lines.push(formatHy2(nodes.nlHy2, '🇳🇱 Нидерланды (Hysteria 2)'));
+    if (nodes.nlHy2 && nlPool && this._isProbeHealthy(nlProbe, 'hysteria2_udp_hop')) {
+      lines.push(formatHy2(nodes.nlHy2, '🇳🇱 Нидерланды (Hysteria 2)', nlPool));
     }
     if (nodes.deVless && this._isProbeHealthy(deProbe, 'vless_tcp_8443')) {
       lines.push(formatVless(nodes.deVless, '🇩🇪 Германия (VLESS 8443)'));
@@ -374,11 +377,11 @@ class VpnSubscriptionService {
     }
 
     // Add remaining if they were degraded
-    if (nodes.deHy2 && !this._isProbeHealthy(deProbe, 'hysteria2_udp_443')) {
-      lines.push(formatHy2(nodes.deHy2, '🇩🇪 Германия (Hysteria 2 - Degraded)'));
+    if (nodes.deHy2 && dePool && !this._isProbeHealthy(deProbe, 'hysteria2_udp_hop')) {
+      lines.push(formatHy2(nodes.deHy2, '🇩🇪 Германия (Hysteria 2 - Degraded)', dePool));
     }
-    if (nodes.nlHy2 && !this._isProbeHealthy(nlProbe, 'hysteria2_udp_443')) {
-      lines.push(formatHy2(nodes.nlHy2, '🇳🇱 Нидерланды (Hysteria 2 - Degraded)'));
+    if (nodes.nlHy2 && nlPool && !this._isProbeHealthy(nlProbe, 'hysteria2_udp_hop')) {
+      lines.push(formatHy2(nodes.nlHy2, '🇳🇱 Нидерланды (Hysteria 2 - Degraded)', nlPool));
     }
     if (nodes.deVless && !this._isProbeHealthy(deProbe, 'vless_tcp_8443')) {
       lines.push(formatVless(nodes.deVless, '🇩🇪 Германия (VLESS 8443 - Degraded)'));
@@ -803,19 +806,13 @@ class VpnSubscriptionService {
     }
 
     // Fetch probe snapshots if monitor available
-    let probeSnapshots = {};
-    if (this.externalProbeMonitor && typeof this.externalProbeMonitor.snapshot === 'function') {
-      try {
-        const [de, nl] = await Promise.all([
-          this.externalProbeMonitor.snapshot('de').catch(() => null),
-          this.externalProbeMonitor.snapshot('nl').catch(() => null),
-        ]);
-        probeSnapshots = { de, nl };
-      } catch (_) {}
-    }
+    const [probeSnapshots, portPools] = await Promise.all([
+      this._probeSnapshots(),
+      this.portPoolService?.activeForSubscription ? this.portPoolService.activeForSubscription().catch(() => ({ de: null, nl: null })) : Promise.resolve({ de: null, nl: null }),
+    ]);
 
     if (String(format || '').toLowerCase() === 'sing-box') {
-      const profile = this.buildSingboxProfile({ nodes, probeSnapshots });
+      const profile = this.buildSingboxProfile({ nodes, probeSnapshots, portPools });
       return {
         status: 200,
         contentType: 'application/json; charset=utf-8',
@@ -823,7 +820,7 @@ class VpnSubscriptionService {
       };
     }
 
-    const base64 = this.buildBase64Profile({ nodes, probeSnapshots });
+    const base64 = this.buildBase64Profile({ nodes, probeSnapshots, portPools });
     return {
       status: 200,
       contentType: 'text/plain; charset=utf-8',
@@ -834,6 +831,19 @@ class VpnSubscriptionService {
       body: base64,
     };
   }
+
+  async _probeSnapshots() {
+    if (!this.externalProbeMonitor || typeof this.externalProbeMonitor.snapshot !== 'function') return {};
+    try {
+      const [de, nl] = await Promise.all([
+        this.externalProbeMonitor.snapshot('de').catch(() => null),
+        this.externalProbeMonitor.snapshot('nl').catch(() => null),
+      ]);
+      return { de, nl };
+    } catch (_) {
+      return {};
+    }
+  }
 }
 
 module.exports = {
@@ -843,5 +853,4 @@ module.exports = {
   happProfileTitle,
   parseHysteriaUri,
   parseVlessUri,
-  DEFAULT_PORT_HOPPING_RANGE,
 };

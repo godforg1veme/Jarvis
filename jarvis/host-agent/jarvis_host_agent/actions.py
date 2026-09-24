@@ -18,7 +18,7 @@ from .hysteria_vpn_manager import HysteriaVpnManager
 from .vpn_manager import XrayVpnManager
 from .network_probes import probe_dns, probe_outbound_https
 from .vpn_incident_classifier import classify_vpn_incident
-from .vpn_probe_credentials import ProbeCredentialError, install_probe_credential
+from .vpn_probe_credentials import ProbeCredentialError, install_probe_credential, probe_credential_readiness
 from .vpn_external_probe import read_probe_result
 
 MAX_OUTPUT_BYTES = 32 * 1024
@@ -162,9 +162,17 @@ def _probe_unit(target_node: str) -> str:
     return f"jarvis-vpn-probe@{target_node}"
 
 
-def _run_probe(config: HostAgentConfig, target_node: str) -> dict[str, Any]:
+def _run_probe(config: HostAgentConfig, target_node: str, protocol: str | None = None) -> dict[str, Any]:
     if not _probe_target_allowed(config, target_node):
         return {"state": "failed", "errorCode": "VPN_PROBE_TARGET_REJECTED"}
+    if protocol is not None:
+        try:
+            readiness = probe_credential_readiness(config, target_node=target_node, protocol=protocol)
+        except ProbeCredentialError:
+            readiness = "configuration_invalid"
+        if readiness != "ready":
+            code = "VPN_PROBE_CREDENTIAL_NOT_INSTALLED" if readiness == "not_installed" else "VPN_PROBE_CONFIGURATION_INVALID"
+            return {"state": "failed", "errorCode": code}
     result = _run(["/usr/bin/systemctl", "start", f"{_probe_unit(target_node)}.service"], timeout=75)
     if result["state"] != "succeeded":
         return {"state": "unknown", "errorCode": "PROBE_RUN_UNKNOWN"}
@@ -189,7 +197,7 @@ def _probe_monitor(config: HostAgentConfig, target_node: str, enabled: bool) -> 
 
 def execute(config: HostAgentConfig, operation: str, arguments: dict[str, Any]) -> dict[str, Any]:
     if operation == "vpn.external_probe.run":
-        return _run_probe(config, arguments["targetNode"])
+        return _run_probe(config, arguments["targetNode"], arguments.get("protocol"))
     if operation == "vpn.external_probe.monitor.enable":
         return _probe_monitor(config, arguments["targetNode"], True)
     if operation == "vpn.external_probe.monitor.disable":

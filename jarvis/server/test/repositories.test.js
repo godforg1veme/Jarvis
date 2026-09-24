@@ -3,6 +3,60 @@ const assert = require('node:assert/strict');
 const { ConversationRepository } = require('../src/conversations/conversationRepository');
 const { DocumentRepository } = require('../src/knowledge/documentRepository');
 const { TelegramUpdateRepository } = require('../src/telegram/telegramUpdateRepository');
+const { VpnRepository } = require('../src/vpn/vpnRepository');
+
+test('probe timer gate counts only latest protocol-matched proof for each of four bindings', async () => {
+  let sql;
+  const repository = new VpnRepository({ async query(statement) { sql = statement; return { rows: [{ count: 0 }] }; } });
+  assert.equal(await repository.hasVerifiedProbeBindings(), false);
+  assert.match(sql, /DISTINCT ON/);
+  assert.match(sql, /probe\.install/);
+  assert.match(sql, /probe\.rotate/);
+  assert.match(sql, /probe\.recheck/);
+  assert.match(sql, /result->>'acceptedCheck'/);
+  assert.match(sql, /vless_tcp_8443/);
+  assert.match(sql, /hysteria2_udp_hop/);
+  assert.match(sql, /completed_at>now\(\)-interval '24 hours'/);
+  assert.match(sql, /status='succeeded'/);
+  assert.match(sql, /result->>'targetNode'=arguments->>'sourceNode'/);
+  assert.match(sql, /result->>'runnerNode'=arguments->>'runnerNode'/);
+  assert.match(sql, /result->>'protocol'=arguments->>'protocol'/);
+  assert.match(sql, /'de', 'nl', 'vless'/);
+  assert.match(sql, /'nl', 'de', 'hysteria2'/);
+});
+
+test('probe recheck menu candidates are owner-scoped fixed install attempts', async () => {
+  let query;
+  const repository = new VpnRepository({ async query(statement, values) {
+    query = { statement, values };
+    return { rows: [{ sourceNode: 'de', protocol: 'vless' }] };
+  } });
+  assert.deepEqual(await repository.probeRecheckCandidates({ userId: 'owner-a' }),
+    [{ sourceNode: 'de', protocol: 'vless' }]);
+  assert.deepEqual(query.values, ['owner-a']);
+  assert.match(query.statement, /user_id=\$1/);
+  assert.match(query.statement, /probe\.install/);
+  assert.match(query.statement, /probe\.rotate/);
+  assert.match(query.statement, /status IN \('succeeded', 'failed', 'unknown'\)/);
+  assert.match(query.statement, /\('de', 'nl', 'vless'\)/);
+  assert.match(query.statement, /\('nl', 'de', 'hysteria2'\)/);
+});
+
+test('VPN confirmation lookup, approval, and rejection stay in the originating conversation', async () => {
+  const calls = [];
+  const repository = new VpnRepository({ async query(statement, values) {
+    calls.push({ statement, values });
+    return { rows: [] };
+  } });
+  const origin = { userId: 'user', originChannel: 'telegram', originDeviceId: null, conversationId: '11111111-1111-4111-8111-111111111111' };
+  await repository.latestPending(origin);
+  await repository.approve({ ...origin, requestId: '22222222-2222-4222-8222-222222222222' });
+  await repository.reject({ ...origin, requestId: '33333333-3333-4333-8333-333333333333' });
+  for (const call of calls) {
+    assert.match(call.statement, /conversation_id IS NOT DISTINCT FROM/);
+    assert.equal(call.values.at(-1), origin.conversationId);
+  }
+});
 
 test('Telegram update claim uses parameterized SQL', async () => {
   const calls = [];
@@ -12,9 +66,26 @@ test('Telegram update claim uses parameterized SQL', async () => {
       return { rowCount: 1, rows: [{ update_id: values[0] }] };
     },
   });
-  assert.equal(await repository.claim(42, '123'), true);
-  assert.deepEqual(calls[0].values, [42, '123']);
+  assert.equal(await repository.claim(42, '123', 'message'), true);
+  assert.deepEqual(calls[0].values, [42, '123', 'message']);
   assert.equal(calls[0].sql.includes('123'), false);
+  await assert.rejects(repository.claim(43, '123', 'unknown'), /invalid Telegram update kind/);
+});
+
+test('Telegram update outcomes use parameterized IDs and bounded failure codes', async () => {
+  const calls = [];
+  const repository = new TelegramUpdateRepository({
+    query: async (sql, values) => { calls.push({ sql, values }); return { rowCount: 1, rows: [] }; },
+  });
+
+  await repository.markCompleted(42);
+  await repository.markFailed(43, 'MODEL_UNAVAILABLE');
+
+  assert.match(calls[0].sql, /status='completed'/);
+  assert.deepEqual(calls[0].values, [42]);
+  assert.match(calls[1].sql, /status='failed'/);
+  assert.deepEqual(calls[1].values, [43, 'MODEL_UNAVAILABLE']);
+  await assert.rejects(repository.markFailed(44, 'provider secret'), /invalid Telegram failure code/);
 });
 
 test('message insert scopes the conversation by user ID', async () => {

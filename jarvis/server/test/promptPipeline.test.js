@@ -79,6 +79,17 @@ test('output validator rejects provider identity and unverified tool success', (
   assert.equal(validateOutput('Я — Jarvis. Чем займёмся?').ok, true);
 });
 
+test('output validator rejects an invented user identity', () => {
+  assert.deepEqual(
+    validateOutput('Владелец и пользователь — это ты (Илья).').violations,
+    ['unverified_user_identity'],
+  );
+  assert.deepEqual(
+    validateOutput('Тебя зовут Максим.').violations,
+    ['unverified_user_identity'],
+  );
+});
+
 test('prompt builder removes persisted foreign model identities from history', () => {
   const prompt = buildCanonicalPrompt({
     currentRequest: 'Продолжим',
@@ -90,6 +101,21 @@ test('prompt builder removes persisted foreign model identities from history', (
   });
   assert.deepEqual(prompt.history, [
     { role: 'user', content: 'Кто ты?' },
+    { role: 'assistant', content: 'Я — Jarvis.' },
+  ]);
+});
+
+test('prompt builder removes persisted assistant claims about an unverified user identity', () => {
+  const prompt = buildCanonicalPrompt({
+    currentRequest: 'Кто я?',
+    history: [
+      { role: 'user', content: 'Проверка' },
+      { role: 'assistant', content: 'Владелец и пользователь — это ты (Илья).' },
+      { role: 'assistant', content: 'Я — Jarvis.' },
+    ],
+  });
+  assert.deepEqual(prompt.history, [
+    { role: 'user', content: 'Проверка' },
     { role: 'assistant', content: 'Я — Jarvis.' },
   ]);
 });
@@ -239,6 +265,25 @@ test('assistant corrects one policy violation and returns the second answer', as
   assert.equal(answer, 'Я — Jarvis, твой семейный ассистент.');
   assert.equal(calls.length, 2);
   assert.match(calls[1][0].content, /provider_identity/);
+});
+
+test('assistant corrects an invented user identity instead of preserving it in dialogue', async () => {
+  const calls = [];
+  const assistant = new AssistantService({
+    profile: { instructionMode: 'reinforced-current-user' },
+    provider: {
+      async answer(input) {
+        calls.push(input.messages);
+        return calls.length === 1
+          ? 'Владелец и пользователь — это ты (Илья).'
+          : 'Я не знаю твоё имя, пока ты сам не скажешь его.';
+      },
+    },
+  });
+  const answer = await assistant.answer({ currentRequest: 'Как меня зовут?', history: [], runtimeContext: { channel: 'telegram' } });
+  assert.equal(answer, 'Я не знаю твоё имя, пока ты сам не скажешь его.');
+  assert.equal(calls.length, 2);
+  assert.match(calls[1][0].content, /unverified_user_identity/);
 });
 
 test('assistant stops after a second policy violation', async () => {

@@ -7,9 +7,12 @@ Wants=network-online.target
 Type=oneshot
 DynamicUser=yes
 Environment=PYTHONPATH=/opt/jarvis-host-agent
-EnvironmentFile=/etc/jarvis-vpn/probe-%i.env
-LoadCredential=vless.uri:/etc/jarvis-vpn/probe-%i-vless.uri
-LoadCredential=hysteria2.uri:/etc/jarvis-vpn/probe-%i-hysteria2.uri
+# VPN_PROBE_HYSTERIA_HOP_POOL is public-only JSON (max 512 bytes): version,
+# nodeCode, generation, 4-12 ports in 20000-50000, hopIntervalSeconds 5-45.
+# URI/password material remains available solely through LoadCredential below.
+EnvironmentFile=/etc/jarvis-vpn/probes/probe-%i.env
+LoadCredential=vless.uri:/etc/jarvis-vpn/probes/probe-%i-vless.uri
+LoadCredential=hysteria2.uri:/etc/jarvis-vpn/probes/probe-%i-hysteria2.uri
 StateDirectory=jarvis-vpn-probe
 StateDirectoryMode=0700
 ExecStart=/usr/bin/python3 -m jarvis_host_agent.vpn_external_probe_runner --target %i --vless-host ${VPN_PROBE_VLESS_HOST} --hysteria-host ${VPN_PROBE_HYSTERIA_HOST} --expected-exit-ip ${VPN_PROBE_EXPECTED_EXIT_IP} --result /var/lib/jarvis-vpn-probe/%i.json

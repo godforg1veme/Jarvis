@@ -4,7 +4,143 @@ This file is the status authority for project documentation. Specifications and
 plans under `docs/superpowers/` are preserved as decision history; their old
 future-tense wording does not override the current architecture in `AGENTS.md`.
 
-Status snapshot: 2026-09-17.
+Status snapshot: 2026-09-24.
+
+Current VPN acceptance: all four owner-confirmed cross-node test bindings have
+fresh healthy proofs. The owner separately enabled both approximately
+15-minute systemd probe timers in the originating private Telegram chat;
+scheduled DE and NL runs on 2026-09-24 reported healthy VLESS 443/8443 and
+Hysteria2 fixed-443/hopping checks. NL now has DNS-only
+`vpn-nl.rilora.ru -> 94.183.208.56`, a Let's Encrypt certificate for that
+name expiring 2026-12-23, and root-only Cloudflare DNS-01 settings that keep
+the old `vpn.rilora.ru` certificate alongside it. Real Hysteria2 clients
+validated both TLS names before and after switching NL's advertised SNI to
+the new name; six existing credentials and the generated VPN configuration
+were preserved. Supervisor repair acceptance completed on 2026-09-24: after a
+first safely rejected NL approval exposed cross-node callback routing to DE,
+the host-bound route fix was deployed and a second owner-approved NL Xray
+failure drill completed with `POSTCHECK_PASSED`. Both stacks were healthy
+afterward, open VPN incidents returned to zero, and scheduled post-repair
+DE↔NL probes passed all four VLESS/Hysteria2 endpoint checks. Automatic
+certificate renewal has not yet been observed, and no 99.9% availability
+guarantee has been demonstrated. External probe timers do not currently send
+their own Telegram incident alert; `/vpn_health` displays those results, while
+Operations separately alerts on persistent local node/service diagnoses.
+Only an owner-confirmed Xray/Hysteria2 service restart is enabled. See
+`updates/2026-09-24-vpn-supervisor-host-bound-callback-routing.md` and
+`updates/2026-09-24-vpn-monitoring-alerting-and-repair-scope.md` and
+`updates/2026-09-24-vpn-probe-timers-and-nl-dns-acme.md`
+Telegram Happ profile creation and rename fix, source only (2026-09-24): guided
+interaction kinds are now authorized in the repository and PostgreSQL migration
+`028_telegram_subscription_interaction_kinds.sql`. An end-to-end Telegram-handler
+test covers creation, invalid-input retry, client binding, rename, owner/chat
+scope, and token redaction. This consolidation has not deployed the change or
+applied migration 028 to production; the production flow still needs rollout
+and a real Telegram tap-through.
+.
+
+The following dated rollout paragraphs describe their respective earlier
+milestones and are superseded by this current-status paragraph where noted.
+
+VPN external-probe acceptance gate, deployed integration source 2026-09-23:
+credential installation is counted only after a fresh, node-matched VLESS 8443
+or Hysteria2 hopping check succeeds. Only four distinct recent accepted proofs
+from the latest attempts can unlock timer activation; legacy success records
+and failed rotations cannot. Local tests and a read-only production SQL parse
+passed. Activation enables timers sequentially, compensates a second-side
+failure with one closed first-side disable, and never claims success for an
+uncertain outcome. The initial integrated server was deployed on 2026-09-23.
+One owner-confirmed NL-to-DE VLESS test key is installed; its original install
+outcome remains unknown. Its earlier confirmed recheck returned `EXIT_MISMATCH`
+before the expected-egress fix reached both nodes on 2026-09-24. A later
+owner-confirmed `unknown` (`PROBE_RUN_UNKNOWN`) was actually the opposite
+DE-to-NL VLESS direction. Read-only diagnosis on DE found no NL test key and
+systemd exit 243/CREDENTIALS. It says nothing about the installed NL-to-DE
+route. At 03:00 Moscow the owner confirmed a new NL-to-DE VLESS test-key
+installation, and its durable action succeeded with a fresh `vless_tcp_8443`
+proof. A separate Telegram callback bug caused generic errors on private
+recheck taps because `chatType` was not forwarded; the narrow route fix is
+deployed. That was the first of four required proofs. A later successful
+DE-to-NL VLESS installation/recheck brought the count at that milestone to two
+of four. Both Hysteria2 directions and timer activation were then pending; no
+99.9% uptime claim was or is made.
+The missing-credential recheck gate was deployed on both Host Agents and the
+server on 2026-09-24; the owner completed the NL-to-DE VLESS proof afterward.
+The deployed DE/NL timer units were changed to an approximately 15-minute
+repeat interval on 2026-09-23 and verified while still disabled.
+See `updates/2026-09-23-vpn-probe-gate-and-monitor-rollout.md`.
+The credential-safe recheck deployment and current manual acceptance step are
+recorded in `updates/2026-09-23-vpn-probe-credential-recheck-rollout.md`.
+The expected-egress baseline deployment and latest unknown manual acceptance
+outcome are recorded in `updates/2026-09-24-vpn-probe-egress-baseline-deployment.md`.
+The egress correction design and task plan are
+`superpowers/specs/2026-09-23-vpn-probe-egress-baseline-design.md` and
+`superpowers/plans/2026-09-23-vpn-probe-egress-baseline.md`.
+The 2026-09-24 Hysteria2 install-button fix preserves the selected protocol
+through confirmation creation. Its first real owner tap had failed before any
+action record or credential transfer. The next confirmed tap reached Host Agent
+but failed because its parser required the node IP and Hysteria2 TLS name to
+match. That parser is fixed on both nodes; the failed attempt installed no
+credential. Later owner taps completed both Hysteria2 proofs. See
+`updates/2026-09-24-vpn-hysteria2-probe-button-fix.md`.
+
+VPN Supervisor owner-approved restarts, 2026-09-23 initial rollout: the deployed server may
+propose only a matching Xray or Hysteria2 service restart after bounded
+diagnosis. Execution requires fresh owner confirmation in the originating
+private Telegram chat, repeats deterministic checks, uses the closed Host
+Agent operation once, and verifies both stacks. Uncertain results reconcile
+under the same request ID without retry. Migration 026 is applied and restore
+playbooks remain disabled. At this initial rollout milestone, no live restart
+had yet been accepted. The subsequent 2026-09-24 acceptance is recorded below
+and in `updates/2026-09-24-vpn-supervisor-host-bound-callback-routing.md`.
+See `updates/2026-09-23-vpn-supervisor-owner-approved-restarts.md` and
+`VPN_SUPERVISOR_REPAIR_GUIDE.md`.
+
+The 2026-09-24 NL drill identified and then cleared a callback-routing defect:
+shared run details were readable, but approval rechecked the DE Host Agent.
+The deployed fix routes `details`, `reject`, and `allow` by persisted run host
+ID and adds an independent host-ownership guard inside each node service. A
+genuine owner-approved NL Xray restart subsequently passed postchecks. See
+`updates/2026-09-24-vpn-supervisor-host-bound-callback-routing.md`.
+
+Happ resilient port-pool deployment, 2026-09-18: Jarvis now has
+a closed DE/NL public Hysteria2 port-pool contract, an exact two-request hopping
+probe, and migration 024. Ordinary Happ output uses only a validated finite port
+list and omits the previously used undocumented interval parameter. The active
+pools and hopping probe use Happ's 30-second multi-port default. The DE server
+and both Host Agents were deployed; migration rows for two four-port pools, public
+smoke, and disabled probe timers were verified. The real Happ port-hopping and
+split-routing acceptance remains mandatory. The current
+[VPN resilience runbook](VPN_RESILIENCE_RUNBOOK.md) defines the evidence order
+and the no-timer safety boundary.
+
+The active Telegram button architecture guide and shipped-menu contract are
+`telegram-button-architecture.md` and `telegram-menu-contract.md`. An automated
+contract test checks owner/member keyboard rows and agent-document links.
+The 2026-09-24 post-release owner text, inbound voice, and live Life OS
+Mission → Life OS return path, together with the 2026-09-23 baseline, are
+documented in `updates/2026-09-23-telegram-dialogue-acceptance.md`.
+
+Telegram dialogue resilience and identity guard, source update 2026-09-23:
+assistant output and persisted history reject unverified claims about the
+owner's identity. Message and callback processing failures return a bounded
+safe reply and retain only closed route/outcome/failure codes; raw dialogue,
+callback payloads, exception text, and credentials are excluded from these
+diagnostics. Production already has migrations 024/025 and the general
+classified fallback path. A specific Telegram voice-ASR failure reply now
+correctly says that its transcript was not saved; this refinement was deployed
+with the integrated server but has not been tested during a real ASR outage.
+A real owner text question about the user's name and a Telegram voice note were
+accepted on 2026-09-23 and repeated after deployment on 2026-09-24. The live
+answer did not assert a personal name; it said none was known. A read-only
+owner-scoped count found no active profile memory matching an explicit
+«меня зовут» fact for this account. Telegram display names and prior assistant
+replies are not trusted identity facts.
+The voice persisted only as `voice_transcript`. On 2026-09-24 the owner also
+completed the read-only `Миссия` → `Life OS` path in Telegram Desktop; the two
+corresponding callback updates completed without failure codes and the root
+section list was visible afterward. Other member-client and changing-action
+acceptance remains separate; details are in the linked acceptance record.
 
 Dynamic VPN Subscription Network & Port Hopping rollout, 2026-09-16: Jarvis
 now generates dynamic Sing-box/Happ subscriptions with four endpoints
@@ -37,11 +173,9 @@ metadata and request a one-hour automatic update interval. A Happ display-name
 change still depends on a successful client refresh.
 Read-only production checks on 2026-09-17 verified the four generated URIs,
 node addresses, running services and UDP redirect rules; real Happ latency and
-traffic on Wi-Fi/mobile remain unverified. NL currently has a valid certificate
-for `vpn.rilora.ru` (expires 2026-12-12), but that name resolves to DE. NL's
-unattended HTTP-01 renewal is therefore not established. A distinct DNS-only NL
-hostname and matching certificate are required before expiry; do not present
-this as a completed redundant TLS deployment. See
+traffic on Wi-Fi/mobile remain unverified. At that earlier milestone, NL had
+only a `vpn.rilora.ru` certificate and lacked its own DNS hostname. The
+separate NL DNS and DNS-01 certificate were added later on 2026-09-24. See
 `updates/2026-09-16-happ-subscription-compatibility.md`.
 
 Multi-node VPN Supervisor rollout, 2026-09-16: Jarvis now manages separate
@@ -50,8 +184,9 @@ Agent sockets. Telegram requires an explicit country choice before protocol
 actions, while `/vpn_health` reads both nodes. Operations persists both hosts,
 polls DE normally and NL with a VPN-only collector, and runs the deterministic
 incident classifier plus isolated LLM advisory against the affected node's
-sanitized logs. Real repair playbooks remain disabled; the only executable
-Supervisor playbook is the synthetic owner-approved no-op. The deployed model
+sanitized logs. At this 2026-09-16 milestone real repair playbooks were disabled;
+the only executable Supervisor playbook was the synthetic owner-approved no-op.
+The deployed model
 contract, two-node Host Agent path, TCP 443/8443 reachability, production image,
 public smoke, and unchanged VPN service uptimes are verified. The real owner
 approved the synthetic no-op in Telegram; PostgreSQL recorded `succeeded` and
@@ -63,8 +198,8 @@ planner can request one closed read-only snapshot from the incident's own node.
 The server validates the fresh diagnosis, provides only typed check statuses
 to a second planner call, and stops on stale, invalid, or repeated requests.
 Simulated DE/Xray and NL/Hysteria2 fault E2E and the full 461-test server suite
-passed; 33 focused tests passed in the production image. Real repair remains
-disabled. Cross-node client probe code and its read-only result operation are
+passed; 33 focused tests passed in the production image. Real repair was still
+disabled at this milestone. Cross-node client probe code and its read-only result operation are
 deployed on both nodes with root-only transient credential handoff, but no
 test credential is installed and both timers remain disabled; each of the four
 fixed test devices still requires owner Telegram confirmation. See
@@ -78,7 +213,8 @@ Telegram `/vpn_health`. Local suites passed 79 Host Agent and 430 server tests;
 36 focused tests passed inside the built production image. Public smoke and
 live Xray/Hysteria/Host Agent health passed, and the healthy production snapshot
 opened no false incident. The LLM advisory and remote-node enrollment milestones
-were implemented on 2026-09-16; real repair execution remains disabled. See
+were implemented on 2026-09-16; real repair execution was disabled at that
+milestone. See
 `updates/2026-09-15-vpn-supervisor-classifier.md`.
 
 Happ VPN routing default-proxy correction, 2026-09-15: the `Jarvis RU Direct`
@@ -202,8 +338,8 @@ The server ASR interface is deployed with a private Russian-only GigaAM
 `v3_e2e_rnnt` ONNX worker on DE-4. Allowlisted Telegram `voice` notes are
 bounded, transcribed through that private worker, and saved only as
 `voice_transcript`; a deployed synthetic OGG service-to-worker contract is
-accepted. Real inbound owner Telegram voice and paired-Desktop client
-acceptance remain manual checks. Telegram `audio` and other media remain
+accepted. Real inbound owner Telegram voice passed on 2026-09-23; paired-Desktop
+client acceptance remains manual. Telegram `audio` and other media remain
 attachment ingestion.
 
 ## Authoritative current documents
@@ -212,6 +348,9 @@ attachment ingestion.
 | --- | --- |
 | `README.md` | Product overview, current capabilities, architecture, setup |
 | `AGENTS.md` | Authoritative runtime, safety, code, and verification rules |
+| `telegram-button-architecture.md` | Mandatory Telegram route, trust-boundary, failure, and agent change-control guide |
+| `telegram-menu-contract.md` | Shipped Telegram keyboard, callback, confirmation, and focused regression contract |
+| `updates/2026-09-23-telegram-dialogue-acceptance.md` | Live owner text/voice evidence, automated E2E matrix, and remaining release/client gates |
 | `deploy/README.md` | Current Ubuntu 24.04 and Cloudflare Tunnel operations |
 | `updates/2026-09-01-cloud-desktop-memory-rollout.md` | Итог текущего развёртывания Desktop, памяти, устройств и известных ограничений |
 | `updates/2026-09-14-telegram-button-navigation.md` | Production rollout record for button-first navigation in Telegram |
@@ -221,7 +360,18 @@ attachment ingestion.
 | `updates/2026-09-15-jarvis-life-os-v2.md` | Implementation, Desktop installation, production rollout, and verification record for Life OS v2 |
 | `updates/2026-09-15-telegram-life-os-parity.md` | Native Telegram Life OS control surface, migration 019, production rollout, and verification record |
 | `updates/2026-09-15-vpn-supervisor-classifier.md` | Deterministic VPN diagnosis, incident integration, E2E fault simulations, and production rollout record |
+| `VPN_SUPERVISOR_REPAIR_GUIDE.md` | Closed AI proposal, owner confirmation, one-shot restart and recovery rules |
+| `updates/2026-09-23-vpn-supervisor-owner-approved-restarts.md` | Real-restart deployment and acceptance boundary |
+| `updates/2026-09-23-vpn-probe-gate-and-monitor-rollout.md` | Initial external-probe gate deployment; disabled-timer state was superseded by 2026-09-24 acceptance |
+| `updates/2026-09-23-vpn-probe-credential-recheck-rollout.md` | Historical credential recheck deployment; subsequent four-direction acceptance is in the 2026-09-24 records |
+| `updates/2026-09-24-vpn-probe-recheck-gate-rollout.md` | Missing-credential gate deployment, followed by completed four-binding owner acceptance |
+| `updates/2026-09-24-vpn-probe-egress-baseline-deployment.md` | Expected-egress baseline rollout and intermediate unknown result; superseded by later accepted checks |
+| `updates/2026-09-24-vpn-hysteria2-probe-button-fix.md` | Hysteria2 probe-button/parser fixes and subsequent accepted Hysteria2 bindings |
+| `updates/2026-09-24-vpn-probe-timers-and-nl-dns-acme.md` | Four-probe gate, enabled timers, dual-name NL DNS-01 certificate, and follow-up Supervisor acceptance |
+| `updates/2026-09-24-vpn-supervisor-host-bound-callback-routing.md` | Cross-node Supervisor button routing defect, host-bound source fix, and live repair acceptance status |
+| `updates/2026-09-24-vpn-monitoring-alerting-and-repair-scope.md` | Current four-path external probe coverage, Telegram alert boundaries, limited restart scope, and live acceptance matrix |
 | `VPN_PC_SETUP.md` | Руководство по настройке Hysteria 2 и VLESS на ПК (Windows / macOS) и устранению неполадок |
+| `VPN_RESILIENCE_RUNBOOK.md` | Current Hysteria2/Happ/VLESS diagnostic and acceptance procedure |
 | `CLAUDE.md`, `gemini.md` | Thin pointers to the authoritative agent context |
 | This file | Status and supersession index |
 
@@ -247,7 +397,7 @@ attachment ingestion.
 | `superpowers/plans/2026-09-14-jarvis-life-os-v2.md` | Code checkpoints, local checks, Desktop installation, complete real-PostgreSQL workflow acceptance, and production server rollout completed after explicit owner approval; external accounts were not connected. |
 | `superpowers/specs/2026-09-15-telegram-life-os-parity-design.md` | Implemented and production-deployed: native 11-section Telegram hierarchy, closed callbacks, owner/revision/replay boundaries, guided mutations, and confirmed family sharing. Real owner/member client taps remain manual. |
 | `superpowers/plans/2026-09-15-telegram-life-os-parity.md` | Completed with full local regression, production-image callback tests, migration 019, public smoke, and unchanged VPN/Host Agent service health. |
-| `superpowers/specs/2026-09-15-vpn-supervisor-classifier-design.md` | Implemented and production-deployed: deterministic single-cause classification, strict cross-validation, three-observation debounce, and shared Operations/Telegram diagnosis. LLM and repair remain disabled. |
+| `superpowers/specs/2026-09-15-vpn-supervisor-classifier-design.md` | Historical classifier milestone: deterministic single-cause classification, strict cross-validation, three-observation debounce, and shared Operations/Telegram diagnosis. See the 2026-09-23 Supervisor update for owner-approved restarts. |
 | `superpowers/plans/2026-09-15-vpn-supervisor-classifier.md` | Completed with simulated fault E2E coverage, full local regression, production-image tests, and live healthy snapshot acceptance. |
 | `superpowers/plans/2026-09-09-jarvis-vision.md` | Execution plan adapted to the current cloud-brain/local-hands architecture; first camera + two-display + memory slice implemented and locally accepted |
 | `plans/2026-09-01-jarvis-family-cloud-assistant.md` | Active roadmap; Milestones 0–3 are partial, later milestones are not complete |

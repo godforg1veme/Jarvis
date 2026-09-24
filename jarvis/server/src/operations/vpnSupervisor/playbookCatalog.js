@@ -1,10 +1,10 @@
 const { CATALOG_VERSION } = require('./contracts');
 
 const PLAYBOOK_CATALOG = Object.freeze([
-  Object.freeze({ id: 'restart_xray', affectedStack: 'xray', enabled: false, mutation: true,
+  Object.freeze({ id: 'restart_xray', affectedStack: 'xray', enabled: true, mutation: true,
     incidentCodes: Object.freeze(['XRAY_SERVICE_FAILURE']), preconditions: Object.freeze(['config_valid', 'hysteria2_healthy']),
     postChecks: Object.freeze(['xray_config', 'xray_service', 'xray_listeners', 'hysteria2_healthy']), rollback: 'none' }),
-  Object.freeze({ id: 'restart_hysteria2', affectedStack: 'hysteria2', enabled: false, mutation: true,
+  Object.freeze({ id: 'restart_hysteria2', affectedStack: 'hysteria2', enabled: true, mutation: true,
     incidentCodes: Object.freeze(['HYSTERIA2_SERVICE_FAILURE']), preconditions: Object.freeze(['config_valid', 'auth_healthy', 'xray_healthy']),
     postChecks: Object.freeze(['hysteria2_config', 'hysteria2_service', 'hysteria2_listener', 'auth_healthy', 'xray_healthy']), rollback: 'none' }),
   Object.freeze({ id: 'restore_xray_known_good', affectedStack: 'xray', enabled: false, mutation: true,

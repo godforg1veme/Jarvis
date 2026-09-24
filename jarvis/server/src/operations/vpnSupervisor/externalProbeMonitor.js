@@ -1,7 +1,7 @@
 const crypto = require('node:crypto');
 const { z } = require('zod');
 
-const CHECKS = ['vless_tcp_443', 'vless_tcp_8443', 'hysteria2_udp_443'];
+const CHECKS = ['vless_tcp_443', 'vless_tcp_8443', 'hysteria2_udp_443', 'hysteria2_udp_hop'];
 const CODES = ['NOT_CONFIGURED', 'RUNNER_UNAVAILABLE', 'CHECK_UNAVAILABLE', 'EGRESS_UNAVAILABLE', 'PROXY_CONNECT_FAILURE', 'EXIT_MISMATCH', 'HTTP_FAILURE'];
 const check = z.object({ status: z.enum(['healthy', 'failed', 'unknown']), failureCode: z.enum(CODES).nullable() }).strict();
 const schema = z.object({
