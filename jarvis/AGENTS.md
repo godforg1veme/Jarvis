@@ -51,9 +51,11 @@ See `docs/README.md` for current implementation status and historical records.
   a second explicit confirmation and changing recovery continues through the
   existing origin-bound proposal path. Migration 019 and this Telegram surface
   were deployed on 2026-09-15; automated production-image button coverage
-  passed, while taps from real owner/member Telegram clients remain manual
-  acceptance. The same subsystem also provides an owner-scoped paginated
-  gallery that can transiently deliver uploaded documents and readable retained
+  passed. The real owner read-only Life OS `Миссия` → `Life OS` return path was
+  verified in Telegram Desktop on 2026-09-24; member-specific keyboard and
+  owner-only denial remain manual client acceptance. The same subsystem also
+  provides an owner-scoped paginated gallery that can transiently deliver
+  uploaded documents and readable retained
   Visual Memory frames before a separate keep/delete choice. Gallery callbacks
   carry only closed source identifiers and bounded page state; bytes, storage
   keys, and paths must not enter callbacks or conversation history. Owner-only
@@ -95,8 +97,10 @@ See `docs/README.md` for current implementation status and historical records.
   appeared in Timeline/Context Recovery. Authenticated read-only Desktop
   bootstrap/Mission Control/Timeline requests, Compose health, and public smoke
   also passed. The native Telegram Life OS control surface was deployed later
-  the same day; live external providers, real-client Telegram taps, and
-  interactive changing recovery on a paired Desktop remain manual acceptance.
+  the same day; live external providers, member-client taps, and interactive
+  changing recovery on a paired Desktop remain manual acceptance. The real
+  owner read-only Mission → Life OS return path passed on 2026-09-24; see
+  `docs/updates/2026-09-23-telegram-dialogue-acceptance.md`.
 - The deployed text model is currently configured through OpenRouter. Do not
   hard-code a provider or model into product behavior.
 

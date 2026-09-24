@@ -109,9 +109,9 @@ and the no-timer safety boundary.
 The active Telegram button architecture guide and shipped-menu contract are
 `telegram-button-architecture.md` and `telegram-menu-contract.md`. An automated
 contract test checks owner/member keyboard rows and agent-document links.
-The 2026-09-23 live owner text/voice and bottom-menu acceptance, one inline
-callback, and remaining integration/member-client gates are recorded in
-`updates/2026-09-23-telegram-dialogue-acceptance.md`.
+The 2026-09-24 post-release owner text, inbound voice, and live Life OS
+Mission → Life OS return path, together with the 2026-09-23 baseline, are
+documented in `updates/2026-09-23-telegram-dialogue-acceptance.md`.
 
 Telegram dialogue resilience and identity guard, source update 2026-09-23:
 assistant output and persisted history reject unverified claims about the
@@ -122,10 +122,17 @@ diagnostics. Production already has migrations 024/025 and the general
 classified fallback path. A specific Telegram voice-ASR failure reply now
 correctly says that its transcript was not saved; this refinement was deployed
 with the integrated server but has not been tested during a real ASR outage.
-A real owner text question about the user's
-name and a Telegram voice note were accepted on 2026-09-23: both updates
-completed without failure codes, the voice persisted only as `voice_transcript`,
-and the replies did not assert the VPN-profile name as the user's identity.
+A real owner text question about the user's name and a Telegram voice note were
+accepted on 2026-09-23 and repeated after deployment on 2026-09-24. The live
+answer did not assert a personal name; it said none was known. A read-only
+owner-scoped count found no active profile memory matching an explicit
+«меня зовут» fact for this account. Telegram display names and prior assistant
+replies are not trusted identity facts.
+The voice persisted only as `voice_transcript`. On 2026-09-24 the owner also
+completed the read-only `Миссия` → `Life OS` path in Telegram Desktop; the two
+corresponding callback updates completed without failure codes and the root
+section list was visible afterward. Other member-client and changing-action
+acceptance remains separate; details are in the linked acceptance record.
 
 Dynamic VPN Subscription Network & Port Hopping rollout, 2026-09-16: Jarvis
 now generates dynamic Sing-box/Happ subscriptions with four endpoints
