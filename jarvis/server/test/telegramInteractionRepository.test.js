@@ -11,6 +11,11 @@ test('accepts only closed bounded Telegram interaction contexts', () => {
   assert.deepEqual(validateContext('vpn_access_label', { protocol: 'hysteria2', node: 'nl' }), { protocol: 'hysteria2', node: 'nl' });
   assert.deepEqual(validateContext('device_instruction', { deviceId: DEVICE_ID }), { deviceId: DEVICE_ID });
   assert.throws(() => validateContext('vpn_access_label', { protocol: 'wireguard' }), /invalid/);
+  assert.deepEqual(validateContext('vpn_subscription_create_label', {}), {});
+  assert.deepEqual(validateContext('vpn_subscription_rename_label', { subscriptionId: DEVICE_ID }), { subscriptionId: DEVICE_ID });
+  assert.throws(() => validateContext('vpn_subscription_rename_label', {}), /invalid/);
+  assert.throws(() => validateContext('vpn_subscription_rename_label', { subscriptionId: 'not-a-uuid' }), /invalid/);
+  assert.throws(() => validateContext('vpn_subscription_rename_label', { subscriptionId: DEVICE_ID, token: 'secret' }), /invalid/);
   assert.throws(() => validateContext('device_instruction', { deviceId: DEVICE_ID, command: 'delete' }), /invalid/);
   assert.throws(() => validateContext('memory_add', { secret: 'value' }), /invalid/);
 });

@@ -346,6 +346,19 @@ with its validation tests.
   changes.
 - Ask before adding a new production dependency.
 
+## Telegram Guided Interaction Invariant
+
+- Every guided text-input kind emitted by a Telegram callback must be accepted
+  by TelegramInteractionRepository.KINDS and by the current PostgreSQL
+  telegram_interactions_kind_check constraint. Add a forward-only migration
+  whenever that set changes.
+- Validate each non-empty interaction context as a closed shape, and cover
+  creation, invalid retry, successful input, consumption, and owner/conversation/
+  chat scoping through the real Telegram message and menu handlers. Do not
+  substitute a stub interactions.begin for this end-to-end gate.
+- Keep a parity test between the repository allowlist, callback-emitted kinds,
+  and the latest database constraint.
+
 ## Commands and Verification
 
 Windows client:

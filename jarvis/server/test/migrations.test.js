@@ -5,6 +5,7 @@ const path = require('node:path');
 const test = require('node:test');
 const { DEFAULT_MIGRATIONS_DIR, listMigrationFiles, runMigrations } = require('../src/db/migrate');
 const { LIFE_EVENT_TYPES, LINK_TARGET_TYPES, SOURCE_CHANNELS } = require('../src/life/lifeSchemas');
+const { KINDS: TELEGRAM_INTERACTION_KINDS } = require('../src/telegram/telegramInteractionRepository');
 
 test('migration files are ordered and narrowly named', () => {
   const files = listMigrationFiles();
@@ -32,7 +33,22 @@ test('migration files are ordered and narrowly named', () => {
     '021_vpn_probe_credentials.sql',
     '022_vpn_subscriptions.sql',
     '023_vpn_subscription_repair_action.sql',
+    '027_telegram_subscription_interaction_kinds.sql',
   ]);
+});
+
+test('guided Telegram kinds emitted by VPN flows and the final database constraint stay in sync', () => {
+  const migration = fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, '027_telegram_subscription_interaction_kinds.sql'), 'utf8');
+  const constraint = /ADD CONSTRAINT telegram_interactions_kind_check CHECK \(kind IN \(([\s\S]*?)\)\);/.exec(migration);
+  assert.ok(constraint, 'final Telegram interaction kind constraint must exist');
+  const persistedKinds = Array.from(constraint[1].matchAll(/'([^']+)'/g), (match) => match[1]);
+  assert.equal(new Set(persistedKinds).size, persistedKinds.length, 'database constraint must not list duplicate kinds');
+  assert.deepEqual([...persistedKinds].sort(), [...TELEGRAM_INTERACTION_KINDS].sort(), 'repository allowlist and final database constraint must match');
+
+  const vpnSource = fs.readFileSync(path.join(__dirname, '../src/vpn/vpnCommandService.js'), 'utf8');
+  const emittedKinds = Array.from(vpnSource.matchAll(/requestInput:\s*\{\s*kind:\s*'([^']+)'/g), (match) => match[1]);
+  assert.ok(emittedKinds.length > 0, 'VPN guided input kinds must be found');
+  assert.deepEqual([...new Set(emittedKinds)].filter((kind) => !TELEGRAM_INTERACTION_KINDS.has(kind)), []);
 });
 
 test('VPN subscription migration creates owner-scoped subscription table without sensitive secret storage', () => {

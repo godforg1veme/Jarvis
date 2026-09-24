@@ -4,6 +4,8 @@ const { FAMILY_PERMISSIONS, FAMILY_RESOURCE_TYPES } = require('../life/people/pe
 const INTERACTION_TTL_MS = 10 * 60 * 1000;
 const UUID_RE = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 const KINDS = new Set([
+  'vpn_subscription_create_label',
+  'vpn_subscription_rename_label',
   'vpn_access_label',
   'device_pairing_name',
   'device_instruction',
@@ -30,6 +32,10 @@ function validateContext(kind, value) {
   if (kind === 'vpn_access_label') {
     if (keys.length < 1 || keys.length > 2 || !['vless', 'hysteria2'].includes(context.protocol) || (context.node && !['de', 'nl'].includes(context.node))) throw new Error('invalid Telegram interaction context');
     return { protocol: context.protocol, node: context.node || 'de' };
+  }
+  if (kind === 'vpn_subscription_rename_label') {
+    if (keys.length !== 1 || !UUID_RE.test(String(context.subscriptionId || ''))) throw new Error('invalid Telegram interaction context');
+    return { subscriptionId: String(context.subscriptionId).toLowerCase() };
   }
   if (kind === 'device_instruction') {
     if (keys.length !== 1 || !UUID_RE.test(String(context.deviceId || ''))) throw new Error('invalid Telegram interaction context');
