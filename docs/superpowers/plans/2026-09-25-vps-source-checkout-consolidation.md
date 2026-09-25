@@ -89,7 +89,12 @@ Add the Python guard as the first validation in each entrypoint, before any muta
 
 - [ ] **Step 3: Run deployment-script and guard tests**
 
-Run: `py -m unittest discover -s host-agent/tests -p test_*deploy_script.py -v; py -m unittest discover -s host-agent/tests -p test_source_checkout_guard.py -v`
+Run these separately in PowerShell:
+
+```powershell
+py -m unittest discover -s host-agent/tests -p test_host_agent_deploy_script.py -v
+py -m unittest discover -s host-agent/tests -p test_source_checkout_guard.py -v
+```
 
 Expected: every ordering and preflight case passes.
 
@@ -142,7 +147,16 @@ Commit: `docs: define canonical VPS source workflow`
 
 - [ ] **Step 1: Run the complete Host Agent suite and review branch history**
 
-Run: `py -m unittest discover -s host-agent/tests -v`, `git diff --check`, `git status --short --branch`, and compare task-branch commits with freshly fetched `origin/main`.
+Run these from the repository root in PowerShell:
+
+```powershell
+$env:PYTHONPATH = (Resolve-Path 'host-agent').Path
+py -m unittest discover -s host-agent/tests -v
+git diff --check
+git status --short --branch
+```
+
+Also compare task-branch commits with freshly fetched `origin/main`.
 
 Expected: all Host Agent tests pass; task branch contains only this plan/spec and source-consolidation guard/docs; no unrelated user changes are included.
 
