@@ -47,7 +47,7 @@ The real owner-approved VPN Supervisor acceptance state was rechecked before dep
 
 The installed app was version 1.0.0 and registered as a machine-wide installation under `C:\Program Files\Jarvis Desktop`. Package version 1.0.1 was built as an all-users NSIS installer to keep the update in the same location; electron-builder reported `perMachine=true`. The installer file is `dist/Jarvis-Desktop-1.0.1-Setup.exe` (183,689,844 bytes, product version 1.0.1).
 
-Both silent machine-wide upgrade attempts were cancelled at the Windows UAC prompt. The installed application therefore remains at version 1.0.0; no installation success is claimed. The 1.0.1 installer and old installed application are retained until an administrator approves the upgrade and the installed-version/start checks pass.
+After two cancelled UAC prompts, the administrator approved a later attempt. The installer exited with code 0, the machine-wide registry entry and installed executable both report version 1.0.1, and the application launched with one main process and four child processes. The user-data directory still exists. The old 1.0.0 installer artifacts remain in `dist`: the local execution policy rejected their deletion after the upgrade was verified.
 
 ## Outstanding checks
 

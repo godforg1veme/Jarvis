@@ -421,7 +421,7 @@ attachment ingestion.
 | `superpowers/specs/2026-09-25-github-jarvis-cleanup-design.md` | Completed as approved; repository consolidation kept the Telegram menu contract unchanged. |
 | `superpowers/plans/2026-09-25-vpn-subscription-flow-verification.md` | Source regression and production migration are complete; a real Telegram client tap remains manual. |
 | `superpowers/plans/2026-09-25-jarvis-repository-consolidation.md` | GitHub branches and canonical checkout are consolidated; removal of the old parent-folder Git metadata is still pending. |
-| `superpowers/plans/2026-09-25-vps-and-desktop-rollout.md` | Server release and migration are complete; the Windows 1.0.1 upgrade awaits an administrator-approved UAC prompt because both attempts were cancelled. |
+| `superpowers/plans/2026-09-25-vps-and-desktop-rollout.md` | Server and Windows 1.0.1 releases are verified; obsolete local installer artifacts could not be removed by the current execution policy. |
 
 The cloud design originally selected Ubuntu 22.04 and direct Caddy ingress.
 Production reality supersedes those deployment details: the current VPS is

@@ -113,7 +113,7 @@ npm run dist:win
 ```
 
 - [x] Verify the installer filename reports the reviewed package version and inspect its size and timestamp before installation.
-- [x] Attempt the silent upgrade twice without changing installed app data; both Windows UAC requests were cancelled, so the installed version remains 1.0.0.
+- [x] Attempt the silent upgrade twice without changing installed app data; both UAC prompts were cancelled. A later administrator-approved run succeeded with exit code 0 and updated the installed version to 1.0.1.
 
 ```powershell
 $installer = (Resolve-Path '.\dist\Jarvis-Desktop-1.0.1-Setup.exe').Path
@@ -121,8 +121,8 @@ $process = Start-Process -FilePath $installer -ArgumentList '/S' -Wait -PassThru
 if ($process.ExitCode -ne 0) { throw "Installer exited with $($process.ExitCode)" }
 ```
 
-- [ ] Re-read the installed executable product version and confirm Jarvis starts after an administrator approves UAC. Keep the prior installer until both checks pass.
-- [ ] Remove obsolete `dist/` installers only after the new installation is verified; keep build output untracked.
+- [x] Re-read the installed executable product version (1.0.1) and confirm Jarvis starts after the administrator-approved UAC upgrade. The user data directory still exists.
+- [ ] Remove obsolete `dist/` installers only after the new installation is verified; the safe single-file deletion attempt was rejected by the local execution policy, so the old installers remain. Keep build output untracked.
 
 ### Task 4: Inspect production rollout preconditions
 
@@ -164,5 +164,5 @@ if ($process.ExitCode -ne 0) { throw "Installer exited with $($process.ExitCode)
 **Files:** GitHub `main`, `F:\test\jarvis`, installed Windows client, and any updated VPS release.
 
 - [x] Compare the Git SHA in GitHub and the canonical Windows clone. Report any service-specific deployed image/Host Agent hash separately because those installations do not track Git branches.
-- [x] Verify production Compose health, migration 028, public readiness, and Host Agent state. Installed Windows version remains 1.0.0 pending UAC approval.
+- [x] Verify installed Windows version 1.0.1 and successful launch, production Compose health, migration 028, public readiness, and Host Agent state.
 - [x] List all checks that could not run and their concrete reason; do not infer real Telegram or hardware acceptance from automated tests.
