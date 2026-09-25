@@ -2,7 +2,7 @@
 
 Date: 2026-09-25
 
-Status: design approved in chat; awaiting review of this written specification.
+Status: approved; implementation in progress.
 
 ## Context
 
