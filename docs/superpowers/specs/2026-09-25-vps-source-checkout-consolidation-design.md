@@ -2,7 +2,7 @@
 
 Date: 2026-09-25
 
-Status: approved; implementation in progress.
+Status: implemented and verified; see `docs/updates/2026-09-25-vps-source-checkout-consolidation.md`.
 
 ## Context
 

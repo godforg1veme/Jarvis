@@ -318,6 +318,7 @@ See `docs/README.md` for current implementation status and historical records.
 - Before staging source for a VPS deployment, run `python3 /home/deploy/apps/jarvis/deploy/scripts/verify-source-checkout.py source /home/deploy/apps/jarvis`. The Windows Host Agent deploy script checks both the local checkout and its remote source before uploading anything. Never stage code from a nested `jarvis/` copy or an uncommitted overlay.
 - An immutable server release may use a detached checkout only when its full commit SHA is recorded and `python3 deploy/scripts/verify-source-checkout.py release <recorded-full-sha> <release-path>` confirms it is reachable from GitHub `main`.
 - The source checkout is deployment material, not the running server release. Do not run `git reset --hard` or `git clean` on a production tree to make it look current; prepare a fresh sibling checkout, preserve required state, compare runtime configuration, and switch only after checks pass.
+- Before replacing or removing a source directory, inspect the host paths mounted into running Compose containers. Keep each mounted file's original inode available until the container is recreated, or preserve a verified hard link in a private ignored directory. Confirm the container IDs and health after any planned restart.
 - Docker Compose runs `server` and private `postgres`; `cloudflared` is the
   intended public ingress because the dedicated `xray.service` owns port 443.
   The deployed VPN is VLESS + REALITY + XTLS Vision for Happ. Xray health and

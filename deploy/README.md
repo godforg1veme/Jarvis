@@ -54,6 +54,12 @@ Prepare a fresh sibling checkout and preserve the existing runtime files before
 switching paths. Do not use `git reset --hard` or `git clean` to repair a
 production checkout.
 
+Before removing an old source directory, inspect Docker's bind mounts. A
+running container keeps the file inode mounted from its start time even after
+the host path changes. Keep that inode available until the container is
+recreated, or preserve a verified hard link in a private ignored directory.
+Check the new container IDs and health before removing that preservation copy.
+
 ## Desktop EXE update reminder
 
 When deployment work also changes the Windows client or its packaged resources,
