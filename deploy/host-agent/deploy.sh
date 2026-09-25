@@ -5,6 +5,9 @@ app_root="${1:-/home/deploy/apps/jarvis}"
 app_root="${app_root%$'\r'}"
 agent_root="/opt/jarvis-host-agent"
 
+echo "==> Verifying canonical source checkout..."
+python3 "${app_root}/deploy/scripts/verify-source-checkout.py" source "${app_root}"
+
 if [[ ! -d "${app_root}/host-agent/jarvis_host_agent" ]]; then
   echo "Error: ${app_root}/host-agent/jarvis_host_agent not found" >&2
   exit 1

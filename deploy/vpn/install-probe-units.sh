@@ -6,6 +6,8 @@ source_dir="${app_root}/deploy/vpn"
 service_source="${source_dir}/jarvis-vpn-probe@.service"
 timer_source="${source_dir}/jarvis-vpn-probe@.timer"
 
+python3 "${app_root}/deploy/scripts/verify-source-checkout.py" source "${app_root}"
+
 test -f "${service_source}"
 test -f "${timer_source}"
 

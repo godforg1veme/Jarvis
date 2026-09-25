@@ -5,9 +5,28 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$guardScript = Join-Path $repositoryRoot 'deploy/scripts/verify-source-checkout.py'
+$hostAgentPath = Join-Path $repositoryRoot 'host-agent'
+$hostAgentTestsPath = Join-Path $hostAgentPath 'tests'
+$deployScriptPath = Join-Path $repositoryRoot 'deploy/host-agent/deploy.sh'
+
+Write-Host "==> Verifying local source checkout..."
+& py $guardScript source $repositoryRoot
+if ($LASTEXITCODE -ne 0) {
+  throw "Local source checkout is not ready. Deployment aborted."
+}
+
+$remotePreflight = "python3 '$RemoteAppRoot/deploy/scripts/verify-source-checkout.py' source '$RemoteAppRoot'"
+Write-Host "==> Verifying source checkout on $HostName..."
+& ssh $HostName $remotePreflight
+if ($LASTEXITCODE -ne 0) {
+  throw "Remote source checkout is not ready. Deployment aborted before upload."
+}
+
 Write-Host "==> Running local Host Agent unit tests..."
-$env:PYTHONPATH = (Resolve-Path 'host-agent').Path
-$testProcess = Start-Process -FilePath "py" -ArgumentList @("-m", "unittest", "discover", "-s", "host-agent/tests") -Wait -PassThru -NoNewWindow
+$env:PYTHONPATH = $hostAgentPath
+$testProcess = Start-Process -FilePath "py" -ArgumentList @("-m", "unittest", "discover", "-s", $hostAgentTestsPath) -WorkingDirectory $repositoryRoot -Wait -PassThru -NoNewWindow
 if ($testProcess.ExitCode -ne 0) {
   throw "Local Host Agent unit tests failed. Deployment aborted."
 }
@@ -18,7 +37,7 @@ $tempTar = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "host-agen
 $remoteArchive = "/tmp/host-agent-$([guid]::NewGuid().ToString('N')).tar.gz"
 
 try {
-  & tar --exclude='*__pycache__*' --exclude='*.pyc' -czf $tempTar -C host-agent .
+  & tar --exclude='*__pycache__*' --exclude='*.pyc' -czf $tempTar -C $hostAgentPath .
   if ($LASTEXITCODE -ne 0) {
     throw "Failed to create host-agent archive."
   }
@@ -36,7 +55,7 @@ try {
   }
 
   # Also ensure deploy/host-agent/deploy.sh is uploaded
-  & scp deploy/host-agent/deploy.sh "$($HostName):$RemoteAppRoot/deploy/host-agent/deploy.sh"
+  & scp $deployScriptPath "$($HostName):$RemoteAppRoot/deploy/host-agent/deploy.sh"
   if ($LASTEXITCODE -ne 0) {
     throw "Failed to upload deploy.sh to VPS."
   }
