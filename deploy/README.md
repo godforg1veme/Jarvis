@@ -23,6 +23,35 @@ and 443 are free, but it must not be started on the current Xray host.
 Do not commit or paste real values from those files. Use `deploy/env.example`
 as the variable-name reference.
 
+## Canonical source and VPS checkouts
+
+Use `https://github.com/godforg1veme/Jarvis.git` as the project remote and
+`main` as the shared source branch. The Windows checkout is `F:\test\jarvis`.
+Both VPSs keep source at `/home/deploy/apps/jarvis`: `jarvis-vps` runs the
+Jarvis Server, and `jarvis-vps-new` runs VPN services and Host Agent.
+
+Before uploading Host Agent files or installing VPN probe units, verify the
+source checkout. The Windows deploy script checks its own checkout and the VPS
+before it uploads anything. Run the same check directly on a VPS with:
+
+```bash
+python3 /home/deploy/apps/jarvis/deploy/scripts/verify-source-checkout.py source /home/deploy/apps/jarvis
+```
+
+The check confirms that the directory is a clean checkout of current `main`,
+uses the canonical GitHub remote, has no nested `jarvis/` project, and has no
+leftover branch references. For a detached server release, record its full
+commit SHA and check that exact revision against `main`:
+
+```bash
+python3 deploy/scripts/verify-source-checkout.py release <recorded-full-sha> <release-path>
+```
+
+If a SHA, source, or Compose check fails, stop and inspect the difference.
+Prepare a fresh sibling checkout and preserve the existing runtime files before
+switching paths. Do not use `git reset --hard` or `git clean` to repair a
+production checkout.
+
 ## Desktop EXE update reminder
 
 When deployment work also changes the Windows client or its packaged resources,

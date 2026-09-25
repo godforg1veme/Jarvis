@@ -313,7 +313,11 @@ See `docs/README.md` for current implementation status and historical records.
   owner as of 2026-09-06. Do not enable the timer as part of panel maintenance.
 
 - The production VPS (`87.120.187.202`) runs Ubuntu 24.04 LTS (SSH host `jarvis-vps`).
-- The new VPS (`94.183.208.56`) runs Ubuntu 24.04.4 LTS; passwordless sudo user `deploy` and SSH access are configured via host alias `jarvis-vps-new` in `~/.ssh/config` using `~/.ssh/gemini_vps2`. Remote application root is `/home/deploy/apps/jarvis`.
+- The secondary VPN/Host Agent VPS (`94.183.208.56`) runs Ubuntu 24.04.4 LTS; passwordless sudo user `deploy` and SSH access are configured via host alias `jarvis-vps-new` in `~/.ssh/config` using `~/.ssh/gemini_vps2`.
+- The canonical Windows checkout is `F:\test\jarvis`. Both VPS source checkouts use `/home/deploy/apps/jarvis` and the GitHub remote `https://github.com/godforg1veme/Jarvis.git`; `main` is the only permanent source branch. The primary VPS runs Jarvis Server, while the secondary VPS runs VPN services and Host Agent.
+- Before staging source for a VPS deployment, run `python3 /home/deploy/apps/jarvis/deploy/scripts/verify-source-checkout.py source /home/deploy/apps/jarvis`. The Windows Host Agent deploy script checks both the local checkout and its remote source before uploading anything. Never stage code from a nested `jarvis/` copy or an uncommitted overlay.
+- An immutable server release may use a detached checkout only when its full commit SHA is recorded and `python3 deploy/scripts/verify-source-checkout.py release <recorded-full-sha> <release-path>` confirms it is reachable from GitHub `main`.
+- The source checkout is deployment material, not the running server release. Do not run `git reset --hard` or `git clean` on a production tree to make it look current; prepare a fresh sibling checkout, preserve required state, compare runtime configuration, and switch only after checks pass.
 - Docker Compose runs `server` and private `postgres`; `cloudflared` is the
   intended public ingress because the dedicated `xray.service` owns port 443.
   The deployed VPN is VLESS + REALITY + XTLS Vision for Happ. Xray health and
@@ -474,6 +478,10 @@ with its validation tests.
   are in `main` and that no open pull request or active worktree depends on it.
 - Do not keep completed task branches as alternate development bases. Start new
   work from the latest `main`.
+- Keep GitHub `main`, the canonical Windows checkout, and both VPS source
+  checkouts on the same published commit. After merging a task, delete its
+  temporary branch once no worktree or open pull request depends on it. Do not
+  create a second permanent branch or a nested `jarvis/` source tree.
 
 ## Telegram Menu Contract
 
