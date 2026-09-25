@@ -208,13 +208,16 @@ See `docs/README.md` for current implementation status and historical records.
   `probe.recheck` action can perform one read-only test of an existing key;
   it must never replay an unknown install or rotate a key for recovery. Both
   approximately 15-minute timers were enabled by an originating private-chat
-  owner confirmation on 2026-09-24 and have completed healthy scheduled runs
-  on DE and NL. The already
+  owner confirmation on 2026-09-24 and completed healthy scheduled runs on DE
+  and NL. A read-only check on 2026-09-25 found the DE timer disabled/inactive
+  and the NL timer enabled/active, contrary to that rollout record. The
+  subscription release did not change either timer; check their live systemd
+  state before relying on scheduled probes. The already
   accepted `supervisor_acceptance_noop` never calls Host Agent. Before changing
   this production boundary, verify the running playbook flags and owner
   acceptance record; readiness alone does not prove a real repair.
 - Cross-node client probe code, root-only credential installer and systemd
-  units are deployed on DE and NL; both approximately 15-minute timers are
+  units are deployed on DE and NL; both approximately 15-minute timers were
   enabled after four fresh owner-confirmed proofs and a separate owner action.
   The runners cover NL→DE and DE→NL for both VLESS and Hysteria2; snapshots
   expose VLESS TCP 443/8443 and Hysteria2 UDP fixed-443/hopping checks. A
