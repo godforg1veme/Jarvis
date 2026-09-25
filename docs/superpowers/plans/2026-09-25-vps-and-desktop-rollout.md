@@ -113,7 +113,7 @@ npm run dist:win
 ```
 
 - [x] Verify the installer filename reports the reviewed package version and inspect its size and timestamp before installation.
-- [x] Attempt the silent upgrade without changing installed app data; Windows cancelled the UAC request, so the installed version remains 1.0.0.
+- [x] Attempt the silent upgrade twice without changing installed app data; both Windows UAC requests were cancelled, so the installed version remains 1.0.0.
 
 ```powershell
 $installer = (Resolve-Path '.\dist\Jarvis-Desktop-1.0.1-Setup.exe').Path
