@@ -40,8 +40,10 @@ python3 /home/deploy/apps/jarvis/deploy/scripts/verify-source-checkout.py source
 
 The check confirms that the directory is a clean checkout of current `main`,
 uses the canonical GitHub remote, has no nested `jarvis/` project, and has no
-leftover branch references. For a detached server release, record its full
-commit SHA and check that exact revision against `main`:
+leftover branch references. VPS backups, deployment staging files, and the
+pending-operation marker stay at their existing paths and remain outside Git.
+For a detached server release, record its full commit SHA and check that exact
+revision against `main`:
 
 ```bash
 python3 deploy/scripts/verify-source-checkout.py release <recorded-full-sha> <release-path>

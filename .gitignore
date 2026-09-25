@@ -49,6 +49,12 @@ yarn-error.log*
 pnpm-debug.log*
 error.txt
 
+# VPS-local backups and deployment staging state
+.backups/
+.deploy-backups/
+.deploy-stage-*
+pendingCommandId
+
 # Downloaded archives and package experiments
 *.tgz
 *.whl

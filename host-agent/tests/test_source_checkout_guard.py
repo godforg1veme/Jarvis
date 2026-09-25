@@ -89,6 +89,28 @@ class SourceCheckoutGuardTests(unittest.TestCase):
 
         self.assert_source_fails("worktree is not clean")
 
+    def test_vps_operation_state_paths_are_ignored_by_the_repository(self):
+        repository_root = GUARD_SCRIPT.parents[2]
+        paths = (
+            ".backups/example.tar.gz",
+            ".deploy-backups/example.tar.gz",
+            ".deploy-stage-vpn/example.conf",
+            "pendingCommandId",
+            "deploy/.env",
+            "deploy/secrets/example-token",
+        )
+
+        for path in paths:
+            with self.subTest(path=path):
+                result = subprocess.run(
+                    ["git", "-C", str(repository_root), "check-ignore", "--quiet", "--no-index", path],
+                    check=False,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                self.assertEqual(result.returncode, 0, f"{path} is not ignored")
+
     def test_nested_jarvis_directory_is_rejected(self):
         (self.repo / "jarvis").mkdir()
 

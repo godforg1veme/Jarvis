@@ -82,7 +82,9 @@ repository. Add a deployment preflight that verifies the canonical remote,
 `jarvis/` project directory. For an immutable release directory, allow only an
 explicitly recorded commit that is reachable from GitHub `main`. The preflight
 prints the selected source SHA and fails before any deployment action when a
-check does not pass.
+check does not pass. Add ignore rules for VPS-local backups, deployment staging
+artifacts, and the pending-operation marker so preserved runtime state does not
+make the canonical source checkout look dirty.
 
 ## Failure and rollback behavior
 
@@ -111,7 +113,7 @@ check does not pass.
 - Each VPS has only local `main` and only the live `origin/main` remote-tracking
   ref after pruning stale refs.
 - Environment files, backups, staging state, and pending-operation markers are
-  preserved and their contents remain private.
+  preserved at documented or ignored paths and their contents remain private.
 - The primary VPS Compose configuration resolves to the same runtime settings
   as before promotion; no service was recreated for checkout normalization.
 - Both Host Agent services and VPN stacks remain healthy, and the public

@@ -108,6 +108,7 @@ Commit: `fix: verify source before deployment mutations`
 
 **Files:**
 - Modify: `AGENTS.md`
+- Modify: `.gitignore`
 - Modify: `deploy/README.md`
 - Modify: `docs/superpowers/specs/2026-09-25-vps-source-checkout-consolidation-design.md`
 
@@ -119,6 +120,8 @@ Commit: `fix: verify source before deployment mutations`
 - [ ] **Step 1: Add the concise canonical-source rule to `AGENTS.md`**
 
 Update the existing deployment and branch-policy sections, rather than adding a conflicting second architecture description. State that agents start from current `main`, use short-lived task branches only for isolated work, merge verified changes to `main`, and remove task branches after confirmed merge. Require preflight before VPS source staging and forbid nested `jarvis/` repository copies.
+
+Add ignore rules for VPS-local `.backups/`, `.deploy-backups/`, `.deploy-stage-*`, and `pendingCommandId`. Keep `.env`, `deploy/secrets/`, and `jarvis-server-deploy.zip` covered by their existing ignore rules.
 
 - [ ] **Step 2: Update the operator runbook in plain, direct language**
 
@@ -201,7 +204,7 @@ Expected: staged clones on both hosts are byte-identical in Git object revision 
 
 - [ ] **Step 4: Restore required operational files into staging and verify manifests**
 
-Copy only the verified current `deploy/.env`, `deploy/secrets`, and any runtime data whose exact path is consumed by the application. Preserve owner, group, mode, timestamps when required, and checksums. Keep old backup/staging artifacts and marker data safe outside tracked source or at explicitly ignored runtime paths; add no secret or state file to Git. Ensure the staged tree can be made clean without discarding any state.
+Copy only the verified current `deploy/.env`, `deploy/secrets`, and any runtime data whose exact path is consumed by the application. Preserve owner, group, mode, timestamps when required, and checksums. Keep backup/staging artifacts and marker data at their original paths under the new ignore rules. Archive the previous checkout's tracked `data/` files under `.deploy-backups/jarvis-source-consolidation-<date>/data/`, because canonical `main` owns those same paths. Add no secret or state file to Git. Ensure the staged tree can be made clean without discarding any state.
 
 Expected: restored state matches its pre-staging manifest; unneeded old source overlays are not copied into the new project tree.
 
