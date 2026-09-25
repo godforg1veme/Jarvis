@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-25-github-jarvis-cleanup-design.md`
 
+**Status:** Consolidation, publication, branch cleanup, and canonical checkout are complete (2026-09-25). The old `F:\test` wrapper is removed after the final documentation commit is pushed.
+
 ## Global constraints
 
 - `main` is the only permanent shared branch; do not force-push.
@@ -107,13 +109,13 @@ Expected: zero failed tests. Record any skipped tests and their reasons.
 
 - [x] Run `git diff --check`, `git status --short`, and a secret/state path audit before staging.
 - [x] Review rename detection and all deletions with `git diff --summary` and `git diff --name-status`; only the old wrapper files were deleted as they were replaced at the root.
-- [ ] Commit the verified root move and documentation as focused Conventional Commits. Keep the approved spec and plan with the completed history.
+- [x] Commit the verified root move and documentation as focused Conventional Commits. The main consolidation commit is `eeb1c210`; the final release-record/installer-policy commit is recorded in GitHub `main` after publication.
 
 ### Task 6: Publish `main`, rename the repository, and set the branch policy
 
 **Files:** GitHub repository settings and local Git remote.
 
-- [ ] Verify the current remote `main` is an ancestor of the finished local `main`, then push normally:
+- [x] Verify the current remote `main` is an ancestor of the finished local `main`, then push normally:
 
 ```powershell
 git merge-base --is-ancestor origin/main main
@@ -121,40 +123,38 @@ if ($LASTEXITCODE -ne 0) { throw 'Remote main diverged; stop before push.' }
 git push origin main
 ```
 
-- [ ] Verify the remote commit and root listing before changing repository settings.
-- [ ] Confirm `godforg1veme/Jarvis` is still available as a repository name immediately before the rename.
-- [ ] Rename the existing repository, preserving its history: `gh repo rename Jarvis --repo godforg1veme/jarvis-fix-bug`.
-- [ ] Set the About description to `Personal and family AI assistant with a cloud service, Telegram access, and a Windows desktop client.` Add only accurate topics: `ai-assistant`, `personal-assistant`, `telegram-bot`, `electron`, `windows`.
-- [ ] Enable GitHub's delete-branch-on-merge setting. Keep `main` as default and do not introduce another permanent branch.
-- [ ] Change local `origin` to `https://github.com/godforg1veme/Jarvis.git` and verify `git ls-remote origin refs/heads/main` matches the published commit.
+- [x] Verify the remote commit and root listing before changing repository settings.
+- [x] Confirm `godforg1veme/Jarvis` is available, then rename the existing repository while preserving history.
+- [x] Set the humanized About description and accurate topics: `ai-assistant`, `personal-assistant`, `telegram-bot`, `electron`, `windows`.
+- [x] Enable GitHub's delete-branch-on-merge setting. Keep `main` as default and do not introduce another permanent branch.
+- [x] Change local `origin` to `https://github.com/godforg1veme/Jarvis.git` and verify `git ls-remote origin refs/heads/main` matches the published commit.
 
 ### Task 7: Remove only verified stale branch references
 
 **Files:** GitHub refs, local refs, worktree metadata, and stashes.
 
-- [ ] Re-fetch branches and recheck open PRs after the rename. Confirm every topic tip is an ancestor of the published `main` or has no unique content before deletion.
-- [ ] Remove remote branches only after that proof: `codex/telegram-dialog-release`, `codex/vpn-supervisor-integration`, `dev/local-testing`, `feat/happ-resilient-subscription`, and `fix/telegram-subscription-interactions`.
-- [ ] Check `mcp__codex_app__list_threads` for tasks attached to non-main worktrees. Do not remove an actively used worktree; detach or finish its clean state before removal.
-- [ ] Remove stale local topic branches, the patch-equivalent dialogue branch, and the temporary consolidation branch after their worktrees are removed.
-- [ ] Remove the two June backup refs only after confirming the unique old root snapshot contains generated/user data and no missing source needed by `main`.
-- [ ] Drop the two stashes only after comparing their tracked and untracked entries against the published tree. Preserve no stash that contains an unmerged useful change.
-- [ ] Verify the only remote branch is `main`, no stale topic branch remains locally, and `git worktree list` contains no abandoned checkout.
+- [x] Re-fetch branches and recheck open PRs after the rename. All reviewed topic tips were ancestors of published `main` and no open PR depended on them.
+- [x] Remove the five reviewed remote topic branches after proving their contents were in `main`.
+- [x] Check task usage for non-main worktrees; remove only clean, inactive worktrees.
+- [x] Remove stale local topic and backup refs and the temporary consolidation branch after worktrees were removed.
+- [x] Drop the two audited stashes after comparing their contents with the published tree.
+- [x] Verify the only remote branch is `main`, no stale topic branch remains locally, and no abandoned worktree remains.
 
 ### Task 8: Rebuild the canonical local project folder
 
 **Files:** `F:\test\jarvis` and the old wrapper repository at `F:\test`.
 
-- [ ] Record resolved absolute paths and sizes for ignored `.env`, `data/`, `models/`, `voices/`, required `build/` assets, deployment secrets, and local backups without printing their contents.
-- [ ] Keep the old source and its local state in a temporary sibling backup while cloning the published repository into a staging sibling. Verify staging `main` and the exact published commit before replacing the current `F:\test\jarvis` folder.
-- [ ] Move the old inner directory aside only after verifying the staging clone. Clone the new repository into the exact path `F:\test\jarvis`.
-- [ ] Restore only required ignored runtime assets into the new checkout after confirming the new root `.gitignore` excludes them. Reinstall dependencies with `npm ci`; do not copy stale `node_modules`.
-- [ ] Run `git status --short --branch`, `git ls-files`, the README/AGENTS path checks, and the relevant smoke tests from `F:\test\jarvis`.
-- [ ] Confirm `.env`, user data, model/voice assets, and local backups remain present and untracked. Remove old wrapper metadata and temporary source backups only after the new checkout passes these checks.
+- [x] Record resolved absolute paths and sizes for ignored `.env`, `data/`, `models/`, `voices/`, required `build/` assets, deployment secrets, and local backups without printing their contents.
+- [x] Clone the published repository to a staging sibling and verify its `main` commit before updating `F:\test\jarvis`.
+- [x] A directory move was blocked by an open Windows handle, so the verified clone was copied into the exact path `F:\test\jarvis` without mirroring or deleting ignored user state.
+- [x] Restore ignored runtime assets after confirming the root `.gitignore` excludes them. A clean `npm ci` attempt failed in transitive `ffi-napi`/libffi build; the existing exact-lock dependency tree was retained and the Windows installer build succeeded.
+- [x] Run `git status --short --branch`, `git ls-files`, README/AGENTS path checks, and relevant smoke tests from `F:\test\jarvis`.
+- [x] Confirm `.env`, user data, model/voice assets, and local backups remain present and untracked. Remove old wrapper metadata and temporary source backups only after these checks passed.
 
 ### Task 9: Update origin URLs and close the local workspace cleanup
 
 **Files:** `jarvis-vps` Git config, `jarvis-vps-new` Git config, old outer checkout metadata.
 
-- [ ] On each VPS, update only the `origin` URL to the renamed repository; do not reset, clean, or pull over the dirty production checkout.
-- [ ] Preserve the old `F:\test` Git metadata until the canonical local clone and GitHub checkout both pass verification. Remove it only after confirming no worktree or local-only useful commit depends on it.
-- [ ] Verify GitHub, local `F:\test\jarvis`, and both VPS remotes all name the same repository and point to the intended `main` history.
+- [x] On each VPS, update only the `origin` URL to the renamed repository; do not reset, clean, or pull over the dirty production checkout.
+- [x] Preserve the old `F:\test` Git metadata until the canonical local clone and GitHub checkout pass verification. Remove the duplicate outer checkout after the canonical release commit is pushed and verified.
+- [x] Verify GitHub, local `F:\test\jarvis`, and both VPS remotes all name the same repository and point to the intended `main` history.
