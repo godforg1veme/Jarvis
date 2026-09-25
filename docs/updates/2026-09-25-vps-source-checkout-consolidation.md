@@ -27,9 +27,8 @@ are preserved under `.deploy-backups/jarvis-active-binds-20260925/` until those
 containers are recreated from the canonical checkout. A private note in that
 directory records when the hard links can be removed.
 
-The Compose configuration hash stayed the same before and after promotion.
-All four container IDs were unchanged, the running Server, PostgreSQL, GigaAM,
-and Cloudflared containers remained healthy, and public readiness returned
+All four container IDs remained unchanged; the running Server, PostgreSQL,
+GigaAM, and Cloudflared containers stayed healthy, and public readiness returned
 `ok`. The active Server release at `eeb1c210d53b08cc0b322243998add8e63a2ffe6`
 was verified as a clean commit reachable from `main`; it was not restarted or
 replaced during source cleanup.
