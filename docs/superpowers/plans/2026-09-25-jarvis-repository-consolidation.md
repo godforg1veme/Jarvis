@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-25-github-jarvis-cleanup-design.md`
 
-**Status:** Consolidation, publication, branch cleanup, and canonical checkout are complete (2026-09-25). The old `F:\test` wrapper is removed after the final documentation commit is pushed.
+**Status:** GitHub consolidation, branch cleanup, and canonical checkout are complete (2026-09-25). The duplicate source files in `F:\test` were removed. Its hidden outer `.git` metadata remains because the local execution policy rejected the final recursive deletion; `F:\test\jarvis` is the canonical repository.
 
 ## Global constraints
 
@@ -149,12 +149,12 @@ git push origin main
 - [x] A directory move was blocked by an open Windows handle, so the verified clone was copied into the exact path `F:\test\jarvis` without mirroring or deleting ignored user state.
 - [x] Restore ignored runtime assets after confirming the root `.gitignore` excludes them. A clean `npm ci` attempt failed in transitive `ffi-napi`/libffi build; the existing exact-lock dependency tree was retained and the Windows installer build succeeded.
 - [x] Run `git status --short --branch`, `git ls-files`, README/AGENTS path checks, and relevant smoke tests from `F:\test\jarvis`.
-- [x] Confirm `.env`, user data, model/voice assets, and local backups remain present and untracked. Remove old wrapper metadata and temporary source backups only after these checks passed.
+- [x] Confirm `.env`, user data, model/voice assets, and local backups remain present and untracked. The duplicate source files were removed after verification; the parent `.git` metadata remains because the local execution policy rejected its deletion.
 
 ### Task 9: Update origin URLs and close the local workspace cleanup
 
 **Files:** `jarvis-vps` Git config, `jarvis-vps-new` Git config, old outer checkout metadata.
 
 - [x] On each VPS, update only the `origin` URL to the renamed repository; do not reset, clean, or pull over the dirty production checkout.
-- [x] Preserve the old `F:\test` Git metadata until the canonical local clone and GitHub checkout pass verification. Remove the duplicate outer checkout after the canonical release commit is pushed and verified.
+- [ ] Remove the parent `F:\test\.git` metadata after verifying there are no local-only commits or worktrees. The deletion was rejected by local execution policy; do not use `F:\test` as the active project root while that metadata remains.
 - [x] Verify GitHub, local `F:\test\jarvis`, and both VPS remotes all name the same repository and point to the intended `main` history.

@@ -53,3 +53,4 @@ The first silent machine-wide upgrade attempt was cancelled at the Windows UAC p
 
 - A real owner Telegram phone tap through create, bind, and rename remains manual acceptance. The automated E2E and production database constraint passed, but they do not prove a real Telegram client tap.
 - A live systemd check found `jarvis-vpn-probe@de.timer` disabled/inactive and `jarvis-vpn-probe@nl.timer` enabled/active. This differs from the 2026-09-24 rollout record. No timer or credential was changed during this release; reconcile that state separately.
+- The duplicate source files at `F:\test` were removed after verifying `F:\test\jarvis` and GitHub `main`. Local execution policy rejected deletion of the old parent `.git` metadata, so it remains with staged source deletions. Use `F:\test\jarvis` as the project root and do not commit from `F:\test`.
