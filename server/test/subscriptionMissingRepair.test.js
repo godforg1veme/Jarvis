@@ -13,7 +13,11 @@ for (const failure of [null, 'export', 'transport', 'bind']) {
     const repository = {
       async isOwner({ userId }) { return userId === 'owner'; },
       async hasUnresolvedSubscriptionRepair() { return Boolean(pending); },
-      async create(input) { pending = input; return input; },
+      async create(input) {
+        // Round-trip the confirmation as PostgreSQL JSONB does, with reordered keys.
+        input.arguments.missing = input.arguments.missing.map(({ node, protocol, clientId }) => ({ clientId, node, protocol }));
+        pending = input; return input;
+      },
       async approve(scope) {
         if (approved || scope.conversationId !== context.conversationId) return null;
         approved = true; return pending;

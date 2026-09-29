@@ -39,7 +39,12 @@ async function executeMissingRepair(service, record, sub) {
   const targets = record.arguments.missing;
   if (!Array.isArray(targets) || !targets.length || targets.length > 4) throw new Error('INVALID_TARGETS');
   const currentMissing = await missingEndpoints(service, sub);
-  if (JSON.stringify(currentMissing) !== JSON.stringify(targets)) throw new Error('STALE_TARGETS');
+  // PostgreSQL JSONB reorders object keys; compare the closed fields explicitly.
+  if (currentMissing.length !== targets.length || !targets.every((target, index) =>
+    target && Object.keys(target).sort().join(',') === 'clientId,node,protocol'
+    && ['node', 'protocol', 'clientId'].every((key) => target[key] === currentMissing[index][key]))) {
+    throw new Error('STALE_TARGETS');
+  }
   const ids = bindings(sub);
   const checkpoint = { subscriptionId: sub.id, operations: targets.map(({ node, protocol }) => ({ node, protocol, requestId: childId(record.id, node, protocol) })) };
   // Persist every mutation identifier before sending any mutation to Host Agent.
