@@ -26,6 +26,25 @@ class VpnRepository {
     return result.rows[0];
   }
 
+  async createSubscriptionRepair(input) {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`subscription-repair:${input.arguments.subscriptionId}`]);
+      const scoped = new VpnRepository(client);
+      if (await scoped.hasUnresolvedSubscriptionRepair({ userId: input.userId, subscriptionId: input.arguments.subscriptionId })) {
+        await client.query('ROLLBACK');
+        return null;
+      }
+      const record = await scoped.create(input);
+      await client.query('COMMIT');
+      return record;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally { client.release(); }
+  }
+
   async get({ userId, requestId }) {
     const result = await this.pool.query('SELECT * FROM vpn_action_requests WHERE id=$1 AND user_id=$2', [requestId, userId]);
     return result.rows[0] || null;
@@ -66,7 +85,9 @@ class VpnRepository {
 
   async complete({ requestId, status, result = null, errorCode = null }) {
     const saved = await this.pool.query(`
-      UPDATE vpn_action_requests SET status=$2,result=$3::jsonb,error_code=$4,updated_at=now(),
+      UPDATE vpn_action_requests SET status=$2,
+        result=CASE WHEN $2='unknown' AND $3::jsonb IS NULL THEN result ELSE $3::jsonb END,
+        error_code=$4,updated_at=now(),
         completed_at=CASE WHEN $2 IN ('running','unknown') THEN completed_at ELSE now() END
       WHERE id=$1 AND status IN ('running','unknown') RETURNING *
     `, [requestId, status, result ? JSON.stringify(result) : null, errorCode]);

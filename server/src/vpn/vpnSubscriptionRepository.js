@@ -124,6 +124,17 @@ class VpnSubscriptionRepository {
     `, [id.trim()]);
   }
 
+  async replaceBindings({ id, userId, expected, replacement }) {
+    const result = await this.pool.query(`
+      UPDATE vpn_subscriptions SET client_id_de=$1, client_id_nl=$2
+      WHERE id=$3 AND user_id=$4 AND revoked_at IS NULL
+        AND client_id_de::jsonb=$5::jsonb AND client_id_nl::jsonb=$6::jsonb
+      RETURNING *
+    `, [JSON.stringify(replacement.de), JSON.stringify(replacement.nl), id, userId,
+      JSON.stringify(expected.de), JSON.stringify(expected.nl)]);
+    return mapSubscriptionRow(result.rows?.[0] || null);
+  }
+
   async bindClients({ id, userId, clientIdDe, clientIdNl }) {
     if (!id || !userId || !clientIdDe || !clientIdNl) throw new Error('Subscription client binding is required');
     const result = await this.pool.query(`

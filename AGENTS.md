@@ -380,6 +380,11 @@ See `docs/README.md` for current implementation status and historical records.
   rather than an empty or direct-only profile. The existing owner URL passed
   HTTP 200 with three endpoints after deployment; missing DE Hysteria2 clients
   and real phone-side Happ import remain separate follow-up acceptance.
+  Bound profiles also expose owner-private Telegram restoration through the
+  existing subscription repair confirmation. Only explicit missing-client
+  exports qualify; replacement saves durable child operation IDs and uses
+  owner-scoped binding compare-and-swap without token rotation. Unknown results
+  preserve checkpoints and block another repair pending reconciliation.
   Telegram `/vpn` offers «📲 Подписки (Happ)» with creation, token rotation, and revocation.
   Initial binding of the four client identities is a separate owner-confirmed
   `subscription.repair` action (migration 023); an already bound or uncertain

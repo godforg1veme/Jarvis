@@ -39,6 +39,13 @@ paths, storage keys, tokens, credentials, or unchecked user text may appear.
 
 - `life:*`: Life OS hierarchy and proposals; mutable values use scoped guided input.
 - `vpn:*`: country/protocol menus, subscriptions, and origin-bound confirmation.
+  Bound subscription profiles offer «🔧 Восстановить подключения» through
+  the existing `vpn:sub:repair:<uuid>` callback. In the owner's private chat,
+  only explicit `VPN_CLIENT_NOT_FOUND` export results qualify for replacement.
+  A fresh origin-bound confirmation freezes those targets. Execution rechecks
+  targets, durably records per-endpoint operation IDs before issue, and updates
+  only missing bindings with compare-and-swap. Existing tokens remain unchanged.
+  Unknown outcomes block another repair until original-ID reconciliation.
   `/vpn_health` shows the local Host Agent diagnosis and separate cross-node
   VLESS/Hysteria2 probe results. External timer failures do not currently send
   their own proactive Telegram incident message. Its «Автоматический ремонт»

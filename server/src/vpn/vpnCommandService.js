@@ -1,4 +1,5 @@
 const crypto = require('node:crypto');
+const { missingEndpoints, executeMissingRepair } = require('./subscriptionMissingRepair');
 const { buildRoutingArtifact, buildRoutingSummary } = require('./vpnRoutingService');
 const { parseVpnHealth } = require('./vpnHealthSchema');
 const { ExternalProbeMonitor } = require('../operations/vpnSupervisor/externalProbeMonitor');
@@ -1058,11 +1059,12 @@ class VpnCommandService {
     }
     return {
       answer: `📲 **${sub.label}**\n\n` +
-        'Серверы подключены: 🇩🇪 Германия и 🇳🇱 Нидерланды, Hysteria 2 и VLESS. Одна ссылка добавляет все четыре варианта в Happ.\n\n' +
+        'Профиль настроен для 🇩🇪 Германии и 🇳🇱 Нидерландов, Hysteria 2 и VLESS. Ссылка добавляет доступные подключения в Happ. Если доступ пропал, используйте «Восстановить подключения».\n\n' +
         'Если профиль уже добавлен в Happ, обновите подписку в самом приложении — серверы загрузятся по прежней ссылке.\n\n' +
         'Если ссылка потеряна или нужна для другого устройства, выпустите новую. После этого старую ссылку придётся заменить в Happ на всех устройствах.',
       buttons: [
         [{ text: '🔗 Получить новую ссылку', data: `vpn:sub:rotate:${sub.id}` }],
+        [{ text: '🔧 Восстановить подключения', data: `vpn:sub:repair:${sub.id}` }],
         [{ text: '✏️ Переименовать', data: `vpn:sub:rename:${sub.id}` }],
         [{ text: '🗑 Отозвать подписку', data: `vpn:sub:revoke:${sub.id}` }],
         [{ text: '« К подпискам', data: 'vpn:sub:menu' }],
@@ -1121,18 +1123,27 @@ class VpnCommandService {
   async _createSubscriptionRepair(subscriptionId, context) {
     const sub = await this.subscriptionService?.repository?.findById(subscriptionId);
     if (!sub || sub.revokedAt || sub.userId !== context.userId) return { answer: 'Подписка не найдена или отозвана.', buttons: [[{ text: '« К подпискам', data: 'vpn:sub:menu' }]] };
-    if (this.subscriptionService.hasCompleteClientBinding(sub)) return { answer: 'Четыре сервера уже подключены. Если ссылка потеряна, откройте профиль и нажмите «Получить новую ссылку».', buttons: [[{ text: '« К подписке', data: `vpn:sub:view:${sub.id}` }]] };
+    const bound = this.subscriptionService.hasCompleteClientBinding(sub);
+    let missing = null;
+    if (bound) {
+      if (context.originChannel !== 'telegram' || context.chatType !== 'private') return { answer: 'Восстановление доступно в личном Telegram-чате владельца.' };
+      try { missing = await missingEndpoints(this, sub); }
+      catch (_) { return { answer: 'Проверка подключений недоступна. Новые ключи не выпускались.' }; }
+      if (!missing.length) return { answer: 'Все подключения доступны; восстановление не требуется.' };
+    }
     if (await this.repository.hasUnresolvedSubscriptionRepair({ userId: context.userId, subscriptionId })) return { answer: 'Восстановление этой подписки уже ожидает подтверждения или проверки результата. Повторный выпуск доступов заблокирован.', buttons: [[{ text: '« К подписке', data: `vpn:sub:view:${sub.id}` }]] };
     const id = crypto.randomUUID();
-    const args = { subscriptionId };
+    const args = missing ? { subscriptionId, missing } : { subscriptionId };
     const fingerprint = crypto.createHash('sha256').update(JSON.stringify({ action: 'subscription.repair', args })).digest();
-    const record = await this.repository.create({
+    const record = await (this.repository.createSubscriptionRepair || this.repository.create).call(this.repository, {
       id, userId: context.userId, conversationId: context.conversationId, originChannel: context.originChannel,
       originDeviceId: context.originDeviceId || null, action: 'subscription.repair', arguments: args, fingerprint,
       expiresAt: new Date(this.now().getTime() + CONFIRMATION_TTL_MS),
     });
+    if (!record) return { answer: 'Восстановление уже ожидает подтверждения или проверки результата.' };
     return {
-      answer: `Подключить четыре сервера к профилю «${sub.label}»? После подтверждения бот выпустит доступы и пришлёт новую ссылку для Happ.`,
+      answer: missing ? `Восстановить отсутствующие подключения (${missing.length}) профиля «${sub.label}»? Будут выпущены новые ключи только вместо отсутствующих. Ссылка подписки сохранится.`
+        : `Подключить четыре сервера к профилю «${sub.label}»? После подтверждения бот выпустит доступы и пришлёт новую ссылку для Happ.`,
       buttons: [[{ text: '✅ Подтвердить', data: `vpn:confirm:${record.id}` }, { text: '✖️ Отмена', data: `vpn:reject:${record.id}` }]],
     };
   }
@@ -1142,6 +1153,16 @@ class VpnCommandService {
     if (!sub || sub.revokedAt || sub.userId !== context.userId) {
       await this.repository.complete({ requestId: record.id, status: 'failed', errorCode: 'SUBSCRIPTION_NOT_FOUND' });
       return { answer: 'Подписка не найдена или отозвана.', buttons: [[{ text: '« К подпискам', data: 'vpn:sub:menu' }]] };
+    }
+    if (record.arguments?.missing) {
+      try {
+        if (context.originChannel !== 'telegram' || context.chatType !== 'private') throw new Error('PRIVATE_CHAT_REQUIRED');
+        await executeMissingRepair(this, record, sub);
+        return { answer: '✅ Подключения восстановлены. Обновите подписку в Happ по прежней ссылке.', buttons: [[{ text: '« К профилю', data: `vpn:sub:view:${sub.id}` }]] };
+      } catch (_) {
+        await this.repository.complete({ requestId: record.id, status: 'unknown', errorCode: 'SUBSCRIPTION_REPAIR_UNKNOWN' });
+        return { answer: 'Восстановление остановлено. Повторный выпуск заблокирован до проверки результата; сохраните прежнюю ссылку.' };
+      }
     }
     if (this.subscriptionService.hasCompleteClientBinding(sub)) {
       await this.repository.complete({ requestId: record.id, status: 'failed', errorCode: 'SUBSCRIPTION_ALREADY_BOUND' });

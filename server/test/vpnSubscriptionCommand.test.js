@@ -204,6 +204,6 @@ test('repair confirmation binds exactly four issued clients and blocks a repeate
   assert.equal(number, 4);
   assert.equal(calls.at(-1).status, 'succeeded');
   const repeat = await service.handleCallback({ ...context, data: `vpn:sub:repair:${subscriptionId}` });
-  assert.match(repeat.answer, /уже подключены/);
+  assert.match(repeat.answer, /личном Telegram/);
   assert.equal(number, 4);
 });
