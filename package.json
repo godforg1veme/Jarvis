@@ -1,22 +1,23 @@
 {
   "name": "jarvis",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Cloud-first Windows client for the Jarvis personal assistant",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "start:legacy": "start.bat",
     "test:cloud": "node --test cloud/*.test.js voice/cloudVoiceService.test.js tts/windowsSapiService.test.js",
-    "dist:win": "node scripts/checkCloudPackageAssets.js && node scripts/prepareWakeWordRuntime.js && node scripts/prepareReleaseIcon.js && electron-builder --win nsis"
+    "dist:win": "node scripts/checkCloudPackageAssets.js && node scripts/prepareWakeWordRuntime.js && node scripts/prepareReleaseIcon.js && electron-builder --win nsis",
+    "setup": "node scripts/installDependencies.js"
   },
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^42.4.0",
+    "electron": "^42.11.9",
     "electron-builder": "^26.0.12"
   },
   "dependencies": {
-    "undici": "^7.29.0",
+    "undici": "^7.30.0",
     "vosk": "^0.3.39"
   },
   "build": {
@@ -64,6 +65,10 @@
       "perMachine": true,
       "allowToChangeInstallationDirectory": true,
       "deleteAppDataOnUninstall": false
-    }
+    },
+    "npmRebuild": false
+  },
+  "engines": {
+    "node": ">=22.12.0"
   }
 }

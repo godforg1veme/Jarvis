@@ -209,10 +209,12 @@ See `docs/README.md` for current implementation status and historical records.
   it must never replay an unknown install or rotate a key for recovery. Both
   approximately 15-minute timers were enabled by an originating private-chat
   owner confirmation on 2026-09-24 and completed healthy scheduled runs on DE
-  and NL. A read-only check on 2026-09-25 found the DE timer disabled/inactive
-  and the NL timer enabled/active, contrary to that rollout record. The
-  subscription release did not change either timer; check their live systemd
-  state before relying on scheduled probes. The already
+  and NL. Timer instances name the destination peer, not the host running
+  them. On 2026-09-29, DE had `@nl.timer` enabled/active and NL had `@de.timer`
+  enabled/active; both most recent peer-probe services completed successfully.
+  Each host's self-target timer was disabled/inactive. The 2026-09-25 note
+  interpreted instance names without their host and incorrectly described a
+  rollout mismatch. Inspect both host and peer when checking timer state. The already
   accepted `supervisor_acceptance_noop` never calls Host Agent. Before changing
   this production boundary, verify the running playbook flags and owner
   acceptance record; readiness alone does not prove a real repair.
@@ -515,7 +517,17 @@ with its validation tests.
 
 Windows client:
 
+Use Node.js 22.12+ (verified on 24.14.1). For a fresh dependency installation,
+use `npm run setup`: it performs locked `npm ci`, handles the Windows ffi-napi
+installer probe, and separately verifies native module loading and Electron.
+Do not replace this with globally disabled dependency scripts or copied native
+binaries. Both the installed client and its wake-word Node runtime must be
+checked when updating Electron or native dependencies. Electron Builder must keep
+`npmRebuild: false`: Vosk runs in the bundled Node process, so rebuilding its
+native modules for Electron targets the wrong runtime.
+
 ```powershell
+npm run setup
 npm start
 node scripts/ensureTts.js
 node scripts/ensureStt.js

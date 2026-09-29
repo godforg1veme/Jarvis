@@ -14,6 +14,15 @@ assert.deepEqual(classifyVisualIntent('Посмотри в камеру'), { vis
 assert.deepEqual(classifyVisualIntent('Посмотри на оба монитора'), { visual: true, target: 'screen', kind: 'short' });
 assert.deepEqual(classifyVisualIntent('Следи за камерой и экраном'), { visual: true, target: 'all', kind: 'active' });
 assert.deepEqual(classifyVisualIntent('Я купил новую камеру'), { visual: false });
+for (const text of ['покажи config.json в документах', 'покажи файл camera.jpg', 'покажи папку отчеты на рабочем столе']) {
+  assert.deepEqual(classifyVisualIntent(text), { visual: false }, text);
+  assert.equal(parseIntent(text).action, 'reveal_file', text);
+}
+for (const text of ['покажи экран', 'покажи мне камеру', 'покажи оба монитора', 'покажи это']) {
+  assert.equal(classifyVisualIntent(text).visual, true, text);
+  assert.equal(parseIntent(text).action, 'visual_analyze', text);
+}
+
 
 async function main() {
   assert.equal(isVisualAnalyzeCommand('посмотри сюда'), true);

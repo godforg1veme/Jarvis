@@ -19,12 +19,14 @@ The documentation index records which behavior has been tested locally, deployed
 
 ## Start the Windows client
 
-Requirements: Windows and Node.js. From the repository root:
+Requirements: Windows x64 and Node.js 22.12 or newer. Node.js 24.14.1 was verified. From the repository root:
 
 ```powershell
-npm ci
+npm run setup
 npm start
 ```
+
+`npm run setup` installs the locked dependencies and verifies the Vosk native modules and Electron executable. On Windows it handles the known ffi-napi installer probe failure without disabling dependency scripts. If downloading Electron fails, the command stops; retry after restoring network access.
 
 To create the Windows x64 installer:
 
