@@ -374,6 +374,12 @@ See `docs/README.md` for current implementation status and historical records.
   Sing-box JSON (or Base64 for legacy clients) demoting probe-degraded nodes via `ExternalProbeMonitor`.
   `GET /happ-sub/:token` provides a 1-click HTML landing bridge to the Happ
   subscription deeplink for that same URL.
+  As of 2026-09-29, a fully bound subscription serves its available endpoints
+  when some bound exports fail; incomplete bindings remain blocked. If no VPN
+  endpoint can be serialized, it returns `SUBSCRIPTION_ENDPOINTS_UNAVAILABLE`
+  rather than an empty or direct-only profile. The existing owner URL passed
+  HTTP 200 with three endpoints after deployment; missing DE Hysteria2 clients
+  and real phone-side Happ import remain separate follow-up acceptance.
   Telegram `/vpn` offers «📲 Подписки (Happ)» with creation, token rotation, and revocation.
   Initial binding of the four client identities is a separate owner-confirmed
   `subscription.repair` action (migration 023); an already bound or uncertain
