@@ -22,3 +22,25 @@ Actual replacements are pending the owner's Telegram taps: VPN → subscriptions
 → profile → restore connections → confirm, for each profile. Codex did not issue
 keys or fabricate a Telegram confirmation. Four-endpoint subscription responses
 and real Happ refresh remain acceptance after those actions.
+
+## Live follow-up: JSONB target comparison and reconciliation
+
+The owner confirmed two repairs in Telegram, but both stopped before their
+mutation checkpoints. PostgreSQL JSONB reordered target object keys; the previous
+JSON.stringify equality incorrectly classified identical targets as changed.
+Release 38b931fa7c9465c523b5a312133c80612d9c01cc compares the exact closed fields
+independently of object-key order. The regression fixture now reproduces JSONB
+reordering; all 608 server tests passed.
+
+Read-only operation.status proved that neither original deterministic child ID
+had a Host Agent claim or result. Both original, already owner-confirmed durable
+actions were resumed under their same identifiers after owner/profile checks and
+a conditional status claim. Both succeeded without another Telegram approval or
+a new mutation identifier. The original supplied subscription URL returned HTTP
+200 with four endpoints in both Base64 and explicit Sing-box formats. Tokens
+were preserved; credential bodies were not printed or saved.
+
+Two profiles now have all four exports. The third still has one missing DE
+Hysteria2 client and awaits its own owner Telegram confirmation. Public smoke,
+server/database/ASR health and active Xray/Hysteria2/Host Agent checks passed.
+Phone-side Happ import/traffic remains manual acceptance.
