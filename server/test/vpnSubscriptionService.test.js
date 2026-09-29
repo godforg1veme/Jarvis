@@ -11,6 +11,62 @@ const {
 const dePool = { nodeCode: 'de', generation: '123e4567-e89b-42d3-a456-426614174000', ports: [20011, 22229, 26549, 30013], hopIntervalSeconds: 30 };
 const nlPool = { nodeCode: 'nl', generation: '223e4567-e89b-42d3-a456-426614174000', ports: [20117, 23483, 27611, 31829], hopIntervalSeconds: 30 };
 
+for (const scenario of [
+  { name: 'missing DE Hysteria client', failed: ['de:hy2'], count: 3 },
+  { name: 'DE node unavailable', failed: ['de:hy2', 'de:vless'], count: 2, throws: true },
+  { name: 'one transport failure', failed: ['nl:vless'], count: 3, throws: true },
+  { name: 'all exports unavailable', failed: ['de:hy2', 'de:vless', 'nl:hy2', 'nl:vless'], count: 0 },
+  { name: 'malformed exports', malformed: true, count: 0 },
+  { name: 'Hysteria without pools and VLESS unavailable', failed: ['de:vless', 'nl:vless'], noPools: true, count: 0 },
+  { name: 'incomplete binding', unbound: true, count: 0 },
+]) {
+  for (const format of [null, 'sing-box']) {
+    test(`resolveSubscription handles ${scenario.name} in ${format || 'Base64'}`, async () => {
+      const calls = [];
+      const record = {
+        id: 'fixture-profile', label: 'Fixture',
+        client_id_de: JSON.stringify({ hy2: 'vpn-aaaaaaaaaaaa', vless: 'vpn-bbbbbbbbbbbb' }),
+        client_id_nl: scenario.unbound ? null : JSON.stringify({ hy2: 'vpn-cccccccccccc', vless: 'vpn-dddddddddddd' }),
+      };
+      const service = new VpnSubscriptionService({
+        repository: { findActiveByTokenHash: async (hash) => {
+          assert.equal(hash, hashToken('sub_fixture_unchanged'));
+          return record;
+        } },
+        clients: Object.fromEntries(['de', 'nl'].map((node) => [node, { request: async (request) => {
+          assert.ok(['vpn.hysteria2.client.export', 'vpn.client.export'].includes(request.operation));
+          const proto = request.operation === 'vpn.client.export' ? 'vless' : 'hy2';
+          assert.equal(request.arguments.clientId, JSON.parse(record['client_id_' + node])[proto]);
+          calls.push(`${node}:${proto}`);
+          if (scenario.failed?.includes(`${node}:${proto}`)) {
+            if (scenario.throws) throw new Error('fixture transport failure');
+            return { result: { state: 'failed', errorCode: 'VPN_CLIENT_NOT_FOUND' } };
+          }
+          const shareUri = scenario.malformed ? 'invalid' : proto === 'hy2'
+            ? `hy2://fixture:password@${node}.example:443?sni=${node}.example`
+            : `vless://fixture@${node}.example:8443?pbk=fixture&sid=abcd`;
+          return { result: { state: 'succeeded', data: { shareUri } } };
+        } }])),
+        portPoolService: { activeForSubscription: async () => scenario.noPools ? {} : { de: dePool, nl: nlPool } },
+      });
+      const response = await service.resolveSubscription('sub_fixture_unchanged', { format });
+      assert.equal(response.status, scenario.count ? 200 : 503);
+      if (!scenario.count) {
+        assert.deepEqual(JSON.parse(response.body), { error: scenario.unbound
+          ? 'SUBSCRIPTION_CLIENT_BINDING_REQUIRED' : 'SUBSCRIPTION_ENDPOINTS_UNAVAILABLE' });
+      } else if (format) {
+        const profile = JSON.parse(response.body);
+        assert.equal(profile.outbounds.filter((o) => ['hysteria2', 'vless'].includes(o.type)).length, scenario.count);
+        assert.equal(profile.outbounds[0].outbounds.length, scenario.count);
+      } else {
+        assert.equal(Buffer.from(response.body, 'base64').toString('utf8').split('\n').length, scenario.count);
+        assert.equal(response.headers['profile-update-interval'], '1');
+      }
+      assert.equal(calls.length, scenario.unbound ? 0 : 4);
+    });
+  }
+}
+
 test('generateToken produces sub_ prefixed 68 char token and valid sha256 hash', () => {
   const { token, tokenHash } = generateToken();
   assert.equal(typeof token, 'string');

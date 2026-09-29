@@ -799,11 +799,17 @@ class VpnSubscriptionService {
       await this.repository.touchLastAccessed(subscription.id).catch(() => {});
     }
 
-    // Fetch node credentials
-    const nodes = await this._exportNodeCredentials(subscription);
-    if (!hasCompleteClientBinding(subscription) || !nodes.deHy2 || !nodes.deVless || !nodes.nlHy2 || !nodes.nlVless) {
+    if (!hasCompleteClientBinding(subscription)) {
       return { status: 503, contentType: 'application/json; charset=utf-8', body: JSON.stringify({ error: 'SUBSCRIPTION_CLIENT_BINDING_REQUIRED' }) };
     }
+
+    // Export only this profile's bound clients; partial failures omit endpoints.
+    const nodes = await this._exportNodeCredentials(subscription);
+    const unavailable = () => ({
+      status: 503,
+      contentType: 'application/json; charset=utf-8',
+      body: JSON.stringify({ error: 'SUBSCRIPTION_ENDPOINTS_UNAVAILABLE' }),
+    });
 
     // Fetch probe snapshots if monitor available
     const [probeSnapshots, portPools] = await Promise.all([
@@ -813,6 +819,7 @@ class VpnSubscriptionService {
 
     if (String(format || '').toLowerCase() === 'sing-box') {
       const profile = this.buildSingboxProfile({ nodes, probeSnapshots, portPools });
+      if (!profile.outbounds.some((outbound) => outbound.type === 'vless' || outbound.type === 'hysteria2')) return unavailable();
       return {
         status: 200,
         contentType: 'application/json; charset=utf-8',
@@ -821,6 +828,7 @@ class VpnSubscriptionService {
     }
 
     const base64 = this.buildBase64Profile({ nodes, probeSnapshots, portPools });
+    if (!base64) return unavailable();
     return {
       status: 200,
       contentType: 'text/plain; charset=utf-8',
