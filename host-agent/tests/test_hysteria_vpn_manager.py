@@ -67,7 +67,8 @@ class HysteriaVpnManagerTests(unittest.TestCase):
                 return {"state": "succeeded", "data": {"output": "UNCONN 0 0 203.0.113.11:443 0.0.0.0:*\n"}}
             return {"state": "succeeded", "data": {"output": "configuration OK\n"}}
 
-        self.manager = HysteriaVpnManager(run, self.state_path, self.config_path, "/hysteria", "hysteria-server.service")
+        self.manager = HysteriaVpnManager(run, self.state_path, self.config_path, "/hysteria", "hysteria-server.service",
+                                         acme_dns_path=self.state_path.parent / "hysteria2-acme-dns.json")
 
     def tearDown(self):
         self.temp.cleanup()
