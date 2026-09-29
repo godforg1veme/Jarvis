@@ -1,7 +1,7 @@
 # Remaining maintenance fixes
 
 Date: 2026-09-29
-Status: authorized by the owner; implementation in progress.
+Status: implemented and checked; see the dated maintenance result record.
 
 The owner approved fixing the remaining file-command, Windows installation and Operations UI dependency issues. Work stays on a temporary branch until checks pass.
 

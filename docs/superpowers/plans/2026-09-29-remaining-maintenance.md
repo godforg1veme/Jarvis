@@ -17,6 +17,6 @@ No new production dependency, no secrets in output, no source reset/clean on pro
 - [x] Update Operations UI Vitest to 4.1.11 and update audited root dependencies within existing ranges; inspect lockfile diffs. Run Operations UI tests/build and both audits.
 - [x] Run focused Telegram subscription handler/migration tests and adjacent Desktop tests. Inspect any failure rather than hiding it.
 - [x] Write the dated result record and update current instructions for installation and host-to-peer timer directions.
-- [ ] Commit reviewed changes, fast-forward main and publish. Synchronize both VPS source checkouts without restarting unchanged server code, remove task worktree/branch, and run the source guard everywhere.
+- [x] Commit reviewed changes, fast-forward main and publish. Both VPS source checkouts passed the source guard at 61007a4; no server restart was needed. Native worktree archival and final branch cleanup follow this record.
 
 - [x] Owner approved Desktop update; build and install 1.0.2, verify packaged/installed Vosk, installed source and application startup.

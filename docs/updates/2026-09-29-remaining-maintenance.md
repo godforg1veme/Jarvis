@@ -34,3 +34,7 @@ Read-only cached probe results on 2026-09-29 showed:
 Automated Telegram handler coverage passed. This run did not complete real owner create/bind/rename taps in Telegram or phone-side Happ refresh and label acceptance. It also did not test microphone capture interactively after installation. These remain manual acceptance checks; a test suite or visible application window is not proof of those client flows.
 
 Server production code did not change. The existing immutable server release remains in use; this maintenance updates source material and the Windows application without an unnecessary server restart.
+
+## Source publication
+
+Implementation commit 61007a4daac98a79185c6235010a71d95eed78ac was published to GitHub main. Windows and both VPS source checkouts were fast-forwarded to it; both remote source guards passed. Canonical Windows root and Operations UI dependencies were freshly installed from their updated lockfiles. The temporary branch and managed worktree are removed after recording these results.
