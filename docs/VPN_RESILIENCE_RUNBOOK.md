@@ -19,6 +19,16 @@ rollout notes below describe earlier states and must not be treated as current.
 
 ## Monitoring, notifications, and repair scope
 
+Maintenance acceptance (2026-09-29): DE hopping DNAT was absent while UDP 443
+and local service checks passed. After owner authorization, the existing DNAT
+was restored and persisted on both hosts in `/etc/ufw/before.rules`. The setup
+script validates syntax and atomically saves UFW configuration; it no longer
+silently skips persistence when netfilter-persistent is absent. Do not reload
+UFW, reboot or flush Docker NAT merely to check this rule. Fresh cross-node
+tests at 20:51:55 and 20:52:27 UTC passed all four checks. No VPN service was
+restarted or credential/pool/token rotated. Future boot-time persistence remains
+to be observed. See [rollout](updates/2026-09-29-hysteria-hopping-persistence.md).
+
 Two cross-node systemd timers run at an approximately 15-minute cadence: the
 NL runner probes DE and the DE runner probes NL. The four credential bindings
 are NL→DE VLESS, NL→DE Hysteria2, DE→NL VLESS, and DE→NL Hysteria2. Each

@@ -369,6 +369,14 @@ See `docs/README.md` for current implementation status and historical records.
   Both DE and NL nodes run UDP port hopping across `20000:50000` via iptables NAT PREROUTING
   DNAT to port 443 (`deploy/vpn/setup-port-hopping.sh`), mitigating observed
   UDP 443 blocking without guaranteeing reachability on every client network.
+  On 2026-09-29 DE's live hopping DNAT was found missing after its reboot;
+  the precise loss event is unverified. Neither node had netfilter-persistent.
+  Owner-authorized maintenance restored DE's rule and persisted both nodes'
+  rules in UFW before.rules through a validated atomic helper. Both directions
+  passed fresh fixed-443/hopping and VLESS 443/8443 probes afterwards. VPN
+  services and containers were not restarted; keys, pools and URLs were preserved.
+  Persistence syntax and configuration are verified; a future reboot remains
+  operational acceptance rather than an already observed event.
   PostgreSQL migration `022_vpn_subscriptions.sql` stores only SHA-256 token hashes
   (`token_hash`) for strict zero raw secret persistence. `GET /sub/:token` dynamically generates
   Sing-box JSON (or Base64 for legacy clients) demoting probe-degraded nodes via `ExternalProbeMonitor`.

@@ -4,14 +4,16 @@ This file is the status authority for project documentation. Specifications and
 plans under `docs/superpowers/` are preserved as decision history; their old
 future-tense wording does not override the current architecture in `AGENTS.md`.
 
-Status snapshot: 2026-09-25.
+Status snapshot: 2026-09-29.
 
 Current VPN acceptance: all four owner-confirmed cross-node test bindings have
-fresh healthy proofs from 2026-09-24. A live check on 2026-09-25 found the DE
-probe timer disabled/inactive and the NL timer enabled/active, which differs
-from the 2026-09-24 rollout record. The subscription release did not change
-either timer or any VPN credential. Recheck this timer discrepancy before
-relying on scheduled probes. The recorded 2026-09-24 DE and NL runs reported
+fresh healthy proofs from 2026-09-24. The old 2026-09-25 timer discrepancy
+was a host/peer interpretation error: DE runs `@nl.timer` and NL runs
+`@de.timer`; both were enabled/active on 2026-09-29. Owner-authorized hopping
+maintenance restored missing DE DNAT and persisted both nodes' rules in UFW.
+Fresh probes on 2026-09-29 passed both directions; keys and URLs were preserved.
+See [hopping maintenance](updates/2026-09-29-hysteria-hopping-persistence.md).
+The recorded 2026-09-24 DE and NL runs reported
 healthy VLESS 443/8443 and Hysteria2 fixed-443/hopping checks. NL now has DNS-only
 `vpn-nl.rilora.ru -> 94.183.208.56`, a Let's Encrypt certificate for that
 name expiring 2026-12-23, and root-only Cloudflare DNS-01 settings that keep
