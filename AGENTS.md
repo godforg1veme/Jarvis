@@ -366,6 +366,13 @@ See `docs/README.md` for current implementation status and historical records.
   `url-test` failover, while the default Happ-compatible Base64 response is a list
   of four URIs and does not itself guarantee automatic failover:
   (1) 🇩🇪 DE Hysteria 2, (2) 🇳🇱 NL Hysteria 2, (3) 🇩🇪 DE VLESS 8443, and (4) 🇳🇱 NL VLESS 8443.
+  On 2026-10-08, all four active subscriptions exported four endpoints. The
+  scheduled cache accepts validated peer results for 20 minutes to cover the
+  15-minute timer plus jitter; owner-confirmed one-shot proofs retain a
+  five-minute limit. Only positively healthy routes receive preferred ordering;
+  unknown routes remain fallbacks and do not authorize credential replacement
+  or repair. See `docs/updates/2026-10-08-vpn-probe-resilience.md` for live
+  checks, deployed revision and remaining Hysteria hopping uncertainty.
   Both DE and NL nodes run UDP port hopping across `20000:50000` via iptables NAT PREROUTING
   DNAT to port 443 (`deploy/vpn/setup-port-hopping.sh`), mitigating observed
   UDP 443 blocking without guaranteeing reachability on every client network.

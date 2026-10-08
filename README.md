@@ -15,6 +15,8 @@ Telegram is Jarvis's first cloud client. The project also includes a Windows app
 - Allowlisted Telegram voice notes can be transcribed by the private GigaAM service on DE-4. The service processes `voice` notes under size, duration, and rate limits. Real owner Telegram voice was accepted; paired Desktop voice still needs a client check.
 - VPN management supports Happ subscriptions across the DE and NL nodes, with VLESS and Hysteria2 options. The Supervisor can propose a limited service restart after diagnosis; execution requires a fresh owner confirmation. Current verification and remaining client checks are listed in [`docs/README.md`](docs/README.md).
 
+VPN subscriptions prefer positively healthy routes and retain unverified routes as fallbacks. Scheduled proof freshness covers the 15-minute probe interval; owner-confirmed one-shot proofs retain stricter freshness. See the [2026-10-08 verification record](docs/updates/2026-10-08-vpn-probe-resilience.md) for current route uncertainty.
+
 The documentation index records which behavior has been tested locally, deployed, or still needs a real client check. PWA support and live integrations for the Life OS external providers remain planned.
 
 ## Start the Windows client

@@ -212,6 +212,13 @@ originating Telegram/Desktop client.
 
 ## Happ VPN
 
+The 2026-10-08 release aligns scheduled proof freshness with the 15-minute
+peer timers: cached snapshots expire after 20 minutes, while owner-confirmed
+one-shot installation/recheck proofs still expire after five minutes. Unknown
+routes remain subscription fallbacks behind positively healthy routes and never
+authorize key replacement. Current deployment and live route evidence are in
+[`the verification record`](../docs/updates/2026-10-08-vpn-probe-resilience.md).
+
 The current host runs a dedicated hardened `xray.service` with VLESS + REALITY
 + XTLS Vision on TCP 443 and a managed 8443 fallback for unstable client
 routes. Happ exports prefer 8443 and retain 443 as a rollback listener. Its
