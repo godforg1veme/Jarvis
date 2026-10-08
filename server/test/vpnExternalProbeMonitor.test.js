@@ -43,3 +43,16 @@ test('DE is observed only from NL runner, NL only from DE runner; errors fail cl
   assert.equal((await broken.snapshot('de')).checks.vless_tcp_443.status, 'unknown');
   assert.equal((await broken.snapshot('nl')).checks.vless_tcp_443.status, 'unknown');
 });
+
+test('scheduled snapshots span the timer interval without relaxing fresh action proofs', async () => {
+  const snapshot = result('de', new Date(NOW.getTime() - 16 * 60000).toISOString());
+  const monitor = new ExternalProbeMonitor({ clients: { nl: { async request() {
+    return { result: { state: 'succeeded', data: snapshot } };
+  } } }, now: () => NOW });
+  assert.equal((await monitor.snapshot('de')).checks.vless_tcp_8443.status, 'healthy');
+  assert.equal(validateExternalProbe(snapshot, 'de', NOW).checks.vless_tcp_8443.status, 'unknown');
+  snapshot.sampledAt = new Date(NOW.getTime() - 20 * 60000 - 1).toISOString();
+  assert.equal((await monitor.snapshot('de')).checks.vless_tcp_8443.status, 'unknown');
+  snapshot.sampledAt = new Date(NOW.getTime() + 30001).toISOString();
+  assert.equal((await monitor.snapshot('de')).checks.vless_tcp_8443.status, 'unknown');
+});

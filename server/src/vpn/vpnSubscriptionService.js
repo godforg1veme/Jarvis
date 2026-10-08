@@ -176,8 +176,7 @@ class VpnSubscriptionService {
   }
 
   _isProbeHealthy(snapshot, checkName) {
-    if (!snapshot || !snapshot.checks || !snapshot.checks[checkName]) return true; // optimistic if not probed
-    return snapshot.checks[checkName].status !== 'failed';
+    return snapshot?.checks?.[checkName]?.status === 'healthy';
   }
 
   buildSingboxProfile({ nodes = {}, probeSnapshots = {}, portPools = {} } = {}) {
@@ -376,18 +375,19 @@ class VpnSubscriptionService {
       lines.push(formatVless(nodes.nlVless, '🇳🇱 Нидерланды (VLESS 8443)'));
     }
 
-    // Add remaining if they were degraded
+    // Retain unverified routes as fallbacks without claiming a known failure.
+    const suffix = (snapshot, checkName) => snapshot?.checks?.[checkName]?.status === 'failed' ? ' - Degraded' : '';
     if (nodes.deHy2 && dePool && !this._isProbeHealthy(deProbe, 'hysteria2_udp_hop')) {
-      lines.push(formatHy2(nodes.deHy2, '🇩🇪 Германия (Hysteria 2 - Degraded)', dePool));
+      lines.push(formatHy2(nodes.deHy2, `🇩🇪 Германия (Hysteria 2${suffix(deProbe, 'hysteria2_udp_hop')})`, dePool));
     }
     if (nodes.nlHy2 && nlPool && !this._isProbeHealthy(nlProbe, 'hysteria2_udp_hop')) {
-      lines.push(formatHy2(nodes.nlHy2, '🇳🇱 Нидерланды (Hysteria 2 - Degraded)', nlPool));
+      lines.push(formatHy2(nodes.nlHy2, `🇳🇱 Нидерланды (Hysteria 2${suffix(nlProbe, 'hysteria2_udp_hop')})`, nlPool));
     }
     if (nodes.deVless && !this._isProbeHealthy(deProbe, 'vless_tcp_8443')) {
-      lines.push(formatVless(nodes.deVless, '🇩🇪 Германия (VLESS 8443 - Degraded)'));
+      lines.push(formatVless(nodes.deVless, `🇩🇪 Германия (VLESS 8443${suffix(deProbe, 'vless_tcp_8443')})`));
     }
     if (nodes.nlVless && !this._isProbeHealthy(nlProbe, 'vless_tcp_8443')) {
-      lines.push(formatVless(nodes.nlVless, '🇳🇱 Нидерланды (VLESS 8443 - Degraded)'));
+      lines.push(formatVless(nodes.nlVless, `🇳🇱 Нидерланды (VLESS 8443${suffix(nlProbe, 'vless_tcp_8443')})`));
     }
 
     const validLines = lines.filter(Boolean);

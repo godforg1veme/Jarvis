@@ -15,11 +15,15 @@ function unknown(targetNode) {
   return { targetNode, sampledAt: null, checks: Object.fromEntries(CHECKS.map((name) => [name, { status: 'unknown', failureCode: 'RUNNER_UNAVAILABLE' }])) };
 }
 
-function validate(value, targetNode, now = new Date()) {
+// Scheduled probes repeat every 15 minutes, with jitter and bounded execution.
+// Direct owner-confirmed probe proofs retain the stricter five-minute default.
+const SCHEDULED_MAX_AGE_MS = 20 * 60 * 1000;
+
+function validate(value, targetNode, now = new Date(), maxAgeMs = 300000) {
   const parsed = schema.safeParse(value);
   if (!parsed.success || parsed.data.targetNode !== targetNode) return unknown(targetNode);
   const age = now.getTime() - Date.parse(parsed.data.sampledAt);
-  if (!Number.isFinite(age) || age > 300000 || age < -30000) return unknown(targetNode);
+  if (!Number.isFinite(age) || age > maxAgeMs || age < -30000) return unknown(targetNode);
   for (const item of Object.values(parsed.data.checks)) {
     if ((item.status === 'healthy') !== (item.failureCode === null)) return unknown(targetNode);
   }
@@ -41,7 +45,7 @@ class ExternalProbeMonitor {
       const response = await client.request({ version: 1, requestId: crypto.randomUUID(),
         operation: 'vpn.external_probe.snapshot', arguments: { targetNode }, sentAt: this.now().toISOString() });
       if (response?.result?.state !== 'succeeded') return unknown(targetNode);
-      return validate(response.result.data, targetNode, this.now());
+      return validate(response.result.data, targetNode, this.now(), SCHEDULED_MAX_AGE_MS);
     } catch (_) {
       return unknown(targetNode);
     }

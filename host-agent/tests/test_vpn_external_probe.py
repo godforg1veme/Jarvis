@@ -93,6 +93,24 @@ class ExternalProbeContractTests(unittest.TestCase):
             with self.assertRaises(ProbeConfigError):
                 validate_probe_result(bad, "nl", now)
 
+    def test_scheduled_cache_spans_timer_interval_but_direct_proofs_stay_fresh(self):
+        now = datetime(2026, 9, 16, 12, 0, tzinfo=timezone.utc)
+        result = {"version": 1, "targetNode": "de", "sampledAt": "2026-09-16T11:44:00Z", "checks": {
+            name: {"status": "healthy", "failureCode": None}
+            for name in ("vless_tcp_443", "vless_tcp_8443", "hysteria2_udp_443", "hysteria2_udp_hop")
+        }}
+        with self.assertRaises(ProbeConfigError):
+            validate_probe_result(result, "de", now)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "de.json"
+            path.write_text(json.dumps(result), encoding="utf-8")
+            self.assertEqual(read_probe_result("de", root=root, now=now)["checks"]["vless_tcp_8443"]["status"], "healthy")
+            for timestamp in ("2026-09-16T11:39:59Z", "2026-09-16T12:00:31Z"):
+                result["sampledAt"] = timestamp
+                path.write_text(json.dumps(result), encoding="utf-8")
+                self.assertEqual(read_probe_result("de", root=root, now=now)["checks"]["vless_tcp_8443"]["status"], "unknown")
+
     def test_read_only_result_reader_returns_unknown_for_missing_or_hostile_file(self):
         now = datetime(2026, 9, 16, 12, 0, tzinfo=timezone.utc)
         with tempfile.TemporaryDirectory() as directory:

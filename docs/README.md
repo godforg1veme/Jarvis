@@ -4,7 +4,14 @@ This file is the status authority for project documentation. Specifications and
 plans under `docs/superpowers/` are preserved as decision history; their old
 future-tense wording does not override the current architecture in `AGENTS.md`.
 
-Status snapshot: 2026-09-29.
+Status snapshot: 2026-10-08.
+
+Live VPN inspection on 2026-10-08 found four fully bound active subscriptions,
+each exporting four endpoints. Both nodes' VPN services, peer timers and live/
+persistent hopping DNAT are present. VLESS passed both directions; Hysteria2
+fixed-443 passed separate strict client checks, while hopping acceptance remains
+mixed. Scheduled proof freshness and subscription ordering corrections are
+recorded in [the current update](updates/2026-10-08-vpn-probe-resilience.md).
 
 Current VPN acceptance: all four owner-confirmed cross-node test bindings have
 fresh healthy proofs from 2026-09-24. The old 2026-09-25 timer discrepancy

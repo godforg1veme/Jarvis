@@ -119,7 +119,7 @@ def build_hysteria_client_config(parsed: dict, local_port: int) -> dict:
             "socks5": {"listen": f"127.0.0.1:{port}", "disableUDP": True}}
 
 
-def validate_probe_result(value: object, expected_target: str, now: datetime) -> dict:
+def validate_probe_result(value: object, expected_target: str, now: datetime, *, max_age_seconds: int = 300) -> dict:
     if expected_target not in {"de", "nl"} or not isinstance(value, dict):
         raise ProbeConfigError()
     try:
@@ -134,7 +134,7 @@ def validate_probe_result(value: object, expected_target: str, now: datetime) ->
         sampled = datetime.fromisoformat(value["sampledAt"].replace("Z", "+00:00"))
     except (ValueError, AttributeError, TypeError):
         raise ProbeConfigError() from None
-    if sampled.tzinfo is None or sampled < now - timedelta(minutes=5) or sampled > now + timedelta(seconds=30):
+    if sampled.tzinfo is None or sampled < now - timedelta(seconds=max_age_seconds) or sampled > now + timedelta(seconds=30):
         raise ProbeConfigError()
     checks = value["checks"]
     if not isinstance(checks, dict) or set(checks) != CHECK_NAMES:
@@ -167,7 +167,9 @@ def read_probe_result(target: str, *, root: Path = Path("/var/lib/jarvis-vpn-pro
             raw = handle.read(4097)
             if len(raw) > 4096:
                 raise ProbeConfigError()
-        return validate_probe_result(json.loads(raw), target, moment)
+        # The timer repeats every 15 minutes; allow jitter and bounded execution.
+        # Fresh run/installation proofs still use the five-minute default.
+        return validate_probe_result(json.loads(raw), target, moment, max_age_seconds=1200)
     except (OSError, ValueError, UnicodeError, TypeError):
         checks = {name: {"status": "unknown", "failureCode": "RUNNER_UNAVAILABLE"}
                   for name in sorted(CHECK_NAMES)}

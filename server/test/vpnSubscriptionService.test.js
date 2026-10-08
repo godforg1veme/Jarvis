@@ -175,6 +175,35 @@ test('buildSingboxProfile demotes node when probe snapshot indicates failure', (
   ]);
 });
 
+test('unverified routes follow healthy routes but keep all credentials and pools', () => {
+  const service = new VpnSubscriptionService();
+  const nodes = {
+    deHy2: 'hy2://u1:p1@vpn-de.rilora.ru:443?obfs=salamander&obfs-password=k1',
+    nlHy2: 'hy2://u2:p2@vpn-nl.rilora.ru:443?obfs=salamander&obfs-password=k2',
+    deVless: 'vless://uuid-de@jarvis.rilora.ru:8443?security=reality&pbk=p&sid=s',
+    nlVless: 'vless://uuid-nl@jarvis-nl.rilora.ru:8443?security=reality&pbk=p&sid=s',
+  };
+  for (const status of ['unknown', undefined]) {
+    const input = { nodes, portPools: { de: dePool, nl: nlPool }, probeSnapshots: {
+      de: { checks: { hysteria2_udp_hop: status ? { status, failureCode: 'CHECK_UNAVAILABLE' } : undefined,
+        vless_tcp_8443: { status: 'healthy', failureCode: null } } },
+      nl: { checks: { hysteria2_udp_hop: { status: 'unknown', failureCode: 'RUNNER_UNAVAILABLE' },
+        vless_tcp_8443: { status: 'healthy', failureCode: null } } },
+    } };
+    const group = service.buildSingboxProfile(input).outbounds[0].outbounds;
+    assert.deepEqual(group, ['🇩🇪 Германия (VLESS 8443)', '🇳🇱 Нидерланды (VLESS 8443)',
+      '🇩🇪 Германия (Hysteria 2)', '🇳🇱 Нидерланды (Hysteria 2)']);
+    const lines = Buffer.from(service.buildBase64Profile(input), 'base64').toString('utf8').split('\n');
+    assert.equal(lines.length, 4);
+    assert.ok(lines[0].startsWith('vless://uuid-de@'));
+    assert.ok(lines[1].startsWith('vless://uuid-nl@'));
+    assert.ok(lines[2].startsWith('hy2://u1:p1@'));
+    assert.ok(lines[3].startsWith('hy2://u2:p2@'));
+    assert.ok(lines[2].includes(dePool.ports.join(',')));
+    assert.equal(decodeURIComponent(lines.join('\n')).includes('Degraded'), false);
+  }
+});
+
 test('buildBase64Profile outputs decodable URI list with port hopping and tags', () => {
   const service = new VpnSubscriptionService();
   const deHy2 = 'hy2://u1:p1@vpn-de.rilora.ru:443?obfs=salamander&obfs-password=k1&sni=vpn-de.rilora.ru';
