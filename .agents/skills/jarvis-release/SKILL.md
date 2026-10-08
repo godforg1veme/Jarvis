@@ -25,8 +25,11 @@ gh pr list --state open --json number,headRefName,baseRefName
 `main` остаётся единственной постоянной общей веткой.
 
 В рамках порученной публикации: проверь diff/тесты/документы, получи свежую
-`origin/main`, объедини проверенную работу, push без force. Затем обнови чистые
-source checkouts обоих VPS через fast-forward и выполни source guard до staging.
+`origin/main`, объедини проверенную работу, push без force. GitHub `main`
+является источником истины для VPS. Сразу после успешного push обнови оба VPS без отдельного
+напоминания или повторного разрешения: синхронизируй чистые source checkouts
+через fast-forward, выполни source guard до staging и установи изменившиеся
+VPS-компоненты по руководству. Публикация не завершена до итоговой проверки VPS.
 Сохраняй dirty source; никогда не используй production reset/clean.
 
 Сравни работающие компоненты с опубликованной версией. Обновляй только
