@@ -54,7 +54,12 @@ For VPS setup and operations, see [`deploy/README.md`](deploy/README.md). Never 
 ## Repository layout
 
 Порядок публикации, проверки веток и синхронизации компьютера с VPS описан в
-[руководстве по выпуску](docs/release-workflow.md). Проверка установленного кода:
+[руководстве по выпуску](docs/release-workflow.md).
+
+[Как синхронизация работает сейчас: объяснение и схемы](docs/release-workflow.md#как-синхронизация-работает-сейчас).
+[Описание выпуска от 9 октября 2026 года](docs/updates/2026-10-09-release-workflow.md).
+
+Проверка установленного кода:
 
 ```powershell
 py deploy/scripts/release-status.py --fetch --vps --desktop-app "C:/Program Files/Jarvis Desktop/resources/app" --check
