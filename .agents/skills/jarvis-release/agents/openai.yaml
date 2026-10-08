@@ -1,0 +1,4 @@
+interface:
+  display_name: "Выпуск Jarvis"
+  short_description: "Сверка веток, GitHub, VPS, Desktop и документации"
+  default_prompt: "Используй $jarvis-release для проверки веток и выпуска согласованных изменений Jarvis."

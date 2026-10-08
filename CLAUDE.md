@@ -1,13 +1,6 @@
 # Claude Code
 
-[`AGENTS.md`](AGENTS.md) is the sole authoritative instruction set for coding
-agents in this repository. Read it before inspecting or changing code. It
-covers the architecture, safety boundaries, generated files, and verification
-commands.
-
-After changes to the Windows client or its packaged resources, follow the
-`Desktop EXE Update Reminder` in `AGENTS.md`.
-
-Use [`README.md`](README.md) for the product overview and [`docs/README.md`](docs/README.md)
-for current implementation status and historical project records. Do not keep a
-separate status snapshot here.
+Прочитай корневой [AGENTS.md](AGENTS.md) перед работой. Это общий источник
+правил всех агентов. По Git, VPS, Desktop и MD используй
+[release-workflow](docs/release-workflow.md); текущий статус находится в
+[docs/README.md](docs/README.md). Отдельные правила и статус здесь не дублируются.

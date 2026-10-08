@@ -25,6 +25,13 @@ as the variable-name reference.
 
 ## Canonical source and VPS checkouts
 
+Общий порядок GitHub, веток, VPS и Desktop находится в
+[руководстве по выпуску](../docs/release-workflow.md). До staging обнови чистый
+source через fast-forward, затем выполни source guard. Из Windows всю цепочку
+можно проверить командой `py deploy/scripts/release-status.py --fetch --vps`;
+`--check` возвращает ненулевой результат при незавершённой синхронизации.
+Одна копия source и установленный runtime проверяются отдельно.
+
 Use `https://github.com/godforg1veme/Jarvis.git` as the project remote and
 `main` as the shared source branch. The Windows checkout is `F:\test\jarvis`.
 Both VPSs keep source at `/home/deploy/apps/jarvis`: `jarvis-vps` runs the

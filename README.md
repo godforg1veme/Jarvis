@@ -53,6 +53,17 @@ For VPS setup and operations, see [`deploy/README.md`](deploy/README.md). Never 
 
 ## Repository layout
 
+Порядок публикации, проверки веток и синхронизации компьютера с VPS описан в
+[руководстве по выпуску](docs/release-workflow.md). Проверка установленного кода:
+
+```powershell
+py deploy/scripts/release-status.py --fetch --vps --desktop-app "C:/Program Files/Jarvis Desktop/resources/app" --check
+```
+
+Команда проверяет версии и состояние; установка выполняется отдельно в рамках
+порученного выпуска. [Skill jarvis-release](.agents/skills/jarvis-release/SKILL.md)
+использует тот же порядок.
+
 - `server/` contains the cloud API, Telegram bot, persistence, model routing, and Life OS services.
 - `renderer/`, `main.js`, and `preload.js` make up the Windows Electron client.
 - `agents/`, `actions/`, and `tools/` contain the local execution path and its policies.

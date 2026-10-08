@@ -1,17 +1,7 @@
-# GEMINI.md
+# Gemini
 
-[`AGENTS.md`](AGENTS.md) is the sole authoritative instruction set for coding
-agents in this repository. Read it completely before inspecting or changing
-code. It defines the current architecture, safety boundaries, generated files,
-and verification commands; do not duplicate or override it here.
-
-The `Desktop EXE Update Reminder` in `AGENTS.md` is mandatory after changes that
-affect the Windows client or its packaged resources.
-
-Gemini is an optional provider/advisor, not Jarvis's identity or the sole AI
-architecture. For implemented-versus-roadmap status and historical design
-records, use [`docs/README.md`](docs/README.md).
-
-Do not keep an independent status snapshot here. Current VPN deployment and
-remaining client/certificate acceptance risks are tracked in `AGENTS.md` and
-[`docs/README.md`](docs/README.md).
+Прочитай корневой [AGENTS.md](AGENTS.md) перед работой. Это общий источник
+правил всех агентов. По Git, VPS, Desktop и MD используй
+[release-workflow](docs/release-workflow.md); текущий статус находится в
+[docs/README.md](docs/README.md). Провайдер выбирается настройками и не задаёт
+личность Jarvis. Отдельные правила и статус здесь не дублируются.
