@@ -27,7 +27,10 @@ async function evaluateJobModels({ apiKey, profile, models, cases = JOB_MODEL_EV
         row.languageCheck = candidate.language === 'ru' ? /[а-яё]/iu.test(letter.text) : !/[а-яё]/iu.test(letter.text);
         row.forbiddenClaims = /73\s*%|foundation model|фундаментальн[а-яё ]+модел|published research papers|две научные публикации/iu.test(letter.text);
         row.shortEditCheck = candidate.id !== 'short-edit' || row.wordCount <= 120;
-      } catch { row.failureCode = 'JOB_EVALUATION_FAILED'; }
+      } catch (error) {
+        row.failureCode = ['JOB_MODEL_INVALID_OUTPUT', 'JOB_MODEL_INVALID_FACTS'].includes(error?.code)
+          ? error.code : 'JOB_EVALUATION_FAILED';
+      }
       row.durationMs = Math.round(performance.now() - started); rows.push(row);
       onProgress({ caseId: row.caseId, model: row.model, schemaValid: row.schemaValid, costUsd: row.costUsd });
     }
