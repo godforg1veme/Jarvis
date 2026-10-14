@@ -16,7 +16,12 @@ function publicJobFailure(error) {
     JOB_MODEL_INVALID_FACTS: 'Модель использовала неподтверждённые сведения. Письмо не принято.',
     JOB_REVISION_CONFLICT: 'Данные изменились. Открой актуальную карточку или черновик.',
     JOB_GENERATION_BUSY: 'Этот запрос уже обрабатывается. Второй вызов модели не запущен.',
+    JOB_GENERATION_OUTCOME_UNKNOWN: 'Генерация была прервана, её стоимость ещё уточняется. Этот запрос повторно не запускается. Можно отдельно запросить новый вариант письма.',
     JOB_CONFIRMATION_UNAVAILABLE: 'Подтверждение недоступно, уже использовано или истекло.',
+    JOB_APPLICANT_API_UNAVAILABLE: 'Доступный канал отправки HH пока не подтверждён. Одного ключа поиска недостаточно. Письмо не отправлено.',
+    JOB_HH_NOT_CONNECTED: 'Нужно подключение HH с правом отправки и выбранное основное резюме.',
+    JOB_HH_RESUME_UNAVAILABLE: 'Основное резюме недоступно. Другое резюме автоматически не выбрано.',
+    JOB_HH_NOT_FOUND: 'Вакансия недоступна или архивирована. Отклик не отправлен.',
     JOB_NOT_FOUND: 'Эта вакансия или письмо недоступны.', JOB_SENSITIVE_INPUT: 'Не присылай ключи и пароли в профиль.' };
   return response(messages[error?.code] || 'Не удалось завершить действие. Открой актуальный раздел и попробуй снова.', [[button('В поиск работы', 'menu')]]);
 }
@@ -28,6 +33,9 @@ class JobTelegramService {
     try { const scope = jobScope(context); await assertJobScope(this.pool, scope);
       if (!['approve', 'confirm'].includes(parsed.action)) await this.pool.query(`UPDATE job_confirmations SET status='cancelled'
         WHERE user_id=$1 AND conversation_id=$2 AND chat_id=$3 AND status='pending' AND kind IN ('settings','profile')`,
+      [scope.userId, scope.conversationId, scope.chatId]);
+      if (['menu', 'back', 'draft', 'cancel', 'regenerate', 'edit', 'translate'].includes(parsed.action)) await this.pool.query(`UPDATE job_confirmations SET status='cancelled'
+        WHERE user_id=$1 AND conversation_id=$2 AND chat_id=$3 AND kind='apply' AND status='pending'`,
       [scope.userId, scope.conversationId, scope.chatId]);
       return await this.handle({ scope, context, ...parsed });
     } catch (error) { return publicJobFailure(error); }
@@ -70,7 +78,10 @@ class JobTelegramService {
       if (!vacancy) throw jobError('JOB_NOT_FOUND');
       if (action === 'view') return cardView(vacancy);
       const current = await this.draftRepository.current({ userId: scope.userId, vacancyId: targetId });
-      return draftView(current || await this.draftService.generate({ scope, vacancyId: targetId, requestId: context.requestId }));
+      const profile = await this.profileRepository.get({ userId: scope.userId });
+      const reusable = current && current.vacancy_revision === vacancy.revision && current.profile_revision === profile?.revision;
+      return draftView(reusable ? current : await this.draftService.generate({ scope, vacancyId: targetId,
+        parentDraftId: current?.id || null, requestId: context.requestId }));
     }
     if (action === 'regenerate' || action === 'edit' || action === 'translate' || action === 'draft' || action === 'send' || action === 'cancel') {
       const draft = await this.draftRepository.get({ userId: scope.userId, draftId: targetId });
@@ -146,7 +157,7 @@ ${profile.profile.facts.map((x) => x.text).join('\n')}
       if (interaction.kind === 'job_settings_edit' || interaction.kind === 'job_profile_edit') {
         const kind = interaction.kind === 'job_settings_edit' ? 'settings' : 'profile';
         const confirmation = await this.settingsService.preview({ scope, kind, targetId, revision, value: parsed });
-        const summary = kind === 'profile' ? parsed.facts.map((x) => x.text).join('\n') + `\nПримеров писем: ${parsed.examples.length}`
+        const summary = kind === 'profile' ? `Факты:\n${parsed.facts.map((x) => x.text).join('\n') || 'пока нет'}\n\nПримеры стиля:\n${parsed.examples.map((x, index) => `${index + 1}. ${x}`).join('\n\n') || 'пока нет'}`
           : `Ориентир: ${parsed.targetRub} ₽; город: ${parsed.officeCity}; удалёнка: ${parsed.remote ? 'да' : 'нет'}.
 Интервал: ${parsed.intervalMs / 60000} мин; история: ${parsed.historyDays} дней.
 Модель: ${parsed.model || this.defaultModel || 'не выбрана'}; уведомление: $${parsed.budgetUsd}.

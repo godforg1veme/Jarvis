@@ -15,6 +15,7 @@ class JobDraftRepository {
     if (typeof text !== 'string' || !text.trim() || text.length > 10000 || !Array.isArray(facts)) throw jobError('JOB_INVALID_DRAFT');
     return jobTransaction(this.pool, async (client) => {
       await assertJobScope(client, scope);
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`job-owner:${scope.userId}`]);
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`job-draft:${scope.userId}:${vacancyId}`]);
       const allowed = await client.query(`SELECT v.id FROM job_vacancies v JOIN job_matches m ON m.vacancy_id=v.id
         JOIN job_profiles p ON p.user_id=m.user_id WHERE v.id=$1 AND m.user_id=$2

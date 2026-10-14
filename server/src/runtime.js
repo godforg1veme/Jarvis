@@ -584,6 +584,7 @@ async function createRuntime(config, overrides = {}) {
       const telegramInteractions = overrides.telegramInteractionRepository || new TelegramInteractionRepository(pool);
       jobRuntime = createJobRuntime({ config, pool, interactions: telegramInteractions,
         fetchImpl: overrides.jobModelFetch,
+        applicationAdapter: overrides.jobApplicationAdapter,
         send: ({ chatId, answer, buttons }) => bot.api.sendMessage(chatId, answer,
           buttons?.length ? { reply_markup: telegramReplyMarkup(buttons) } : {}),
       });
@@ -721,7 +722,7 @@ async function createRuntime(config, overrides = {}) {
     async start() {
       await app.listen({ host: config.host, port: config.port });
       if (operationsRuntime) await operationsRuntime.start();
-      if (jobRuntime) jobRuntime.start();
+      if (jobRuntime) await jobRuntime.start();
       if (knowledgeWorker) knowledgeWorker.start();
       if (visualMemoryWorker) visualMemoryWorker.start();
       if (commandWorker) commandWorker.start();

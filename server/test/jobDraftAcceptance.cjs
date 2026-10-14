@@ -8,6 +8,7 @@ const { JobDraftRepository } = require('../src/jobs/jobDraftRepository');
 const { JobUsageRepository } = require('../src/jobs/jobUsageRepository');
 const { JobModelAdapter } = require('../src/jobs/jobModelAdapter');
 const { JobDraftService } = require('../src/jobs/jobDraftService');
+const { recoverJobGenerations } = require('../src/jobs/jobRecovery');
 
 test('real PostgreSQL: model only on request, duplicate request, revisions, failure retention and budget continues', async () => {
   const f = await createJobPostgresFixture(); let calls = 0, fail = false;
@@ -51,6 +52,14 @@ test('real PostgreSQL: model only on request, duplicate request, revisions, fail
     assert.equal((await f.pool.query('SELECT count(*)::int AS n FROM job_budget_notices')).rows[0].n, 1);
     await assert.rejects(service.generate({ scope: { ...f.scope, userId: f.stranger }, vacancyId: vacancy.id,
       requestId: crypto.randomUUID() }));
+    assert.equal(calls, 4);
+    const interruptedId = crypto.randomUUID();
+    await f.pool.query(`INSERT INTO job_tasks(user_id,request_id,kind,payload,status,created_at)
+      VALUES($1,$2,'generate',$3,'running',now()-interval '4 minutes')`, [f.owner, interruptedId,
+      { vacancyId: vacancy.id, parentDraftId: null, invoked: true }]);
+    assert.equal(await recoverJobGenerations(f.pool), 1);
+    assert.equal(await recoverJobGenerations(f.pool), 0);
+    await assert.rejects(service.generate({ scope: f.scope, vacancyId: vacancy.id, requestId: interruptedId }), { code: 'JOB_GENERATION_OUTCOME_UNKNOWN' });
     assert.equal(calls, 4);
     console.log('PASS generation acceptance: scoped facts, model calls, dedup, versions, failures and soft budget');
   } finally { await f.close(); }

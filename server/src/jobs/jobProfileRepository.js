@@ -16,6 +16,7 @@ class JobProfileRepository {
     profile = profileSchema.parse(profile);
     return jobTransaction(this.pool, async (client) => {
     await assertJobScope(client, scope);
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`job-owner:${scope.userId}`]);
     let result;
     if (expectedRevision === 0) result = await client.query(`INSERT INTO job_profiles(user_id,profile)
       VALUES($1,$2) ON CONFLICT(user_id) DO NOTHING RETURNING *`, [scope.userId, profile]);

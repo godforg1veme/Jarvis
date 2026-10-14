@@ -52,6 +52,7 @@ class JobSettingsService {
   async approve({ scope, confirmationId }) {
     return jobTransaction(this.pool, async (client) => {
       await assertJobScope(client, scope);
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`job-owner:${scope.userId}`]);
       const row = (await client.query(`UPDATE job_confirmations SET status='consumed' WHERE id=$1 AND user_id=$2
         AND conversation_id=$3 AND chat_id=$4 AND channel='telegram' AND kind IN ('settings','profile')
         AND status='pending' AND expires_at>$5 RETURNING *`,

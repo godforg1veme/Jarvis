@@ -8,8 +8,11 @@ const { JobModelAdapter } = require('./jobModelAdapter');
 const { JobSettingsService } = require('./jobSettingsService');
 const { JobTelegramService } = require('./jobTelegramService');
 const { JobDeliveryWorker } = require('./jobDeliveryWorker');
+const { JobApplicationRepository } = require('./jobApplicationRepository');
+const { JobApplicationService } = require('./jobApplicationService');
+const { JobRecoveryWorker } = require('./jobRecovery');
 
-function createJobRuntime({ config, pool, interactions, send, fetchImpl }) {
+function createJobRuntime({ config, pool, interactions, send, fetchImpl, applicationAdapter = null }) {
   if (!config.jobSearchEnabled) return null;
   const defaults = {};
   for (const [key, value] of Object.entries({ model: config.jobSearchModel, budgetUsd: config.jobBudgetUsd,
@@ -22,9 +25,14 @@ function createJobRuntime({ config, pool, interactions, send, fetchImpl }) {
   const draftService = new JobDraftService({ pool, searchRepository, profileRepository, draftRepository, usageRepository,
     modelAdapter: new JobModelAdapter({ config, fetchImpl }), defaultModel: config.jobSearchModel });
   const settingsService = new JobSettingsService({ pool, searchRepository, profileRepository });
+  const applicationRepository = new JobApplicationRepository(pool);
+  const applicationService = new JobApplicationService({ pool, repository: applicationRepository, searchRepository, adapter: applicationAdapter });
   const telegramService = new JobTelegramService({ pool, searchRepository, profileRepository, draftRepository,
-    usageRepository, interactions, draftService, settingsService, defaultModel: config.jobSearchModel });
+    usageRepository, interactions, draftService, settingsService, applicationService, defaultModel: config.jobSearchModel });
   const deliveryWorker = new JobDeliveryWorker({ pool, searchRepository, deliveryRepository, send });
-  return { telegramService, deliveryWorker, start() { deliveryWorker.start(); }, close() { return deliveryWorker.close(); } };
+  const recoveryWorker = new JobRecoveryWorker({ pool, applicationRepository });
+  return { telegramService, deliveryWorker, applicationService, applicationRepository,
+    async start() { await recoveryWorker.start(); deliveryWorker.start(); },
+    async close() { await Promise.all([deliveryWorker.close(), recoveryWorker.close()]); } };
 }
 module.exports = { createJobRuntime };

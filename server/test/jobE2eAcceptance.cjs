@@ -16,10 +16,12 @@ const { UserRepository } = require('../src/users/userRepository');
 const { ConversationRepository } = require('../src/conversations/conversationRepository');
 const { createTelegramAccessPolicy } = require('../src/telegram/accessPolicy');
 
-test('E2E local HTTP + actual grammy bot + handlers + PostgreSQL: configure, collect, deliver, generate, edit, translate and replay', async () => {
+test('E2E local HTTP + actual bot + PG: configure, collect, letter, approval, lost acknowledgement and original-ID reconciliation', async () => {
   const fixture = await createJobPostgresFixture();
   let updateId = 4000, modelCalls = 0, telegramId = 0;
   const sent = [], upstreamCalls = [];
+  const publicationTime = new Date(Date.now() - 60000).toISOString();
+  const applications = new Map(); let submitCalls = 0;
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1'); upstreamCalls.push(url.pathname);
     let body = ''; for await (const chunk of req) body += chunk;
@@ -33,7 +35,15 @@ test('E2E local HTTP + actual grammy bot + handlers + PostgreSQL: configure, col
     if (url.pathname === '/hh/vacancies') return json({ found: 1, pages: 1, items: [{ id: '9001' }] });
     if (url.pathname === '/hh/vacancies/9001') return json({ id: '9001', name: 'Junior AI Engineer',
       employer: { name: 'Fixture company' }, description: 'Build AI tools and API integrations',
-      work_format: [{ id: 'REMOTE' }], published_at: new Date(Date.now() - 60000).toISOString() });
+      work_format: [{ id: 'REMOTE' }], published_at: publicationTime });
+    if (url.pathname === '/connector/inspect') return json({ resumeAvailable: true });
+    if (url.pathname === '/connector/submit') {
+      submitCalls++; const input = JSON.parse(body);
+      applications.set(input.operationId, { outcome: 'sent', verified: true, externalId: 'fixture-application' });
+      // Simulate a committed external mutation whose acknowledgement never reaches Jarvis.
+      return res.destroy();
+    }
+    if (url.pathname === '/connector/reconcile') return json(applications.get(url.searchParams.get('operationId')) || { outcome: 'unknown' });
     if (url.pathname === '/telegram/getMe') return json({ ok: true, result: { id: 5000, is_bot: true, first_name: 'Fixture bot', username: 'fixture_jobs_bot' } });
     if (url.pathname === '/telegram/answerCallbackQuery') return json({ ok: true, result: true });
     if (url.pathname === '/telegram/sendMessage') {
@@ -49,9 +59,18 @@ test('E2E local HTTP + actual grammy bot + handlers + PostgreSQL: configure, col
   try {
     await fixture.pool.query("INSERT INTO user_identities(user_id,provider,external_id) VALUES($1,'telegram','101')", [fixture.owner]);
     const interactions = new TelegramInteractionRepository(fixture.pool);
+    const hh = new HhClient({ baseUrl: `${origin}/hh/`, allowTestHttp: true });
+    const applicationAdapter = { capabilities: { applicantApply: true },
+      async inspect({ externalId }) {
+        const data = await (await fetch(`${origin}/connector/inspect`)).json();
+        return { ...data, vacancy: await hh.getVacancy({ externalId }) };
+      },
+      async submit(input) { return (await fetch(`${origin}/connector/submit`, { method: 'POST',
+        headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) })).json(); },
+      async reconcile({ operationId }) { return (await fetch(`${origin}/connector/reconcile?operationId=${operationId}`)).json(); } };
     jobs = createJobRuntime({ config: { jobSearchEnabled: true, jobSearchModel: 'fixture-model',
       openrouterApiKey: crypto.randomUUID(), modelTimeoutMs: 5000 }, pool: fixture.pool, interactions,
-      fetchImpl: (_url, init) => fetch(`${origin}/model`, init),
+      fetchImpl: (_url, init) => fetch(`${origin}/model`, init), applicationAdapter,
       send: ({ chatId, answer, buttons }) => bot.api.sendMessage(chatId, answer, buttons?.length ? { reply_markup: telegramReplyMarkup(buttons) } : {}) });
     const menu = new TelegramMenuService({ interactions, jobSearchService: jobs.telegramService });
     const messages = new TelegramMessageService({ accessPolicy: createTelegramAccessPolicy(['101']),
@@ -84,7 +103,7 @@ test('E2E local HTTP + actual grammy bot + handlers + PostgreSQL: configure, col
     preview = await message('факт: Participated in a fixture automation project\nпример: Brief factual style.');
     await callback(findButton(preview, 'Подтвердить'));
     collector = createCollectorRuntime({ env: { JARVIS_JOB_SEARCH_ENABLED: 'true' }, pool: fixture.pool,
-      hhClient: new HhClient({ baseUrl: `${origin}/hh/`, allowTestHttp: true }), currencyRates: { async get() { return null; } }, wait: async () => {} });
+      hhClient: hh, currencyRates: { async get() { return null; } }, wait: async () => {} });
     await collector.tick();
     assert.equal(modelCalls, 0, 'collection must not call the model');
     const beforeCard = sent.length;
@@ -104,7 +123,20 @@ test('E2E local HTTP + actual grammy bot + handlers + PostgreSQL: configure, col
     assert.ok(!upstreamCalls.some((path) => /negotiations/.test(path)), 'preparation must never submit an application');
     assert.equal((await fixture.pool.query('SELECT count(*)::int AS n FROM job_drafts')).rows[0].n, 3);
     await jobs.deliveryWorker.tick(); assert.equal(sent.at(-1), translated, 'no duplicate card after worker restart');
-    console.log('PASS E2E through local HTTP fixtures, actual grammy dispatch, real handlers and PostgreSQL; live HH submission is not covered');
+    await fixture.pool.query("INSERT INTO job_connections(user_id,resume_id,status) VALUES($1,'fixture-resume','connected')", [fixture.owner]);
+    const applicationPreview = await callback(findButton(translated, 'Отправить отклик'));
+    assert.match(applicationPreview.reply.text, /Fixture cover letter 3/); assert.equal(submitCalls, 0);
+    const unknown = await callback(findButton(applicationPreview.reply, 'Подтвердить отправку'));
+    assert.match(unknown.reply.text, /пока неизвестен/); assert.equal(submitCalls, 1);
+    const operationBefore = (await fixture.pool.query('SELECT * FROM job_applications')).rows[0];
+    assert.equal(operationBefore.status, 'unknown');
+    assert.equal(operationBefore.approved_text, 'Fixture cover letter 3');
+    const reconciled = await callback(findButton(unknown.reply, 'Проверить результат'));
+    assert.match(reconciled.reply.text, /Источник подтвердил/); assert.equal(submitCalls, 1);
+    const operationAfter = (await fixture.pool.query('SELECT * FROM job_applications')).rows[0];
+    assert.equal(operationAfter.operation_id, operationBefore.operation_id); assert.equal(operationAfter.status, 'sent');
+    assert.equal(modelCalls, 3);
+    console.log('PASS E2E including confirmed submission, dropped acknowledgement and read-only reconciliation through a local test connector; live HH capability is not covered');
   } finally {
     await collector?.close(); await jobs?.close();
     await new Promise((resolve) => server.close(resolve)); await fixture.close();

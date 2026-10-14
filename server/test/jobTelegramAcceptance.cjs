@@ -64,6 +64,8 @@ test('real message/menu handlers + PG: guided retries, consumption, scopes, draf
     await msg('bad profile input');
     assert.equal((await interactions.getActive(f.scope)).interaction.kind, 'job_profile_edit');
     preview = await msg('факт: Private confirmed fixture automation\nпример: Private style example');
+    assert.match(preview.answer, /Private confirmed fixture automation/);
+    assert.match(preview.answer, /Private style example/, 'approval must show the actual style examples');
     await cb(preview.buttons[0][0].data);
     const vacancy = await search.upsertVacancy({ externalId: '555', snapshot: { title: 'AI Engineer', description: 'LLM', publishedAt: '2026-10-15', url: 'https://hh.ru/vacancy/555' } });
     await search.recordMatch({ userId: f.owner, vacancyId: vacancy.id, filterRevision: 1 });

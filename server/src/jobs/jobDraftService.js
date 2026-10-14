@@ -32,6 +32,7 @@ class JobDraftService {
     });
     if (task.payload.vacancyId !== vacancyId || task.payload.parentDraftId !== parentDraftId) throw jobError('JOB_INVALID_REQUEST');
     if (task.status === 'complete') return this.draftRepository.get({ userId: scope.userId, draftId: task.result_id });
+    if (task.status === 'unknown') throw jobError('JOB_GENERATION_OUTCOME_UNKNOWN');
     // An existing running request never starts another billable model call.
     if (task.request_id !== requestId || task.payload.parentDraftId !== parentDraftId) throw jobError('JOB_INVALID_REQUEST');
     const claimed = await this.pool.query(`UPDATE job_tasks SET status='running',payload=payload||'{"invoked":true}'::jsonb
