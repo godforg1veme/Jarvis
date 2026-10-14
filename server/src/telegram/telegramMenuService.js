@@ -40,6 +40,7 @@ class TelegramMenuService {
     this.lifeMissionControlService = options.lifeMissionControlService || null;
     this.lifeOsService = options.lifeOsService || null;
     this.memoryGalleryService = options.memoryGalleryService || null;
+    this.jobSearchService = options.jobSearchService || null;
     this.ownerTelegramId = String(options.ownerTelegramId || '0');
     this.operationsEnabled = options.operationsEnabled === true;
     const configuredOperationsUrl = this.operationsEnabled && options.operationsPublicOrigin
@@ -77,7 +78,8 @@ class TelegramMenuService {
     await this._cancel(context);
     if (action === 'home') {
       const admin = this.owner(context) ? ' Доступны также VPN и Operations.' : '';
-      return { answer: `Jarvis готов. Выбери раздел снизу или напиши вопрос обычным текстом.${admin}`, replyKeyboard: this.keyboard(context) };
+      return { answer: `Jarvis готов. Выбери раздел снизу или напиши вопрос обычным текстом.${admin}`, replyKeyboard: this.keyboard(context),
+        ...(this.jobSearchService && context.user?.role === 'owner' && context.chatType === 'private' ? { jobSearchEntry: true } : {}) };
     }
     if (action === 'help') {
       return {
@@ -171,6 +173,10 @@ class TelegramMenuService {
 
   async handleCallback(data, context) {
     data = String(data || '');
+    if (data.startsWith('job:')) {
+      await this._cancel(context);
+      return this.jobSearchService ? this.jobSearchService.handleCallback(data, context) : { answer: 'Поиск работы сейчас недоступен.' };
+    }
     const flow = /^flow:cancel:([a-f0-9-]{36})$/i.exec(data);
     if (flow) {
       const cancelled = await this._cancel(context, flow[1]);
@@ -292,6 +298,9 @@ class TelegramMenuService {
     const interaction = active.interaction;
     const value = String(text || '').trim();
     if (!value) return { answer: 'Напиши значение обычным текстом.', buttons: interactionCancel(interaction.id) };
+    if (interaction.kind.startsWith('job_')) return this.jobSearchService
+      ? this.jobSearchService.handlePendingText(value, context, interaction)
+      : { answer: 'Поиск работы сейчас недоступен.' };
 
     if (interaction.kind.startsWith('life_') && this.lifeOsService) {
       try {

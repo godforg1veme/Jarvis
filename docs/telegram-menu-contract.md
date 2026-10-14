@@ -9,6 +9,14 @@ source changes; verify the deployed revision before a server rollout.
 
 ## Change control
 
+Локальная разработка от 15 октября 2026: согласован новый owner-only путь
+«Главное → Поиск работы» с inline-карточками и подтверждениями. Код находится
+в рабочей ветке, не выпущен; нижняя клавиатура не меняется. Контракт новой
+функции описан в [спецификации](superpowers/specs/2026-10-15-job-search-design.md),
+фактическая приёмка — в [записи разработки](updates/2026-10-15-job-search-development.md).
+Реализация добавляет закрытое семейство `job:*` и четыре `job_*` guided-input
+kind через migration 030. Текущий production-статус этого документа сохраняется.
+
 Do not alter a label, row, availability, callback grammar, route, or
 confirmation boundary without explicit owner approval in the current task, a
 focused test of the route and authorization, and an update here and in

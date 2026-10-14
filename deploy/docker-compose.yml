@@ -1,6 +1,31 @@
 name: jarvis-family
 
 services:
+  job-collector:
+    profiles: [job-search-de]
+    build:
+      context: ..
+      dockerfile: deploy/server.Dockerfile
+    command: [node, src/jobs/collectorMain.js]
+    restart: unless-stopped
+    stop_grace_period: 40s
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      JARVIS_JOB_SEARCH_ENABLED: ${JARVIS_JOB_SEARCH_ENABLED:-false}
+      JARVIS_JOB_COLLECTOR_INTERVAL_MS: ${JARVIS_JOB_COLLECTOR_INTERVAL_MS:-1800000}
+      JARVIS_JOB_HISTORY_DAYS: ${JARVIS_JOB_HISTORY_DAYS:-14}
+      HH_USER_AGENT: ${HH_USER_AGENT:-JarvisJobSearch/1.0}
+      HH_APP_TOKEN: ${HH_APP_TOKEN:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [backend]
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
   postgres:
     image: pgvector/pgvector:pg16
     restart: unless-stopped
@@ -45,6 +70,15 @@ services:
       SALAD_MODEL: ${SALAD_MODEL:-}
       SALAD_AUTH_MODE: ${SALAD_AUTH_MODE:-bearer}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      JARVIS_JOB_SEARCH_ENABLED: ${JARVIS_JOB_SEARCH_ENABLED:-false}
+      JARVIS_JOB_MODEL: ${JARVIS_JOB_MODEL:-}
+      JARVIS_JOB_BUDGET_USD: ${JARVIS_JOB_BUDGET_USD:-3}
+      JARVIS_JOB_SECRET_KEY: ${JARVIS_JOB_SECRET_KEY:-}
+      JARVIS_JOB_PUBLIC_ORIGIN: ${JARVIS_JOB_PUBLIC_ORIGIN:-}
+      HH_CLIENT_ID: ${HH_CLIENT_ID:-}
+      HH_CLIENT_SECRET: ${HH_CLIENT_SECRET:-}
+      HH_USER_AGENT: ${HH_USER_AGENT:-JarvisJobSearch/1.0}
+      HH_APP_TOKEN: ${HH_APP_TOKEN:-}
       OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
       OPENROUTER_FALLBACK_API_KEY: ${OPENROUTER_FALLBACK_API_KEY:-}
       OPENROUTER_FALLBACK_MODEL: ${OPENROUTER_FALLBACK_MODEL:-}

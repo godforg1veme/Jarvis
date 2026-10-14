@@ -21,6 +21,7 @@ function telegramMenuContext({ user, conversation, input }) {
     chatType: input.chatType,
     originChannel: 'telegram',
     originDeviceId: null,
+    requestId: `telegram:${input.updateId}`,
   };
 }
 
@@ -550,7 +551,7 @@ class TelegramMessageService {
         const menuResult = await this.menuService.handleMenuAction(action, menuContext);
         const answer = String(menuResult?.answer || '').trim();
         if (!answer) throw new Error('Telegram menu returned an empty answer');
-        await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: answer });
+        await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: menuResult.historyAnswer || answer });
         return { status: 'answered', ...menuResult, answer };
       }
       const pendingResult = await this.menuService.handlePendingText(input.text, menuContext);
@@ -560,7 +561,7 @@ class TelegramMessageService {
       } else if (pendingResult) {
         const answer = String(pendingResult.answer || '').trim();
         if (!answer) throw new Error('Telegram interaction returned an empty answer');
-        await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: answer });
+        await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: pendingResult.historyAnswer || answer });
         return { status: 'answered', ...pendingResult, answer };
       }
     }

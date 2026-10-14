@@ -1,6 +1,7 @@
 const { Bot, InputFile } = require('grammy');
 const { sendTelegramText, splitTelegramText } = require('./telegramFormatting');
 const { isLifeCallback } = require('./telegramLifeOsService');
+const { isJobCallback, isJobVacancyUrl } = require('../jobs/jobTelegramCallbacks');
 const { isVpnCallback } = require('../vpn/vpnCommandService');
 const { TELEGRAM_FAILURE_CODES, classifyTelegramFailure, telegramFailureReply } = require('./telegramFailure');
 
@@ -17,14 +18,14 @@ function vpnReplyMarkup(buttons, options = {}) {
         const text = String(button?.text || '');
         const data = String(button?.data || '');
         const url = String(button?.url || '');
-        const validCallback = data && !url && Buffer.byteLength(data, 'utf8') <= 64 && (TELEGRAM_CALLBACK_RE.test(data) || isLifeCallback(data) || isVpnCallback(data));
+        const validCallback = data && !url && Buffer.byteLength(data, 'utf8') <= 64 && (TELEGRAM_CALLBACK_RE.test(data) || isLifeCallback(data) || isVpnCallback(data) || isJobCallback(data));
         const validOperationsUrl = url && !data && options.operationsPanelUrl && url === options.operationsPanelUrl;
         const validRoutingUrl = url && !data && (url === 'https://jarvis.rilora.ru/happ-routing' || (options.routingUrl && url === options.routingUrl));
         const validSubscriptionUrl = url && !data && (
           url.startsWith('https://jarvis.rilora.ru/happ-sub/') ||
           (options.publicUrl && url.startsWith(`${options.publicUrl}/happ-sub/`))
         );
-        const validUrl = validOperationsUrl || validRoutingUrl || validSubscriptionUrl;
+        const validUrl = validOperationsUrl || validRoutingUrl || validSubscriptionUrl || isJobVacancyUrl(url);
         if (text.length < 1 || text.length > 64 || (!validCallback && !validUrl)) {
           throw new Error('invalid VPN button');
         }
@@ -53,6 +54,11 @@ async function replyWithChunks(ctx, text, buttons, replyKeyboard, options = {}) 
   const markup = buttons !== undefined
     ? vpnReplyMarkup(buttons, options)
     : validatedReplyKeyboard(replyKeyboard);
+  if (options.plainText) {
+    const chunks = splitTelegramText(text);
+    for (let i = 0; i < chunks.length; i++) await ctx.reply(chunks[i], i === chunks.length - 1 && markup ? { reply_markup: markup } : {});
+    return;
+  }
   await sendTelegramText(
     (chunk, options) => ctx.reply(chunk, options),
     text,
@@ -103,7 +109,8 @@ async function sendResult(ctx, result, options = {}) {
     await sendTelegramMedia(ctx, result.media, options);
     return;
   }
-  await replyWithChunks(ctx, result.answer, result.buttons, result.replyKeyboard, options);
+  await replyWithChunks(ctx, result.answer, result.buttons, result.replyKeyboard, { ...options, plainText: result.plainText === true });
+  if (result.jobSearchEntry === true) await replyWithChunks(ctx, 'Поиск вакансий и подготовка откликов:', [[{ text: 'Поиск работы', data: 'job:menu' }]], undefined, options);
   if (result.artifact) {
     const artifact = result.artifact;
     const content = String(artifact.content || '');
@@ -161,7 +168,7 @@ function createTelegramBot(options) {
 
   bot.on('callback_query:data', async (ctx, next) => {
     const data = String(ctx.callbackQuery?.data || '');
-    if (!TELEGRAM_CALLBACK_RE.test(data) && !isLifeCallback(data) && !isVpnCallback(data)) return next();
+    if (!TELEGRAM_CALLBACK_RE.test(data) && !isLifeCallback(data) && !isVpnCallback(data) && !isJobCallback(data)) return next();
     await ctx.answerCallbackQuery().catch(() => {});
     const result = typeof messageService.handleCallback === 'function'
       ? await messageService.handleCallback(ctx.update)

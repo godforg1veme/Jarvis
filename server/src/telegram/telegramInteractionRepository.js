@@ -24,11 +24,20 @@ const KINDS = new Set([
   'life_source_create',
   'life_source_update',
   'life_preference_set',
+  'job_settings_edit',
+  'job_profile_edit',
+  'job_draft_edit',
+  'job_draft_translate',
 ]);
 
 function validateContext(kind, value) {
   const context = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   const keys = Object.keys(context);
+  if (kind.startsWith('job_')) {
+    if (keys.length !== 2 || !UUID_RE.test(String(context.targetId || ''))
+      || !Number.isInteger(context.revision) || context.revision < 1) throw new Error('invalid Telegram interaction context');
+    return { targetId: String(context.targetId).toLowerCase(), revision: context.revision };
+  }
   if (kind === 'vpn_access_label') {
     if (keys.length < 1 || keys.length > 2 || !['vless', 'hysteria2'].includes(context.protocol) || (context.node && !['de', 'nl'].includes(context.node))) throw new Error('invalid Telegram interaction context');
     return { protocol: context.protocol, node: context.node || 'de' };

@@ -1,4 +1,5 @@
 const { z } = require('zod');
+const { loadJobConfig } = require('../jobs/jobConfig');
 
 function parseBoolean(value) {
   if (typeof value === 'boolean') return value;
@@ -261,7 +262,7 @@ function loadConfig(env = process.env) {
     vpnSupervisorAcceptanceEnabled: parseBoolean(env.JARVIS_VPN_SUPERVISOR_ACCEPTANCE_ENABLED),
   };
 
-  const config = baseSchema.parse(raw);
+  const config = { ...baseSchema.parse(raw), ...loadJobConfig(env) };
   if (config.nodeEnv === 'production') {
     if (!config.databaseUrl) throw new Error('DATABASE_URL is required in production');
     if (!config.telegramBotToken) throw new Error('TELEGRAM_BOT_TOKEN is required in production');

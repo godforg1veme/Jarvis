@@ -1,0 +1,19 @@
+const UUID = '[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}';
+const SIMPLE = /^job:(menu|settings|profile|check|pause|resume|connect|disconnect|back)$/;
+const TARGET = new RegExp(`^job:(view|prepare|save|hide|draft|regenerate|edit|translate|send|confirm|cancel|approve|resume_select):(${UUID})$`, 'i');
+const PAGE = /^job:(saved|applications):([0-9]{1,4})$/;
+
+function parseJobCallback(value) {
+  if (typeof value !== 'string' || Buffer.byteLength(value) > 64) return null;
+  const simple = SIMPLE.exec(value); if (simple) return { action: simple[1] };
+  const target = TARGET.exec(value); if (target) return { action: target[1].toLowerCase(), targetId: target[2].toLowerCase() };
+  const page = PAGE.exec(value); if (page) return { action: page[1], page: Number(page[2]) };
+  return null;
+}
+function isJobCallback(value) { return parseJobCallback(value) !== null; }
+function isJobVacancyUrl(value) {
+  try { const url = new URL(value); return url.protocol === 'https:' && url.hostname === 'hh.ru'
+    && !url.username && !url.password && !url.port && /^\/vacancy\/\d{1,20}$/.test(url.pathname) && !url.search && !url.hash; }
+  catch { return false; }
+}
+module.exports = { parseJobCallback, isJobCallback, isJobVacancyUrl };

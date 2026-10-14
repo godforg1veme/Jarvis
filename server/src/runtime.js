@@ -5,7 +5,8 @@ const { runMigrations } = require('./db/migrate');
 const { createAnswerProvider } = require('./providers/providerFactory');
 const { providerProfileForConfig } = require('./providers/providerProfile');
 const { createTelegramAccessPolicy } = require('./telegram/accessPolicy');
-const { createTelegramBot } = require('./telegram/bot');
+const { createTelegramBot, telegramReplyMarkup } = require('./telegram/bot');
+const { createJobRuntime } = require('./jobs/jobRuntime');
 const { sendTelegramText } = require('./telegram/telegramFormatting');
 const { MAX_TELEGRAM_VOICE_BYTES, TelegramMessageService } = require('./telegram/messageService');
 const { TelegramUpdateRepository } = require('./telegram/telegramUpdateRepository');
@@ -114,6 +115,7 @@ async function createRuntime(config, overrides = {}) {
   const readinessChecks = pool ? [databaseReadinessCheck(pool)] : [];
   const app = overrides.app || buildApp({ config, readinessChecks });
   let bot = overrides.bot || null;
+  let jobRuntime = null;
   let pollingHealth = { at: 0, ok: false };
 
   if (pool) {
@@ -580,6 +582,11 @@ async function createRuntime(config, overrides = {}) {
         visualMemoryService,
       });
       const telegramInteractions = overrides.telegramInteractionRepository || new TelegramInteractionRepository(pool);
+      jobRuntime = createJobRuntime({ config, pool, interactions: telegramInteractions,
+        fetchImpl: overrides.jobModelFetch,
+        send: ({ chatId, answer, buttons }) => bot.api.sendMessage(chatId, answer,
+          buttons?.length ? { reply_markup: telegramReplyMarkup(buttons) } : {}),
+      });
       const telegramLifeOsService = config.lifeOsEnabled ? new TelegramLifeOsService({
         interactions: telegramInteractions,
         repository: lifeProjectionRepository,
@@ -607,6 +614,7 @@ async function createRuntime(config, overrides = {}) {
         lifeMissionControlService: missionControlService,
         lifeOsService: telegramLifeOsService,
         memoryGalleryService,
+        jobSearchService: jobRuntime?.telegramService,
         ownerTelegramId: config.operationsOwnerTelegramId,
         operationsEnabled: config.operationsEnabled,
         operationsPublicOrigin: config.operationsPublicOrigin,
@@ -709,9 +717,11 @@ async function createRuntime(config, overrides = {}) {
     vpnSubscriptionService,
     vpnSubscriptionRepository,
     lifeEventGateway,
+    jobRuntime,
     async start() {
       await app.listen({ host: config.host, port: config.port });
       if (operationsRuntime) await operationsRuntime.start();
+      if (jobRuntime) jobRuntime.start();
       if (knowledgeWorker) knowledgeWorker.start();
       if (visualMemoryWorker) visualMemoryWorker.start();
       if (commandWorker) commandWorker.start();
@@ -722,6 +732,7 @@ async function createRuntime(config, overrides = {}) {
       if (bot) void bot.start().catch((error) => app.log.error({ err: error }, 'Telegram polling stopped'));
     },
     async close() {
+      if (jobRuntime) await jobRuntime.close();
       if (knowledgeWorker) knowledgeWorker.stop();
       if (visualMemoryWorker) visualMemoryWorker.stop();
       if (commandWorker) commandWorker.stop();

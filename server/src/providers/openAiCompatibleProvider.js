@@ -17,7 +17,11 @@ class OpenAiCompatibleProvider {
     this.fetch = options.fetchImpl || globalThis.fetch;
   }
 
-  async answer({ text, messages }) {
+  async answer(input) {
+    return (await this.answerWithUsage(input)).text;
+  }
+
+  async answerWithUsage({ text, messages, maxTokens, includeUsage = false }) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     const headers = { 'Content-Type': 'application/json' };
@@ -31,21 +35,40 @@ class OpenAiCompatibleProvider {
         stream: false,
       };
       if (this.reasoning) body.reasoning = this.reasoning;
+      if (maxTokens !== undefined) {
+        if (!Number.isInteger(maxTokens) || maxTokens < 1 || maxTokens > 16384) throw new Error('invalid provider token limit');
+        body.max_tokens = maxTokens;
+      }
+      if (includeUsage) body.usage = { include: true };
       const response = await this.fetch(completionUrl(this.baseUrl), {
         method: 'POST',
         headers,
         body: JSON.stringify(body),
         signal: controller.signal,
+        redirect: 'error',
       });
       if (!response.ok) throw new Error(`${this.name} request failed with HTTP ${response.status}`);
       const declaredLength = Number(response.headers.get('content-length') || 0);
       if (declaredLength > MAX_PROVIDER_RESPONSE_BYTES) throw new Error(`${this.name} response is too large`);
-      const raw = await response.text();
-      if (Buffer.byteLength(raw, 'utf8') > MAX_PROVIDER_RESPONSE_BYTES) throw new Error(`${this.name} response is too large`);
+      const chunks = []; let byteCount = 0;
+      const reader = response.body.getReader();
+      try {
+        for (;;) {
+          const part = await reader.read(); if (part.done) break;
+          byteCount += part.value.byteLength;
+          if (byteCount > MAX_PROVIDER_RESPONSE_BYTES) { await reader.cancel(); throw new Error(`${this.name} response is too large`); }
+          chunks.push(Buffer.from(part.value));
+        }
+      } finally { reader.releaseLock(); }
+      const raw = Buffer.concat(chunks, byteCount).toString('utf8');
       const data = JSON.parse(raw);
       const content = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
       if (typeof content !== 'string' || !content.trim()) throw new Error(`${this.name} returned an invalid response`);
-      return content.trim();
+      const usage = {};
+      for (const key of ['cost', 'prompt_tokens', 'completion_tokens', 'total_tokens']) {
+        if (typeof data.usage?.[key] === 'number' && Number.isFinite(data.usage[key]) && data.usage[key] >= 0) usage[key] = data.usage[key];
+      }
+      return { text: content.trim(), usage, requestId: typeof data.id === 'string' && data.id.length <= 150 ? data.id : null };
     } catch (error) {
       if (error && error.name === 'AbortError') throw new Error(`${this.name} request timed out`);
       throw error;
