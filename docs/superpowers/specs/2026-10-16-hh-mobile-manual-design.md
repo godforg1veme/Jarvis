@@ -55,11 +55,19 @@ owner binding и primary resume. Второй Chromium с этим profile не 
 Docker socket, sudo, БД или model credentials. Chromium sandbox, SYS_CHROOT,
 ограничения ресурсов, запрет downloads и service workers сохраняются.
 
-Отдельный небольшой HTTP/WebSocket gateway обслуживает только manual UI,
-закрытые start/finish/status и VNC transport. Он получает ссылку на runtime,
-не управляет Docker и не перезапускает серверы. VNC слушает только внутри
-контейнера; gateway публикуется только на loopback хоста для Tailscale Serve.
-Прямые VNC и CDP не публикуются ни в tailnet, ни в интернете.
+Отдельный небольшой HTTP/WebSocket gateway-контейнер обслуживает только
+manual UI, закрытые start/finish/status и VNC transport. У него нет HH profile,
+БД, apply/read credentials или Docker socket. Gateway и browser соединены
+отдельной приватной сетью; gateway не подключён к сетям bot server/collector.
+Gateway публикуется только на loopback хоста для Tailscale Serve.
+
+В browser отдельный manual broker получает ссылку на runtime. Он требует
+отдельный manual credential для каждого control/transport запроса. Этот ключ
+получают только gateway и browser; он не передаётся телефону, Telegram,
+read/apply клиентам или модели. Raw VNC слушает только loopback внутри browser
+контейнера. Только авторизованный broker может соединять его с transport.
+Ни один компонент не управляет Docker и не перезапускает серверы. Прямые VNC
+и CDP не публикуются ни в tailnet, ни в интернете.
 
 Tailscale Serve проксирует отдельный путь `/hh/` на этот gateway, не заменяя
 остальную конфигурацию. Funnel не включается. HTML, JS, шрифты и noVNC assets
@@ -69,8 +77,10 @@ Tailscale Serve проксирует отдельный путь `/hh/` на э�
 
 Gateway принимает запросы только с ожидаемыми Host/Origin и идентичностью
 заранее настроенного владельца из identity headers доверенного Serve.
-Bind loopback и deployment-проверка обязательны: одних присланных заголовков
-или принадлежности к tailnet недостаточно. При установке привязка identity
+Host bind loopback, изоляция сети gateway и deployment-проверка обязательны:
+одних присланных заголовков или принадлежности к tailnet недостаточно.
+Browser broker никогда не доверяет Tailscale headers без отдельного manual
+credential gateway. При установке привязка identity
 сопоставляется с настроенным Jarvis owner; значения не попадают в Git/логи.
 Другой пользователь tailnet, member, отсутствующая identity или неверная
 конфигурация получают отказ, включая WebSocket upgrade.
@@ -135,7 +145,8 @@ callback семейства или guided-input kind не требуется. П
 
 Ожидаемые изменения: `job-browser/src/browserMain.js`, `hhBrowser.js`,
 `captchaRecovery.js`, отдельные coordinator/state/gateway модули и локальные
-UI assets; Dockerfile и Compose opt-in настройки; collector/client closed
+UI assets в отдельном gateway-пакете; Dockerfile и Compose opt-in настройки;
+закреплённый WebSocket transport как часть noVNC integration; collector/client closed
 codes; job Telegram delivery/menu URL button и конфигурация. Контракт меню
 обновляется вместе с реализацией, а не объявляет невыпущенный UI установленным.
 Общие правила остаются в AGENTS, runtime — в runtime-context/deploy,
@@ -164,7 +175,8 @@ codes; job Telegram delivery/menu URL button и конфигурация. Кон
 ## Выпуск
 
 Публикация этой новой функции отдельно согласуется после реализации и тестов.
-Обновляются server/collector и browser на DE, исходники обоих VPS, точечно
+Обновляются server/collector и browser на DE, добавляется изолированный gateway,
+обновляются исходники обоих VPS, точечно
 Serve path и приватные настройки. Windows EXE и VPN runtime не меняются.
 Существующие профили, секреты, mounts, backup policy и прочие Serve paths
 сохраняются. Неподтверждённый результат установки проверяется по его маркеру,
