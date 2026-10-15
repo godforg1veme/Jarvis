@@ -18,10 +18,10 @@
 | VPN Supervisor | Owner-confirmed ограниченный NL Xray restart с postchecks; peer timers включены | Restore отключён; external timer failures ещё не создают Telegram incidents |
 | Эксплуатация | Server, PostgreSQL и ASR healthy; hopping DNAT присутствует и сохранён в UFW на обоих узлах | Реальная проверка сохранения после reboot и автоматического ACME renewal; backups отложены владельцем |
 | Дальнейшая работа | Облако и Windows являются основными частями продукта | PWA, server executors, расписания и реальные account connectors |
-| Поиск работы | Выпущены server, browser и collector на DE; health, чтение HH и совпадение кода проверены. GitHub/Windows/DE/NL синхронизированы | Включение поиска владельцем и реальная Telegram/HH приёмка; [результат выпуска](updates/2026-10-15-job-search-release.md) |
+| Поиск работы | Поиск включён, карточки доставляются; server/browser/collector DE проверены. GitHub/Windows/DE/NL синхронизированы | Новые кнопки в живом Telegram и подтверждённый HH-отклик; [первый выпуск](updates/2026-10-15-job-search-release.md), [обновление кнопок](updates/2026-10-15-job-search-buttons.md) |
 
-Локально подготовлено [обновление кнопок поиска работы](updates/2026-10-15-job-search-buttons.md):
-включение/выключение и постоянный пункт в нижнем меню. Оно ещё не установлено на DE.
+[Обновление кнопок поиска работы](updates/2026-10-15-job-search-buttons.md)
+установлено на DE: включение/выключение и постоянный пункт в нижнем меню.
 
 Последняя сверка компонентов выполнена 9 октября 2026 года после публикации
 единого release-workflow: Windows и оба VPS-исходника совпадают, установленный

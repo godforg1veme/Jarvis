@@ -12,7 +12,7 @@ source changes; verify the deployed revision before a server rollout.
 Выпуск от 15 октября 2026: согласованный owner-only путь
 «Главное → Поиск работы» с inline-карточками и подтверждениями установлен
 на DE; в первом выпуске нижняя клавиатура не менялась. Последующее
-локальное обновление кнопок описано в таблице ниже. Контракт новой
+обновление кнопок установлено на DE и описано в таблице ниже. Контракт новой
 функции описан в [спецификации](superpowers/specs/2026-10-15-job-search-design.md),
 фактическая приёмка — в [записи разработки](updates/2026-10-15-job-search-development.md).
 Реализация добавляет закрытое семейство `job:*` и четыре `job_*` guided-input
@@ -59,8 +59,9 @@ replays do not toggle it back. Turning off preserves filters, checkpoint and
 partial collection progress, revokes the previous collection lease and stops
 card delivery. Turning on makes collection due immediately. Application
 confirmation, existing callback grammar and guided-input kinds are unchanged.
-This UI update was explicitly requested by the owner on 2026-10-15; it remains
-local until its separate release is authorized.
+This UI update was explicitly requested by the owner on 2026-10-15 and deployed
+after separate release authorization. The server rendering matches the actual
+enabled search; real owner tap-through of the new buttons remains unverified.
 
 Strings and mappings live in `server/src/telegram/telegramMenu.js`. `/start`
 and `/help` remain Home and Help aliases. Owner-only handlers recheck server
