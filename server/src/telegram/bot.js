@@ -54,13 +54,15 @@ async function replyWithChunks(ctx, text, buttons, replyKeyboard, options = {}) 
   const markup = buttons !== undefined
     ? vpnReplyMarkup(buttons, options)
     : validatedReplyKeyboard(replyKeyboard);
+  const previewOptions = options.disableLinkPreview === true ? { link_preview_options: { is_disabled: true } } : {};
   if (options.plainText) {
     const chunks = splitTelegramText(text);
-    for (let i = 0; i < chunks.length; i++) await ctx.reply(chunks[i], i === chunks.length - 1 && markup ? { reply_markup: markup } : {});
+    for (let i = 0; i < chunks.length; i++) await ctx.reply(chunks[i], {
+      ...previewOptions, ...(i === chunks.length - 1 && markup ? { reply_markup: markup } : {}) });
     return;
   }
   await sendTelegramText(
-    (chunk, options) => ctx.reply(chunk, options),
+    (chunk, chunkOptions) => ctx.reply(chunk, { ...chunkOptions, ...previewOptions }),
     text,
     markup ? { reply_markup: markup } : {},
   );
@@ -109,7 +111,8 @@ async function sendResult(ctx, result, options = {}) {
     await sendTelegramMedia(ctx, result.media, options);
     return;
   }
-  await replyWithChunks(ctx, result.answer, result.buttons, result.replyKeyboard, { ...options, plainText: result.plainText === true });
+  await replyWithChunks(ctx, result.answer, result.buttons, result.replyKeyboard, { ...options,
+    plainText: result.plainText === true, disableLinkPreview: result.disableLinkPreview === true });
   if (result.jobSearchEntry === true) await replyWithChunks(ctx, 'Поиск вакансий и подготовка откликов:', [[{ text: 'Поиск работы', data: 'job:menu' }]], undefined, options);
   if (result.artifact) {
     const artifact = result.artifact;

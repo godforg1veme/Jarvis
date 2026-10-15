@@ -29,6 +29,12 @@ kind через migration 030. [Результат выпуска](updates/2026-
 Collector располагает только read credential; отдельный apply credential
 доступен bot server и browser при явном opt-in. Метки и callback grammar прежние.
 
+По поручению владельца 15 октября подготовлено отключение предпросмотра ссылок
+в сообщениях поиска работы. Как автоматическая доставка, так и ответы на
+кнопки передают `link_preview_options.is_disabled=true`; длинные ответы
+сохраняют это для каждой части. Текст, URL, кнопки и полномочия не меняются.
+Обновление пока локальное; ранее отправленные сообщения не редактируются.
+
 Do not alter a label, row, availability, callback grammar, route, or
 confirmation boundary without explicit owner approval in the current task, a
 focused test of the route and authorization, and an update here and in

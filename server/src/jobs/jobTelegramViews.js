@@ -1,5 +1,6 @@
 function response(answer, buttons = []) {
-  return { answer, ...(buttons.length ? { buttons } : {}), plainText: true, historyAnswer: 'Поиск работы: результат действия показан владельцу.' };
+  return { answer, ...(buttons.length ? { buttons } : {}), plainText: true, disableLinkPreview: true,
+    historyAnswer: 'Поиск работы: результат действия показан владельцу.' };
 }
 function button(text, action, id) { return { text, data: `job:${action}${id == null ? '' : `:${id}`}` }; }
 function homeView({ search, usage, connection }) {

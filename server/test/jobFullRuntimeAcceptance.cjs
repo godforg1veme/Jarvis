@@ -8,6 +8,8 @@ const { Pool } = require('pg');
 const { loadConfig } = require('../src/config/loadConfig');
 const { createRuntime } = require('../src/runtime');
 const { listMigrationFiles, runMigrations } = require('../src/db/migrate');
+const { JobSearchRepository } = require('../src/jobs/jobSearchRepository');
+const { JobDeliveryRepository } = require('../src/jobs/jobDeliveryRepository');
 
 test('full runtime with real pgvector: all migrations twice, health, real bot home and job path', async () => {
   if (!process.env.JARVIS_JOB_TEST_DATABASE_URL) throw new Error('Explicit local test database URL is required');
@@ -43,6 +45,7 @@ test('full runtime with real pgvector: all migrations twice, health, real bot ho
     await runtime.bot.init();
     runtime.bot.start = async () => {}; // No long polling; dispatch below uses the real registered handlers.
     await runtime.start();
+    runtime.jobRuntime.deliveryWorker.stop(); // Explicit tick below makes transport assertions deterministic.
     assert.equal((await runtime.app.inject('/health/live')).statusCode, 200);
     assert.equal((await runtime.app.inject('/health/ready')).statusCode, 200);
     await runtime.bot.handleUpdate({ update_id: 1, message: { message_id: 1, date: 1,
@@ -54,7 +57,17 @@ test('full runtime with real pgvector: all migrations twice, health, real bot ho
       from: { id: 101, is_bot: false, first_name: 'Fixture' }, data: 'job:menu',
       message: { message_id: 1, date: 1, chat: { id: 101, type: 'private' } } } });
     assert.match(sent.at(-1).text, /Поиск работы/);
+    assert.deepEqual(sent.at(-1).link_preview_options, { is_disabled: true }, 'manual job responses suppress previews');
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM job_searches')).rows[0].n, 1);
+    const search = new JobSearchRepository(pool), deliveries = new JobDeliveryRepository(pool);
+    const vacancy = await search.upsertVacancy({ externalId: '123', snapshot: {
+      title: 'Fixture AI vacancy', company: 'Fixture', url: 'https://hh.ru/vacancy/123', publishedAt: '2026-10-15T12:00:00Z', description: 'Fixture' } });
+    await search.recordMatch({ userId: owner, vacancyId: vacancy.id, filterRevision: 1 });
+    await deliveries.enqueue({ userId: owner, vacancyId: vacancy.id });
+    await runtime.jobRuntime.deliveryWorker.tick();
+    assert.match(sent.at(-1).text, /Fixture AI vacancy/);
+    assert.deepEqual(sent.at(-1).link_preview_options, { is_disabled: true }, 'scheduled deliveries use the actual runtime sendMessage options');
+    assert.equal(sent.at(-1).reply_markup.inline_keyboard[0][0].url, 'https://hh.ru/vacancy/123');
     console.log(`PASS full runtime: ${listMigrationFiles().length} actual migrations, real pgvector, health and registered bot job route`);
   } finally {
     if (runtime) await runtime.close(); else if (pool) await pool.end();
