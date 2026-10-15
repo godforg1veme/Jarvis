@@ -8,13 +8,22 @@ const CODES = new Set(['JOB_HH_DOM_CHANGED', 'JOB_COLLECTION_WINDOW_SATURATED', 
   'JOB_BROWSER_INVALID_REQUEST', 'JOB_BROWSER_BUSY', 'JOB_BROWSER_REQUEST_TOO_LARGE', 'JOB_BROWSER_RESPONSE_TOO_LARGE']);
 
 class JobBrowserClient {
-  constructor({ baseUrl = 'http://job-browser:8080', ownerId, token, fetchImpl = globalThis.fetch, allowTestHttp = false }) {
+  constructor({ baseUrl = 'http://job-browser:8080', ownerId, token, applyToken = null, fetchImpl = globalThis.fetch, allowTestHttp = false }) {
     const url = new URL(baseUrl);
     if (url.username || url.password || url.pathname !== '/' || url.search || url.hash
       || (url.origin !== 'http://job-browser:8080' && !(allowTestHttp === true && url.protocol === 'http:' && url.hostname === '127.0.0.1'))
       || !UUID.test(ownerId || '') || typeof token !== 'string' || !/^[\x21-\x7e]{32,256}$/.test(token)) throw jobError('JOB_BROWSER_CONFIG_INVALID');
-    this.url = new URL('/rpc', url).href; this.ownerId = ownerId; this.token = token; this.fetch = fetchImpl;
+    if (applyToken !== null && (typeof applyToken !== 'string' || !/^[\x21-\x7e]{32,256}$/.test(applyToken)
+      || applyToken === token)) throw jobError('JOB_BROWSER_CONFIG_INVALID');
+    this.url = new URL('/rpc', url).href; this.ownerId = ownerId; this.token = token; this.applyToken = applyToken; this.fetch = fetchImpl;
   }
+  asApplicationAdapter() {
+    return { capabilities: { applicantApply: Boolean(this.applyToken) },
+      inspect: ({ userId, externalId, resumeId }) => this.request(userId, 'inspect', { externalId: String(externalId), resumeId }),
+      submit: ({ userId, ...args }) => this.request(userId, 'submit', args),
+      reconcile: ({ userId, ...args }) => this.request(userId, 'reconcile', args) };
+  }
+  connection(userId) { return this.request(userId, 'connection', {}); }
   forUser(userId) {
     if (userId !== this.ownerId) throw jobError('JOB_BROWSER_ACCESS_DENIED');
     return { capabilities: CAPABILITIES,
@@ -26,15 +35,22 @@ class JobBrowserClient {
   }
   async request(userId, operation, args) {
     if (userId !== this.ownerId) throw jobError('JOB_BROWSER_ACCESS_DENIED');
+    const writing = ['submit', 'reconcile'].includes(operation);
+    if (writing && !this.applyToken) throw jobError('JOB_BROWSER_ACCESS_DENIED');
     let response;
     try {
       response = await this.fetch(this.url, { method: 'POST', headers: {
-        authorization: `Bearer ${this.token}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ userId, operation, args }), redirect: 'manual', signal: AbortSignal.timeout(45000) });
+        authorization: `Bearer ${writing ? this.applyToken : this.token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ userId, operation, args }), redirect: 'manual', signal: AbortSignal.timeout(writing ? 120000 : 45000) });
     } catch { throw jobError('JOB_HH_UNAVAILABLE'); }
     const result = await readBoundedJson(response);
     if (!response.ok || result?.ok !== true) throw jobError(CODES.has(result?.code) ? result.code : 'JOB_HH_UNAVAILABLE');
     const value = result.value;
+    if (operation === 'connection' && (!/^[a-zA-Z0-9]{1,100}$/.test(value?.resumeId || '')
+      || typeof value?.title !== 'string' || !value.title.trim() || value.title.length > 500)) throw jobError('JOB_HH_INVALID_RESPONSE');
+    if (writing && (!value || !['unknown', 'sent', 'failed', 'manual_required', 'already_applied'].includes(value.outcome)
+      || (value.outcome !== 'unknown' && value.verified !== true)
+      || (value.outcome === 'sent' && !/^[1-9]\d{0,19}$/.test(value.externalId || '')))) throw jobError('JOB_HH_INVALID_RESPONSE');
     if (operation === 'search' && (!Array.isArray(value?.items) || value.items.length > 20
       || !Number.isInteger(value.pages) || value.pages < 0 || value.pages > 1000
       || !Number.isInteger(value.found) || value.found < 0 || !value.items.every((item) => /^\d{1,20}$/.test(item?.id || '')))) throw jobError('JOB_HH_INVALID_RESPONSE');
@@ -42,8 +58,8 @@ class JobBrowserClient {
       || !Number.isFinite(Date.parse(value?.publishedAt)))) throw jobError('JOB_HH_INVALID_RESPONSE');
     if (operation === 'resumes' && (!Array.isArray(value) || value.length > 20
       || !value.every((item) => /^[a-zA-Z0-9]{1,100}$/.test(item?.id || '') && typeof item.title === 'string' && item.title.length <= 500))) throw jobError('JOB_HH_INVALID_RESPONSE');
-    if (operation === 'inspect' && (value?.vacancy?.externalId !== args.externalId
-      || typeof value.resumeAvailable !== 'boolean' || typeof value.manualRequired !== 'boolean')) throw jobError('JOB_HH_INVALID_RESPONSE');
+    if (operation === 'inspect' && (!value || typeof value.resumeAvailable !== 'boolean' || typeof value.manualRequired !== 'boolean'
+      || (value.vacancy?.externalId !== args.externalId && !(value.resumeAvailable === false && value.manualRequired === true && value.vacancy === null)))) throw jobError('JOB_HH_INVALID_RESPONSE');
     return value;
   }
 }

@@ -17,6 +17,15 @@ source changes; verify the deployed revision before a server rollout.
 Реализация добавляет закрытое семейство `job:*` и четыре `job_*` guided-input
 kind через migration 030. Текущий production-статус этого документа сохраняется.
 
+Браузерное подключение сохраняет этот путь: «Подключить HH» проверяет уже
+выполненный владельцем вход и выбранное им основное резюме, записывает только
+метаданные в PostgreSQL. Повторное нажатие не меняет revision; другое резюме
+не подставляется. Авторизация/смена резюме не выполняются через модель.
+Отправка использует прежнее подтверждение точного текста и исходную operation;
+проверка неизвестного результата передаёт тот же одобренный текст браузеру.
+Collector располагает только read credential; отдельный apply credential
+доступен bot server и browser при явном opt-in. Метки и callback grammar прежние.
+
 Do not alter a label, row, availability, callback grammar, route, or
 confirmation boundary without explicit owner approval in the current task, a
 focused test of the route and authorization, and an update here and in

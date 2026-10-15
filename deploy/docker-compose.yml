@@ -14,6 +14,8 @@ services:
       JARVIS_JOB_BROWSER_ENABLED: "1"
       JARVIS_JOB_BROWSER_OWNER_ID: ${JARVIS_JOB_BROWSER_OWNER_ID:-}
       JARVIS_JOB_BROWSER_TOKEN: ${JARVIS_JOB_BROWSER_TOKEN:-}
+      JARVIS_JOB_BROWSER_APPLY_ENABLED: ${JARVIS_JOB_BROWSER_APPLY_ENABLED:-0}
+      JARVIS_JOB_BROWSER_APPLY_TOKEN: ${JARVIS_JOB_BROWSER_APPLY_TOKEN:-}
     volumes:
       - job-browser-profile:/home/pwuser/profile
     networks: [job-browser-rpc]
@@ -113,6 +115,11 @@ services:
       JARVIS_JOB_BUDGET_USD: ${JARVIS_JOB_BUDGET_USD:-3}
       JARVIS_JOB_SECRET_KEY: ${JARVIS_JOB_SECRET_KEY:-}
       JARVIS_JOB_PUBLIC_ORIGIN: ${JARVIS_JOB_PUBLIC_ORIGIN:-}
+      JARVIS_JOB_BROWSER_URL: http://job-browser:8080
+      JARVIS_JOB_BROWSER_OWNER_ID: ${JARVIS_JOB_BROWSER_OWNER_ID:-}
+      JARVIS_JOB_BROWSER_TOKEN: ${JARVIS_JOB_BROWSER_TOKEN:-}
+      JARVIS_JOB_BROWSER_APPLY_ENABLED: ${JARVIS_JOB_BROWSER_APPLY_ENABLED:-0}
+      JARVIS_JOB_BROWSER_APPLY_TOKEN: ${JARVIS_JOB_BROWSER_APPLY_TOKEN:-}
       HH_CLIENT_ID: ${HH_CLIENT_ID:-}
       HH_CLIENT_SECRET: ${HH_CLIENT_SECRET:-}
       HH_USER_AGENT: ${HH_USER_AGENT:-JarvisJobSearch/1.0}
@@ -181,7 +188,7 @@ services:
       - /run/jarvis-host-agent:/run/jarvis-host-agent:ro
     secrets:
       - operations_host_agent_authenticator
-    networks: [backend]
+    networks: [backend, job-browser-rpc]
     deploy:
       resources:
         limits:

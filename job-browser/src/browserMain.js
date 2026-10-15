@@ -4,11 +4,17 @@ const { UUID } = require('./rpcProtocol');
 const { createRpcServer } = require('./rpcServer');
 const { HhBrowser } = require('./hhBrowser');
 const { allowedRequest } = require('./networkPolicy');
+const { ApplicationLedger } = require('./applicationLedger');
+const { HhApplicationDriver } = require('./hhApplicationDriver');
+const { GuardedSubmission } = require('./guardedSubmission');
 
 async function startBrowser(env = process.env) {
   const ownerId = env.JARVIS_JOB_BROWSER_OWNER_ID, token = env.JARVIS_JOB_BROWSER_TOKEN;
   if (env.JARVIS_JOB_BROWSER_ENABLED !== '1' || process.platform !== 'linux' || process.getuid() === 0
     || !UUID.test(ownerId || '') || !/^[\x21-\x7e]{32,256}$/.test(token || '')) throw new Error('JOB_BROWSER_CONFIG_INVALID');
+  const applyEnabled = env.JARVIS_JOB_BROWSER_APPLY_ENABLED === '1';
+  const applyToken = applyEnabled ? env.JARVIS_JOB_BROWSER_APPLY_TOKEN : null;
+  if (applyEnabled && (!/^[\x21-\x7e]{32,256}$/.test(applyToken || '') || applyToken === token)) throw new Error('JOB_BROWSER_CONFIG_INVALID');
   await fs.access('/.dockerenv');
   const root = '/home/pwuser/profile', owner = await fs.lstat(root);
   if (!owner.isDirectory() || owner.uid !== process.getuid() || (owner.mode & 0o077)) throw new Error('JOB_BROWSER_PROFILE_OWNER_DENIED');
@@ -29,12 +35,21 @@ async function startBrowser(env = process.env) {
   try {
     context = await chromium.launchPersistentContext(root, { headless: true, chromiumSandbox: true,
       acceptDownloads: false, serviceWorkers: 'block', locale: 'ru-RU' });
-    // Includes popups and frames. Read service exposes no mutation operation.
+    // Includes popups and frames. Only the guarded driver can permit its exact POST.
     await context.route('**/*', (route) => ['GET', 'HEAD', 'OPTIONS'].includes(route.request().method())
       && allowedRequest(route.request().url()) ? route.continue() : route.abort());
     await context.routeWebSocket('**/*', (socket) => socket.close());
     const browser = new HhBrowser({ context, primaryResumeId });
-    server = createRpcServer({ browser, ownerId, token });
+    let submissions = null;
+    if (applyEnabled) {
+      if (!primaryResumeId) throw new Error('JOB_BROWSER_CONFIG_INVALID');
+      const ledger = new ApplicationLedger({ root: `${root}/applications`, ownerId });
+      await ledger.directory();
+      const guarded = new GuardedSubmission({ ledger, driver: new HhApplicationDriver({ browser }), ownerId, primaryResumeId });
+      submissions = { submit: (input) => browser.run(() => guarded.submit(input)),
+        reconcile: (input) => browser.run(() => guarded.reconcile(input)) };
+    }
+    server = createRpcServer({ browser, ownerId, token, submissions, applyToken });
     await new Promise((resolve, reject) => { server.once('error', reject); server.listen(8080, '0.0.0.0', resolve); });
     return { async close() {
       await new Promise((resolve) => server.close(resolve)); await browser.tail; await context.close();

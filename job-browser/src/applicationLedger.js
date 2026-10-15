@@ -112,6 +112,17 @@ class ApplicationLedger {
     if (!this.same(this.validateClaim(pair), claim)) return { outcome: 'unknown' };
     return this.result(claim);
   }
+  async hasClaim(input) {
+    const identity = this.identity(input); await this.directory();
+    const operation = await this.read('operation', identity.operationHash);
+    const pair = await this.read('pair', identity.pairHash);
+    if (operation) {
+      const claim = this.validateClaim(operation);
+      if (claim.pairHash !== identity.pairHash || (input.letter !== undefined && hash(input.letter) !== claim.letterHash)) throw failure('JOB_BROWSER_OPERATION_CHANGED');
+    }
+    if (pair) this.validateClaim(pair);
+    return Boolean(operation || pair);
+  }
   async finish(input, result) {
     const identity = this.identity(input); await this.directory();
     const claim = this.validateClaim(await this.read('operation', identity.operationHash));

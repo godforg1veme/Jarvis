@@ -86,7 +86,7 @@ class JobApplicationService {
     if (!['unknown', 'sending'].includes(operation.status)) return applicationView(operation);
     let result;
     try { result = await this.adapter.reconcile({ userId: scope.userId, operationId,
-      externalId: operation.vacancy_external_id, resumeId: operation.resume_id }); }
+      externalId: operation.vacancy_external_id, resumeId: operation.resume_id, letter: operation.approved_text }); }
     catch { return applicationView({ ...operation, status: 'unknown' }); }
     const saved = await this.repository.finish({ userId: scope.userId, operationId, ...this.validResult(result) });
     return applicationView(saved || operation);

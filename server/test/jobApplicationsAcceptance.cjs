@@ -111,7 +111,11 @@ test('real PG: unknown result never repeats POST; reconciliation keeps the origi
     const sameUnknown = await f.service.confirm({ scope: f.scope, confirmationId: anotherResume.id });
     assert.equal(sameUnknown.operationId, unknown.operationId, 'changing the primary resume must not bypass an unknown submission');
     assert.equal(f.submits, 1);
-    f.adapter.reconcile = async ({ operationId }) => { assert.equal(operationId, unknown.operationId); return { outcome: 'sent', verified: true, externalId: 'verified-fixture' }; };
+    const original = await f.repository.get({ scope: f.scope, operationId: unknown.operationId });
+    f.adapter.reconcile = async ({ operationId, letter, resumeId }) => {
+      assert.equal(operationId, unknown.operationId); assert.equal(letter, original.approved_text);
+      assert.equal(resumeId, original.resume_id);
+      return { outcome: 'sent', verified: true, externalId: 'verified-fixture' }; };
     const verified = await f.service.reconcile({ scope: f.scope, operationId: unknown.operationId });
     assert.equal(verified.applicationStatus, 'sent'); assert.equal(f.submits, 1);
   } finally { await f.close(); }

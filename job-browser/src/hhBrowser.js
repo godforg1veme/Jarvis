@@ -16,11 +16,20 @@ class HhBrowser {
   run(fn) {
     const pending = this.tail.then(fn); this.tail = pending.catch(() => {}); return pending;
   }
-  async read(url, expected, reader) {
+  connection() {
+    return this.run(async () => {
+      const resumes = await this.read('https://hh.ru/applicant/resumes', 'authenticated', readResumes);
+      const primary = resumes.filter((item) => item.id === this.primaryResumeId);
+      if (primary.length !== 1) throw failure('JOB_HH_RESUME_UNAVAILABLE');
+      return { resumeId: primary[0].id, title: primary[0].title };
+    });
+  }
+  async open(url, expected) {
     const page = await this.context.newPage(); page.setDefaultTimeout(10000);
     try {
-      await page.route('**/*', (route) => ['GET', 'HEAD', 'OPTIONS'].includes(route.request().method())
-        && allowedRequest(route.request().url()) ? route.fallback() : route.abort());
+      const readGuard = (route) => ['GET', 'HEAD', 'OPTIONS'].includes(route.request().method())
+        && allowedRequest(route.request().url()) ? route.fallback() : route.abort();
+      await page.route('**/*', readGuard);
       const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await page.waitForTimeout(1500);
       const current = new URL(page.url());
@@ -48,11 +57,16 @@ class HhBrowser {
       const privacyCandidate = expected === 'resume_privacy' && signal.state === 'unknown'
         && response?.status() === 200 && /^\/resume\/[a-zA-Z0-9]+$/.test(current.pathname);
       if (signal.state !== expected && !zeroCandidate && !formCandidate && !privacyCandidate) throw failure('JOB_HH_DOM_CHANGED');
-      return await reader(page);
+      return { page, releaseReadGuard: () => page.unroute('**/*', readGuard) };
     } catch (error) {
+      await page.close().catch(() => {});
       if (/^JOB_[A-Z_]+$/.test(error.code || '')) throw error;
       throw failure('JOB_HH_UNAVAILABLE');
-    } finally { await page.close().catch(() => {}); }
+    }
+  }
+  async read(url, expected, reader) {
+    const opened = await this.open(url, expected);
+    try { return await reader(opened.page); } finally { await opened.page.close().catch(() => {}); }
   }
   search({ query, publishedFrom, publishedTo, page = 0 }) {
     if (typeof query !== 'string' || !query.trim() || query.length > 200 || !Number.isInteger(page) || page < 0 || page >= CAPABILITIES.maxPages
@@ -71,24 +85,24 @@ class HhBrowser {
   }
   listResumes() { return this.run(() => this.read('https://hh.ru/applicant/resumes', 'authenticated', readResumes)); }
   inspect({ externalId, resumeId }) {
+    return this.run(() => this.inspectNow({ externalId, resumeId }));
+  }
+  async inspectNow({ externalId, resumeId }) {
     if (!/^\d{1,20}$/.test(String(externalId)) || !this.primaryResumeId || resumeId !== this.primaryResumeId) return Promise.reject(failure('JOB_HH_RESUME_UNAVAILABLE'));
-    return this.run(async () => {
-      const resumes = await this.read('https://hh.ru/applicant/resumes', 'authenticated', readResumes);
-      const details = await this.read(`https://hh.ru/vacancy/${externalId}`, 'vacancy', async (page) => ({
-        vacancy: await readVacancyPage(page, externalId),
-        employerId: await readEmployerId(page),
-        alreadyApplied: await page.locator('[data-qa="vacancy-response-link-view-topic"], [data-qa="vacancy-response-link-top-again"]').count() > 0,
-      }));
-      if (details.alreadyApplied) return { vacancy: details.vacancy, resumeAvailable: resumes.some((resume) => resume.id === resumeId),
-        manualRequired: true, reasonCode: 'JOB_HH_ALREADY_APPLIED' };
-      const privacy = await this.read(`https://hh.ru/resume/${resumeId}`, 'resume_privacy', (page) => readResumePrivacy(page, { resumeId }));
-      const permission = evaluatePrivacy({ privacy, employerId: details.employerId });
-      if (!permission.allowed) return { vacancy: details.vacancy, resumeAvailable: resumes.some((resume) => resume.id === resumeId),
-        manualRequired: true, reasonCode: permission.reasonCode };
-      const state = await this.read(`https://hh.ru/applicant/vacancy_response?vacancyId=${externalId}`, 'application',
-        (page) => readApplicationForm(page, { externalId: String(externalId), resumeId, resumes }));
-      return { vacancy: details.vacancy, ...state };
-    });
+    const resumes = await this.read('https://hh.ru/applicant/resumes', 'authenticated', readResumes);
+    if (!resumes.some((resume) => resume.id === resumeId)) return { resumeAvailable: false, manualRequired: true,
+      reasonCode: 'JOB_HH_RESUME_UNAVAILABLE', vacancy: null };
+    const details = await this.read(`https://hh.ru/vacancy/${externalId}`, 'vacancy', async (page) => ({
+      vacancy: await readVacancyPage(page, externalId), employerId: await readEmployerId(page),
+      alreadyApplied: await page.locator('[data-qa="vacancy-response-link-view-topic"], [data-qa="vacancy-response-link-top-again"]').count() > 0,
+    }));
+    if (details.alreadyApplied) return { vacancy: details.vacancy, resumeAvailable: true, manualRequired: true, reasonCode: 'JOB_HH_ALREADY_APPLIED' };
+    const privacy = await this.read(`https://hh.ru/resume/${resumeId}`, 'resume_privacy', (page) => readResumePrivacy(page, { resumeId }));
+    const permission = evaluatePrivacy({ privacy, employerId: details.employerId });
+    if (!permission.allowed) return { vacancy: details.vacancy, resumeAvailable: true, manualRequired: true, reasonCode: permission.reasonCode };
+    const state = await this.read(`https://hh.ru/applicant/vacancy_response?vacancyId=${externalId}`, 'application',
+      (page) => readApplicationForm(page, { externalId: String(externalId), resumeId, resumes }));
+    return { vacancy: details.vacancy, ...state };
   }
 }
 

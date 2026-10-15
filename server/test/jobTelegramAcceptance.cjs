@@ -16,9 +16,18 @@ const { TelegramUpdateRepository } = require('../src/telegram/telegramUpdateRepo
 const { UserRepository } = require('../src/users/userRepository');
 const { ConversationRepository } = require('../src/conversations/conversationRepository');
 const { createTelegramAccessPolicy } = require('../src/telegram/accessPolicy');
+const { once } = require('node:events');
+const { createRpcServer } = require('../../job-browser/src/rpcServer');
+const { JobBrowserClient } = require('../src/jobs/jobBrowserClient');
+const { JobBrowserConnectionService } = require('../src/jobs/jobBrowserConnectionService');
 
 test('real message/menu handlers + PG: guided retries, consumption, scopes, draft editing and history privacy', async () => {
-  const f = await createJobPostgresFixture(); let updateId = 1000, calls = 0;
+  const f = await createJobPostgresFixture(); let updateId = 1000, calls = 0, connectionReads = 0, selectedResume = 'fixtureResume';
+  const token = crypto.randomBytes(32).toString('hex');
+  const rpc = createRpcServer({ ownerId: f.owner, token, browser: { async connection() {
+    connectionReads++; return { resumeId: selectedResume, title: 'Основное fixture резюме' };
+  } } });
+  rpc.listen(0, '127.0.0.1'); await once(rpc, 'listening');
   try {
     await f.pool.query("INSERT INTO user_identities(user_id,provider,external_id) VALUES($1,'telegram','101'),($2,'telegram','202')", [f.owner, f.stranger]);
     const search = new JobSearchRepository(f.pool), profiles = new JobProfileRepository(f.pool), drafts = new JobDraftRepository(f.pool), usage = new JobUsageRepository(f.pool);
@@ -28,7 +37,9 @@ test('real message/menu handlers + PG: guided retries, consumption, scopes, draf
       draftRepository: drafts, usageRepository: usage, defaultModel: 'fixture-model',
       modelAdapter: { async generate() { calls++; return { text: JSON.stringify({ text: `Private fixture letter ${calls}`, factIds: ['fact_1'] }), usage: { cost: 0.001 } }; } } });
     const jobs = new JobTelegramService({ pool: f.pool, searchRepository: search, profileRepository: profiles,
-      draftRepository: drafts, usageRepository: usage, draftService, settingsService, interactions, defaultModel: 'fixture-model' });
+      draftRepository: drafts, usageRepository: usage, draftService, settingsService, interactions, defaultModel: 'fixture-model',
+      connectionService: new JobBrowserConnectionService({ pool: f.pool, browserClient: new JobBrowserClient({ ownerId: f.owner,
+        token, baseUrl: `http://127.0.0.1:${rpc.address().port}`, allowTestHttp: true }) }) });
     const menu = new TelegramMenuService({ interactions, jobSearchService: jobs });
     const messages = new TelegramMessageService({ accessPolicy: createTelegramAccessPolicy(['101', '202']),
       updateRepository: new TelegramUpdateRepository(f.pool), userRepository: new UserRepository(f.pool),
@@ -44,6 +55,17 @@ test('real message/menu handlers + PG: guided retries, consumption, scopes, draf
     assert.match((await cb('job:menu', 202)).answer, /владельцу/);
     assert.match((await cb('job:menu', 101, -100, 'group')).answer, /личном/);
     await cb('job:menu');
+    await cb('job:connect', 202); await cb('job:connect', 101, -100, 'group');
+    assert.equal(connectionReads, 0, 'foreign and group callbacks cannot read the private browser connection');
+    assert.match((await cb('job:connect')).answer, /Основное fixture резюме/);
+    const connected = (await f.pool.query('SELECT * FROM job_connections WHERE user_id=$1', [f.owner])).rows[0];
+    assert.equal(connected.resume_id, 'fixtureResume'); assert.equal(connected.status, 'connected');
+    await cb('job:connect');
+    assert.equal((await f.pool.query('SELECT revision FROM job_connections WHERE user_id=$1', [f.owner])).rows[0].revision, connected.revision);
+    selectedResume = 'replacementResume';
+    assert.match((await cb('job:connect')).answer, /Данные изменились/);
+    assert.equal((await f.pool.query('SELECT resume_id FROM job_connections WHERE user_id=$1', [f.owner])).rows[0].resume_id, 'fixtureResume');
+    selectedResume = 'fixtureResume';
     await cb('job:settings');
     const active = await interactions.getActive(f.scope);
     assert.equal(active.interaction.kind, 'job_settings_edit');
@@ -87,5 +109,5 @@ test('real message/menu handlers + PG: guided retries, consumption, scopes, draf
     assert.ok(!history.includes('Private fixture letter'));
     assert.ok(!history.includes('Private confirmed fixture automation'));
     console.log('PASS Telegram acceptance: real handlers, real guided state, owner/private scope, retries, expiry and private history');
-  } finally { await f.close(); }
+  } finally { await new Promise((resolve) => rpc.close(resolve)); await f.close(); }
 });

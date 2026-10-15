@@ -8,7 +8,7 @@ test('real Chromium reads fixtures, rejects changed/security pages, and never ma
   const browser = await chromium.launch({ headless: true, chromiumSandbox: true });
   const context = await browser.newContext({ serviceWorkers: 'block' });
   let writes = 0;
-  let hiddenResume = true, questionnaire = false;
+  let hiddenResume = true, questionnaire = false, resumePresent = true;
   await context.route('**/*', async (route) => {
     const request = route.request(), url = new URL(request.url());
     if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method())) { writes++; return route.abort(); }
@@ -38,7 +38,7 @@ test('real Chromium reads fixtures, rejects changed/security pages, and never ma
         <div data-qa="vacancy-company"><a href="/employer/${url.pathname === '/vacancy/102' ? '1001' : '900'}">Fixture</a></div>
         <script>fetch('/unexpected-write',{method:'POST',body:'fixture'}).catch(()=>{});</script>`;
     } else if (url.pathname === '/applicant/resumes') {
-      body = '<h1>Мои резюме</h1><div data-qa="resume"><a data-qa="resume-title" href="/resume/fixtureA">Первое резюме</a></div>';
+      body = `<h1>Мои резюме</h1><div data-qa="resume"><a data-qa="resume-title" href="/resume/${resumePresent ? 'fixtureA' : 'fixtureB'}">Первое резюме</a></div>`;
     } else if (url.pathname === '/resume/fixtureA') {
       body = `<button type="button" data-qa="resume-visibility-card">Скрыто от выбранных работодателей</button>
       <script>document.querySelector('button').onclick=()=>{
@@ -64,6 +64,7 @@ test('real Chromium reads fixtures, rejects changed/security pages, and never ma
     assert.equal(vacancy.title, 'Junior AI'); assert.equal(vacancy.publishedAt, '2026-10-15T07:00:00.000Z');
     assert.equal(vacancy.salary, null);
     assert.deepEqual(await hh.listResumes(), [{ id: 'fixtureA', title: 'Первое резюме' }]);
+    assert.deepEqual(await hh.connection(), { resumeId: 'fixtureA', title: 'Первое резюме' });
     assert.equal((await hh.inspect({ externalId: '101', resumeId: 'fixtureA' })).reasonCode, 'JOB_HH_RESUME_HIDDEN');
     hiddenResume = false;
     assert.equal((await hh.inspect({ externalId: '101', resumeId: 'fixtureA' })).manualRequired, false);
@@ -71,6 +72,9 @@ test('real Chromium reads fixtures, rejects changed/security pages, and never ma
     assert.equal((await hh.inspect({ externalId: '101', resumeId: 'fixtureA' })).manualRequired, true);
     assert.equal((await hh.inspect({ externalId: '102', resumeId: 'fixtureA' })).reasonCode, 'JOB_HH_EMPLOYER_BLOCKED');
     await assert.rejects(hh.inspect({ externalId: '101', resumeId: 'fixtureB' }), { code: 'JOB_HH_RESUME_UNAVAILABLE' });
+    resumePresent = false;
+    await assert.rejects(hh.connection(), { code: 'JOB_HH_RESUME_UNAVAILABLE' });
+    assert.equal((await hh.inspect({ externalId: '101', resumeId: 'fixtureA' })).resumeAvailable, false);
     assert.equal(writes, 0, 'page-level read guard blocks writes before any transport');
   } finally { await context.close(); await browser.close(); }
 });

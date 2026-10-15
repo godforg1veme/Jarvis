@@ -11,9 +11,21 @@ const { JobDeliveryWorker } = require('./jobDeliveryWorker');
 const { JobApplicationRepository } = require('./jobApplicationRepository');
 const { JobApplicationService } = require('./jobApplicationService');
 const { JobRecoveryWorker } = require('./jobRecovery');
+const { JobBrowserClient } = require('./jobBrowserClient');
+const { JobBrowserConnectionService } = require('./jobBrowserConnectionService');
 
 function createJobRuntime({ config, pool, interactions, send, fetchImpl, applicationAdapter = null }) {
   if (!config.jobSearchEnabled) return null;
+  let connectionService = null;
+  if (config.jobBrowserOwnerId && config.jobBrowserToken) {
+    const browserClient = new JobBrowserClient({ baseUrl: config.jobBrowserUrl, ownerId: config.jobBrowserOwnerId,
+      token: config.jobBrowserToken, fetchImpl });
+    connectionService = new JobBrowserConnectionService({ pool, browserClient });
+  }
+  if (!applicationAdapter && config.jobBrowserApplyEnabled === true) {
+    applicationAdapter = new JobBrowserClient({ baseUrl: config.jobBrowserUrl, ownerId: config.jobBrowserOwnerId,
+      token: config.jobBrowserToken, applyToken: config.jobBrowserApplyToken, fetchImpl }).asApplicationAdapter();
+  }
   const defaults = {};
   for (const [key, value] of Object.entries({ model: config.jobSearchModel, budgetUsd: config.jobBudgetUsd,
     intervalMs: config.jobCollectorIntervalMs, historyDays: config.jobHistoryDays })) if (value !== undefined) defaults[key] = value;
@@ -28,7 +40,7 @@ function createJobRuntime({ config, pool, interactions, send, fetchImpl, applica
   const applicationRepository = new JobApplicationRepository(pool);
   const applicationService = new JobApplicationService({ pool, repository: applicationRepository, searchRepository, adapter: applicationAdapter });
   const telegramService = new JobTelegramService({ pool, searchRepository, profileRepository, draftRepository,
-    usageRepository, interactions, draftService, settingsService, applicationService, defaultModel: config.jobSearchModel });
+    usageRepository, interactions, draftService, settingsService, applicationService, connectionService, defaultModel: config.jobSearchModel });
   const deliveryWorker = new JobDeliveryWorker({ pool, searchRepository, deliveryRepository, send });
   const recoveryWorker = new JobRecoveryWorker({ pool, applicationRepository });
   return { telegramService, deliveryWorker, applicationService, applicationRepository,

@@ -4,7 +4,11 @@ const exact = (value, keys) => value && typeof value === 'object' && !Array.isAr
 function validRequest(value, ownerId) {
   if (!exact(value, ['userId', 'operation', 'args']) || !UUID.test(value.userId) || value.userId !== ownerId) return false;
   const args = value.args;
-  if (value.operation === 'resumes') return exact(args, []);
+  if (['submit', 'reconcile'].includes(value.operation)) return exact(args, ['operationId', 'externalId', 'resumeId', 'letter'])
+    && UUID.test(args.operationId || '') && typeof args.externalId === 'string' && /^\d{1,20}$/.test(args.externalId)
+    && typeof args.resumeId === 'string' && /^[a-zA-Z0-9]{1,100}$/.test(args.resumeId)
+    && typeof args.letter === 'string' && args.letter.trim().length > 0 && args.letter.length <= 10000;
+  if (['resumes', 'connection'].includes(value.operation)) return exact(args, []);
   if (value.operation === 'inspect') return exact(args, ['externalId', 'resumeId'])
     && typeof args.externalId === 'string' && /^\d{1,20}$/.test(args.externalId)
     && typeof args.resumeId === 'string' && /^[a-zA-Z0-9]{1,100}$/.test(args.resumeId);

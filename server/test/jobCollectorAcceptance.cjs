@@ -34,6 +34,8 @@ test('real HTTP + PostgreSQL: 14 days, pagination, duplicate queries, restart, f
     let state = await search.ensure({ scope: f.scope });
     state = await search.saveSettings({ scope: f.scope, expectedRevision: state.revision,
       settings: { ...state.settings, queries: ['Junior AI', 'AI Engineer'], activated: true } });
+    // Scheduling uses the database clock; bind it to this fixture's fixed clock.
+    await f.pool.query('UPDATE job_searches SET next_check_at=$1 WHERE user_id=$2', [now, f.owner]);
     const hh = new HhClient({ baseUrl: `http://127.0.0.1:${server.address().port}/`, allowTestHttp: true });
     const collector = () => new JobCollector({ searchRepository: search, deliveryRepository: delivery,
       hhClient: hh, now: () => now, wait: async () => {} });

@@ -17,6 +17,7 @@ class GuardedSubmission {
       if (typeof input.letter !== 'string' || !input.letter.trim() || input.letter.length > 10000) throw Object.assign(new Error('JOB_INVALID_DRAFT'), { code: 'JOB_INVALID_DRAFT' });
       const stored = await this.ledger.lookup(input);
       if (stored.outcome !== 'unknown') return stored;
+      if (await this.ledger.hasClaim(input)) return { execute: false, outcome: 'unknown' };
       let prepared;
       try {
         prepared = await this.driver.prepare({ ...identity, letter: input.letter });
@@ -34,10 +35,11 @@ class GuardedSubmission {
   }
   reconcile(input) {
     return this.run(async () => {
-      const identity = this.identity(input), stored = await this.ledger.lookup(identity);
+      const identity = this.identity(input), stored = await this.ledger.lookup({ ...identity, letter: input.letter });
       if (stored.outcome !== 'unknown') return stored;
+      if (!await this.ledger.hasClaim(identity)) return { outcome: 'unknown' };
       try {
-        const result = await this.driver.readResult(identity);
+        const result = await this.driver.readResult({ ...identity, letter: input.letter });
         return await this.ledger.finish(identity, result);
       } catch { return { outcome: 'unknown' }; }
     });
