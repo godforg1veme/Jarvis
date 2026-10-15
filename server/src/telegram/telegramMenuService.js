@@ -54,7 +54,8 @@ class TelegramMenuService {
   }
 
   keyboard(context) {
-    return replyKeyboard(this.owner(context));
+    return replyKeyboard(this.owner(context), { jobSearchEnabled: Boolean(this.jobSearchService)
+      && context.user?.role === 'owner' && context.chatType === 'private' });
   }
 
   async _cancel(context, id = null) {
@@ -76,6 +77,8 @@ class TelegramMenuService {
   async handleMenuAction(action, context) {
     if (!action) return null;
     await this._cancel(context);
+    if (action === 'jobs') return this.jobSearchService
+      ? this.jobSearchService.handleCallback('job:menu', context) : { answer: 'Поиск работы сейчас недоступен.' };
     if (action === 'home') {
       const admin = this.owner(context) ? ' Доступны также VPN и Operations.' : '';
       return { answer: `Jarvis готов. Выбери раздел снизу или напиши вопрос обычным текстом.${admin}`, replyKeyboard: this.keyboard(context),

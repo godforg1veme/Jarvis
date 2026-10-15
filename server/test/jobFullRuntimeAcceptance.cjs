@@ -48,6 +48,8 @@ test('full runtime with real pgvector: all migrations twice, health, real bot ho
     await runtime.bot.handleUpdate({ update_id: 1, message: { message_id: 1, date: 1,
       from: { id: 101, is_bot: false, first_name: 'Fixture' }, chat: { id: 101, type: 'private' }, text: '/start' } });
     assert.equal(sent.at(-1).reply_markup.inline_keyboard[0][0].callback_data, 'job:menu');
+    assert.ok(sent.some((payload) => payload.reply_markup?.keyboard?.flat().some((button) => button.text === '💼 Поиск работы')),
+      'registered bot /start sends the new persistent owner job button');
     await runtime.bot.handleUpdate({ update_id: 2, callback_query: { id: '2', chat_instance: 'fixture',
       from: { id: 101, is_bot: false, first_name: 'Fixture' }, data: 'job:menu',
       message: { message_id: 1, date: 1, chat: { id: 101, type: 'private' } } } });

@@ -3,7 +3,8 @@ function response(answer, buttons = []) {
 }
 function button(text, action, id) { return { text, data: `job:${action}${id == null ? '' : `:${id}`}` }; }
 function homeView({ search, usage, connection }) {
-  return response(`Поиск работы\n${search.settings.activated ? search.settings.paused ? 'На паузе' : 'Поиск включён' : 'Ожидает настройки и включения'}
+  const enabled = search.settings.activated && !search.settings.paused;
+  return response(`Поиск работы\n${enabled ? 'Поиск включён' : 'Поиск выключен'}
 Проверка: каждые ${Math.round(search.settings.intervalMs / 60000)} мин.
 Первая выдача: ${search.settings.historyDays} дней.
 Последняя успешная проверка: ${search.checkpoint ? new Date(search.checkpoint).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' }) : 'ещё не выполнена'}
@@ -11,9 +12,9 @@ API за ${usage.month}: $${Number(usage.total).toFixed(4)}${usage.pending ? `, 
 Уведомление: $${search.settings.budgetUsd}; работа после него продолжается.
 HH: ${connection?.status === 'connected' ? connection.resume_id ? 'подключён, основное резюме выбрано' : 'нужно выбрать резюме' : 'не подключён'}.
 ${search.status === 'attention' ? 'Последняя проверка не завершена; сохранённый прогресс будет использован повторно.' : ''}`.trim(), [
+    [button(enabled ? 'Выключить поиск' : 'Включить поиск', enabled ? 'pause' : 'resume')],
     [button('Настройки', 'settings'), button('Сохранённые', 'saved', 0)],
     [button('Отклики', 'applications', 0), button('Проверить сейчас', 'check')],
-    [button(search.settings.paused ? 'Возобновить поиск' : 'Пауза поиска', search.settings.paused ? 'resume' : 'pause')],
     [button('Профиль и примеры', 'profile'), button('Подключить HH', 'connect')],
     [button('Назад', 'back')],
   ]);

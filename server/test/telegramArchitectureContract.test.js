@@ -7,10 +7,10 @@ const { replyKeyboard } = require('../src/telegram/telegramMenu');
 const root = path.resolve(__dirname, '../..');
 const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
 
-function documentedRows(contract, column) {
-  const rows = contract.split(/\r?\n/).filter((line) => /^\| [1-4] \|/.test(line));
-  assert.equal(rows.length, 4, 'document all four keyboard rows');
-  return rows.map((line) => {
+function documentedRows(contract, column, jobSearchEnabled) {
+  const rows = contract.split(/\r?\n/).filter((line) => /^\| [1-5] \|/.test(line));
+  assert.equal(rows.length, 5, 'document the four base rows and the conditional job row');
+  return rows.filter((line) => jobSearchEnabled || !line.startsWith('| 5 |')).map((line) => {
     const cell = line.split('|')[column].trim();
     return cell === 'absent' ? null : cell.split(', ').map((label) => label.replaceAll('`', ''));
   }).filter(Boolean);
@@ -19,8 +19,10 @@ function documentedRows(contract, column) {
 test('documented owner and member keyboard rows match shipped source exactly', () => {
   const contract = read('docs/telegram-menu-contract.md');
   for (const [owner, column] of [[true, 2], [false, 3]]) {
-    const actual = replyKeyboard(owner).keyboard.map((row) => row.map((button) => button.text));
-    assert.deepEqual(actual, documentedRows(contract, column));
+    for (const jobSearchEnabled of [false, true]) {
+      const actual = replyKeyboard(owner, { jobSearchEnabled }).keyboard.map((row) => row.map((button) => button.text));
+      assert.deepEqual(actual, documentedRows(contract, column, jobSearchEnabled));
+    }
     assert.equal(replyKeyboard(owner).is_persistent, true);
     assert.equal(replyKeyboard(owner).resize_keyboard, true);
   }

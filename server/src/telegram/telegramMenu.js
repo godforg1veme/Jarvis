@@ -7,25 +7,27 @@ const MENU = Object.freeze({
   VPN: '🔐 VPN',
   OPERATIONS: '📊 Панель',
   HELP: '❓ Помощь',
+  JOBS: '💼 Поиск работы',
 });
 
 const ACTION_BY_LABEL = new Map([
   [MENU.HOME, 'home'], [MENU.LIFE, 'life'], [MENU.MEMORY, 'memory'],
   [MENU.DOCUMENTS, 'documents'], [MENU.DEVICES, 'devices'], [MENU.VPN, 'vpn'],
-  [MENU.OPERATIONS, 'operations'], [MENU.HELP, 'help'],
+  [MENU.OPERATIONS, 'operations'], [MENU.HELP, 'help'], [MENU.JOBS, 'jobs'],
 ]);
 
 function menuAction(value) {
   return ACTION_BY_LABEL.get(String(value || '')) || null;
 }
 
-function replyKeyboard(owner) {
+function replyKeyboard(owner, { jobSearchEnabled = false } = {}) {
   const keyboard = [
     [{ text: MENU.HOME }, { text: MENU.LIFE }],
     [{ text: MENU.MEMORY }, { text: MENU.DOCUMENTS }],
     [{ text: MENU.DEVICES }, ...(owner ? [{ text: MENU.VPN }] : [{ text: MENU.HELP }])],
   ];
   if (owner) keyboard.push([{ text: MENU.OPERATIONS }, { text: MENU.HELP }]);
+  if (owner && jobSearchEnabled) keyboard.push([{ text: MENU.JOBS }]);
   return { keyboard, resize_keyboard: true, is_persistent: true };
 }
 

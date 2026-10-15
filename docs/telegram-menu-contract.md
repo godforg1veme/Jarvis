@@ -11,7 +11,8 @@ source changes; verify the deployed revision before a server rollout.
 
 Выпуск от 15 октября 2026: согласованный owner-only путь
 «Главное → Поиск работы» с inline-карточками и подтверждениями установлен
-на DE; нижняя клавиатура не меняется. Контракт новой
+на DE; в первом выпуске нижняя клавиатура не менялась. Последующее
+локальное обновление кнопок описано в таблице ниже. Контракт новой
 функции описан в [спецификации](superpowers/specs/2026-10-15-job-search-design.md),
 фактическая приёмка — в [записи разработки](updates/2026-10-15-job-search-development.md).
 Реализация добавляет закрытое семейство `job:*` и четыре `job_*` guided-input
@@ -46,6 +47,20 @@ ordinary assistant input unless a valid scoped guided interaction owns it.
 | 2 | `🧠 Память`, `📄 Документы` | `🧠 Память`, `📄 Документы` | Memory, documents |
 | 3 | `🖥 Устройства`, `🔐 VPN` | `🖥 Устройства`, `❓ Помощь` | Devices; owner VPN; help |
 | 4 | `📊 Панель`, `❓ Помощь` | absent | Owner Operations, help |
+| 5 | `💼 Поиск работы` | absent | Owner job search, feature enabled and private chat only |
+
+Row 5 is emitted only when job search is configured and the server role is
+owner in a private chat. Other rows retain their labels and order. The exact
+text routes through the existing scoped `job:menu`; it cancels active guided
+input before opening the job menu. Ordinary text without the exact label is dialogue.
+The job home shows `Включить поиск` (`job:resume`) while disabled and
+`Выключить поиск` (`job:pause`) while enabled. Each click sets that explicit state;
+replays do not toggle it back. Turning off preserves filters, checkpoint and
+partial collection progress, revokes the previous collection lease and stops
+card delivery. Turning on makes collection due immediately. Application
+confirmation, existing callback grammar and guided-input kinds are unchanged.
+This UI update was explicitly requested by the owner on 2026-10-15; it remains
+local until its separate release is authorized.
 
 Strings and mappings live in `server/src/telegram/telegramMenu.js`. `/start`
 and `/help` remain Home and Help aliases. Owner-only handlers recheck server

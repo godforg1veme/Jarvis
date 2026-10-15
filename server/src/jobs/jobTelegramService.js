@@ -59,13 +59,13 @@ class JobTelegramService {
       return response(action === 'save' ? 'Вакансия сохранена в Jarvis.' : 'Вакансия скрыта в Jarvis.', [[button('В поиск работы', 'menu')]]);
     }
     if (action === 'pause' || action === 'resume') {
-      await this.searchRepository.saveSettings({ scope, expectedRevision: search.revision,
-        settings: { ...search.settings, paused: action === 'pause', activated: action === 'resume' || search.settings.activated } });
+      await this.searchRepository.setEnabled({ scope, expectedRevision: search.revision, enabled: action === 'resume' });
       return this.home(scope);
     }
     if (action === 'check') {
       await this.pool.query('UPDATE job_searches SET next_check_at=now() WHERE user_id=$1', [scope.userId]);
-      return response(search.settings.activated && !search.settings.paused ? 'Проверка поставлена в очередь сборщика.' : 'Сначала включи поиск в настройках или возобнови его.');
+      return response(search.settings.activated && !search.settings.paused ? 'Проверка поставлена в очередь сборщика.' : 'Сначала нажми «Включить поиск».',
+        [[button('В поиск работы', 'menu')]]);
     }
     if (action === 'saved') return listView(await this.searchRepository.list({ userId: scope.userId, saved: true, page }), page, 'saved');
     if (action === 'applications') {

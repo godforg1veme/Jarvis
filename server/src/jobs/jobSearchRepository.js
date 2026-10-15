@@ -28,6 +28,23 @@ class JobSearchRepository {
     return row;
   }
 
+  async setEnabled({ scope, expectedRevision, enabled }) {
+    await assertJobScope(this.pool, scope);
+    if (typeof enabled !== 'boolean') throw jobError('JOB_INVALID_SETTINGS_INPUT');
+    const row = (await this.pool.query(`UPDATE job_searches SET
+      settings=jsonb_set(jsonb_set(settings,'{activated}',to_jsonb($1::boolean)),'{paused}',to_jsonb(NOT $1::boolean)),
+      revision=revision+1,conversation_id=$2,chat_id=$3,
+      next_check_at=CASE WHEN $1::boolean THEN now() ELSE next_check_at END,
+      lease_id=NULL,lease_until=NULL,status='idle',failure_code=NULL,updated_at=now()
+      WHERE user_id=$4 AND revision=$5
+      AND (settings->>'activated' IS DISTINCT FROM ($1::boolean)::text OR settings->>'paused' IS DISTINCT FROM (NOT $1::boolean)::text)
+      RETURNING *`, [enabled, scope.conversationId, scope.chatId, scope.userId, expectedRevision])).rows[0];
+    if (row) return row;
+    const current = await this.getSettings({ userId: scope.userId });
+    if (current?.settings.activated === enabled && current.settings.paused === !enabled) return current;
+    throw jobError('JOB_REVISION_CONFLICT');
+  }
+
   async upsertVacancy({ source = 'hh', externalId, snapshot }) {
     if (source !== 'hh' || !/^\d{1,20}$/.test(externalId)) throw jobError('JOB_INVALID_VACANCY');
     const serialized = JSON.stringify(snapshot);
