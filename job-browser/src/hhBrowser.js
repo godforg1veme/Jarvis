@@ -2,6 +2,7 @@ const { allowedRequest } = require('./networkPolicy');
 const { classifyPage, classifySession } = require('./pageSignals');
 const { readSearchPage, readVacancyPage, readResumes } = require('./hhPageReader');
 const { readApplicationForm } = require('./hhApplicationForm');
+const { readResumePrivacy, readEmployerId, evaluatePrivacy } = require('./hhPrivacy');
 const failure = (code) => Object.assign(new Error(code), { code });
 const CAPABILITIES = Object.freeze({ dateWindows: false, maxPages: 1000 });
 
@@ -44,7 +45,9 @@ class HhBrowser {
         && response?.status() === 200 && current.pathname === '/search/vacancy';
       const formCandidate = expected === 'application' && signal.state === 'unknown'
         && response?.status() === 200 && current.pathname === '/applicant/vacancy_response';
-      if (signal.state !== expected && !zeroCandidate && !formCandidate) throw failure('JOB_HH_DOM_CHANGED');
+      const privacyCandidate = expected === 'resume_privacy' && signal.state === 'unknown'
+        && response?.status() === 200 && /^\/resume\/[a-zA-Z0-9]+$/.test(current.pathname);
+      if (signal.state !== expected && !zeroCandidate && !formCandidate && !privacyCandidate) throw failure('JOB_HH_DOM_CHANGED');
       return await reader(page);
     } catch (error) {
       if (/^JOB_[A-Z_]+$/.test(error.code || '')) throw error;
@@ -73,10 +76,15 @@ class HhBrowser {
       const resumes = await this.read('https://hh.ru/applicant/resumes', 'authenticated', readResumes);
       const details = await this.read(`https://hh.ru/vacancy/${externalId}`, 'vacancy', async (page) => ({
         vacancy: await readVacancyPage(page, externalId),
+        employerId: await readEmployerId(page),
         alreadyApplied: await page.locator('[data-qa="vacancy-response-link-view-topic"], [data-qa="vacancy-response-link-top-again"]').count() > 0,
       }));
       if (details.alreadyApplied) return { vacancy: details.vacancy, resumeAvailable: resumes.some((resume) => resume.id === resumeId),
         manualRequired: true, reasonCode: 'JOB_HH_ALREADY_APPLIED' };
+      const privacy = await this.read(`https://hh.ru/resume/${resumeId}`, 'resume_privacy', (page) => readResumePrivacy(page, { resumeId }));
+      const permission = evaluatePrivacy({ privacy, employerId: details.employerId });
+      if (!permission.allowed) return { vacancy: details.vacancy, resumeAvailable: resumes.some((resume) => resume.id === resumeId),
+        manualRequired: true, reasonCode: permission.reasonCode };
       const state = await this.read(`https://hh.ru/applicant/vacancy_response?vacancyId=${externalId}`, 'application',
         (page) => readApplicationForm(page, { externalId: String(externalId), resumeId, resumes }));
       return { vacancy: details.vacancy, ...state };

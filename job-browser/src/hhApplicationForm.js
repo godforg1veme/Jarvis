@@ -1,3 +1,5 @@
+const { classifyPage } = require('./pageSignals');
+
 function inspectForm(raw, { externalId, resumeId, resumes }) {
   let url; try { url = new URL(raw.url); } catch { return { manualRequired: true, reasonCode: 'JOB_HH_FORM_CHANGED' }; }
   const matches = resumes.filter((resume) => resume.id === resumeId);
@@ -6,6 +8,9 @@ function inspectForm(raw, { externalId, resumeId, resumes }) {
   const uniqueTitle = selected && resumes.filter((resume) => normalize(resume.title) === normalize(selected.title)).length === 1;
   if (!selected || !uniqueTitle) return { resumeAvailable: false, manualRequired: true, reasonCode: 'JOB_HH_RESUME_UNAVAILABLE' };
   const result = { resumeAvailable: true, manualRequired: true, reasonCode: 'JOB_HH_FORM_CHANGED' };
+  const signal = classifyPage({ status: 200, pathname: url.pathname, text: raw.text, iframeSources: raw.iframeSources || [] });
+  if (signal.state === 'captcha') return { ...result, reasonCode: 'JOB_HH_CAPTCHA_REQUIRED' };
+  if (['login_required', 'access_denied'].includes(signal.state)) return result;
   if (url.origin !== 'https://hh.ru' || url.pathname !== '/applicant/vacancy_response'
     || url.searchParams.getAll('vacancyId').length !== 1 || url.searchParams.get('vacancyId') !== externalId) return result;
   if (!Array.isArray(raw.resumeTitles) || raw.resumeTitles.length !== 1 || normalize(raw.resumeTitles[0]) !== normalize(selected.title)) return result;
@@ -25,8 +30,8 @@ function inspectForm(raw, { externalId, resumeId, resumes }) {
 async function readApplicationForm(page, args) {
   const raw = await page.evaluate(() => ({
     url: location.href,
+    text: document.body?.innerText?.slice(0, 64000) || '',
     resumeTitles: [...document.querySelectorAll('[data-qa="resume-title"]')].slice(0, 21).map((node) => node.textContent.slice(0, 500)),
-    hiddenResumeWarning: [...document.querySelectorAll('[data-qa="hidden-resume-warning"]')].some((node) => node.getClientRects().length > 0),
     fields: [...document.querySelectorAll('input,select,textarea')].slice(0, 101).map((node) => ({
       tag: node.tagName, type: node.type, name: node.name, qa: node.getAttribute('data-qa') })),
     submitCount: document.querySelectorAll('[data-qa="vacancy-response-submit-popup"]').length,
@@ -34,6 +39,18 @@ async function readApplicationForm(page, args) {
     letterInputCount: document.querySelectorAll('[data-qa="vacancy-response-popup-form-letter-input"]').length,
     letterToggleCount: document.querySelectorAll('[data-qa="vacancy-response-letter-toggle"]').length,
   }));
+  // A zero-size hidden tooltip still has a client rect in HH. Use actual visibility.
+  raw.hiddenResumeWarning = false;
+  for (const warning of (await page.locator('[data-qa="hidden-resume-warning"]').all()).slice(0, 20)) {
+    if (await warning.isVisible()) { raw.hiddenResumeWarning = true; break; }
+  }
+  raw.iframeSources = [];
+  for (const frame of (await page.locator('iframe').all()).slice(0, 100)) {
+    if (await frame.isVisible()) {
+      const source = await frame.getAttribute('src');
+      if (source) { try { raw.iframeSources.push(new URL(source, raw.url).href); } catch {} }
+    }
+  }
   return inspectForm(raw, args);
 }
 module.exports = { inspectForm, readApplicationForm };

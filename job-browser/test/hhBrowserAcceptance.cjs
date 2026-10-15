@@ -27,7 +27,7 @@ test('real Chromium reads fixtures, rejects changed/security pages, and never ma
     } else if (url.pathname === '/vacancy/404') { status = 404; body = 'Не найдено'; }
     else if (url.pathname === '/applicant/vacancy_response') {
       body = `<div data-qa="resume-title">Первое резюме</div>
-        ${hiddenResume ? '<div data-qa="hidden-resume-warning">Измените видимость резюме</div>' : ''}
+        <div data-qa="hidden-resume-warning" ${hiddenResume ? '' : 'style="width:0;height:0;overflow:hidden"'}>Измените видимость резюме</div>
         <form><input type="hidden" name="_xsrf" value="fixture"><button data-qa="vacancy-response-letter-toggle" type="button">Добавить письмо</button>
         ${questionnaire ? '<input type="text" name="questionnaire">' : ''}
         <button data-qa="vacancy-response-submit-popup" type="submit">Откликнуться</button></form>`;
@@ -35,9 +35,19 @@ test('real Chromium reads fixtures, rejects changed/security pages, and never ma
       body = `<script type="application/ld+json">${JSON.stringify({ '@type': 'JobPosting', title: 'Junior AI',
         datePosted: '2026-10-15T10:00:00+03:00', hiringOrganization: { name: 'Fixture' } })}</script>
         <div data-qa="vacancy-description">Автоматизация и AI</div>
+        <div data-qa="vacancy-company"><a href="/employer/${url.pathname === '/vacancy/102' ? '1001' : '900'}">Fixture</a></div>
         <script>fetch('/unexpected-write',{method:'POST',body:'fixture'}).catch(()=>{});</script>`;
     } else if (url.pathname === '/applicant/resumes') {
       body = '<h1>Мои резюме</h1><div data-qa="resume"><a data-qa="resume-title" href="/resume/fixtureA">Первое резюме</a></div>';
+    } else if (url.pathname === '/resume/fixtureA') {
+      body = `<button type="button" data-qa="resume-visibility-card">Скрыто от выбранных работодателей</button>
+      <script>document.querySelector('button').onclick=()=>{
+        document.body.insertAdjacentHTML('beforeend','<label data-qa="resume-visibility-card-access-type-blacklist"><input type="radio" checked></label><button type="button" data-qa="applicant-employers-list-activator-blacklist">Список</button>');
+        document.querySelector('[data-qa="applicant-employers-list-activator-blacklist"]').onclick=()=>{
+          const rows=['1001','1002'].map(id=>'<div><div><div><div data-qa="resume-editor-employer-list-item-'+id+'"><a href="/employer/'+id+'">Fixture</a></div></div></div><button type="button" data-qa="resume-employer-list-item-delete"></button></div>').join('');
+          document.body.insertAdjacentHTML('beforeend','<div role="dialog"><input data-qa="resume-editor-employer-list-search-input"><div data-qa="modal-content-scroll-container">'+rows+'</div><button data-qa="resume-modal-button-save">Готово</button></div>');
+        };
+      };</script>`;
     } else { status = 404; body = ''; }
     await route.fulfill({ status, contentType: 'text/html; charset=utf-8', body: `<!DOCTYPE html><html><body>${body}</body></html>` });
   });
@@ -59,6 +69,7 @@ test('real Chromium reads fixtures, rejects changed/security pages, and never ma
     assert.equal((await hh.inspect({ externalId: '101', resumeId: 'fixtureA' })).manualRequired, false);
     questionnaire = true;
     assert.equal((await hh.inspect({ externalId: '101', resumeId: 'fixtureA' })).manualRequired, true);
+    assert.equal((await hh.inspect({ externalId: '102', resumeId: 'fixtureA' })).reasonCode, 'JOB_HH_EMPLOYER_BLOCKED');
     await assert.rejects(hh.inspect({ externalId: '101', resumeId: 'fixtureB' }), { code: 'JOB_HH_RESUME_UNAVAILABLE' });
     assert.equal(writes, 0, 'page-level read guard blocks writes before any transport');
   } finally { await context.close(); await browser.close(); }

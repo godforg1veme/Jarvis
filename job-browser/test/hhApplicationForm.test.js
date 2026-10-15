@@ -9,6 +9,7 @@ test('form inspection binds unique resume title and vacancy; privacy warnings an
     letterInputCount: 0, letterToggleCount: 1, hiddenResumeWarning: false };
   assert.deepEqual(inspectForm(raw, args), { resumeAvailable: true, manualRequired: false, reasonCode: null });
   assert.equal(inspectForm({ ...raw, hiddenResumeWarning: true }, args).reasonCode, 'JOB_HH_RESUME_HIDDEN');
+  assert.equal(inspectForm({ ...raw, text: 'Подтвердите, что вы не робот' }, args).reasonCode, 'JOB_HH_CAPTCHA_REQUIRED');
   for (const changed of [
     { url: 'https://hh.ru/applicant/vacancy_response?vacancyId=124' },
     { url: 'https://hh.ru/applicant/vacancy_response?vacancyId=123&vacancyId=124' },
