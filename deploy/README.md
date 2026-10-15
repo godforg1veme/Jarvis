@@ -375,7 +375,7 @@ active lease. Telegram cannot start or extend capture. Do not enable Vision
 until the memory key has been backed up securely: losing it makes retained frames
 unrecoverable, while changing it without re-encryption breaks existing memory.
 
-## Job search (DE, opt-in; awaiting first release)
+## Job search (DE, opt-in; first release 2026-10-15)
 
 The `job-search-de` profile adds `job-browser` and `job-collector` on DE only.
 The bot server connects to the browser RPC network. No host ports/CDP are
@@ -384,6 +384,10 @@ The collector receives a read credential; only the bot and browser receive
 the distinct apply credential when explicitly enabled. See
 [browser runtime and tests](../job-browser/README.md) and
 [current readiness](../docs/updates/2026-10-15-job-search-development.md).
+
+First production deployment is recorded in the
+[release result](../docs/updates/2026-10-15-job-search-release.md). DE services
+are enabled; the owner's search settings still require Telegram activation.
 
 Publish only after owner authorization under the release workflow. Preserve
 the existing private HH profile volume; configure its external volume name,

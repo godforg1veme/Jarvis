@@ -1,5 +1,9 @@
 # Поиск работы: локальная разработка 15 октября 2026
 
+**Более новый результат:** после разрешения владельца выполнен
+[первый выпуск на DE](2026-10-15-job-search-release.md). Ниже сохранена история
+локальных проверок до публикации.
+
 Последняя контрольная точка: reader, collector, opt-in отправка и read-only
 reconcile подключены к runtime/RPC. Единый Telegram job handler → PostgreSQL →
 RPC → Chromium send/recovery E2E прошёл на DE и повторён в одноразовом Compose

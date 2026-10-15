@@ -35,6 +35,18 @@ See `docs/README.md` for current implementation status and historical records.
 
 ## Current Architecture
 
+### Job search
+
+Выпущен на DE 15 октября 2026: домен `server/src/jobs`, существующий Telegram
+и PostgreSQL, отдельные collector и Chromium browser. Browser владеет приватной
+HH-сессией, узкий RPC привязан к одному owner UUID; read/apply credentials
+разделены. Сбор детерминированный, модель вызывается по кнопке, отправка требует
+подтверждения точного письма и durable intent. Unknown проверяется по исходной
+операции без повторного POST. Стоп-лист работодателей сохраняется.
+Первое включение поиска и live submit ещё требуют действий владельца.
+[Результат выпуска и ограничения](updates/2026-10-15-job-search-release.md),
+[настройка браузера](../job-browser/README.md).
+
 ### Cloud control plane
 
 - `server/` is a Node.js 20+, CommonJS, Fastify service.

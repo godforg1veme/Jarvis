@@ -18,7 +18,7 @@
 | VPN Supervisor | Owner-confirmed ограниченный NL Xray restart с postchecks; peer timers включены | Restore отключён; external timer failures ещё не создают Telegram incidents |
 | Эксплуатация | Server, PostgreSQL и ASR healthy; hopping DNAT присутствует и сохранён в UFW на обоих узлах | Реальная проверка сохранения после reboot и автоматического ACME renewal; backups отложены владельцем |
 | Дальнейшая работа | Облако и Windows являются основными частями продукта | PWA, server executors, расписания и реальные account connectors |
-| Поиск работы — локальная разработка | Reader/RPC, сборщик и opt-in отправка; единый PG/Chromium send E2E прошёл. Живые вход, резюме, стоп-лист и чтение прошлого отклика HH DE подтверждены | Выпуск и реальная приёмка остаются; [согласованный путь](superpowers/specs/2026-10-15-job-search-without-api-options.md), [состояние](updates/2026-10-15-job-search-development.md) |
+| Поиск работы | Выпущены server, browser и collector на DE; health, чтение HH и совпадение кода проверены. GitHub/Windows/DE/NL синхронизированы | Включение поиска владельцем и реальная Telegram/HH приёмка; [результат выпуска](updates/2026-10-15-job-search-release.md) |
 
 Последняя сверка компонентов выполнена 9 октября 2026 года после публикации
 единого release-workflow: Windows и оба VPS-исходника совпадают, установленный
