@@ -13,7 +13,7 @@ test('feature off constructs no database, model or Telegram worker', async () =>
 test('collector has independent configuration and never requires a Telegram or model key', async () => {
   const queries = [];
   const pool = { async query(sql) { queries.push(sql); return { rows: [], rowCount: 0 }; } };
-  const runtime = createCollectorRuntime({ env: { JARVIS_JOB_SEARCH_ENABLED: 'true' }, pool });
+  const runtime = createCollectorRuntime({ env: { JARVIS_JOB_SEARCH_ENABLED: 'true' }, pool, hhClient: {} });
   assert.equal(runtime.enabled, true);
   await runtime.start(); await runtime.close();
   assert.equal(queries.length, 2);

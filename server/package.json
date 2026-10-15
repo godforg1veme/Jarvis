@@ -14,6 +14,7 @@
     "test:jobs:postgres": "node --test test/jobPostgresAcceptance.cjs test/jobCollectorAcceptance.cjs test/jobDraftAcceptance.cjs test/jobTelegramAcceptance.cjs test/jobApplicationsAcceptance.cjs test/jobDeliveryAcceptance.cjs",
     "test:jobs:e2e": "node --test test/jobE2eAcceptance.cjs",
     "test:jobs:runtime": "node --test test/jobFullRuntimeAcceptance.cjs",
+    "test:jobs:browser": "node --test test/jobBrowserCollectorAcceptance.cjs",
     "test": "node --test test/*.test.js"
   },
   "dependencies": {

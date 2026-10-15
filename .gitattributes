@@ -1,0 +1,2 @@
+# Preserve the verified bytes of the pinned upstream Chromium seccomp profile.
+deploy/job-browser/seccomp_profile.json text eol=lf

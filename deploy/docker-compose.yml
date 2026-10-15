@@ -1,6 +1,41 @@
 name: jarvis-family
 
 services:
+  job-browser:
+    profiles: [job-search-de]
+    build:
+      context: ../job-browser
+      dockerfile: Dockerfile
+    init: true
+    user: pwuser
+    restart: unless-stopped
+    stop_grace_period: 60s
+    environment:
+      JARVIS_JOB_BROWSER_ENABLED: "1"
+      JARVIS_JOB_BROWSER_OWNER_ID: ${JARVIS_JOB_BROWSER_OWNER_ID:-}
+      JARVIS_JOB_BROWSER_TOKEN: ${JARVIS_JOB_BROWSER_TOKEN:-}
+    volumes:
+      - job-browser-profile:/home/pwuser/profile
+    networks: [job-browser-rpc]
+    shm_size: 256m
+    pids_limit: 256
+    cap_drop: [ALL]
+    # Chromium's sandbox needs chroot in its user namespace; no SYS_ADMIN.
+    cap_add: [SYS_CHROOT]
+    security_opt:
+      - no-new-privileges:true
+      - seccomp=./job-browser/seccomp_profile.json
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:8080/health',{headers:{authorization:'Bearer '+process.env.JARVIS_JOB_BROWSER_TOKEN}}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+          pids: 256
   job-collector:
     profiles: [job-search-de]
     build:
@@ -15,12 +50,15 @@ services:
       JARVIS_JOB_SEARCH_ENABLED: ${JARVIS_JOB_SEARCH_ENABLED:-false}
       JARVIS_JOB_COLLECTOR_INTERVAL_MS: ${JARVIS_JOB_COLLECTOR_INTERVAL_MS:-1800000}
       JARVIS_JOB_HISTORY_DAYS: ${JARVIS_JOB_HISTORY_DAYS:-14}
-      HH_USER_AGENT: ${HH_USER_AGENT:-JarvisJobSearch/1.0}
-      HH_APP_TOKEN: ${HH_APP_TOKEN:-}
+      JARVIS_JOB_BROWSER_URL: http://job-browser:8080
+      JARVIS_JOB_BROWSER_OWNER_ID: ${JARVIS_JOB_BROWSER_OWNER_ID:-}
+      JARVIS_JOB_BROWSER_TOKEN: ${JARVIS_JOB_BROWSER_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy
-    networks: [backend]
+      job-browser:
+        condition: service_healthy
+    networks: [backend, job-browser-rpc]
     deploy:
       resources:
         limits:
@@ -239,10 +277,15 @@ services:
           memory: 256M
 
 networks:
+  job-browser-rpc:
+    internal: false
   backend:
     internal: false
 
 volumes:
+  job-browser-profile:
+    external: true
+    name: ${JARVIS_JOB_BROWSER_PROFILE_VOLUME:-jarvis-hh-owner-profile}
   postgres-data:
   document-data:
   vision-data:

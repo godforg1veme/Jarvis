@@ -1,8 +1,9 @@
-# HH browser: проверочный этап
+# HH browser: чтение и проверка формы
 
-Изолированный пакет для замены недоступного API соискателя. Это пока публичная
-проба и временный вход владельца, а не интегрированный сборщик или отправитель
-откликов. Playwright/Chromium согласованы владельцем 15 октября 2026.
+Изолированный пакет для замены недоступного API соискателя. Реализованы чтение
+поиска, вакансий, собственных резюме и безопасная проверка формы. Сборщик
+подключён через приватный RPC. Отправка ещё не подключена.
+Playwright/Chromium согласованы владельцем 15 октября 2026.
 
 ## Проверка без аккаунта
 
@@ -26,7 +27,7 @@ SHA256 `cc3e61cabda6bbc1e53e54d27ba4d55a9d3be829b6dd1a596f4a7b31b1cc7849`.
 docker build -t jarvis-job-browser-probe:20261015 .
 docker run --rm --init --user pwuser --memory=1g --cpus=1 --pids-limit=256 \
   --shm-size=256m --security-opt seccomp=/absolute/path/seccomp_profile.json \
-  jarvis-job-browser-probe:20261015
+  -e JARVIS_HH_BROWSER_PROBE=1 jarvis-job-browser-probe:20261015 node src/probe.js
 ```
 
 Проба посещает максимум три страницы: поиск, одну найденную вакансию и вход.
@@ -77,7 +78,52 @@ task-labelled контейнер и локальный SSH tunnel; volume сох
 Одновременный запуск с браузером, уже владеющим профилем, запрещён. Скрипт
 проверяет uid/0700 перед чтением и выводит только закрытый статус.
 
-Основное резюме, заполнение формы, отправка после подтверждения и
-доказательство результата ещё не проверены. Предыдущие
-Telegram/PostgreSQL проверки не заменяют browser E2E этих операций.
-Публичные результаты не разрешают реальный отклик.
+Основное резюме выбрано владельцем и сопоставлено с карточкой HH. Проверка
+формы подтвердила блокировку из-за скрытого резюме; видимость без решения
+владельца не меняется. Заполнение, отправка после подтверждения и доказательство
+результата ещё не проверены. Telegram/PostgreSQL проверки не заменяют browser
+E2E отправки. Публичные результаты не разрешают реальный отклик.
+
+## Приватный сервис чтения
+
+Compose-профиль `job-search-de` содержит отдельные `job-browser` и
+`job-collector`. Браузер находится только в сети `job-browser-rpc`, без host
+ports, DB/model/Telegram env и CDP. Сборщик также подключён к backend для PG.
+RPC принимает только закрытые `search`, `vacancy`, `resumes`, `inspect` с
+отдельным секретом и единственным owner UUID. Submit пока недоступен.
+
+Runtime требует `JARVIS_JOB_BROWSER_ENABLED=1`, `JARVIS_JOB_BROWSER_OWNER_ID`
+и случайный `JARVIS_JOB_BROWSER_TOKEN` длиной 32–256 символов. Приватный профиль
+0700 принадлежит uid `pwuser`; owner binding записывается однажды и не допускает
+замены UUID. Основное резюме читается из приватного manifest, другое автоматически
+не подставляется. Health проверяет процесс RPC, а не вход в HH.
+
+`JARVIS_JOB_BROWSER_PROFILE_VOLUME` указывает на уже существующий volume
+ручного входа. До выпуска нужно сопоставить owner UUID с реальным владельцем
+Jarvis и выбрать этот volume в закрытом окружении DE. Сессия остаётся на месте.
+Compose не создаёт пустую замену существующему профилю.
+
+Sandbox включён; контейнеру оставлена только capability `SYS_CHROOT`.
+Проверка с удалением всех capabilities показала, что Chromium не может
+создать sandbox. Вариант с `SYS_CHROOT`, `no-new-privileges` и официальным
+seccomp прошёл реальные Chromium-проверки. Профиль хранится в
+[`deploy/job-browser/seccomp_profile.json`](../deploy/job-browser/seccomp_profile.json)
+из указанной выше pinned версии Playwright. WebSocket и все изменяющие
+запросы сервиса чтения блокируются, включая запросы popup/frame.
+
+HH не применил проверенные date windows. Сервис задаёт `search_period`, 20
+карточек и сортировку по публикации; сборщик проверяет точные даты вакансии.
+Несогласованные count/pages, неполная страница, лимит выдачи или неизвестный
+DOM дают ошибку с сохранением прогресса, а не успешный checkpoint.
+
+Проверки без Chromium: `node --test job-browser/test/*.test.js` из корня.
+Явные Chromium-проверки внутри pinned image:
+`node --test test/hhBrowserAcceptance.cjs` и
+`node --test test/browserRuntimeAcceptance.cjs`. Второй сценарий требует
+свежий tmpfs `/home/pwuser/profile` с uid/gid 1001 и mode 0700; профиль
+реального владельца для него запрещён. Fixtures не обращаются к HH.
+
+Единая цепочка Chromium → RPC → collector → PostgreSQL проверяется командой
+`npm run test:jobs:browser --prefix server` из корня (нужен отдельный test PG).
+В Windows допускается `PLAYWRIGHT_CHANNEL=msedge`; это отдельное свидетельство
+интеграции, а pinned Chromium DE проверяется приведёнными выше acceptance.

@@ -11,6 +11,7 @@ const schema = z.object({
   hhClientId: z.string().max(255), hhClientSecret: z.string().max(2048),
   hhAppToken: z.string().max(4096),
   hhUserAgent: z.string().max(255),
+  jobBrowserUrl: z.string().max(255), jobBrowserOwnerId: z.string().max(100), jobBrowserToken: z.string().max(256),
 });
 
 function loadJobConfig(env) {
@@ -26,6 +27,9 @@ function loadJobConfig(env) {
     hhClientSecret: String(env.HH_CLIENT_SECRET || '').trim(),
     hhAppToken: String(env.HH_APP_TOKEN || '').trim(),
     hhUserAgent: String(env.HH_USER_AGENT || 'JarvisJobSearch/1.0').trim(),
+    jobBrowserUrl: String(env.JARVIS_JOB_BROWSER_URL || 'http://job-browser:8080').trim(),
+    jobBrowserOwnerId: String(env.JARVIS_JOB_BROWSER_OWNER_ID || '').trim(),
+    jobBrowserToken: String(env.JARVIS_JOB_BROWSER_TOKEN || '').trim(),
   });
   if (config.jobSecretKey && (!/^[a-f\d]{64}$/i.test(config.jobSecretKey)
     && !/^[\w-]{43}$/.test(config.jobSecretKey))) throw new Error('Invalid job secret key');

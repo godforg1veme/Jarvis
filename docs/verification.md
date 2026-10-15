@@ -61,6 +61,21 @@ npm test
 npm start
 ```
 
+Job browser collector integration (opt-in, isolated PostgreSQL fixture only):
+
+```powershell
+npm ci --prefix job-browser
+# Set JARVIS_JOB_TEST_DATABASE_URL to the dedicated local test cluster.
+# Optional PLAYWRIGHT_CHANNEL=msedge uses installed Edge in headless mode.
+npm run test:jobs:browser --prefix server
+```
+
+This test runs the real Chromium reader, authenticated HTTP RPC and collector
+against a unique PostgreSQL fixture schema. HH pages are intercepted fixtures;
+no live HH requests, model calls, Telegram messages or applications are sent.
+Pinned DE Chromium/runtime acceptance commands are in
+[job-browser/README.md](../job-browser/README.md).
+
 Telegram menu changes: run the focused suite in
 `docs/telegram-menu-contract.md`, then full `server/npm test` before deployment.
 

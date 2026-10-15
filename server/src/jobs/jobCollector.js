@@ -29,11 +29,15 @@ class JobCollector {
     };
     const saveProgress = () => this.search.saveProgress({ userId, leaseId: job.lease_id, progress });
     try {
+      const hh = typeof this.hh.forUser === 'function' ? this.hh.forUser(userId) : this.hh;
+      const capabilities = hh.capabilities || { dateWindows: true, maxPages: 20 };
+      if (!Number.isInteger(capabilities.maxPages) || capabilities.maxPages < 1 || capabilities.maxPages > 1000) throw jobError('JOB_HH_INVALID_RESPONSE');
       await saveProgress();
       while (progress.windows.length) {
         const window = progress.windows[0];
-        const page = await request(() => this.hh.search({ query: window.query, publishedFrom: window.from, publishedTo: window.to, page: window.page }));
-        if (page.found > 2000) {
+        const page = await request(() => hh.search({ query: window.query, publishedFrom: window.from, publishedTo: window.to, page: window.page }));
+        if (!Array.isArray(page.items) || !Number.isInteger(page.pages) || !Number.isFinite(page.found) || page.found < 0) throw jobError('JOB_HH_INVALID_RESPONSE');
+        if (page.found > 2000 && capabilities.dateWindows === true) {
           const from = new Date(window.from), to = new Date(window.to);
           if (to - from <= 10 * 60 * 1000) throw jobError('JOB_COLLECTION_WINDOW_SATURATED');
           const mid = new Date(Math.floor((from.getTime() + to.getTime()) / 2 / 300000) * 300000).toISOString();
@@ -41,13 +45,13 @@ class JobCollector {
             { query: window.query, from: window.from, to: mid, page: 0, offset: 0 });
           await saveProgress(); continue;
         }
-        if (page.pages < 0 || page.pages > 20) throw jobError('JOB_HH_INVALID_RESPONSE');
+        if (page.pages < 0 || page.pages > capabilities.maxPages) throw jobError('JOB_HH_INVALID_RESPONSE');
         for (let index = window.offset; index < page.items.length; index++) {
           const item = page.items[index];
           const id = String(item.id);
           if (!/^\d{1,20}$/.test(id)) throw jobError('JOB_HH_INVALID_RESPONSE');
           if (seen.has(id)) { window.offset = index + 1; await saveProgress(); continue; }
-          const snapshot = await request(() => this.hh.getVacancy({ externalId: id }));
+          const snapshot = await request(() => hh.getVacancy({ externalId: id }));
           seen.add(id);
           if (!snapshot.archived && new Date(snapshot.publishedAt) >= new Date(progress.lower)
             && new Date(snapshot.publishedAt) <= new Date(progress.until)) {

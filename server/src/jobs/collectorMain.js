@@ -3,18 +3,20 @@ const { loadJobConfig } = require('./jobConfig');
 const { JobSearchRepository } = require('./jobSearchRepository');
 const { JobDeliveryRepository } = require('./jobDeliveryRepository');
 const { JobCollector } = require('./jobCollector');
-const { HhClient } = require('./hhClient');
+const { JobBrowserClient } = require('./jobBrowserClient');
 const { CurrencyRates } = require('./currencyRates');
 
 function createCollectorRuntime({ env = process.env, pool, hhClient, currencyRates, clock = () => new Date(), wait } = {}) {
   const config = loadJobConfig(env);
   if (!config.jobSearchEnabled) return { async start() {}, async close() {}, enabled: false };
   if (!pool && !env.DATABASE_URL) throw new Error('Job collector requires DATABASE_URL');
+  const source = hhClient || new JobBrowserClient({ baseUrl: config.jobBrowserUrl,
+    ownerId: config.jobBrowserOwnerId, token: config.jobBrowserToken });
   const database = pool || new Pool({ connectionString: env.DATABASE_URL });
   const searchRepository = new JobSearchRepository(database);
   let stopping = false, timer = null, running = null;
   const collector = new JobCollector({ searchRepository, deliveryRepository: new JobDeliveryRepository(database),
-    hhClient: hhClient || new HhClient({ userAgent: config.hhUserAgent, readCredential: config.hhAppToken }),
+    hhClient: source,
     currencyRates: currencyRates || new CurrencyRates(), now: clock, wait, shouldStop: () => stopping });
   const tick = () => {
     if (stopping || running) return running;
