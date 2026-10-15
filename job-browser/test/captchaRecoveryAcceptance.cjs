@@ -9,7 +9,7 @@ const { HhBrowser } = require('../src/hhBrowser');
 const { CaptchaJournal } = require('../src/captchaJournal');
 const { CaptchaRecovery } = require('../src/captchaRecovery');
 
-test('Chromium: wait, exact captcha posts, successful read, unknown restart and foreign owner', { timeout: 90000 }, async () => {
+for (const nativeQuery of [false, true]) test(`Chromium ${nativeQuery ? 'native XHR' : 'body'}: wait, exact captcha posts, successful read, unknown restart and foreign owner`, { timeout: 90000 }, async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'jarvis-captcha-'));
   const ownerId = randomUUID(); let now = 2000000000000;
   let solved = false, rejectAnswer = false, loseReceipt = false, tamper = false, oversizedImage = false, denyAfterAnswer = false;
@@ -26,9 +26,13 @@ test('Chromium: wait, exact captcha posts, successful read, unknown restart and 
       if (u.pathname === '/captcha') { initializations++; return route.fulfill({ contentType: 'application/json', body: '{"key":"fixture"}' }); }
       if (u.pathname === '/account/captcha') {
         answers++;
-        const body = new URLSearchParams(request.postData());
+        const body = nativeQuery ? u.searchParams : new URLSearchParams(request.postData());
         assert.equal(body.get('captchaText'), 'проверка картинки');
-        assert.equal(body.get('_xsrf'), 'fixture-xsrf'); assert.equal(body.get('isBot'), 'false');
+        if (nativeQuery) {
+          assert.equal(request.resourceType(), 'xhr'); assert.equal(request.postDataBuffer(), null);
+          assert.equal(request.headers()['x-xsrftoken'], 'fixture-xsrf');
+          assert.equal(body.get('captchaKey'), 'fixture'); assert.equal(body.get('captchaState'), 'fixture');
+        } else { assert.equal(body.get('_xsrf'), 'fixture-xsrf'); assert.equal(body.get('isBot'), 'false'); }
         if (!rejectAnswer) solved = true;
         return loseReceipt ? route.abort() : route.fulfill({ contentType: 'application/json', body: '{"ok":true}' });
       }
@@ -51,7 +55,8 @@ test('Chromium: wait, exact captcha posts, successful read, unknown restart and 
       const init=()=>fetch('/captcha?lang=RU',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'}}).then(r=>r.json()).then(()=>document.querySelector('img').src='/captcha/picture?key=fixture').catch(()=>{});
       init();init();fetch('/unexpected-write',{method:'POST'}).catch(()=>{});
       document.querySelector('form').onsubmit=e=>{e.preventDefault();${tamper ? "document.querySelector('[name=isBot]').value='true';" : ''}
-        const f=e.currentTarget;const send=()=>fetch(f.action,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams(new FormData(f)).toString()}).catch(()=>{});send();send();};
+        const f=e.currentTarget;const send=()=>{${nativeQuery ? `const a=new URL(f.action); const q=new URLSearchParams({captchaText:f.elements.captchaText.value,captchaKey:'fixture',captchaState:a.searchParams.get('state'),backurl:a.searchParams.get('backurl'),failurl:f.action});
+          const x=new XMLHttpRequest();x.open('POST','/account/captcha?'+q);x.setRequestHeader('Content-Type','application/x-www-form-urlencoded');x.setRequestHeader('X-Xsrftoken',${tamper ? "'wrong'" : 'f.elements._xsrf.value'});x.send();` : `fetch(f.action,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams(new FormData(f)).toString()}).catch(()=>{});`}};send();send();};
       </script>` });
     return route.abort();
   });

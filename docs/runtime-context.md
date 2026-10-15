@@ -55,6 +55,10 @@ captcha POST; отклики сохраняют прежний apply credential 
 [Проверки и статус установки](updates/2026-10-15-hh-captcha-recovery-release.md),
 [контракт OCR](../job-ocr/README.md). Флаг включён; попытка 15 октября в 21:33 МСК
 закончилась manual-required, Telegram notice доставлено, сбор пока остановлен.
+Исправленный OCR установлен из `8de0cfa`. Следующая попытка прошла OCR, но
+локальный guard заблокировал native XHR с ответом в query вместо body.
+[Установка и ремонт формата запроса](updates/2026-10-16-hh-native-captcha-request.md);
+browser-исправление пока локальное, возобновление сбора не подтверждено.
 
 ### Cloud control plane
 

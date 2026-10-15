@@ -1,5 +1,5 @@
 const { createHash, randomUUID } = require('node:crypto');
-const { validInit, validAnswer, validAnswerRequest, sameForm, readForm, targetUrl } = require('./captchaProtocol');
+const { validInit, validAnswer, validPictureKey, validAnswerRequest, sameForm, readForm, targetUrl } = require('./captchaProtocol');
 const { recognizePng } = require('./ocrClient');
 const hash = (value) => createHash('sha256').update(value).digest('hex');
 const failure = (code, extra = {}) => Object.assign(new Error(code), { code, ...extra });
@@ -15,17 +15,19 @@ class CaptchaRecovery {
   }
   async permit(attempt, request) {
     if (!attempt || request.frame() !== attempt.page.mainFrame()) return false;
-    const input = { url: request.url(), method: request.method(), contentType: request.headers()['content-type'], body: request.postDataBuffer() };
+    const headers = request.headers();
+    const input = { url: request.url(), method: request.method(), contentType: headers['content-type'], body: request.postDataBuffer(),
+      csrfToken: headers['x-xsrftoken'], navigation: request.isNavigationRequest(), resourceType: request.resourceType() };
     if (attempt.canInit && !attempt.initCount && validInit(input) && await readForm(attempt.page, attempt.target)) {
       if (attempt.initCount) return false;
       attempt.initCount++;
       attempt.state = await this.journal.write({ ...attempt.state, phase: 'initializing' });
       return true;
     }
-    if (attempt.armed && !attempt.permitted && validAnswerRequest(input, attempt.form, attempt.target, attempt.answer)) {
+    if (attempt.armed && !attempt.permitted && validAnswerRequest(input, attempt.form, attempt.target, attempt.answer, attempt.pictureKey)) {
       // A native form navigation can suspend DOM evaluation. The exact frozen
       // action and hidden values are already rechecked before arming, and the
-      // outgoing body must still match them here.
+      // outgoing body or native XHR query must still match them here.
       attempt.permitted++; attempt.request = request; return true;
     }
     return false;
@@ -52,13 +54,19 @@ class CaptchaRecovery {
           && u.searchParams.size === 1 && Boolean(u.searchParams.get('key')) && n.naturalWidth > 0 && n.naturalWidth <= 1024 && n.naturalHeight > 0 && n.naturalHeight <= 256; } catch { return false; } })) { if (image) throw this.manual(attempt); image = node; }
       }
       if (!image) throw this.manual(attempt);
+      const pictureSource = await image.getAttribute('src');
+      const pictureUrl = new URL(pictureSource, attempt.page.url());
+      const pictureKey = pictureUrl.searchParams.get('key');
+      if (pictureUrl.origin !== 'https://hh.ru' || pictureUrl.pathname !== '/captcha/picture'
+        || pictureUrl.username || pictureUrl.password || pictureUrl.hash || pictureUrl.searchParams.size !== 1
+        || !validPictureKey(pictureKey)) throw this.manual(attempt);
       const box = await image.boundingBox();
       if (!box || box.width < 1 || box.height < 1 || box.width > 2048 || box.height > 512 || box.width * box.height > 1048576) throw this.manual(attempt);
       const answer = await this.recognize(await image.screenshot({ type: 'png', scale: 'css', timeout: 5000 }));
       if (!validAnswer(answer)) throw this.manual(attempt);
       const fresh = await readForm(attempt.page, attempt.target);
-      if (!fresh || !sameForm(form, fresh)) throw this.manual(attempt);
-      attempt.form = fresh; attempt.answer = answer;
+      if (!fresh || !sameForm(form, fresh) || await image.getAttribute('src') !== pictureSource) throw this.manual(attempt);
+      attempt.form = fresh; attempt.answer = answer; attempt.pictureKey = pictureKey;
       await attempt.page.locator('input[name="captchaText"]').fill(answer);
       // Persist before arming the only answer POST. An uncertain attempt is never replayed.
       attempt.state = await this.journal.write({ ...attempt.state, phase: 'attempted' });

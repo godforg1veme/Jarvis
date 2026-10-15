@@ -51,8 +51,9 @@ and `captchaHttpsAcceptance.cjs`. The HTTPS acceptance needs container-only
 ephemeral certificate in private tmpfs and never contacts HH.
 
 Actual images, answers and temporary experiment artifacts stay outside Git.
-The upper/lower-arc change is a local follow-up, not installed in production;
-see [offline results and limits](../docs/updates/2026-10-15-hh-ocr-preprocessing-development.md).
+The upper/lower-arc change was installed on DE from `8de0cfa`;
+see [deployment and remaining browser issue](../docs/updates/2026-10-16-hh-native-captcha-request.md)
+and [offline results and limits](../docs/updates/2026-10-15-hh-ocr-preprocessing-development.md).
 See [design](../docs/superpowers/specs/2026-10-15-hh-captcha-recovery-design.md)
 and [security review](../docs/updates/2026-10-15-hh-captcha-ocr-review.md).
 

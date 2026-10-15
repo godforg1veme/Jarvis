@@ -12,7 +12,7 @@ const { CaptchaJournal } = require('../src/captchaJournal');
 const { CaptchaRecovery } = require('../src/captchaRecovery');
 const { allowedRequest } = require('../src/networkPolicy');
 
-test('local HTTPS: actual captcha dispatch updates browser cookies and never follows POST redirects', { timeout: 45000 }, async () => {
+for (const nativeQuery of [false, true]) test(`local HTTPS ${nativeQuery ? 'native XHR' : 'body'}: actual dispatch updates browser cookies and never follows POST redirects`, { timeout: 45000 }, async () => {
   // Container-only fixture: --network none --add-host hh.ru:127.0.0.1.
   // Ephemeral TLS key is generated in private tmpfs, never stored in the repository.
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'captcha-https-'));
@@ -28,7 +28,8 @@ test('local HTTPS: actual captcha dispatch updates browser cookies and never fol
     }
     if (request.method === 'POST' && u.pathname === '/account/captcha') {
       posts++; let body = ''; for await (const chunk of request) body += chunk;
-      const fields = new URLSearchParams(body); assert.equal(fields.get('captchaText'), 'проверка картинки');
+      const fields = nativeQuery ? u.searchParams : new URLSearchParams(body); assert.equal(fields.get('captchaText'), 'проверка картинки');
+      if (nativeQuery) { assert.equal(body, ''); assert.equal(request.headers['x-xsrftoken'], 'fixture-xsrf'); }
       response.writeHead(reject ? 307 : 302, reject ? { location: 'https://hh.ru/forbidden' }
         : { 'set-cookie': 'fixture_captcha=passed; Path=/; Secure; HttpOnly', location: u.searchParams.get('backurl') });
       return response.end();
@@ -47,7 +48,10 @@ test('local HTTPS: actual captcha dispatch updates browser cookies and never fol
       return response.end(`<h1>Подтвердите, что вы не робот</h1><img id="picture" alt="captcha" src="">
       <form method="post" action="${u.href.replace(/&/g, '&amp;')}"><input type="hidden" name="_xsrf" value="fixture-xsrf">
       <input type="text" name="captchaText"><input type="hidden" name="isBot" value="false"><button type="submit">Продолжить</button></form>
-      <script>fetch('/captcha?lang=RU',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'}}).then(r=>r.json()).then(()=>picture.src='/captcha/picture?key=fixture').catch(()=>{});</script>`);
+      <script>fetch('/captcha?lang=RU',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'}}).then(r=>r.json()).then(()=>picture.src='/captcha/picture?key=fixture').catch(()=>{});
+      ${nativeQuery ? `document.querySelector('form').onsubmit=e=>{e.preventDefault();const f=e.currentTarget,a=new URL(f.action);
+        const q=new URLSearchParams({captchaText:f.elements.captchaText.value,captchaKey:'fixture',captchaState:a.searchParams.get('state'),backurl:a.searchParams.get('backurl'),failurl:f.action});
+        const send=()=>{const x=new XMLHttpRequest();x.open('POST','/account/captcha?'+q);x.setRequestHeader('Content-Type','application/x-www-form-urlencoded');x.setRequestHeader('X-Xsrftoken',f.elements._xsrf.value);x.send();};send();send();};` : ''}</script>`);
     }
     response.writeHead(404); response.end();
   });

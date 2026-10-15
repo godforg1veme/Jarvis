@@ -43,9 +43,29 @@ function sameForm(left, right) {
   return left.action === right.action && left.method === right.method && left.enctype === right.enctype
     && ['_xsrf', 'isBot'].every((name) => left.inputs.find((i) => i.name === name)?.value === right.inputs.find((i) => i.name === name)?.value);
 }
-function validAnswerRequest(input, form, target, answer) {
-  if (!validAnswer(answer) || !validForm(form, target) || input.url !== form.action || input.method !== 'POST'
-    || !Buffer.isBuffer(input.body) || input.body.length > 4096) return false;
+function validPictureKey(value) {
+  return typeof value === 'string' && value.length > 0 && value.length <= 1024 && !/[\x00-\x20\x7f]/.test(value);
+}
+function validAnswerRequest(input, form, target, answer, pictureKey) {
+  if (!validAnswer(answer) || !validForm(form, target) || input.method !== 'POST') return false;
+  if (input.url !== form.action) {
+    try {
+      if (typeof input.url !== 'string' || input.url.length > 24576 || !validPictureKey(pictureKey)
+        || input.navigation !== false || input.resourceType !== 'xhr'
+        || input.csrfToken !== form.inputs.find((i) => i.name === '_xsrf').value
+        || !/^application\/x-www-form-urlencoded(?:;\s*charset=UTF-8)?$/i.test(input.contentType || '')
+        || !(input.body === null || Buffer.isBuffer(input.body) && input.body.length === 0)) return false;
+      const u = new URL(input.url), action = new URL(form.action), fields = u.searchParams;
+      const names = ['captchaText', 'captchaKey', 'captchaState', 'backurl', 'failurl'];
+      return u.origin === ORIGIN && !u.username && !u.password && !u.hash && u.pathname === '/account/captcha'
+        && fields.size === names.length && names.every((name) => fields.getAll(name).length === 1)
+        && fields.get('captchaText') === answer && fields.get('captchaKey') === pictureKey
+        && fields.get('captchaState') === action.searchParams.get('state')
+        && new URL(fields.get('backurl'), ORIGIN).href === target
+        && new URL(fields.get('failurl'), ORIGIN).href === form.action;
+    } catch { return false; }
+  }
+  if (!Buffer.isBuffer(input.body) || input.body.length > 4096) return false;
   const fields = parseFields(input);
   return Boolean(fields && fields.size === 3 && fields.get('captchaText') === answer
     && ['_xsrf', 'isBot'].every((name) => fields.get(name) === form.inputs.find((i) => i.name === name).value));
@@ -63,4 +83,4 @@ async function readForm(page, target) {
   });
   return validForm(form, target) ? form : null;
 }
-module.exports = { validAnswer, validInit, validForm, sameForm, validAnswerRequest, readForm, targetUrl };
+module.exports = { validAnswer, validInit, validForm, sameForm, validPictureKey, validAnswerRequest, readForm, targetUrl };

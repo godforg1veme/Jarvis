@@ -1,5 +1,8 @@
 # HH OCR Preprocessing Implementation Plan
 
+Обновление 16 октября: OCR опубликован и установлен из `8de0cfa`.
+[Результат выпуска и следующая найденная причина](../../updates/2026-10-16-hh-native-captcha-request.md).
+
 > **For agentic workers:** Use executing-plans to implement this plan task-by-task.
 
 **Goal:** Проверить и реализовать ограниченное улучшение подготовки картинок при текущей модели.
