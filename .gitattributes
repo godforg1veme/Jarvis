@@ -1,2 +1,4 @@
 # Preserve the verified bytes of the pinned upstream Chromium seccomp profile.
 deploy/job-browser/seccomp_profile.json text eol=lf
+# The OCR manifest verifies the character table's exact bytes on Windows and Linux.
+job-ocr/characters.json text eol=lf
