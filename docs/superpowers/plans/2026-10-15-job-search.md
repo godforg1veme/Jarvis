@@ -1,5 +1,10 @@
 # Поиск работы: план реализации
 
+**Обновление 15 октября:** задачи подключения официального applicant API
+остановлены после приведённого владельцем уведомления о прекращении поддержки.
+До продолжения этих задач требуется согласовать [новый канал](../specs/2026-10-15-job-search-without-api-options.md)
+и обновить план. Уже проверенные доменные и Telegram-компоненты сохраняются.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 Порядок для этой задачи: выполнение в текущем чате через доступный
