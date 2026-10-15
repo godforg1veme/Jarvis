@@ -19,4 +19,13 @@ function classifyPage({ status = 0, pathname = '', text = '', iframeSources = []
   else if (status >= 200 && status < 300 && /^\/vacancy\/\d+\/?$/.test(pathname) && vacancyContent) state = 'vacancy';
   return { state, challenges: [...challenges].sort(), vacancyLinks: count };
 }
-module.exports = { classifyPage };
+function classifySession(input) {
+  const observation = classifyPage(input);
+  if (['captcha', 'access_denied', 'rate_limited', 'login_required'].includes(observation.state)) {
+    return { authenticated: false, state: observation.state, challenges: observation.challenges };
+  }
+  const privateRoute = /^\/applicant\/(?:resumes|my_resumes|profile)(?:\/[a-zA-Z0-9_-]{1,100})?\/?$/.test(input.pathname || '');
+  const authenticated = input.status === 200 && privateRoute && /Мои резюме/iu.test(String(input.text || '').slice(0, 64000));
+  return { authenticated, state: authenticated ? 'authenticated' : 'unknown', challenges: [] };
+}
+module.exports = { classifyPage, classifySession };
