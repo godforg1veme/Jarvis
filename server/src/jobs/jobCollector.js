@@ -1,5 +1,6 @@
 const { evaluateVacancy } = require('./jobFilters');
 const { jobError } = require('./jobSchemas');
+const { createHash } = require('node:crypto');
 
 class JobCollector {
   constructor({ searchRepository, deliveryRepository, hhClient, currencyRates = null,
@@ -72,8 +73,16 @@ class JobCollector {
       return { outcome: 'complete', matched, requests };
     } catch (error) {
       const code = /^JOB_[A-Z_]+$/.test(error.code || '') ? error.code : 'JOB_COLLECTION_FAILED';
+      const waiting = code === 'JOB_HH_CAPTCHA_WAITING' && Number.isInteger(error.retryAfterMs)
+        && error.retryAfterMs >= 1000 && error.retryAfterMs <= 120000;
       await this.search.finishSearch({ userId, leaseId: job.lease_id, checkpoint: null,
-        nextCheckAt: new Date(now.getTime() + Math.max(settings.intervalMs, error.retryAfterMs || 0)), failureCode: code });
+        nextCheckAt: waiting ? new Date(this.now().getTime() + error.retryAfterMs)
+          : new Date(now.getTime() + Math.max(settings.intervalMs, error.retryAfterMs || 0)), failureCode: code });
+      if (code === 'JOB_HH_CAPTCHA_MANUAL_REQUIRED') {
+        const incidentId = /^[a-f0-9-]{36}$/.test(error.recoveryId || '') ? error.recoveryId
+          : createHash('sha256').update(JSON.stringify([userId, progress.until, 'HH_CAPTCHA'])).digest('hex');
+        await this.delivery.enqueueAttention({ userId, incidentId });
+      }
       return { outcome: code, matched, requests };
     }
   }

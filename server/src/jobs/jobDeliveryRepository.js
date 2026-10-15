@@ -16,11 +16,22 @@ class JobDeliveryRepository {
       JOIN users u ON u.id=d.user_id AND u.role='owner'
       JOIN conversations c ON c.id=s.conversation_id AND c.user_id=s.user_id
         AND c.channel='telegram' AND c.external_chat_id=s.chat_id
-      WHERE d.status='queued' AND d.available_at<=now() AND (d.kind='budget' OR s.settings->>'paused'='false')
+      WHERE d.status='queued' AND d.available_at<=now() AND (d.kind IN ('budget','attention') OR s.settings->>'paused'='false')
       AND (d.kind<>'card' OR EXISTS(SELECT 1 FROM job_matches m WHERE m.user_id=d.user_id AND m.vacancy_id=d.vacancy_id AND NOT m.hidden))
       ORDER BY d.created_at,d.id FOR UPDATE OF d SKIP LOCKED LIMIT 1)
       UPDATE job_deliveries d SET status='sending',lease_until=now()+interval '2 minutes',attempts=attempts+1
       FROM candidate WHERE d.id=candidate.id RETURNING d.*`)).rows[0] || null;
+  }
+  async enqueueAttention({ userId, incidentId }) {
+    uuid.parse(userId);
+    if (typeof incidentId !== 'string' || !/^(?:[a-f0-9]{64}|[a-f0-9-]{36})$/.test(incidentId)) throw jobError('JOB_INVALID_DELIVERY_OUTCOME');
+    return (await this.pool.query(`INSERT INTO job_deliveries(user_id,kind,dedup_key,payload)
+      SELECT s.user_id,'attention',$2,'{"reason":"HH_CAPTCHA"}'::jsonb FROM job_searches s
+      JOIN users u ON u.id=s.user_id AND u.role='owner'
+      JOIN conversations c ON c.id=s.conversation_id AND c.user_id=s.user_id
+        AND c.channel='telegram' AND c.external_chat_id=s.chat_id
+      WHERE s.user_id=$1 ON CONFLICT(user_id,dedup_key) DO NOTHING RETURNING id`,
+    [userId, `attention:captcha:${incidentId}`])).rows[0] || null;
   }
   async finish({ deliveryId, outcome, telegramMessageId = null, retryAfterMs = 30000 }) {
     if (!['sent', 'failed', 'unknown', 'queued'].includes(outcome)) throw jobError('JOB_INVALID_DELIVERY_OUTCOME');

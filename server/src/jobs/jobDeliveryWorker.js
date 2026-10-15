@@ -15,7 +15,11 @@ class JobDeliveryWorker {
         const vacancy = await this.searchRepository.getVacancy({ userId: delivery.user_id, vacancyId: delivery.vacancy_id });
         if (!vacancy || vacancy.hidden) { await this.deliveryRepository.finish({ deliveryId: delivery.id, outcome: 'failed' }); return; }
         view = cardView(vacancy);
-      } else view = { answer: `Поиск работы: расходы API за ${delivery.payload.month} достигли $${delivery.payload.thresholdUsd}. Работа продолжается.`, buttons: [] };
+      } else if (delivery.kind === 'attention') {
+        if (delivery.payload?.reason !== 'HH_CAPTCHA') { await this.deliveryRepository.finish({ deliveryId: delivery.id, outcome: 'failed' }); return; }
+        view = { answer: 'Поиск работы: автоматическая попытка прохождения капчи HH не подтвердила доступ. Проверьте сессию HH в браузере на VPS; при запросе пройдите капчу вручную. Прогресс поиска сохранён; для этой проверки повторной отправки ответа не будет.', buttons: [], disableLinkPreview: true };
+      } else if (delivery.kind === 'budget') view = { answer: `Поиск работы: расходы API за ${delivery.payload.month} достигли $${delivery.payload.thresholdUsd}. Работа продолжается.`, buttons: [] };
+      else { await this.deliveryRepository.finish({ deliveryId: delivery.id, outcome: 'failed' }); return; }
       try {
         const result = await this.send({ chatId: search.chat_id, ...view });
         await this.deliveryRepository.finish({ deliveryId: delivery.id, outcome: 'sent', telegramMessageId: result.message_id });

@@ -2,7 +2,7 @@ const { jobError } = require('./jobSchemas');
 const { readBoundedJson } = require('./boundedHttp');
 const UUID = /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i;
 const CAPABILITIES = Object.freeze({ dateWindows: false, maxPages: 1000 });
-const CODES = new Set(['JOB_HH_DOM_CHANGED', 'JOB_COLLECTION_WINDOW_SATURATED', 'JOB_COLLECTION_WINDOW_EXPIRED',
+const CODES = new Set(['JOB_HH_CAPTCHA_WAITING', 'JOB_HH_CAPTCHA_MANUAL_REQUIRED', 'JOB_HH_DOM_CHANGED', 'JOB_COLLECTION_WINDOW_SATURATED', 'JOB_COLLECTION_WINDOW_EXPIRED',
   'JOB_INVALID_SEARCH', 'JOB_INVALID_VACANCY', 'JOB_HH_CAPTCHA_REQUIRED', 'JOB_HH_RATE_LIMIT', 'JOB_HH_ACCESS_DENIED',
   'JOB_HH_LOGIN_REQUIRED', 'JOB_HH_NOT_FOUND', 'JOB_HH_UNAVAILABLE', 'JOB_HH_RESUME_UNAVAILABLE', 'JOB_BROWSER_ACCESS_DENIED',
   'JOB_BROWSER_INVALID_REQUEST', 'JOB_BROWSER_BUSY', 'JOB_BROWSER_REQUEST_TOO_LARGE', 'JOB_BROWSER_RESPONSE_TOO_LARGE']);
@@ -41,10 +41,18 @@ class JobBrowserClient {
     try {
       response = await this.fetch(this.url, { method: 'POST', headers: {
         authorization: `Bearer ${writing ? this.applyToken : this.token}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ userId, operation, args }), redirect: 'manual', signal: AbortSignal.timeout(writing ? 120000 : 45000) });
+      body: JSON.stringify({ userId, operation, args }), redirect: 'manual', signal: AbortSignal.timeout(writing ? 120000 : 90000) });
     } catch { throw jobError('JOB_HH_UNAVAILABLE'); }
     const result = await readBoundedJson(response);
-    if (!response.ok || result?.ok !== true) throw jobError(CODES.has(result?.code) ? result.code : 'JOB_HH_UNAVAILABLE');
+    if (!response.ok || result?.ok !== true) {
+      const error = jobError(CODES.has(result?.code) ? result.code : 'JOB_HH_UNAVAILABLE');
+      if (error.code === 'JOB_HH_CAPTCHA_WAITING') {
+        if (!Number.isInteger(result.retryAfterMs) || result.retryAfterMs < 1000 || result.retryAfterMs > 120000) throw jobError('JOB_HH_UNAVAILABLE');
+        error.retryAfterMs = result.retryAfterMs;
+      }
+      if (error.code === 'JOB_HH_CAPTCHA_MANUAL_REQUIRED' && UUID.test(result.recoveryId || '')) error.recoveryId = result.recoveryId;
+      throw error;
+    }
     const value = result.value;
     if (operation === 'connection' && (!/^[a-zA-Z0-9]{1,100}$/.test(value?.resumeId || '')
       || typeof value?.title !== 'string' || !value.title.trim() || value.title.length > 500)) throw jobError('JOB_HH_INVALID_RESPONSE');

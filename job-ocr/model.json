@@ -1,0 +1,9 @@
+{
+  "url": "https://huggingface.co/PaddlePaddle/cyrillic_PP-OCRv5_mobile_rec_onnx/resolve/2cef88145434beb8afa9dd82d77d799eb1ad7b29/inference.onnx",
+  "size": 8048799,
+  "sha256": "5371ee1ddaa7983cc62d0818d99e982b6804638c85e4f960d59a574094e172e5",
+  "charactersSha256": "953629847559c74e978c5d09dcec91c1d9d6924dbef7449bd748b00cfc82473b",
+  "license": "Apache-2.0",
+  "source": "PaddlePaddle/cyrillic_PP-OCRv5_mobile_rec_onnx",
+  "revision": "2cef88145434beb8afa9dd82d77d799eb1ad7b29"
+}

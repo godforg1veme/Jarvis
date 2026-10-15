@@ -7,6 +7,8 @@ const { allowedRequest } = require('./networkPolicy');
 const { ApplicationLedger } = require('./applicationLedger');
 const { HhApplicationDriver } = require('./hhApplicationDriver');
 const { GuardedSubmission } = require('./guardedSubmission');
+const { CaptchaJournal } = require('./captchaJournal');
+const { CaptchaRecovery } = require('./captchaRecovery');
 
 async function startBrowser(env = process.env) {
   const ownerId = env.JARVIS_JOB_BROWSER_OWNER_ID, token = env.JARVIS_JOB_BROWSER_TOKEN;
@@ -39,7 +41,10 @@ async function startBrowser(env = process.env) {
     await context.route('**/*', (route) => ['GET', 'HEAD', 'OPTIONS'].includes(route.request().method())
       && allowedRequest(route.request().url()) ? route.continue() : route.abort());
     await context.routeWebSocket('**/*', (socket) => socket.close());
-    const browser = new HhBrowser({ context, primaryResumeId });
+    if (env.JARVIS_HH_CAPTCHA_RECOVERY !== undefined && !['0', '1'].includes(env.JARVIS_HH_CAPTCHA_RECOVERY)) throw new Error('JOB_BROWSER_CONFIG_INVALID');
+    const captchaRecovery = env.JARVIS_HH_CAPTCHA_RECOVERY === '1'
+      ? new CaptchaRecovery({ journal: new CaptchaJournal({ root: `${root}/captcha-recovery`, ownerId }) }) : null;
+    const browser = new HhBrowser({ context, primaryResumeId, captchaRecovery });
     let submissions = null;
     if (applyEnabled) {
       if (!primaryResumeId) throw new Error('JOB_BROWSER_CONFIG_INVALID');

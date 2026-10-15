@@ -1,6 +1,35 @@
 name: jarvis-family
 
 services:
+  job-ocr:
+    profiles: [job-captcha-de]
+    platform: linux/amd64
+    build:
+      context: ../job-ocr
+    user: "1001:1001"
+    init: true
+    restart: unless-stopped
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 64
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=16m
+    volumes:
+      - job-ocr-socket:/run/job-ocr
+    healthcheck:
+      test: [CMD, python, health.py]
+      start_period: 30s
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+          pids: 64
   job-browser:
     profiles: [job-search-de]
     build:
@@ -16,8 +45,10 @@ services:
       JARVIS_JOB_BROWSER_TOKEN: ${JARVIS_JOB_BROWSER_TOKEN:-}
       JARVIS_JOB_BROWSER_APPLY_ENABLED: ${JARVIS_JOB_BROWSER_APPLY_ENABLED:-0}
       JARVIS_JOB_BROWSER_APPLY_TOKEN: ${JARVIS_JOB_BROWSER_APPLY_TOKEN:-}
+      JARVIS_HH_CAPTCHA_RECOVERY: ${JARVIS_HH_CAPTCHA_RECOVERY:-0}
     volumes:
       - job-browser-profile:/home/pwuser/profile
+      - job-ocr-socket:/run/job-ocr:ro
     networks: [job-browser-rpc]
     shm_size: 256m
     pids_limit: 256
@@ -290,6 +321,7 @@ networks:
     internal: false
 
 volumes:
+  job-ocr-socket:
   job-browser-profile:
     external: true
     name: ${JARVIS_JOB_BROWSER_PROFILE_VOLUME:-jarvis-hh-owner-profile}

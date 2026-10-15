@@ -47,6 +47,14 @@ HH-сессией, узкий RPC привязан к одному owner UUID; r
 [Результат выпуска и ограничения](updates/2026-10-15-job-search-release.md),
 [настройка браузера](../job-browser/README.md).
 
+Локальная следующая версия добавляет отдельный networkless `job-ocr` с UNIX socket
+и opt-in `JARVIS_HH_CAPTCHA_RECOVERY`. Browser хранит owner-bound журнал капчи;
+инициализация и ответ допускаются по одному разу после паузы, неопределённые
+записи не повторяются. Read credential расширяется только на эти два закрытых
+captcha POST; отклики сохраняют прежний apply credential и подтверждение.
+[Проверки и статус установки](updates/2026-10-15-hh-captcha-recovery-development.md),
+[контракт OCR](../job-ocr/README.md). Это описание разработки, не текущего runtime.
+
 ### Cloud control plane
 
 - `server/` is a Node.js 20+, CommonJS, Fastify service.

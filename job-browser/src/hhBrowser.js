@@ -3,14 +3,17 @@ const { classifyPage, classifySession } = require('./pageSignals');
 const { readSearchPage, readVacancyPage, readResumes } = require('./hhPageReader');
 const { readApplicationForm } = require('./hhApplicationForm');
 const { readResumePrivacy, readEmployerId, evaluatePrivacy } = require('./hhPrivacy');
+const { dispatchCaptcha } = require('./captchaDispatch');
 const failure = (code) => Object.assign(new Error(code), { code });
 const CAPABILITIES = Object.freeze({ dateWindows: false, maxPages: 1000 });
 
 class HhBrowser {
-  constructor({ context, now = () => new Date(), primaryResumeId = null }) {
+  constructor({ context, now = () => new Date(), primaryResumeId = null, captchaRecovery = null, captchaDispatch = dispatchCaptcha }) {
     if (!context || typeof context.newPage !== 'function') throw failure('JOB_BROWSER_CONTEXT_REQUIRED');
     this.context = context; this.now = now; this.tail = Promise.resolve(); this.capabilities = CAPABILITIES;
     this.primaryResumeId = primaryResumeId;
+    this.captchaRecovery = captchaRecovery;
+    this.captchaDispatch = captchaDispatch;
   }
   // One persistent profile, one active read. A rejected operation must not poison the queue.
   run(fn) {
@@ -26,25 +29,41 @@ class HhBrowser {
   }
   async open(url, expected) {
     const page = await this.context.newPage(); page.setDefaultTimeout(10000);
+    let attempt = null;
     try {
-      const readGuard = (route) => ['GET', 'HEAD', 'OPTIONS'].includes(route.request().method())
-        && allowedRequest(route.request().url()) ? route.fallback() : route.abort();
+      attempt = this.captchaRecovery && ['search', 'vacancy'].includes(expected)
+        ? await this.captchaRecovery.begin(page, url) : null;
+      const readGuard = async (route) => {
+        const request = route.request();
+        if (['GET', 'HEAD', 'OPTIONS'].includes(request.method())) return allowedRequest(request.url()) ? route.fallback() : route.abort();
+        try { if (attempt && await this.captchaRecovery.permit(attempt, request)) return this.captchaDispatch(route); } catch {}
+        return route.abort();
+      };
       await page.route('**/*', readGuard);
-      const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      let response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await page.waitForTimeout(1500);
-      const current = new URL(page.url());
-      if (current.origin !== 'https://hh.ru') throw failure('JOB_HH_ACCESS_DENIED');
-      const observation = await page.evaluate(() => ({
-        text: document.body?.innerText?.slice(0, 64000) || '',
-        vacancyLinks: document.querySelectorAll('[data-qa="vacancy-serp__vacancy"]').length,
-        vacancyContent: Boolean(document.querySelector('[data-qa="vacancy-description"]')),
-      }));
-      const iframeSources = [];
-      for (const frame of (await page.locator('iframe').all()).slice(0, 100)) {
-        if (await frame.isVisible()) { const src = await frame.getAttribute('src'); if (src) iframeSources.push(new URL(src, current).href); }
+      const observe = async () => {
+        const current = new URL(page.url());
+        if (current.origin !== 'https://hh.ru') throw failure('JOB_HH_ACCESS_DENIED');
+        const observation = await page.evaluate(() => ({
+          text: document.body?.innerText?.slice(0, 64000) || '',
+          vacancyLinks: document.querySelectorAll('[data-qa="vacancy-serp__vacancy"]').length,
+          vacancyContent: Boolean(document.querySelector('[data-qa="vacancy-description"]')),
+        }));
+        const iframeSources = [];
+        for (const frame of (await page.locator('iframe').all()).slice(0, 100)) {
+          if (await frame.isVisible()) { const src = await frame.getAttribute('src'); if (src) iframeSources.push(new URL(src, current).href); }
+        }
+        const input = { ...observation, iframeSources, pathname: current.pathname, status: response?.status() || 0 };
+        return { current, signal: expected === 'authenticated' ? classifySession(input) : classifyPage(input) };
+      };
+      let { current, signal } = await observe();
+      if (signal.state === 'captcha' && attempt) {
+        response = await this.captchaRecovery.recover(attempt);
+        await page.waitForTimeout(1500);
+        ({ current, signal } = await observe());
+        if (signal.state === 'captcha') throw this.captchaRecovery.manual(attempt);
       }
-      const input = { ...observation, iframeSources, pathname: current.pathname, status: response?.status() || 0 };
-      const signal = expected === 'authenticated' ? classifySession(input) : classifyPage(input);
       const errors = { captcha: 'JOB_HH_CAPTCHA_REQUIRED', rate_limited: 'JOB_HH_RATE_LIMIT',
         access_denied: 'JOB_HH_ACCESS_DENIED', login_required: 'JOB_HH_LOGIN_REQUIRED' };
       if (errors[signal.state]) throw failure(errors[signal.state]);
@@ -57,16 +76,24 @@ class HhBrowser {
       const privacyCandidate = expected === 'resume_privacy' && signal.state === 'unknown'
         && response?.status() === 200 && /^\/resume\/[a-zA-Z0-9]+$/.test(current.pathname);
       if (signal.state !== expected && !zeroCandidate && !formCandidate && !privacyCandidate) throw failure('JOB_HH_DOM_CHANGED');
-      return { page, releaseReadGuard: () => page.unroute('**/*', readGuard) };
+      return { page, captchaAttempt: attempt, releaseReadGuard: () => page.unroute('**/*', readGuard) };
     } catch (error) {
       await page.close().catch(() => {});
+      if (attempt?.permitted === 1) throw this.captchaRecovery.manual(attempt);
       if (/^JOB_[A-Z_]+$/.test(error.code || '')) throw error;
       throw failure('JOB_HH_UNAVAILABLE');
     }
   }
   async read(url, expected, reader) {
     const opened = await this.open(url, expected);
-    try { return await reader(opened.page); } finally { await opened.page.close().catch(() => {}); }
+    try {
+      const value = await reader(opened.page);
+      if (opened.captchaAttempt) await this.captchaRecovery.success(url, opened.captchaAttempt);
+      return value;
+    } catch (error) {
+      if (opened.captchaAttempt?.permitted === 1) throw this.captchaRecovery.manual(opened.captchaAttempt);
+      throw error;
+    } finally { await opened.page.close().catch(() => {}); }
   }
   search({ query, publishedFrom, publishedTo, page = 0 }) {
     if (typeof query !== 'string' || !query.trim() || query.length > 200 || !Number.isInteger(page) || page < 0 || page >= CAPABILITIES.maxPages

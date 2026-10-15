@@ -76,6 +76,17 @@ no live HH requests, model calls, Telegram messages or applications are sent.
 Pinned DE Chromium/runtime acceptance commands are in
 [job-browser/README.md](../job-browser/README.md).
 
+HH captcha recovery adds Linux-only `captchaRecoveryAcceptance.cjs` and
+`captchaHttpsAcceptance.cjs` in `job-browser/test`. Run them with the pinned
+Chromium image, sandbox and disposable tmpfs, never with the owner's profile.
+The HTTPS test uses `--network none --add-host hh.ru:127.0.0.1` and an ephemeral
+fixture certificate; it exercises actual route.fetch, cookies and 307/308 handling.
+The worker is tested separately without network or credentials; see
+[job-ocr/README.md](../job-ocr/README.md). Real PostgreSQL coverage is
+`node --test test/jobCaptchaAcceptance.cjs` inside `server`, with a dedicated
+local test database. It applies the forward-only attention migration and checks
+delay, checkpoints, deduplication and owner/private-chat delivery.
+
 Confirmed browser applications require Linux durable-file semantics. Run the
 disposable test-only stack, which builds from both lockfiles and uses an internal
 network, tmpfs PostgreSQL and HH-shaped intercepted pages:

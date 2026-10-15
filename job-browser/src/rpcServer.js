@@ -50,7 +50,9 @@ function createRpcServer({ browser, ownerId, token, submissions = null, applyTok
                 : input.operation === 'connection' ? await browser.connection() : await browser.listResumes();
       respond(res, 200, { ok: true, value });
     } catch (error) {
-      if (!res.writableEnded) respond(res, 502, { ok: false, code: SAFE_CODES.has(error.code) ? error.code : 'JOB_HH_UNAVAILABLE' });
+      if (!res.writableEnded) respond(res, 502, { ok: false, code: SAFE_CODES.has(error.code) ? error.code : 'JOB_HH_UNAVAILABLE',
+        ...(error.code === 'JOB_HH_CAPTCHA_WAITING' && Number.isInteger(error.retryAfterMs) && error.retryAfterMs >= 1000 && error.retryAfterMs <= 120000 ? { retryAfterMs: error.retryAfterMs } : {}),
+        ...(error.code === 'JOB_HH_CAPTCHA_MANUAL_REQUIRED' && UUID.test(error.recoveryId || '') ? { recoveryId: error.recoveryId } : {}) });
     } finally { active--; }
   });
   server.maxConnections = 16;

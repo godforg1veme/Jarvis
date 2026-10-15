@@ -42,6 +42,7 @@ test('migration files are ordered and narrowly named', () => {
     '028_telegram_subscription_interaction_kinds.sql',
     '029_job_search.sql',
     '030_job_search_interactions.sql',
+    '031_job_captcha_attention.sql',
   ]);
 });
 

@@ -46,6 +46,15 @@ focused test of the route and authorization, and an update here and in
 the architecture guide. Refactoring internals must preserve this observable
 contract. Labels are presentation, never authority.
 
+Локальная разработка 15 октября: после поручения владельца подготовлено
+уведомление о неподтверждённой автоматической попытке капчи HH. Путь:
+collector → owner-scoped PostgreSQL attention outbox → прежний Bot send.
+Уведомление содержит фиксированное объяснение и просьбу пройти проверку
+вручную; кнопок, OCR, токенов и исключений нет. Одна операция не создаёт
+повторных уведомлений. Claim заново проверяет owner и привязку личного чата
+к conversation; member/чужой chat не получают сообщение. Новых callback или
+guided-input kind нет. Это ещё не подтверждение production-выпуска.
+
 ## Persistent bottom keyboard
 
 The keyboard is persistent, resizeable, and exact-text matched. Other text is
