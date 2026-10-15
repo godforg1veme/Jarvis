@@ -13,6 +13,7 @@ import threading
 import warnings
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
+from preprocessing import recognition_images, recognition_tensor
 
 MAX_BYTES = 262144
 SOCKET = '/run/job-ocr/ocr.sock'
@@ -78,25 +79,10 @@ class Recognizer:
         self.allowed = {0} | {i + 1 for i, c in enumerate(self.characters) if c == ' ' or re.fullmatch('[а-яё]', c.lower())}
 
     def recognize(self, data):
-        from PIL import Image, ImageOps
         np = self.np
-        gray = ImageOps.grayscale(image_from_bytes(data))
-        array = np.asarray(gray)
-        height, width = array.shape
         candidates = []
-        angles = np.linspace(-2.95, -0.19, 900)[None, :]
-        # A bounded family of geometric corrections; no dictionary or LLM guesses.
-        for factor in (0.9 + i * 0.025 for i in range(25)):
-            center_y = height * factor
-            radii = np.linspace(center_y + 12, center_y - 80, 140)[:, None]
-            xs = np.rint(width / 2 + radii * np.cos(angles)).astype(int)
-            ys = np.rint(center_y + radii * np.sin(angles)).astype(int)
-            good = (xs >= 0) & (xs < width) & (ys >= 0) & (ys < height)
-            unwrapped = np.full((140, 900), 255, dtype=np.uint8)
-            unwrapped[good] = array[ys[good], xs[good]]
-            image = ImageOps.expand(ImageOps.autocontrast(Image.fromarray(unwrapped)), border=4, fill=255).convert('RGB')
-            image = image.resize((round(image.width / image.height * 48), 48), Image.Resampling.BICUBIC)
-            tensor = (np.asarray(image).astype(np.float32) / 127.5 - 1).transpose(2, 0, 1)[None, :, :, :]
+        for image in recognition_images(image_from_bytes(data)):
+            tensor = recognition_tensor(image)
             probabilities = self.session.run(None, {self.input_name: tensor})[0][0]
             if probabilities.ndim != 2 or probabilities.shape[1] != len(self.characters) + 1 or not np.isfinite(probabilities).all():
                 raise ValueError('OCR_RESULT_REJECTED')
@@ -111,6 +97,13 @@ class Recognizer:
                 last = index
             candidates.append((''.join(answer).strip().lower(), sum(confidence) / len(confidence) if confidence else 0))
         return choose_answer(candidates)
+
+
+def rejection_code(error):
+    # No exception text may escape. Only these literal internal ValueErrors
+    # are public diagnostics; arbitrary messages collapse to a fixed fallback.
+    allowed = {'OCR_NO_CONSENSUS', 'OCR_INPUT_REJECTED', 'OCR_RESULT_REJECTED'}
+    return str(error) if type(error) is ValueError and str(error) in allowed else 'OCR_REJECTED'
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -154,8 +147,10 @@ class Handler(BaseHTTPRequestHandler):
             if not valid_answer(answer):
                 raise ValueError('OCR_RESULT_REJECTED')
             self.respond(200, {'answer': answer})
-        except Exception:
-            self.respond(422, {'code': 'OCR_REJECTED'})
+        except Exception as error:
+            code = rejection_code(error)
+            print('JOB_' + code, flush=True)
+            self.respond(422, {'code': code})
         finally:
             if watchdog:
                 watchdog.cancel()

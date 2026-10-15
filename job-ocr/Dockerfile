@@ -7,7 +7,7 @@ WORKDIR /opt/worker
 COPY model.json characters.json /opt/ocr-model/
 COPY fetch_model.py /opt/fetch_model.py
 RUN python /opt/fetch_model.py && rm /opt/fetch_model.py && mkdir -p /run/job-ocr && chown 1001:1001 /run/job-ocr && chmod 0700 /run/job-ocr
-COPY worker.py health.py ./
+COPY worker.py health.py preprocessing.py ./
 COPY LICENSES /usr/share/licenses/jarvis-job-ocr/
 USER 1001:1001
 CMD ["python", "worker.py"]

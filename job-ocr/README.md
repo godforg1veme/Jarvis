@@ -20,7 +20,10 @@ The default flag is `0`; the worker's profile is separate from `job-search-de`.
 POST `/ocr` accepts only PNG bytes, Content-Length 1–262144, width≤2048,
 height≤512 and ≤1048576 pixels. It rejects other content types, chunked bodies,
 duplicate lengths, animations, corrupt images and unsupported shapes. The
-recognizer tests a bounded family of polar corrections and requires at least
+recognizer tests 54 bounded alternatives: unwarped grayscale/contrast/inversion
+and polar correction for both upper and lower arcs. Recognition tensors are
+limited to height 48 and width 16–1024, including extreme input aspect ratios.
+It requires at least
 four agreeing, sufficiently confident outputs and 60% consensus among eligible
 outputs. The result is exactly `{answer: string}` with two Russian words.
 This is not evidence that HH accepted the answer. Browser recovery separately
@@ -30,6 +33,9 @@ No request content or recognized text is logged. A ten-second browser deadline
 and twelve-second worker watchdog bound failures; Docker bounds CPU and memory.
 Errors return only fixed codes. The worker reads no image/model paths from a
 request and never interprets OCR output as a prompt, command or tool call.
+Recognition failure emits the closed `JOB_OCR_NO_CONSENSUS` diagnostic and
+returns `OCR_NO_CONSENSUS`; malformed input and invalid model output have separate
+closed codes. Arbitrary exception messages are never forwarded or logged.
 Browser read RPC has a 90-second outer deadline to cover navigation, the bounded
 OCR request, the one answer and read-only reconciliation; application RPC keeps
 its existing 120-second deadline.
@@ -45,6 +51,8 @@ and `captchaHttpsAcceptance.cjs`. The HTTPS acceptance needs container-only
 ephemeral certificate in private tmpfs and never contacts HH.
 
 Actual images, answers and temporary experiment artifacts stay outside Git.
+The upper/lower-arc change is a local follow-up, not installed in production;
+see [offline results and limits](../docs/updates/2026-10-15-hh-ocr-preprocessing-development.md).
 See [design](../docs/superpowers/specs/2026-10-15-hh-captcha-recovery-design.md)
 and [security review](../docs/updates/2026-10-15-hh-captcha-ocr-review.md).
 
