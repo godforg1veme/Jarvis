@@ -1,0 +1,9 @@
+{
+  "name": "jarvis-job-browser",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "engines": { "node": ">=22.12" },
+  "scripts": { "test": "node --test test/*.test.js", "probe": "node src/probe.js" },
+  "dependencies": { "playwright": "1.64.0" }
+}

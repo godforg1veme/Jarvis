@@ -1,0 +1,73 @@
+# HH browser: проверочный этап
+
+Изолированный пакет для замены недоступного API соискателя. Это пока публичная
+проба и временный вход владельца, а не интегрированный сборщик или отправитель
+откликов. Playwright/Chromium согласованы владельцем 15 октября 2026.
+
+## Проверка без аккаунта
+
+```powershell
+cd job-browser
+npm ci
+npm test
+$env:JARVIS_HH_BROWSER_PROBE='1'
+npm run probe
+```
+
+Локальный probe требует соответствующего установленного Chromium. Для DE
+используется отдельный Docker image с pinned base digest и non-root `pwuser`.
+При обходе внешнего сайта обязательно `chromiumSandbox: true` и официальный
+seccomp профиль. Профиль скачан из
+`https://raw.githubusercontent.com/microsoft/playwright/v1.64.0/utils/docker/seccomp_profile.json`,
+SHA256 `cc3e61cabda6bbc1e53e54d27ba4d55a9d3be829b6dd1a596f4a7b31b1cc7849`.
+Его нельзя подменять `privileged`, root, host IPC или `--no-sandbox`.
+
+```bash
+docker build -t jarvis-job-browser-probe:20261015 .
+docker run --rm --init --user pwuser --memory=1g --cpus=1 --pids-limit=256 \
+  --shm-size=256m --security-opt seccomp=/absolute/path/seccomp_profile.json \
+  jarvis-job-browser-probe:20261015
+```
+
+Проба посещает максимум три страницы: поиск, одну найденную вакансию и вход.
+429/CAPTCHA/отказ/unknown прерывают переходы. Вывод — закрытые состояния,
+число ссылок и известные признаки формы. Ни HTML, ни cookies, ни тексты
+вакансий или CAPTCHA URL в stdout не попадают. Неизвестное не означает healthy.
+Разрешённые домены ограничены; часть ресурсов блокируется этой политикой,
+поэтому результат не описывает поведение при произвольном полном сетевом доступе.
+
+На DE успешно проверены HTTP 200 выдачи (20 ссылок), наличие полного
+описания вакансии и страница входа. В этих публичных пробах видимая CAPTCHA
+не обнаружена. Это не доказывает отсутствие CAPTCHA после ввода данных,
+при повторных сессиях или отправке отклика.
+
+## Временный вход владельца
+
+`node src/ownerLogin.js` требует `JARVIS_HH_OWNER_LOGIN=1`. Профиль находится
+в отдельном приватном volume `/home/pwuser/profile`, права 0700. Окно входа
+закрывается через 30 минут; данные сессии сохраняются в volume. Его нельзя
+копировать в Git, логи или обмениваться им через чат. Пароль и код вводит сам
+владелец на странице HH. Скрипт ничего не вводит и не отправляет.
+
+CDP слушает внутри контейнера, relay направляет только к фиксированному
+локальному порту. Обязательное host binding: `127.0.0.1:19222:9223`;
+никаких `0.0.0.0` host bindings. Доступ с Windows — только SSH forward.
+Нельзя подключать контейнер к сети Jarvis, передавать DB/model/Telegram env,
+Docker socket или host directories. Используется отдельная Docker network.
+
+В Edge открыть `edge://inspect/#devices` (Chrome: `chrome://inspect/#devices`),
+включить Discover network targets, Configure → `localhost:19222` → Done.
+У вкладки HH выбрать inspect и Toggle screencast, если страница не отображается.
+Этот способ просмотра описан в [документации Chrome](https://developer.chrome.com/docs/automation-and-testing/debug-headless).
+
+После входа владелец сообщает, что готов. До этого автоматическая проверка
+личного кабинета не запускается. По завершении этапа остановить именно
+task-labelled контейнер и локальный SSH tunnel; volume сохраняется.
+Не удалять volume без поручения владельца.
+
+## Что ещё не проверено
+
+Вход по коду, показанные после него защиты, основное резюме, заполнение
+формы, отправка после подтверждения и доказательство результата. Предыдущие
+Telegram/PostgreSQL проверки не заменяют browser E2E этих операций.
+Публичные результаты не разрешают реальный отклик.
