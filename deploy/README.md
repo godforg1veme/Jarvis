@@ -374,3 +374,30 @@ read/delete, immediate STOP, and a Telegram observation through that already
 active lease. Telegram cannot start or extend capture. Do not enable Vision
 until the memory key has been backed up securely: losing it makes retained frames
 unrecoverable, while changing it without re-encryption breaks existing memory.
+
+## Job search (DE, opt-in; awaiting first release)
+
+The `job-search-de` profile adds `job-browser` and `job-collector` on DE only.
+The bot server connects to the browser RPC network. No host ports/CDP are
+published; the browser receives neither PostgreSQL nor model/Telegram secrets.
+The collector receives a read credential; only the bot and browser receive
+the distinct apply credential when explicitly enabled. See
+[browser runtime and tests](../job-browser/README.md) and
+[current readiness](../docs/updates/2026-10-15-job-search-development.md).
+
+Publish only after owner authorization under the release workflow. Preserve
+the existing private HH profile volume; configure its external volume name,
+the actual Jarvis owner UUID, random read/apply credentials and the opt-in flags
+in the private DE environment. Never replace the saved profile with a fresh
+volume or print environment values. The selected primary resume and employer
+exclusions must remain unchanged. NL receives source updates but runs no job
+collector/browser. Desktop does not need rebuilding for these server changes.
+
+Enabling the feature exposes the Telegram job path, but searches start only
+after the owner activates settings. «Подключить HH» verifies the saved login
+and primary resume. Confirm the fact profile/examples before generating letters.
+Use the dedicated job model/budget settings; the existing OpenRouter key is
+reused without changing the main assistant model. Live acceptance covers
+cards, edits/translation and restart/dedup; any real application requires a
+selected vacancy and an explicit confirmation of the exact letter in Telegram.
+Keep fixture send results separate from that live acceptance.

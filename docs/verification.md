@@ -76,6 +76,20 @@ no live HH requests, model calls, Telegram messages or applications are sent.
 Pinned DE Chromium/runtime acceptance commands are in
 [job-browser/README.md](../job-browser/README.md).
 
+Confirmed browser applications require Linux durable-file semantics. Run the
+disposable test-only stack, which builds from both lockfiles and uses an internal
+network, tmpfs PostgreSQL and HH-shaped intercepted pages:
+
+```powershell
+docker compose -p jarvis-job-apply-acceptance -f deploy/job-browser/compose.acceptance.yml up --build --abort-on-container-exit --exit-code-from acceptance
+docker compose -p jarvis-job-apply-acceptance -f deploy/job-browser/compose.acceptance.yml down
+```
+
+It exercises the real Telegram job handler, server runtime, PostgreSQL intent,
+authenticated write RPC, Chromium native-form driver and Linux journal. A lost
+acknowledgement is reconciled after restart against the original exact letter.
+It has no production env file, account volume, host ports or live HH application.
+
 Telegram menu changes: run the focused suite in
 `docs/telegram-menu-contract.md`, then full `server/npm test` before deployment.
 

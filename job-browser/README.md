@@ -92,8 +92,12 @@ E2E отправки. Публичные результаты не разреш�
 Compose-профиль `job-search-de` содержит отдельные `job-browser` и
 `job-collector`. Браузер находится только в сети `job-browser-rpc`, без host
 ports, DB/model/Telegram env и CDP. Сборщик также подключён к backend для PG.
-RPC принимает только закрытые `search`, `vacancy`, `resumes`, `inspect` с
-отдельным секретом и единственным owner UUID. Submit пока недоступен.
+RPC принимает закрытые `search`, `vacancy`, `resumes`, `connection`, `inspect`
+с отдельным read-секретом и единственным owner UUID. `submit`/`reconcile`
+выключены по умолчанию; требуют `JARVIS_JOB_BROWSER_APPLY_ENABLED=1` и другого
+случайного `JARVIS_JOB_BROWSER_APPLY_TOKEN`. Apply credential получает только
+bot server и browser, сборщик располагает read credential. Server подключён
+к RPC-сети; профиль браузера и его cookies серверу не передаются.
 
 Runtime требует `JARVIS_JOB_BROWSER_ENABLED=1`, `JARVIS_JOB_BROWSER_OWNER_ID`
 и случайный `JARVIS_JOB_BROWSER_TOKEN` длиной 32–256 символов. Приватный профиль
@@ -146,10 +150,32 @@ DOM дают ошибку с сохранением прогресса, а не 
 сам кнопку отправки не нажимает. `GuardedSubmission` связывает typed driver
 с журналом, закрывает страницу и сверяет исходную операцию при reconcile.
 
-В production RPC submit/reconcile всё ещё не предоставляются. Настоящий
-driver отправки и доказательство результата HH ещё предстоит подключить.
+`HhApplicationDriver` подключён через opt-in runtime/RPC. Перед штатным кликом
+он повторно читает работодателя, стоп-лист и форму. Разрешён ровно один
+native POST с точными vacancy/resume/letter, без изменения видимости по странам,
+ответов на тесты или неизвестных полей. Успех требует native topic/chat и
+статуса нужного резюме/вакансии. Read-only reconcile проверяет собственный
+application bubble и точный текст исходного письма; отсутствие доказательства
+оставляет unknown. Живое чтение прошлого отклика HH подтвердило положительную
+и отрицательную проверки текста; новой отправки в HH ещё не было.
+
 `test/hhSubmissionAcceptance.cjs` использует явно тестовый endpoint и proof,
 проверяет потерю ответа, рестарт, новый ID и read-only reconcile настоящим
 Chromium. Он не доказывает совпадение endpoint/proof с HH. Linux unit-журнал
 проверяется `node --test test/applicationLedger.test.js` в контейнере без сети;
 на Windows эти два теста явно пропускаются, а на DE проходят.
+
+`test/hhApplicationDriverAcceptance.cjs` использует наблюдаемую структуру формы,
+native receipt и application chat. Общая HTML-фикстура находится в `test/helpers/`.
+Единый серверный `test/jobBrowserApplicationsAcceptance.cjs` дополнительно
+проверяет Telegram job handler → PostgreSQL → authenticated RPC → этот driver,
+durable intent до POST и рестарт с точным письмом. Воспроизводимый Linux-стенд:
+
+```sh
+docker compose -p jarvis-job-apply-acceptance -f deploy/job-browser/compose.acceptance.yml up --build --abort-on-container-exit --exit-code-from acceptance
+docker compose -p jarvis-job-apply-acceptance -f deploy/job-browser/compose.acceptance.yml down
+```
+
+Он собирает зависимости по lockfiles, использует внутреннюю сеть и tmpfs PG,
+не имеет host ports, личного HH volume или production env. Тестовый trust доступ
+PostgreSQL ограничен этой одноразовой сетью. Сценарии не отправляют настоящие отклики.

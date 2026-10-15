@@ -15,6 +15,7 @@
     "test:jobs:e2e": "node --test test/jobE2eAcceptance.cjs",
     "test:jobs:runtime": "node --test test/jobFullRuntimeAcceptance.cjs",
     "test:jobs:browser": "node --test test/jobBrowserCollectorAcceptance.cjs",
+    "test:jobs:browser:apply": "node --test test/jobBrowserApplicationsAcceptance.cjs",
     "test": "node --test test/*.test.js"
   },
   "dependencies": {

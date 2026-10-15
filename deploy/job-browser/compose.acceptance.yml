@@ -1,0 +1,42 @@
+# Explicit, disposable fixture. No host ports, real account profile, secrets or persistent data.
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_USER: fixture
+    tmpfs:
+      - /var/lib/postgresql/data:uid=999,gid=999,mode=0700,size=128m
+    networks: [fixture]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U fixture]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 128
+  acceptance:
+    build:
+      context: ../..
+      dockerfile: deploy/job-browser/acceptance.Dockerfile
+    init: true
+    user: pwuser
+    environment:
+      JARVIS_JOB_TEST_DATABASE_URL: postgresql://fixture@postgres/fixture
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [fixture]
+    shm_size: 256m
+    mem_limit: 1g
+    cpus: 1
+    pids_limit: 256
+    cap_drop: [ALL]
+    cap_add: [SYS_CHROOT]
+    security_opt:
+      - no-new-privileges:true
+      - seccomp=./seccomp_profile.json
+networks:
+  fixture:
+    internal: true

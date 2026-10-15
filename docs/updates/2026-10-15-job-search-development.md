@@ -1,11 +1,11 @@
 # Поиск работы: локальная разработка 15 октября 2026
 
-Последняя контрольная точка: реализованы browser reader/RPC и подключение
-сборщика вместо HH API. На живом HH DE проверены выдача, полная вакансия,
-список резюме и форма; основное резюме совпадает с выбором владельца.
-Ложная блокировка формы исправлена: скрытый tooltip ошибочно считался видимым.
-Существующий режим «Скрыто от выбранных работодателей» и стоп-лист читаются
-без изменений; обычная вакансия проходит проверку. Отправка ещё не подключена.
+Последняя контрольная точка: reader, collector, opt-in отправка и read-only
+reconcile подключены к runtime/RPC. Единый Telegram job handler → PostgreSQL →
+RPC → Chromium send/recovery E2E прошёл на DE и повторён в одноразовом Compose
+по repository lockfiles. Живые чтение HH, вход, основное резюме, стоп-лист и
+доказательство прошлого отклика подтверждены. Скрытые работодатели сохранены.
+Новой отправки в HH и production-выпуска ещё не было; нужна приёмка владельцем.
 Ниже сохранены предыдущие этапы; новый результат описан в конце записи.
 
 Предыдущая контрольная точка: владелец завершил вход в HH. Read-only проверка
@@ -298,4 +298,23 @@ Chromium fixture драйвера прошёл native request/receipt, lost ack,
 65/65 Telegram regression gate, full runtime с 32 миграциями и E2E подтверждения
 через тестовый HTTP-адаптер. Chromium reader отдельно проверил свежий connection,
 отказ при удалении основного резюме и отсутствие write. Compose config прошёл
-на DE без запуска сервисов. Единый native browser send E2E остаётся открытым.
+на DE без запуска сервисов. На этой контрольной точке единый native browser
+send E2E оставался открытым; результат ниже закрывает его.
+
+## Единый send E2E завершён
+
+Добавлен `jobBrowserApplicationsAcceptance.cjs`: реальные runtime и Telegram
+job callback handler, PostgreSQL, write RPC, Chromium driver и Linux ledger.
+Запись PG в sending и приватные browser claims проверяются до единственного
+POST. Проверены отказ в group scope, точный текст подтверждения, native receipt,
+повтор confirmation, потеря ответа, новый coordinator/runtime с теми же PG и
+журналом, неверный текст при read-only recovery и последующий успех с точным
+письмом. После восстановления operation ID прежний, POST не повторяется.
+
+Сценарий дважды прошёл на DE: сначала в экспериментальном контейнере, затем
+в воспроизводимом `deploy/job-browser/compose.acceptance.yml` с зависимостями
+по обоим repository lockfiles. Compose использует internal network, tmpfs PG,
+non-root Chromium sandbox и не получает реальные env/profile/host ports.
+Оба тестовых контейнера завершились с кодом 0. Дополнительно прошёл прежний
+native driver acceptance после выделения общей HTML-фикстуры.
+Это испытания синтетических страниц; live HH submit по-прежнему не проверен.
