@@ -43,17 +43,18 @@ HH-сессией, узкий RPC привязан к одному owner UUID; r
 разделены. Сбор детерминированный, модель вызывается по кнопке, отправка требует
 подтверждения точного письма и durable intent. Unknown проверяется по исходной
 операции без повторного POST. Стоп-лист работодателей сохраняется.
-Первое включение поиска и live submit ещё требуют действий владельца.
+Поиск включён; live submit ещё не проверен и требует подтверждения владельца.
 [Результат выпуска и ограничения](updates/2026-10-15-job-search-release.md),
 [настройка браузера](../job-browser/README.md).
 
-Локальная следующая версия добавляет отдельный networkless `job-ocr` с UNIX socket
+На DE установлен отдельный networkless `job-ocr` с UNIX socket
 и opt-in `JARVIS_HH_CAPTCHA_RECOVERY`. Browser хранит owner-bound журнал капчи;
 инициализация и ответ допускаются по одному разу после паузы, неопределённые
 записи не повторяются. Read credential расширяется только на эти два закрытых
 captcha POST; отклики сохраняют прежний apply credential и подтверждение.
-[Проверки и статус установки](updates/2026-10-15-hh-captcha-recovery-development.md),
-[контракт OCR](../job-ocr/README.md). Это описание разработки, не текущего runtime.
+[Проверки и статус установки](updates/2026-10-15-hh-captcha-recovery-release.md),
+[контракт OCR](../job-ocr/README.md). Флаг включён; попытка 15 октября в 21:33 МСК
+закончилась manual-required, Telegram notice доставлено, сбор пока остановлен.
 
 ### Cloud control plane
 
