@@ -9,6 +9,39 @@ source changes; verify the deployed revision before a server rollout.
 
 ## Change control
 
+Согласовано владельцем 16 октября 2026; реализовано локально, не установлено:
+[панель настроек поиска](superpowers/specs/2026-10-16-job-settings-panel-design.md).
+`job:settings` показывает компактные кнопки дохода, города, удалённых вакансий,
+интервала, глубины истории, модели AI, порога уведомления, запросов и исключений.
+Открытие панели не начинает ввод. Скалярные поля предлагают предустановки или
+обычное значение; модель — текущую/настроенные OpenRouter модели, наследование
+и ввод ID. Каталог доступности провайдера не запрашивается; вызовов AI нет.
+Запросы/исключения показываются по восемь: добавление, полный текст, удаление,
+навигация. После сохранения новой фразы показана страница с ней.
+
+Закрытые callbacks: `job:cfg:<field>:<revision>:<page>`, `cfg_input` с той же
+формой, `job:cfg_pick:<field>:<revision>:<index>`, `cfg_item`/`cfg_remove` только
+для списков, `job:cfg_ok:<confirmation-uuid>`. Field — закрытый код параметра,
+не значение. Все callbacks ≤64 байт. Перед записью — краткая разница и отдельное
+«Сохранить / Отмена»; сохранение возвращает панель или список. Старая revision,
+просроченное/потреблённое подтверждение, чужие user/chat/conversation отклоняются.
+Навигация отменяет ожидание ввода; неверное значение позволяет повторить ввод.
+Migration 036 добавляет `job_setting_value`, закрытый context
+`{targetId,revision,field,returnPage}`; остальные job context shapes прежние.
+Старый уже выданный `job_settings_edit` работает до истечения, новая панель его
+не создаёт. Изменения не затрагивают HH-подтверждения, профиль и письма.
+
+Owner-approved on 16 October 2026; implemented locally, not deployed. Settings
+now opens a compact button panel with separate field screens, presets/custom
+values, configured/current model choices and paginated query/exclusion lists.
+Opening the panel starts no input or AI request. Each change has an explicit
+save/cancel preview and returns to the panel or relevant list page. Callbacks
+above remain closed and bounded to 64 bytes; revisions, expiry, owner/private
+scope and single consumption remain enforced. Migration 036 adds one closed
+guided kind/context. Legacy pending editors remain compatible, and HH submission
+confirmations, profiles and letters are unchanged. See the
+[development result](updates/2026-10-16-job-settings-panel-development.md).
+
 Согласовано владельцем и установлено на DE 16 октября 2026:
 [учёт откликов](superpowers/specs/2026-10-16-job-application-tracking-design.md).
 «Поиск работы → Отклики» (`job:applications:<page>`) объединяет журнал Jarvis

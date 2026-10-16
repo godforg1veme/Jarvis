@@ -51,6 +51,12 @@ test('real message/menu handlers + PG: guided retries, consumption, scopes, draf
     const callbackUpdate = (data, from = 101, chat = from, type = 'private') => ({ update_id: ++updateId,
       callback_query: { id: String(updateId), from: { id: from }, data, message: { message_id: updateId, chat: { id: chat, type } } } });
     const cb = (data, ...args) => messages.handleCallback(callbackUpdate(data, ...args));
+    // Simulate a legacy editor issued before the new panel rollout, using the real repository.
+    const legacySettings = async () => {
+      await cb('job:settings');
+      const current = await search.getSettings({userId:f.owner});
+      await interactions.begin({...f.scope,channel:undefined,kind:'job_settings_edit',context:{targetId:current.id,revision:current.revision}});
+    };
     const start = await msg('/start');
     assert.equal(start.jobSearchEntry, true);
     assert.equal(start.replyKeyboard.keyboard.at(-1)[0].text, MENU.JOBS);
@@ -66,7 +72,7 @@ test('real message/menu handlers + PG: guided retries, consumption, scopes, draf
     assert.match((await msg(MENU.JOBS, 101, -100, 'group')).answer, /личном/);
     const jobMenu = await msg(MENU.JOBS);
     assert.equal(jobMenu.buttons[0][0].text, 'Включить поиск');
-    await cb('job:settings');
+    await legacySettings();
     assert.equal((await interactions.getActive(f.scope)).interaction.kind, 'job_settings_edit');
     await msg(MENU.JOBS);
     assert.equal((await interactions.getActive(f.scope)).interaction, null, 'bottom navigation cancels pending settings input');
@@ -108,7 +114,7 @@ test('real message/menu handlers + PG: guided retries, consumption, scopes, draf
     assert.match((await cb('job:connect')).answer, /Данные изменились/);
     assert.equal((await f.pool.query('SELECT resume_id FROM job_connections WHERE user_id=$1', [f.owner])).rows[0].resume_id, 'fixtureResume');
     selectedResume = 'fixtureResume';
-    await cb('job:settings');
+    await legacySettings();
     const active = await interactions.getActive(f.scope);
     assert.equal(active.interaction.kind, 'job_settings_edit');
     await msg('интервал = 0');
@@ -119,7 +125,7 @@ test('real message/menu handlers + PG: guided retries, consumption, scopes, draf
     await cb(preview.buttons[0][0].data);
     assert.equal((await search.getSettings({ userId: f.owner })).settings.intervalMs, 900000);
     assert.match((await cb(preview.buttons[0][0].data)).answer, /недоступно/);
-    await cb('job:settings');
+    await legacySettings();
     const cancelled = await msg('интервал = 20');
     await cb('job:menu');
     assert.match((await cb(cancelled.buttons[0][0].data)).answer, /недоступно/);
@@ -148,7 +154,7 @@ test('real message/menu handlers + PG: guided retries, consumption, scopes, draf
     const edited = await msg('Shorter, please');
     assert.match(edited.answer, /Private fixture letter 2/);
     assert.equal(calls, 2);
-    await cb('job:settings');
+    await legacySettings();
     await f.pool.query("UPDATE telegram_interactions SET expires_at=now()-interval '1 minute' WHERE user_id=$1 AND status='active'", [f.owner]);
     assert.match((await msg('интервал = 20')).answer, /Время ввода закончилось/);
     const history = (await f.pool.query('SELECT content FROM messages')).rows.map((x) => x.content).join('\n');

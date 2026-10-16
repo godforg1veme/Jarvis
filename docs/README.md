@@ -17,6 +17,10 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
+Локально готова [панель настроек поиска с кнопками](updates/2026-10-16-job-settings-panel-development.md):
+отдельные параметры, готовые значения, ввод своего, списки фраз и подтверждение
+изменения. В работающий бот ещё не установлена.
+
 На DE установлен [учёт старых и новых откликов HH](updates/2026-10-16-job-application-tracking-release.md):
 единый список, отдельные статусы отправки и работодателя, первый импорт и
 обновление по кнопке. Чтение active/archived проверено; первый полный импорт
@@ -147,6 +151,10 @@ describes publishing. Plans describe intentions. Code, checks, and actual
 deployment establish what is running.
 
 ### Current status
+
+The [button-based job settings panel](updates/2026-10-16-job-settings-panel-development.md)
+is ready locally: separate fields, presets, custom values, phrase lists and
+explicit save confirmation. It is not installed in the running bot yet.
 
 [Tracking old and new HH applications](updates/2026-10-16-job-application-tracking-release.md)
 is deployed on DE: a merged list, separate submission and employer states, an initial

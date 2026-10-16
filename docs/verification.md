@@ -61,6 +61,29 @@ npm test
 npm start
 ```
 
+Button-based job settings (local development, 2026-10-16):
+
+```powershell
+node --test server/test/jobSettingsPanel.test.js server/test/migrations.test.js server/test/telegramInteractionRepository.test.js
+# Dedicated disposable PostgreSQL only; set JARVIS_JOB_TEST_DATABASE_URL:
+npm run test:jobs:settings --prefix server
+npm run test:jobs:postgres --prefix server
+```
+
+Проверка применяет migration 036 и проходит через настоящие message/menu handlers:
+все поля, предустановки/свой ввод, списки моделей и фраз, добавление/удаление,
+пагинация, минимум один запрос, предел списка, отсутствие записи до подтверждения,
+неизменные значения, retry/consumption/expiry/revision, отмена навигацией,
+чужие user/chat/conversation и duplicate update. Старый pending редактор сохранён.
+Ни AI, ни HH в этих проверках не вызываются; реальный Telegram UI проверяется отдельно.
+
+The fixture applies migration 036 through actual message/menu handlers and covers
+all fields, presets/custom values, configured model choices, phrase lists and
+pagination, addition/removal, minimum/maximum list bounds, explicit confirmation,
+no-op choices, retry/consumption/expiry/revision, navigation cancellation, foreign
+scopes and duplicate updates. Legacy pending editors stay compatible. No AI or HH
+calls occur; actual Telegram UI acceptance remains separate.
+
 HH history tracking (local development, 2026-10-16):
 
 ```powershell

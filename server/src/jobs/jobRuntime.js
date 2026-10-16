@@ -60,7 +60,8 @@ function createJobRuntime({ config, pool, interactions, send, sendPhoto, fetchIm
     captchaWorker = new JobCaptchaWorker({ repository, client, ownerId: config.jobBrowserOwnerId, sendPhoto });
   }
   const telegramService = new JobTelegramService({ pool, searchRepository, profileRepository, draftRepository,
-    usageRepository, interactions, draftService, settingsService, applicationService, connectionService, captchaService, historyService, defaultModel: config.jobSearchModel });
+    usageRepository, interactions, draftService, settingsService, applicationService, connectionService, captchaService, historyService,
+    settingsModels: [config.jobSearchModel, config.openrouterModel, config.openrouterFallbackModel], defaultModel: config.jobSearchModel });
   const deliveryWorker = new JobDeliveryWorker({ pool, searchRepository, deliveryRepository, send, captchaEnabled: Boolean(captchaService) });
   const recoveryWorker = new JobRecoveryWorker({ pool, applicationRepository });
   return { captchaService, telegramService, deliveryWorker, applicationService, applicationRepository, historyWorker, historyRepository, historySync,

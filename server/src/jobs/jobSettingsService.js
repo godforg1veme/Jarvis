@@ -41,22 +41,25 @@ class JobSettingsService {
   constructor({ pool, searchRepository, profileRepository, now = () => new Date() }) {
     Object.assign(this, { pool, searchRepository, profileRepository, now });
   }
-  async preview({ scope, kind, targetId, revision, value }) {
+  async preview({ scope, kind, targetId, revision, value, returnTo }) {
     await assertJobScope(this.pool, scope);
     if (!['settings', 'profile'].includes(kind)) throw jobError('JOB_INVALID_ACTION');
+    if (returnTo !== undefined && (kind !== 'settings' || !returnTo || Object.keys(returnTo).length !== 2
+      || !['panel','queries','exclusions'].includes(returnTo.field) || !Number.isInteger(returnTo.page)
+      || returnTo.page < 0 || returnTo.page > 12)) throw jobError('JOB_INVALID_ACTION');
     const result = await this.pool.query(`INSERT INTO job_confirmations(user_id,conversation_id,chat_id,channel,
       kind,target_id,frozen,expires_at) VALUES($1,$2,$3,'telegram',$4,$5,$6,$7) RETURNING *`,
-    [scope.userId, scope.conversationId, scope.chatId, kind, targetId, { revision, value }, new Date(this.now().getTime() + 600000)]);
+    [scope.userId, scope.conversationId, scope.chatId, kind, targetId, { revision, value, ...(returnTo ? { returnTo } : {}) }, new Date(this.now().getTime() + 600000)]);
     return result.rows[0];
   }
-  async approve({ scope, confirmationId }) {
+  async approve({ scope, confirmationId, panel = false }) {
     return jobTransaction(this.pool, async (client) => {
       await assertJobScope(client, scope);
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`job-owner:${scope.userId}`]);
       const row = (await client.query(`UPDATE job_confirmations SET status='consumed' WHERE id=$1 AND user_id=$2
         AND conversation_id=$3 AND chat_id=$4 AND channel='telegram' AND kind IN ('settings','profile')
-        AND status='pending' AND expires_at>$5 RETURNING *`,
-      [confirmationId, scope.userId, scope.conversationId, scope.chatId, this.now()])).rows[0];
+        AND status='pending' AND expires_at>$5 AND ($6::boolean=false OR (kind='settings' AND frozen ? 'returnTo')) RETURNING *`,
+      [confirmationId, scope.userId, scope.conversationId, scope.chatId, this.now(), panel])).rows[0];
       if (!row) throw jobError('JOB_CONFIRMATION_UNAVAILABLE');
       let updated;
       if (row.kind === 'settings') updated = await client.query(`UPDATE job_searches SET settings=$1,revision=revision+1,
@@ -69,7 +72,7 @@ class JobSettingsService {
         await client.query("UPDATE job_confirmations SET status='stale' WHERE user_id=$1 AND kind='apply' AND status='pending'", [scope.userId]);
       }
       if (!updated.rowCount) throw jobError('JOB_REVISION_CONFLICT');
-      return row.kind;
+      return panel ? {kind:row.kind,returnTo:row.frozen.returnTo} : row.kind;
     });
   }
 }

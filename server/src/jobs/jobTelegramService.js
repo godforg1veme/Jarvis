@@ -3,6 +3,7 @@ const { parseJobCallback } = require('./jobTelegramCallbacks');
 const { response, button, homeView, cardView, draftView, listView } = require('./jobTelegramViews');
 const { parseSettingsEdit, parseProfileEdit } = require('./jobSettingsService');
 const { JobLetterFlow } = require('./jobLetterFlow');
+const { JobSettingsPanel } = require('./jobSettingsPanel');
 
 function jobScope(context) {
   if (context.user?.role !== 'owner' || context.chatType !== 'private' || String(context.chatId) !== String(context.telegramUserId)) throw jobError('JOB_SCOPE_DENIED');
@@ -29,11 +30,11 @@ function publicJobFailure(error) {
 }
 
 class JobTelegramService {
-  constructor(options) { Object.assign(this, options); this.letterFlow = new JobLetterFlow(this); }
+  constructor(options) { Object.assign(this, options); this.letterFlow = new JobLetterFlow(this); this.settingsPanel = new JobSettingsPanel(this); }
   async handleCallback(data, context) {
     const parsed = parseJobCallback(data); if (!parsed) return data.startsWith('job:') ? response('Кнопка недоступна.') : null;
     try { const scope = jobScope(context); await assertJobScope(this.pool, scope);
-      if (!['approve', 'confirm'].includes(parsed.action)) await this.pool.query(`UPDATE job_confirmations SET status='cancelled'
+      if (!['approve', 'confirm', 'cfg_ok'].includes(parsed.action)) await this.pool.query(`UPDATE job_confirmations SET status='cancelled'
         WHERE user_id=$1 AND conversation_id=$2 AND chat_id=$3 AND status='pending' AND kind IN ('settings','profile')`,
       [scope.userId, scope.conversationId, scope.chatId]);
       if (['menu', 'back', 'draft', 'cancel', 'regenerate', 'edit', 'translate', 'prepare', 'base_letter', 'base', 'improved', 'custom', 'custom_ai'].includes(parsed.action)) await this.pool.query(`UPDATE job_confirmations SET status='cancelled'
@@ -53,10 +54,12 @@ class JobTelegramService {
       context: { targetId, revision } });
     return response(answer, [[{ text: 'Отмена', data: `flow:cancel:${interaction.id}` }]]);
   }
-  async handle({ scope, context, action, targetId, page = 0 }) {
+  async handle({ scope, context, action, targetId, field, revision, index, page = 0 }) {
     if (action === 'captcha' || action === 'captcha_refresh') return this.captchaService ? this.captchaService.request(scope, action === 'captcha_refresh') : response('Проверка HH через Telegram не настроена.');
     if (action === 'menu' || action === 'back') return this.home(scope);
     const search = await this.searchRepository.ensure({ scope });
+    const settings = await this.settingsPanel.handle({scope,action,targetId,field,revision,index,page});
+    if (settings) return settings;
     const letter = await this.letterFlow.handle({ scope, context, action, targetId });
     if (letter) return letter;
     const history=this.historyService&&await this.historyService.handle({scope,action,targetId,page});
@@ -98,25 +101,6 @@ class JobTelegramService {
       return this.applicationService.prepareConfirmation({ scope, draftId: draft.id });
     }
     if (action === 'confirm') return this.applicationService ? this.applicationService.confirm({ scope, confirmationId: targetId }) : response('Отправка HH не настроена.');
-    if (action === 'settings') return this.begin(scope, 'job_settings_edit', search.id, search.revision,
-      `Настройки поиска\nОриентир: ${search.settings.targetRub} ₽ на руки; офис: ${search.settings.officeCity}.
-Проверка: ${search.settings.intervalMs / 60000} минут; история: ${search.settings.historyDays} дней.
-Модель: ${search.settings.model || this.defaultModel || 'не выбрана'}; уведомление: $${search.settings.budgetUsd}.
-Запросы:\n${search.settings.queries.join('; ')}
-Исключения: ${search.settings.exclusions.join('; ') || 'нет'}
-Напиши одну или несколько строк:
-зарплата = 100000
-город = Москва
-интервал = 30
-период = 14
-бюджет = 3
-модель = выбранное название модели
-удалёнка = да
-запрос + новая поисковая фраза
-запрос - лишняя фраза
-исключение + нежелательная фраза
-включить
-Изменения применятся после подтверждения.`);
     if (action === 'profile') {
       const profile = await this.profileRepository.ensure({ scope });
       return this.begin(scope, 'job_profile_edit', profile.id, profile.revision,
@@ -136,6 +120,8 @@ ${profile.profile.facts.map((x) => x.text).join('\n')}
     if (!interaction.kind.startsWith('job_')) return null;
     try {
       const scope = jobScope(context); await assertJobScope(this.pool, scope);
+      const setting = await this.settingsPanel.handlePendingText(text, {scope,interaction});
+      if (setting) return setting;
       const letter = await this.letterFlow.handlePendingText(text, { scope, context, interaction });
       if (letter) return letter;
       const value = String(text).trim();

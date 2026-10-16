@@ -25,6 +25,7 @@ const KINDS = new Set([
   'life_source_update',
   'life_preference_set',
   'job_settings_edit',
+  'job_setting_value',
   'job_profile_edit',
   'job_draft_edit',
   'job_draft_translate',
@@ -36,6 +37,13 @@ const KINDS = new Set([
 function validateContext(kind, value) {
   const context = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   const keys = Object.keys(context);
+  if (kind === 'job_setting_value') {
+    if (keys.length !== 4 || keys.some(key => !['targetId','revision','field','returnPage'].includes(key))
+      || !UUID_RE.test(String(context.targetId || '')) || !Number.isInteger(context.revision) || context.revision < 1
+      || !['salary','city','interval','history','budget','model','queries','exclusions'].includes(context.field)
+      || !Number.isInteger(context.returnPage) || context.returnPage < 0 || context.returnPage > 12) throw new Error('invalid Telegram interaction context');
+    return {targetId:String(context.targetId).toLowerCase(),revision:context.revision,field:context.field,returnPage:context.returnPage};
+  }
   if (kind.startsWith('job_')) {
     if (keys.length !== 2 || !UUID_RE.test(String(context.targetId || ''))
       || !Number.isInteger(context.revision) || context.revision < 1) throw new Error('invalid Telegram interaction context');

@@ -15,7 +15,7 @@ async function createJobPostgresFixture() {
     // pgvector is unrelated to jobs and isn't required for this isolated schema.
     for (const name of ['001_identity_and_conversations.sql', '015_telegram_interactions.sql',
       '024_telegram_update_outcomes.sql', '025_telegram_update_kind.sql',
-      '028_telegram_subscription_interaction_kinds.sql', '029_job_search.sql', '030_job_search_interactions.sql', '031_job_captcha_attention.sql', '032_job_telegram_captcha.sql', '033_job_captcha_resilience.sql', '034_job_letter_modes.sql', '035_job_application_tracking.sql']) {
+      '028_telegram_subscription_interaction_kinds.sql', '029_job_search.sql', '030_job_search_interactions.sql', '031_job_captcha_attention.sql', '032_job_telegram_captcha.sql', '033_job_captcha_resilience.sql', '034_job_letter_modes.sql', '035_job_application_tracking.sql', '036_job_setting_value.sql']) {
       const sql = await fs.readFile(path.join(__dirname, '../../src/db/migrations', name), 'utf8');
       await pool.query(sql.replace(/^CREATE EXTENSION[^;]+;\s*/gm, ''));
     }
