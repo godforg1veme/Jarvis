@@ -2,7 +2,7 @@ const http = require('node:http');
 const { createHash, timingSafeEqual } = require('node:crypto');
 const { UUID, validRequest, SAFE_CODES } = require('./rpcProtocol');
 
-function createRpcServer({ browser, ownerId, token, submissions = null, applyToken = null }) {
+function createRpcServer({ browser, ownerId, token, submissions = null, applyToken = null, health = async () => true }) {
   if (!UUID.test(ownerId || '') || typeof token !== 'string' || token.length < 32 || token.length > 256
     || !/^[\x21-\x7e]+$/.test(token)) throw new Error('JOB_BROWSER_CONFIG_INVALID');
   if ((submissions || applyToken) && (!submissions || typeof applyToken !== 'string'
@@ -22,7 +22,10 @@ function createRpcServer({ browser, ownerId, token, submissions = null, applyTok
     const credential = digest(auth), readAuthenticated = timingSafeEqual(expected, credential);
     const applyAuthenticated = timingSafeEqual(expectedApply, credential) && Boolean(submissions && applyToken);
     if (!readAuthenticated && !applyAuthenticated) { respond(res, 401, { ok: false, code: 'JOB_BROWSER_ACCESS_DENIED' }); req.resume(); return; }
-    if (req.method === 'GET' && req.url === '/health') { respond(res, 200, { ok: true }); return; }
+    if (req.method === 'GET' && req.url === '/health') {
+      let healthy = false; try { healthy = await health() === true; } catch {}
+      respond(res, healthy ? 200 : 503, healthy ? { ok: true } : { ok: false, code: 'JOB_BROWSER_UNHEALTHY' }); return;
+    }
     if (req.method !== 'POST' || req.url !== '/rpc' || req.headers['content-type'] !== 'application/json') {
       respond(res, 400, { ok: false, code: 'JOB_BROWSER_INVALID_REQUEST' }); req.resume(); return;
     }

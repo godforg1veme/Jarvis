@@ -34,7 +34,8 @@ test('CAPTCHA client bounded exact shape, private owner credential and PNG limit
 });
 test('unknown photo delivery blocks automatic challenges until explicit refresh', async () => {
   let refresh = false, challenges = 0;
-  const worker = new JobCaptchaWorker({ ownerId, repository: { scope: async () => ({}), consumeRefresh: async () => refresh,
+  const worker = new JobCaptchaWorker({ ownerId, repository: { scope: async () => ({}), getRequest: async () => refresh ? { refresh_requested:true } : null,
+    recover: async () => {}, notify: async () => {}, ackRequest: async () => {}, photoState: async () => 'sent',
     hasUnknownDelivery: async () => true, enqueue: async () => {}, claim: async () => null },
     client: { status: async () => ({ phase: 'active' }), challenge: async arg => { challenges++; assert.equal(arg, true); return { outcome: 'ready', challengeId: randomUUID() }; } } });
   await worker.tick(); assert.equal(challenges, 0); refresh = true; await worker.tick(); assert.equal(challenges, 1);

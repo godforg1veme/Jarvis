@@ -114,6 +114,26 @@ message/menu routing, private owner/chat/conversation scope, atomic reply
 consumption, expiry/replacement/replay, unknown photo ACK and no AI/history use.
 Then run the focused Telegram gate in the menu contract and full server tests.
 
+Resilience regressions (local update, 2026-10-16):
+
+```powershell
+node --test server/test/jobCaptchaResilience.test.js server/test/jobTelegramCaptcha.test.js
+# Dedicated disposable PostgreSQL only:
+node --test server/test/jobCaptchaResilienceAcceptance.cjs server/test/jobTelegramCaptchaAcceptance.cjs
+```
+
+The PG fixture applies migration 033 and checks retained/concurrent refresh,
+old-photo invalidation, expired send leases, same-row retry, unknown answer,
+notification dedup/revoked identity/changed scope and retirement of stale notices.
+Browser unit regressions are `browserHealth.test.js` and `captchaPageRecovery.test.js`.
+The isolated HTTPS `captchaTelegramAcceptance.cjs` deliberately crashes its own
+renderer using a test-only CDP session, verifies `isClosed() === false`, explicit
+refresh and a fresh tab with no duplicate POST. This test does not enable a runtime
+CDP listener. `manualRuntimeAcceptance.cjs` checks failed Chromium health;
+`browserFatalRuntimeAcceptance.cjs` kills only its own fixture Chromium child,
+checks main-process exit, restart with the original pause/claims and normal stop.
+Each runtime test needs its own fresh private tmpfs profile and no real account.
+
 The normalized Compose policy checker in [deploy instructions](../deploy/README.md)
 checks distinct CAPTCHA credentials only on server/browser, explicit flags on
 all three jobs services, preserved external profile, and absence of HH gateway,

@@ -24,14 +24,14 @@ class JobCaptchaClient {
     try {
       const response = await this.fetchImpl(this.url, { method: 'POST', headers: { authorization: `Bearer ${this.token}`,
         'x-jarvis-owner-id': this.ownerId, 'content-type': 'application/json' }, body: JSON.stringify({ operation, args }),
-        redirect: 'manual', signal: AbortSignal.timeout(90000) });
+        redirect: 'manual', signal: AbortSignal.timeout(operation === 'status' ? 5000 : 90000) });
       result = await readBoundedJson(response, 360000);
       if (!response.ok || !exact(result, ['ok', 'value']) || result.ok !== true) throw new Error();
     } catch { throw jobError('JOB_CAPTCHA_UNAVAILABLE'); }
     const v = result.value;
     if (operation === 'status' && exact(v, ['phase','revision']) && ['idle','pending','active','checking'].includes(v.phase) && Number.isSafeInteger(v.revision) && v.revision >= 0) return v;
     if (operation === 'challenge') {
-      if (exact(v, ['outcome']) && v.outcome === 'idle') return v;
+      if (exact(v, ['outcome']) && ['idle','refresh_required'].includes(v.outcome)) return v;
       if (exact(v, ['outcome','challengeId','revision','pngBase64','expiresAt']) && v.outcome === 'ready' && UUID.test(v.challengeId || '')
         && Number.isSafeInteger(v.revision) && v.revision >= 0 && typeof v.expiresAt === 'string' && Number.isFinite(Date.parse(v.expiresAt)) && new Date(v.expiresAt).toISOString() === v.expiresAt
         && Date.parse(v.expiresAt) > Date.now() && Date.parse(v.expiresAt) <= Date.now() + 610000) return { ...v, png: pngBytes(v.pngBase64), pngBase64: undefined };

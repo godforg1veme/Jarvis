@@ -5,6 +5,7 @@ const { readSearchPage, readVacancyPage } = require('./hhPageReader');
 const { classifyPage } = require('./pageSignals');
 const { dispatchCaptcha } = require('./captchaDispatch');
 const { validTarget, fail } = require('./manualState');
+const { bounded } = require('./browserHealth');
 const hashKey = key => createHash('sha256').update(JSON.stringify(['hh-captcha', key])).digest('hex');
 const hashOperation = id => createHash('sha256').update(JSON.stringify(['hh-telegram-operation', id])).digest('hex');
 function validPng(bytes) {
@@ -14,19 +15,28 @@ function validPng(bytes) {
     && bytes.readUInt32BE(20) > 0 && bytes.readUInt32BE(20) <= 256;
 }
 class CaptchaTelegramBrowser {
-  constructor({ context, coordinator, journal, dispatch = dispatchCaptcha, now = Date.now, receiptTimeout = 12000 }) {
-    Object.assign(this, { context, coordinator, journal, dispatch, now, receiptTimeout });
+  constructor({ context, coordinator, journal, dispatch = dispatchCaptcha, now = Date.now, receiptTimeout = 12000,
+    closeTimeoutMs = 2000, onUnhealthy = () => {} }) {
+    Object.assign(this, { context, coordinator, journal, dispatch, now, receiptTimeout, closeTimeoutMs, onUnhealthy });
     this.page = null; this.current = null; this.armed = null; this.initAllowed = false; this.dispatches = new Set();
+    this.crashed = new WeakSet();
     this.tail = Promise.resolve();
   }
   async open(target) {
     if (!validTarget(target)) throw fail();
     await this.drain(); this.current = null; this.armed = null; this.initAllowed = true;
-    if (!this.page || this.page.isClosed()) this.page = this.context.pages().find(p => p.url() === 'about:blank') || await this.context.newPage();
-    await this.page.goto(target, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    // isClosed() remains false for a crashed renderer. Never navigate the old
+    // challenge tab again after an OOM or keep its accumulated page resources.
+    const old = this.page; this.page = null;
+    try {
+      if (old) await bounded(() => old.close(), this.closeTimeoutMs);
+      this.page = await bounded(() => this.context.newPage(), 5000);
+    } catch (error) { this.onUnhealthy(); throw error; }
+    const page = this.page; page.once('crash', () => this.crashed.add(page));
+    await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 30000 });
   }
   async picture() {
-    if (!this.page || this.page.isClosed()) return null;
+    if (!this.page || this.page.isClosed() || this.crashed.has(this.page)) return null;
     const target = this.coordinator.state.target, form = await readForm(this.page, target);
     if (!form) return null;
     const images = await this.page.locator('img').evaluateAll(nodes => nodes.slice(0, 50).flatMap((n, index) => {
@@ -45,10 +55,11 @@ class CaptchaTelegramBrowser {
   challenge(refresh) { return this.run(() => this.issueChallenge(refresh)); }
   async issueChallenge(refresh) {
     const status = this.coordinator.status();
-    if (status.phase === 'idle') return { outcome: 'idle' };
+    if (status.phase === 'idle') { this.current = null; return { outcome: 'idle' }; }
     if (this.current && !refresh) {
-      if (!this.current.used && this.current.revision === status.revision && this.current.expires > this.now()) return this.publicChallenge();
-      throw fail('JOB_CAPTCHA_UNAVAILABLE');
+      if (!this.current.used && this.current.revision === status.revision && this.current.expires > this.now()
+        && this.page && !this.page.isClosed() && !this.crashed.has(this.page)) return this.publicChallenge();
+      return { outcome: 'refresh_required' };
     }
     if (status.phase === 'checking') throw fail('JOB_CAPTCHA_BUSY');
     const opened = await this.coordinator.start(status.revision);
@@ -105,6 +116,7 @@ class CaptchaTelegramBrowser {
       || this.coordinator.status().revision !== input.revision || this.coordinator.status().phase !== 'active'
       || current.expires <= this.now()) return { outcome: 'stale' };
     if (current.used || this.coordinator.state.claims.includes(hashKey(current.key))) return { outcome: 'already_used' };
+    if (!this.page || this.page.isClosed() || this.crashed.has(this.page)) return { outcome: 'stale' };
     const picture = await this.picture();
     if (!picture || picture.key !== current.key || picture.target !== current.target || !sameForm(picture.form, current.form)) return { outcome: 'stale' };
     await this.page.locator('form input[name="captchaText"]').fill(text, { timeout: 3000 });
@@ -175,6 +187,6 @@ class CaptchaTelegramBrowser {
       return true;
     } finally { await reader.close().catch(() => {}); }
   }
-  async close() { this.current = null; this.armed = null; await this.page?.close().catch(() => {}); }
+  async close() { this.current = null; this.armed = null; if (this.page) await bounded(() => this.page.close(), 2000).catch(() => {}); }
 }
 module.exports = { CaptchaTelegramBrowser, validPng, hashKey, hashOperation };

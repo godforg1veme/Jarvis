@@ -586,7 +586,7 @@ async function createRuntime(config, overrides = {}) {
       jobRuntime = createJobRuntime({ config, pool, interactions: telegramInteractions,
         fetchImpl: overrides.jobModelFetch,
         applicationAdapter: overrides.jobApplicationAdapter,
-        sendPhoto: ({ chatId, png, caption, buttons }) => bot.api.sendPhoto(chatId, new InputFile(png, 'hh-captcha.png'), { caption, reply_markup: telegramReplyMarkup(buttons) }),
+        sendPhoto: ({ chatId, png, caption, buttons, signal }) => bot.api.sendPhoto(chatId, new InputFile(png, 'hh-captcha.png'), { caption, reply_markup: telegramReplyMarkup(buttons) }, signal),
         send: ({ chatId, answer, buttons, disableLinkPreview }) => bot.api.sendMessage(chatId, answer, {
           ...(buttons?.length ? { reply_markup: telegramReplyMarkup(buttons) } : {}),
           ...(disableLinkPreview === true ? { link_preview_options: { is_disabled: true } } : {}),

@@ -18,7 +18,7 @@ class JobDeliveryRepository {
         AND c.channel='telegram' AND c.external_chat_id=s.chat_id
       WHERE d.status='queued' AND d.available_at<=now() AND (d.kind IN ('budget','attention') OR s.settings->>'paused'='false')
       AND (d.kind<>'card' OR EXISTS(SELECT 1 FROM job_matches m WHERE m.user_id=d.user_id AND m.vacancy_id=d.vacancy_id AND NOT m.hidden))
-      ORDER BY d.created_at,d.id FOR UPDATE OF d SKIP LOCKED LIMIT 1)
+      ORDER BY CASE WHEN d.kind='attention' THEN 0 ELSE 1 END,d.created_at,d.id FOR UPDATE OF d SKIP LOCKED LIMIT 1)
       UPDATE job_deliveries d SET status='sending',lease_until=now()+interval '2 minutes',attempts=attempts+1
       FROM candidate WHERE d.id=candidate.id RETURNING d.*`)).rows[0] || null;
   }

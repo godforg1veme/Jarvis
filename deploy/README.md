@@ -429,6 +429,26 @@ Confirmed read-only access to the original HH target resumes collection;
 unknown results remain blocked. A particular photo expires after ten minutes,
 but the recovery pause has no timer. Refresh replaces the photo binding.
 
+Local resilience update (2026-10-16, not yet deployed): apply migration 033 before
+starting the changed server. It adds durable request IDs, request timestamps and
+bounded photo retry metadata; existing photos and progress remain intact.
+Install server and browser together: the private challenge protocol gains
+`refresh_required`. Collector code is unchanged. Chromium health evaluates local
+JS in a disposable blank page with a two-second deadline, independently of HH;
+the runtime exits on context loss or an 80-second operation stall so the existing
+restart policy can recover it. CAPTCHA preparation replaces the previous tab.
+Do not attach the real profile to acceptance containers or run a second Chromium
+against that volume. Retain the 1 GiB budget until host capacity is measured.
+
+Refresh requests survive preparation failures and are acknowledged only after a
+durable result, by their original request ID. Photo 429 retries use the same
+outbox row (at most four sends); missing ACK and expired sending leases become
+unknown and require explicit refresh. Unknown human answers also block automatic
+challenges. Closed, scoped failure notices use the existing delivery outbox;
+queued delay notices are retired when recovery succeeds. Backoff is 10/20/40/80/
+120 seconds, and status RPC has a five-second timeout. See the
+[development record](../docs/updates/2026-10-16-hh-captcha-resilience-development.md).
+
 Validate resolved Compose configuration through the bounded policy checker;
 never print or store its secret-bearing JSON:
 

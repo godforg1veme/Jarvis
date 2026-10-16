@@ -1,5 +1,6 @@
 const { assertJobScope } = require('./jobSchemas');
 const { randomUUID } = require('node:crypto');
+const { captchaNoticeView } = require('./jobCaptchaNotices');
 class JobCaptchaRepository {
   constructor(pool) { this.pool = pool; }
   async scope(userId) {
@@ -11,20 +12,49 @@ class JobCaptchaRepository {
   async request(scope, refresh) {
     await assertJobScope(this.pool, scope);
     await this.pool.query(`WITH retired AS (
-      UPDATE job_captcha_photos SET superseded=true
-      WHERE user_id=$1 AND conversation_id=$3 AND chat_id=$4 AND $2::boolean AND status IN ('sending','unknown')
+      UPDATE job_captcha_photos SET superseded=true,
+        status=CASE WHEN status IN ('queued','sent') THEN 'stale' ELSE status END
+      WHERE user_id=$1 AND conversation_id=$3 AND chat_id=$4 AND $2::boolean
+      RETURNING id), retired_notices AS (
+      UPDATE job_deliveries SET status='failed' WHERE user_id=$1 AND $2::boolean AND status='queued'
+        AND payload->>'reason'='HH_CAPTCHA_STATUS' AND payload->>'conversationId'=$3::text AND payload->>'chatId'=$4
       RETURNING id)
       INSERT INTO job_captcha_controls(user_id,refresh_requested) VALUES($1,$2)
-      ON CONFLICT(user_id) DO UPDATE SET refresh_requested=job_captcha_controls.refresh_requested OR excluded.refresh_requested`,
+      ON CONFLICT(user_id) DO UPDATE SET refresh_requested=job_captcha_controls.refresh_requested OR excluded.refresh_requested,
+        request_id=excluded.request_id,requested_at=now(),explicit_request=true`,
     [scope.userId,refresh,scope.conversationId,scope.chatId]);
   }
-  async consumeRefresh(scope) {
+  async getRequest(scope) {
     await assertJobScope(this.pool, scope);
-    return (await this.pool.query('DELETE FROM job_captcha_controls WHERE user_id=$1 RETURNING refresh_requested', [scope.userId])).rows[0]?.refresh_requested === true;
+    return (await this.pool.query('SELECT request_id,refresh_requested,explicit_request FROM job_captcha_controls WHERE user_id=$1', [scope.userId])).rows[0] || null;
+  }
+  async ensureRequest(scope) {
+    await assertJobScope(this.pool, scope);
+    await this.pool.query('INSERT INTO job_captcha_controls(user_id,explicit_request) VALUES($1,false) ON CONFLICT(user_id) DO NOTHING', [scope.userId]);
+    return this.getRequest(scope);
+  }
+  async ackRequest(scope, requestId) {
+    await assertJobScope(this.pool, scope);
+    await this.pool.query(`WITH retired AS (
+      UPDATE job_deliveries SET status='failed' WHERE user_id=$1 AND status='queued'
+        AND payload->>'reason'='HH_CAPTCHA_STATUS' AND payload->>'code'='PREPARATION_DELAYED'
+        AND payload->>'requestId'=$2::text AND payload->>'conversationId'=$3::text AND payload->>'chatId'=$4
+      RETURNING id)
+      DELETE FROM job_captcha_controls WHERE user_id=$1 AND request_id=$2::uuid`, [scope.userId, requestId,scope.conversationId,scope.chatId]);
+  }
+  async recover(scope) {
+    await assertJobScope(this.pool, scope);
+    await this.pool.query(`UPDATE job_captcha_photos SET status=CASE WHEN status='sending' THEN 'unknown' ELSE 'stale' END,lease_until=NULL
+      WHERE user_id=$1 AND conversation_id=$2 AND chat_id=$3 AND
+      (status='sending' AND lease_until<now() OR status IN ('queued','sent') AND expires_at<=now())`, [scope.userId,scope.conversationId,scope.chatId]);
   }
   async hasUnknownDelivery(scope) {
     await assertJobScope(this.pool, scope);
-    return (await this.pool.query("SELECT 1 FROM job_captcha_photos WHERE user_id=$1 AND conversation_id=$2 AND chat_id=$3 AND NOT superseded AND status IN ('sending','unknown') LIMIT 1", [scope.userId,scope.conversationId,scope.chatId])).rowCount > 0;
+    return (await this.pool.query(`SELECT CASE WHEN status='sending' THEN 'sending'
+      WHEN status='consumed' AND lease_until>now() THEN 'answer_sending'
+      WHEN status='consumed' THEN 'answer_unknown' ELSE 'unknown' END AS reason
+      FROM job_captcha_photos WHERE user_id=$1 AND conversation_id=$2 AND chat_id=$3 AND NOT superseded
+      AND (status IN ('sending','unknown') OR status='consumed' AND outcome='unknown') LIMIT 1`, [scope.userId,scope.conversationId,scope.chatId])).rows[0]?.reason || null;
   }
   async enqueue(scope, challenge) {
     await assertJobScope(this.pool, scope);
@@ -33,18 +63,35 @@ class JobCaptchaRepository {
       VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(user_id,challenge_id) DO NOTHING RETURNING id`,
     [scope.userId,scope.conversationId,scope.chatId,challenge.challengeId,challenge.revision,challenge.expiresAt])).rows[0];
   }
-  async claim(scope, challengeId) {
+  async claim(scope, challengeId, requestId = null) {
     await assertJobScope(this.pool, scope);
-    await this.pool.query("UPDATE job_captcha_photos SET status='unknown',lease_until=NULL WHERE user_id=$1 AND status='sending' AND lease_until<now()", [scope.userId]);
-    return (await this.pool.query(`UPDATE job_captcha_photos SET status='sending',lease_until=now()+interval '2 minutes'
-      WHERE user_id=$1 AND challenge_id=$2 AND conversation_id=$3 AND chat_id=$4 AND status='queued' AND expires_at>now() RETURNING *`,
-    [scope.userId,challengeId,scope.conversationId,scope.chatId])).rows[0];
+    return (await this.pool.query(`UPDATE job_captcha_photos SET status='sending',lease_until=now()+interval '2 minutes',attempts=attempts+1
+      WHERE user_id=$1 AND challenge_id=$2 AND conversation_id=$3 AND chat_id=$4 AND status='queued' AND NOT superseded
+      AND expires_at>now() AND available_at<=now() AND attempts<4
+      AND NOT EXISTS(SELECT 1 FROM job_captcha_controls WHERE user_id=$1 AND request_id IS DISTINCT FROM $5::uuid) RETURNING *`,
+    [scope.userId,challengeId,scope.conversationId,scope.chatId,requestId])).rows[0];
   }
-  async delivered(scope, id, messageId, outcome) {
+  async delivered(scope, id, messageId, outcome, retryAfterMs = 0) {
     await assertJobScope(this.pool, scope);
+    if (!['sent','failed','unknown','queued'].includes(outcome) || !Number.isInteger(retryAfterMs) || retryAfterMs<0 || retryAfterMs>86400000) throw new Error('JOB_INVALID_DELIVERY_OUTCOME');
     await this.pool.query(`UPDATE job_captcha_photos SET status=$2,telegram_message_id=$3,lease_until=NULL
+      ,available_at=now()+($7::int*interval '1 millisecond')
       WHERE id=$1 AND status='sending' AND user_id=$4 AND conversation_id=$5 AND chat_id=$6`,
-    [id,outcome,messageId == null ? null : String(messageId),scope.userId,scope.conversationId,scope.chatId]);
+    [id,outcome,messageId == null ? null : String(messageId),scope.userId,scope.conversationId,scope.chatId,retryAfterMs]);
+  }
+  async notify(scope, code, requestId = null) {
+    await assertJobScope(this.pool, scope);
+    if (!captchaNoticeView(code)) throw new Error('JOB_INVALID_DELIVERY_OUTCOME');
+    await this.pool.query(`INSERT INTO job_deliveries(user_id,kind,dedup_key,payload)
+      VALUES($1,'attention','attention:captcha-status:'||$4||':'||COALESCE($5::text,
+        (SELECT id::text FROM job_captcha_photos WHERE user_id=$1 AND conversation_id=$2 AND chat_id=$3 ORDER BY created_at DESC,id DESC LIMIT 1),'initial'),
+        jsonb_build_object('reason','HH_CAPTCHA_STATUS','code',$4::text,'conversationId',$2::text,'chatId',$3::text,'requestId',$5::text))
+      ON CONFLICT(user_id,dedup_key) DO NOTHING`, [scope.userId,scope.conversationId,scope.chatId,code,requestId]);
+  }
+  async photoState(scope, challengeId) {
+    await assertJobScope(this.pool, scope);
+    return (await this.pool.query('SELECT status FROM job_captcha_photos WHERE user_id=$1 AND conversation_id=$2 AND chat_id=$3 AND challenge_id=$4',
+      [scope.userId,scope.conversationId,scope.chatId,challengeId])).rows[0]?.status;
   }
   async known(scope, messageId) {
     await assertJobScope(this.pool, scope);
@@ -53,14 +100,14 @@ class JobCaptchaRepository {
   }
   async consume(scope, messageId) {
     await assertJobScope(this.pool, scope);
-    return (await this.pool.query(`UPDATE job_captcha_photos SET status='consumed',operation_id=$5,outcome='unknown'
-      WHERE user_id=$1 AND conversation_id=$2 AND chat_id=$3 AND telegram_message_id=$4 AND status='sent' AND expires_at>now()
+    return (await this.pool.query(`UPDATE job_captcha_photos SET status='consumed',operation_id=$5,outcome='unknown',lease_until=now()+interval '2 minutes'
+      WHERE user_id=$1 AND conversation_id=$2 AND chat_id=$3 AND telegram_message_id=$4 AND status='sent' AND NOT superseded AND expires_at>now()
       AND NOT EXISTS(SELECT 1 FROM job_captcha_photos newer WHERE newer.user_id=$1 AND newer.created_at>job_captcha_photos.created_at)
       RETURNING challenge_id,revision,operation_id`, [scope.userId,scope.conversationId,scope.chatId,messageId,randomUUID()])).rows[0];
   }
   async finish(scope, operationId, outcome) {
     await assertJobScope(this.pool, scope);
-    await this.pool.query("UPDATE job_captcha_photos SET outcome=$3 WHERE user_id=$1 AND operation_id=$2 AND status='consumed'", [scope.userId,operationId,outcome]);
+    await this.pool.query("UPDATE job_captcha_photos SET outcome=$3,lease_until=NULL WHERE user_id=$1 AND conversation_id=$4 AND chat_id=$5 AND operation_id=$2 AND status='consumed'", [scope.userId,operationId,outcome,scope.conversationId,scope.chatId]);
   }
 }
 module.exports = { JobCaptchaRepository };

@@ -14,6 +14,7 @@ const { ManualCoordinator } = require('./manualCoordinator');
 const { CaptchaTelegramBrowser } = require('./captchaTelegramBrowser');
 const { createCaptchaBroker } = require('./captchaBroker');
 const { randomUUID, createHash } = require('node:crypto');
+const { BrowserHealth, bounded } = require('./browserHealth');
 
 async function handoverCaptcha({ journal, manual, ownerId, target, error, now = Date.now }) {
   let state = await journal.read();
@@ -29,7 +30,7 @@ async function handoverCaptcha({ journal, manual, ownerId, target, error, now = 
   return state.operationId;
 }
 
-async function startBrowser(env = process.env) {
+async function startBrowser(env = process.env, { onFatal = () => {} } = {}) {
   const ownerId = env.JARVIS_JOB_BROWSER_OWNER_ID, token = env.JARVIS_JOB_BROWSER_TOKEN;
   if (env.JARVIS_JOB_BROWSER_ENABLED !== '1' || process.platform !== 'linux' || process.getuid() === 0
     || !UUID.test(ownerId || '') || !/^[\x21-\x7e]{32,256}$/.test(token || '')) throw new Error('JOB_BROWSER_CONFIG_INVALID');
@@ -56,10 +57,11 @@ async function startBrowser(env = process.env) {
   const manualEnabled = env.JARVIS_HH_CAPTCHA_TELEGRAM === '1', manualToken = env.JARVIS_JOB_CAPTCHA_TOKEN;
   if (manualEnabled && (!/^[\x21-\x7e]{32,256}$/.test(manualToken || '') || manualToken === token || manualToken === applyToken)) throw new Error('JOB_MANUAL_CONFIG_INVALID');
   if (!manualEnabled) await assertInactiveWhenDisabled({ root: `${root}/manual-recovery`, ownerId });
-  let context, server, manual, manualPage, broker;
+  let context, server, manual, manualPage, broker, health;
   try {
     context = await chromium.launchPersistentContext(root, { headless: true, chromiumSandbox: true,
       acceptDownloads: false, serviceWorkers: 'block', locale: 'ru-RU' });
+    health = new BrowserHealth({ context, onFatal });
     // Includes popups and frames. Only the guarded driver can permit its exact POST.
     await context.route('**/*', async (route) => {
       if (['GET', 'HEAD', 'OPTIONS'].includes(route.request().method())) return allowedRequest(route.request().url()) ? route.continue() : route.abort();
@@ -77,10 +79,11 @@ async function startBrowser(env = process.env) {
       manual = new ManualCoordinator({ store: new ManualState({ root: `${root}/manual-recovery`, ownerId }),
         open: (target) => manualPage.open(target), verify: (target, id) => manualPage.verify(target, id) });
       await manual.load();
-      manualPage = new CaptchaTelegramBrowser({ context, coordinator: manual, journal });
+      manualPage = new CaptchaTelegramBrowser({ context, coordinator: manual, journal, onUnhealthy: () => health.fail() });
     }
     const onManualRequired = manual && ((target, error) => handoverCaptcha({ journal, manual, ownerId, target, error }));
-    const browser = new HhBrowser({ context, primaryResumeId, captchaRecovery, manualCoordinator: manual, onManualRequired });
+    const browser = new HhBrowser({ context, primaryResumeId, captchaRecovery, manualCoordinator: manual, onManualRequired,
+      onTimeout: () => health.fail() });
     let submissions = null;
     if (applyEnabled) {
       if (!primaryResumeId) throw new Error('JOB_BROWSER_CONFIG_INVALID');
@@ -90,23 +93,31 @@ async function startBrowser(env = process.env) {
       submissions = { submit: (input) => browser.run(() => { manual?.assertAutomatic(); return guarded.submit(input); }),
         reconcile: (input) => browser.run(() => { manual?.assertAutomatic(); return guarded.reconcile(input); }) };
     }
-    server = createRpcServer({ browser, ownerId, token, submissions, applyToken });
+    server = createRpcServer({ browser, ownerId, token, submissions, applyToken, health: () => health.check() });
     await new Promise((resolve, reject) => { server.once('error', reject); server.listen(8080, '0.0.0.0', resolve); });
     if (manual) {
-      broker = createCaptchaBroker({ coordinator: manual, controller: manualPage, ownerId, token: manualToken, run: (fn) => browser.run(fn) });
+      broker = createCaptchaBroker({ coordinator: manual, controller: manualPage, ownerId, token: manualToken,
+        run: fn => bounded(() => browser.run(fn), 80000).catch(error => {
+          if (error.code === 'JOB_BROWSER_OPERATION_TIMEOUT') health.fail();
+          throw error;
+        }) });
       await new Promise((resolve, reject) => { broker.once('error', reject); broker.listen(8082, '0.0.0.0', resolve); });
     }
+    health.start();
     return { async close() {
+      health.close();
       broker?.closeAllConnections();
       if (broker) await new Promise((resolve) => broker.close(resolve));
       await new Promise((resolve) => server.close(resolve)); await browser.tail; await manualPage?.close(); await context.close();
     } };
-  } catch (error) { server?.close(); broker?.close(); await manualPage?.close(); await context?.close(); throw error; }
+  } catch (error) { health?.close(); server?.close(); broker?.close(); await manualPage?.close(); await context?.close(); throw error; }
 }
 
 if (require.main === module) {
   let runtime;
-  startBrowser().then((value) => {
+  startBrowser(process.env, { onFatal: () => {
+    process.stderr.write('JOB_BROWSER_UNHEALTHY\n'); process.exit(1);
+  } }).then((value) => {
     runtime = value; process.stdout.write('JOB_BROWSER_READY\n');
     const close = () => { runtime.close().catch(() => { process.exitCode = 1; }); };
     process.once('SIGTERM', close); process.once('SIGINT', close);

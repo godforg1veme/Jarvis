@@ -4,12 +4,13 @@ const { readSearchPage, readVacancyPage, readResumes } = require('./hhPageReader
 const { readApplicationForm } = require('./hhApplicationForm');
 const { readResumePrivacy, readEmployerId, evaluatePrivacy } = require('./hhPrivacy');
 const { dispatchCaptcha } = require('./captchaDispatch');
+const { bounded } = require('./browserHealth');
 const failure = (code) => Object.assign(new Error(code), { code });
 const CAPABILITIES = Object.freeze({ dateWindows: false, maxPages: 1000 });
 
 class HhBrowser {
   constructor({ context, now = () => new Date(), primaryResumeId = null, captchaRecovery = null, captchaDispatch = dispatchCaptcha,
-    manualCoordinator = null, onManualRequired = null }) {
+    manualCoordinator = null, onManualRequired = null, operationTimeoutMs = 80000, onTimeout = () => {} }) {
     if (!context || typeof context.newPage !== 'function') throw failure('JOB_BROWSER_CONTEXT_REQUIRED');
     this.context = context; this.now = now; this.tail = Promise.resolve(); this.capabilities = CAPABILITIES;
     this.primaryResumeId = primaryResumeId;
@@ -17,10 +18,15 @@ class HhBrowser {
     this.captchaDispatch = captchaDispatch;
     this.manualCoordinator = manualCoordinator;
     this.onManualRequired = onManualRequired;
+    this.operationTimeoutMs = operationTimeoutMs; this.onTimeout = onTimeout;
   }
   // One persistent profile, one active read. A rejected operation must not poison the queue.
   run(fn) {
-    const pending = this.tail.then(fn); this.tail = pending.catch(() => {}); return pending;
+    const pending = this.tail.then(() => bounded(fn, this.operationTimeoutMs)).catch(error => {
+      if (error.code === 'JOB_BROWSER_OPERATION_TIMEOUT') this.onTimeout();
+      throw error;
+    });
+    this.tail = pending.catch(() => {}); return pending;
   }
   connection() {
     return this.run(async () => {

@@ -72,6 +72,13 @@ Server/browser/collector установлены из `b0712e69875adbe62db1892007
 Сценарий фото → reply → однократная отправка → проверка HH → продолжение принят.
 [Результат установки](updates/2026-10-16-hh-telegram-captcha.md).
 
+Позднее 16 октября проверка HH снова остановилась: на DE подтверждён OOM внутри
+browser container при продолжающем успешном HTTP health. Подготовлено локальное
+[восстановление браузера и очереди](updates/2026-10-16-hh-captcha-resilience-development.md):
+проверка Chromium, замена вкладки, durable refresh, bounded retries и owner-scoped
+уведомления. На VPS исправление ещё не установлено; прежняя успешная приёмка
+описывает состояние до этого инцидента.
+
 ### Cloud control plane
 
 - `server/` is a Node.js 20+, CommonJS, Fastify service.
