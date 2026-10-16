@@ -1,3 +1,4 @@
+const { isJobManualAccessUrl } = require('../jobs/jobConfig');
 const { Bot, InputFile } = require('grammy');
 const { sendTelegramText, splitTelegramText } = require('./telegramFormatting');
 const { isLifeCallback } = require('./telegramLifeOsService');
@@ -25,7 +26,8 @@ function vpnReplyMarkup(buttons, options = {}) {
           url.startsWith('https://jarvis.rilora.ru/happ-sub/') ||
           (options.publicUrl && url.startsWith(`${options.publicUrl}/happ-sub/`))
         );
-        const validUrl = validOperationsUrl || validRoutingUrl || validSubscriptionUrl || isJobVacancyUrl(url);
+        const validManualUrl = url && !data && isJobManualAccessUrl(options.jobManualAccessUrl) && url === options.jobManualAccessUrl;
+        const validUrl = validManualUrl || validOperationsUrl || validRoutingUrl || validSubscriptionUrl || isJobVacancyUrl(url);
         if (text.length < 1 || text.length > 64 || (!validCallback && !validUrl)) {
           throw new Error('invalid VPN button');
         }
@@ -176,7 +178,7 @@ function createTelegramBot(options) {
     const result = typeof messageService.handleCallback === 'function'
       ? await messageService.handleCallback(ctx.update)
       : (data.startsWith('vpn:') ? await messageService.handleVpnCallback(ctx.update) : null);
-    if (result) await deliverResult(ctx, result, { operationsPanelUrl: options.operationsPanelUrl, mediaMaxBytes: options.documentMaxBytes });
+    if (result) await deliverResult(ctx, result, { operationsPanelUrl: options.operationsPanelUrl, jobManualAccessUrl: options.jobManualAccessUrl, mediaMaxBytes: options.documentMaxBytes });
   });
 
   if (typeof options.approvalHandler === 'function') {
@@ -188,7 +190,7 @@ function createTelegramBot(options) {
       downloadAttachment: () => downloadTelegramAttachment(ctx, options.token, options.documentMaxBytes, options.fetchImpl),
       downloadVoice: () => downloadTelegramAttachment(ctx, options.token, options.voiceMaxBytes, options.fetchImpl),
     });
-    await deliverResult(ctx, result, { operationsPanelUrl: options.operationsPanelUrl, mediaMaxBytes: options.documentMaxBytes });
+    await deliverResult(ctx, result, { operationsPanelUrl: options.operationsPanelUrl, jobManualAccessUrl: options.jobManualAccessUrl, mediaMaxBytes: options.documentMaxBytes });
   });
 
   bot.catch(async (error) => {

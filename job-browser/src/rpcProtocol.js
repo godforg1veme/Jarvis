@@ -19,7 +19,7 @@ function validRequest(value, ownerId) {
     && date(args.publishedFrom) && date(args.publishedTo) && Date.parse(args.publishedFrom) <= Date.parse(args.publishedTo)
     && Number.isInteger(args.page) && args.page >= 0 && args.page < 1000;
 }
-const SAFE_CODES = new Set(['JOB_HH_CAPTCHA_WAITING', 'JOB_HH_CAPTCHA_MANUAL_REQUIRED', 'JOB_HH_DOM_CHANGED', 'JOB_COLLECTION_WINDOW_SATURATED', 'JOB_COLLECTION_WINDOW_EXPIRED',
+const SAFE_CODES = new Set(['JOB_HH_MANUAL_ACTIVE', 'JOB_HH_CAPTCHA_WAITING', 'JOB_HH_CAPTCHA_MANUAL_REQUIRED', 'JOB_HH_DOM_CHANGED', 'JOB_COLLECTION_WINDOW_SATURATED', 'JOB_COLLECTION_WINDOW_EXPIRED',
   'JOB_INVALID_SEARCH', 'JOB_INVALID_VACANCY', 'JOB_HH_CAPTCHA_REQUIRED', 'JOB_HH_RATE_LIMIT', 'JOB_HH_ACCESS_DENIED',
   'JOB_HH_LOGIN_REQUIRED', 'JOB_HH_NOT_FOUND', 'JOB_HH_UNAVAILABLE', 'JOB_HH_RESUME_UNAVAILABLE']);
 module.exports = { UUID, validRequest, SAFE_CODES };

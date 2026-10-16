@@ -9,6 +9,11 @@ const { HhApplicationDriver } = require('./hhApplicationDriver');
 const { GuardedSubmission } = require('./guardedSubmission');
 const { CaptchaJournal } = require('./captchaJournal');
 const { CaptchaRecovery } = require('./captchaRecovery');
+const { ManualState, assertInactiveWhenDisabled } = require('./manualState');
+const { ManualCoordinator } = require('./manualCoordinator');
+const { ManualBrowser } = require('./manualBrowser');
+const { createManualBroker } = require('./manualBroker');
+const { randomUUID, createHash } = require('node:crypto');
 
 async function startBrowser(env = process.env) {
   const ownerId = env.JARVIS_JOB_BROWSER_OWNER_ID, token = env.JARVIS_JOB_BROWSER_TOKEN;
@@ -33,33 +38,68 @@ async function startBrowser(env = process.env) {
     primaryResumeId = JSON.parse(await fs.readFile(file, 'utf8')).id;
     if (!/^[a-zA-Z0-9]{1,100}$/.test(primaryResumeId || '')) throw new Error('JOB_BROWSER_PROFILE_OWNER_DENIED');
   } catch (error) { if (error.code !== 'ENOENT') throw error; }
-  let context, server;
+  if (env.JARVIS_JOB_MANUAL_ENABLED !== undefined && !['0', '1'].includes(env.JARVIS_JOB_MANUAL_ENABLED)) throw new Error('JOB_MANUAL_CONFIG_INVALID');
+  const manualEnabled = env.JARVIS_JOB_MANUAL_ENABLED === '1', manualToken = env.JARVIS_JOB_MANUAL_TOKEN;
+  if (manualEnabled && (!/^[\x21-\x7e]{32,256}$/.test(manualToken || '') || manualToken === token || manualToken === applyToken)) throw new Error('JOB_MANUAL_CONFIG_INVALID');
+  if (!manualEnabled) await assertInactiveWhenDisabled({ root: `${root}/manual-recovery`, ownerId });
+  let context, server, manual, manualPage, broker;
   try {
-    context = await chromium.launchPersistentContext(root, { headless: true, chromiumSandbox: true,
+    context = await chromium.launchPersistentContext(root, { headless: !manualEnabled, chromiumSandbox: true,
       acceptDownloads: false, serviceWorkers: 'block', locale: 'ru-RU' });
     // Includes popups and frames. Only the guarded driver can permit its exact POST.
-    await context.route('**/*', (route) => ['GET', 'HEAD', 'OPTIONS'].includes(route.request().method())
-      && allowedRequest(route.request().url()) ? route.continue() : route.abort());
+    await context.route('**/*', async (route) => {
+      if (['GET', 'HEAD', 'OPTIONS'].includes(route.request().method())) return allowedRequest(route.request().url()) ? route.continue() : route.abort();
+      try { if (manualPage && await manualPage.permit(route)) return; } catch {}
+      return route.abort();
+    });
     await context.routeWebSocket('**/*', (socket) => socket.close());
     if (env.JARVIS_HH_CAPTCHA_RECOVERY !== undefined && !['0', '1'].includes(env.JARVIS_HH_CAPTCHA_RECOVERY)) throw new Error('JOB_BROWSER_CONFIG_INVALID');
-    const captchaRecovery = env.JARVIS_HH_CAPTCHA_RECOVERY === '1'
-      ? new CaptchaRecovery({ journal: new CaptchaJournal({ root: `${root}/captcha-recovery`, ownerId }) }) : null;
-    const browser = new HhBrowser({ context, primaryResumeId, captchaRecovery });
+    const journal = env.JARVIS_HH_CAPTCHA_RECOVERY === '1' || manualEnabled
+      ? new CaptchaJournal({ root: `${root}/captcha-recovery`, ownerId }) : null;
+    const captchaRecovery = env.JARVIS_HH_CAPTCHA_RECOVERY === '1' ? new CaptchaRecovery({ journal }) : null;
+    if (manualEnabled) {
+      manual = new ManualCoordinator({ store: new ManualState({ root: `${root}/manual-recovery`, ownerId }),
+        open: (target) => manualPage.open(target), verify: (target, id) => manualPage.verify(target, id) });
+      await manual.load();
+      manualPage = new ManualBrowser({ context, coordinator: manual, journal });
+    }
+    const onManualRequired = manual && (async (target, error) => {
+      let state = await journal.read();
+      if (!state || state.phase === 'resolved') {
+        const detectedAt = Date.now();
+        state = await journal.write({ version: 1, ownerId, operationId: randomUUID(), phase: 'blocked', detectedAt,
+          retryAt: detectedAt + 120000, targetHash: createHash('sha256').update(target).digest('hex') });
+      }
+      if (error.recoveryId && error.recoveryId !== state.operationId) throw new Error('JOB_MANUAL_STATE_DENIED');
+      await manual.pending({ target, recoveryId: state.operationId,
+        claims: state.challengeHash ? [state.challengeHash] : [],
+        seedRequired: !state.challengeHash && ['attempted', 'blocked'].includes(state.phase) });
+      return state.operationId;
+    });
+    const browser = new HhBrowser({ context, primaryResumeId, captchaRecovery, manualCoordinator: manual, onManualRequired });
     let submissions = null;
     if (applyEnabled) {
       if (!primaryResumeId) throw new Error('JOB_BROWSER_CONFIG_INVALID');
       const ledger = new ApplicationLedger({ root: `${root}/applications`, ownerId });
       await ledger.directory();
       const guarded = new GuardedSubmission({ ledger, driver: new HhApplicationDriver({ browser }), ownerId, primaryResumeId });
-      submissions = { submit: (input) => browser.run(() => guarded.submit(input)),
-        reconcile: (input) => browser.run(() => guarded.reconcile(input)) };
+      submissions = { submit: (input) => browser.run(() => { manual?.assertAutomatic(); return guarded.submit(input); }),
+        reconcile: (input) => browser.run(() => { manual?.assertAutomatic(); return guarded.reconcile(input); }) };
     }
     server = createRpcServer({ browser, ownerId, token, submissions, applyToken });
     await new Promise((resolve, reject) => { server.once('error', reject); server.listen(8080, '0.0.0.0', resolve); });
+    if (manual) {
+      broker = createManualBroker({ coordinator: manual, ownerId, token: manualToken, run: (fn) => browser.run(fn) });
+      await new Promise((resolve, reject) => { broker.once('error', reject); broker.listen(8082, '0.0.0.0', resolve); });
+      if (manual.status().phase === 'active') await manualPage.open(manual.state.target).catch(() => {});
+    }
     return { async close() {
-      await new Promise((resolve) => server.close(resolve)); await browser.tail; await context.close();
+      broker?.closeManualTransports();
+      broker?.closeAllConnections();
+      if (broker) await new Promise((resolve) => broker.close(resolve));
+      await new Promise((resolve) => server.close(resolve)); await browser.tail; await manualPage?.close(); await context.close();
     } };
-  } catch (error) { server?.close(); await context?.close(); throw error; }
+  } catch (error) { server?.close(); broker?.close(); await manualPage?.close(); await context?.close(); throw error; }
 }
 
 if (require.main === module) {

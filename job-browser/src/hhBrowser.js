@@ -8,12 +8,15 @@ const failure = (code) => Object.assign(new Error(code), { code });
 const CAPABILITIES = Object.freeze({ dateWindows: false, maxPages: 1000 });
 
 class HhBrowser {
-  constructor({ context, now = () => new Date(), primaryResumeId = null, captchaRecovery = null, captchaDispatch = dispatchCaptcha }) {
+  constructor({ context, now = () => new Date(), primaryResumeId = null, captchaRecovery = null, captchaDispatch = dispatchCaptcha,
+    manualCoordinator = null, onManualRequired = null }) {
     if (!context || typeof context.newPage !== 'function') throw failure('JOB_BROWSER_CONTEXT_REQUIRED');
     this.context = context; this.now = now; this.tail = Promise.resolve(); this.capabilities = CAPABILITIES;
     this.primaryResumeId = primaryResumeId;
     this.captchaRecovery = captchaRecovery;
     this.captchaDispatch = captchaDispatch;
+    this.manualCoordinator = manualCoordinator;
+    this.onManualRequired = onManualRequired;
   }
   // One persistent profile, one active read. A rejected operation must not poison the queue.
   run(fn) {
@@ -28,6 +31,7 @@ class HhBrowser {
     });
   }
   async open(url, expected) {
+    this.manualCoordinator?.assertAutomatic();
     const page = await this.context.newPage(); page.setDefaultTimeout(10000);
     let attempt = null;
     try {
@@ -79,6 +83,11 @@ class HhBrowser {
       return { page, captchaAttempt: attempt, releaseReadGuard: () => page.unroute('**/*', readGuard) };
     } catch (error) {
       await page.close().catch(() => {});
+      if (this.onManualRequired && ['search', 'vacancy'].includes(expected)
+        && (['JOB_HH_CAPTCHA_REQUIRED', 'JOB_HH_CAPTCHA_MANUAL_REQUIRED'].includes(error.code) || attempt?.permitted === 1)) {
+        const recoveryId = await this.onManualRequired(url, error);
+        throw Object.assign(failure('JOB_HH_CAPTCHA_MANUAL_REQUIRED'), { recoveryId });
+      }
       if (attempt?.permitted === 1) throw this.captchaRecovery.manual(attempt);
       if (/^JOB_[A-Z_]+$/.test(error.code || '')) throw error;
       throw failure('JOB_HH_UNAVAILABLE');
@@ -91,7 +100,13 @@ class HhBrowser {
       if (opened.captchaAttempt) await this.captchaRecovery.success(url, opened.captchaAttempt);
       return value;
     } catch (error) {
-      if (opened.captchaAttempt?.permitted === 1) throw this.captchaRecovery.manual(opened.captchaAttempt);
+      if (opened.captchaAttempt?.permitted === 1) {
+        if (this.onManualRequired) {
+          const recoveryId = await this.onManualRequired(url, error);
+          throw Object.assign(failure('JOB_HH_CAPTCHA_MANUAL_REQUIRED'), { recoveryId });
+        }
+        throw this.captchaRecovery.manual(opened.captchaAttempt);
+      }
       throw error;
     } finally { await opened.page.close().catch(() => {}); }
   }

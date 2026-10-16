@@ -586,7 +586,7 @@ async function createRuntime(config, overrides = {}) {
         fetchImpl: overrides.jobModelFetch,
         applicationAdapter: overrides.jobApplicationAdapter,
         send: ({ chatId, answer, buttons, disableLinkPreview }) => bot.api.sendMessage(chatId, answer, {
-          ...(buttons?.length ? { reply_markup: telegramReplyMarkup(buttons) } : {}),
+          ...(buttons?.length ? { reply_markup: telegramReplyMarkup(buttons, { jobManualAccessUrl: config.jobManualAccessUrl }) } : {}),
           ...(disableLinkPreview === true ? { link_preview_options: { is_disabled: true } } : {}),
         }),
       });
@@ -654,6 +654,7 @@ async function createRuntime(config, overrides = {}) {
         voiceMaxBytes: MAX_TELEGRAM_VOICE_BYTES,
         onPollingHealth: (value) => { pollingHealth = value; },
         operationsPanelUrl: menuService.operationsPanelUrl,
+        jobManualAccessUrl: config.jobManualAccessUrl,
       });
     }
     if (config.lifeOsEnabled && config.lifeOsRemindersEnabled) {

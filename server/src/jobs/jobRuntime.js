@@ -40,8 +40,8 @@ function createJobRuntime({ config, pool, interactions, send, fetchImpl, applica
   const applicationRepository = new JobApplicationRepository(pool);
   const applicationService = new JobApplicationService({ pool, repository: applicationRepository, searchRepository, adapter: applicationAdapter });
   const telegramService = new JobTelegramService({ pool, searchRepository, profileRepository, draftRepository,
-    usageRepository, interactions, draftService, settingsService, applicationService, connectionService, defaultModel: config.jobSearchModel });
-  const deliveryWorker = new JobDeliveryWorker({ pool, searchRepository, deliveryRepository, send });
+    usageRepository, interactions, draftService, settingsService, applicationService, connectionService, manualAccessUrl: config.jobManualAccessUrl, defaultModel: config.jobSearchModel });
+  const deliveryWorker = new JobDeliveryWorker({ pool, searchRepository, deliveryRepository, send, manualAccessUrl: config.jobManualAccessUrl });
   const recoveryWorker = new JobRecoveryWorker({ pool, applicationRepository });
   return { telegramService, deliveryWorker, applicationService, applicationRepository,
     async start() { await recoveryWorker.start(); deliveryWorker.start(); },

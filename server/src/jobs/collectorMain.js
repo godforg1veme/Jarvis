@@ -17,7 +17,8 @@ function createCollectorRuntime({ env = process.env, pool, hhClient, currencyRat
   let stopping = false, timer = null, running = null;
   const collector = new JobCollector({ searchRepository, deliveryRepository: new JobDeliveryRepository(database),
     hhClient: source,
-    currencyRates: currencyRates || new CurrencyRates(), now: clock, wait, shouldStop: () => stopping });
+    currencyRates: currencyRates || new CurrencyRates(), now: clock, wait, shouldStop: () => stopping,
+    manualAccessUrl: config.jobManualAccessUrl });
   const tick = () => {
     if (stopping || running) return running;
     running = (async () => {

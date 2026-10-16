@@ -44,7 +44,7 @@ class JobTelegramService {
     const search = await this.searchRepository.ensure({ scope });
     const usage = await this.usageRepository.getMonth({ userId: scope.userId });
     const connection = (await this.pool.query('SELECT status,resume_id FROM job_connections WHERE user_id=$1', [scope.userId])).rows[0];
-    return homeView({ search, usage, connection });
+    return homeView({ search, usage, connection, manualAccessUrl: this.manualAccessUrl });
   }
   async begin(scope, kind, targetId, revision, answer) {
     const interaction = await this.interactions.begin({ ...scope, channel: undefined, kind,

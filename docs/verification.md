@@ -87,6 +87,58 @@ The worker is tested separately without network or credentials; see
 local test database. It applies the forward-only attention migration and checks
 delay, checkpoints, deduplication and owner/private-chat delivery.
 
+Mobile manual HH preparation adds display supervision and Compose policy checks:
+
+```powershell
+node --test job-browser/test/displayMain.test.js
+py deploy/scripts/test-job-manual-config.py
+npm test --prefix job-manual
+```
+
+Run the browser/manual Chromium tests in the pinned Linux image with a disposable
+profile, no production environment and no live HH connectivity. Verify that the
+disabled flag launches no display children, Xvfb has no TCP listener, raw VNC
+binds only container loopback, and a display-child failure stops Chromium.
+The normalized Compose preflight in [deploy instructions](../deploy/README.md)
+checks loopback-only gateway, dedicated internal network, preserved external
+profile and distinct manual credentials without outputting their values.
+Do not print or save `docker compose config` output because it contains secrets.
+Actual Tailscale Serve header injection, foreign-owner denial and Safari screen,
+keyboard and «Готово» remain separate live checks after release authorization.
+`job-browser/test/displayLinuxAcceptance.cjs` exercises the real Xvfb/x11vnc,
+sandboxed headed Chromium, RFB handshake, `/proc/net/tcp{,6}` listeners and
+fail-closed shutdown. Mount the test directory at `/tests` and invoke
+`node --test /tests/displayLinuxAcceptance.cjs` in the browser candidate image,
+using the production seccomp/capability policy, `--network none`, no owner
+volume and no production env. It requires the browser's existing writable root
+filesystem; keep that separate from the read-only gateway policy.
+
+The manual coordinator, durable state and broker unit tests are included in
+`node --test job-browser/test/*.test.js`; run on Linux to exercise durable-file
+semantics without skips. Additional explicit acceptance files are:
+
+- `manualBrowserAcceptance.cjs`: native CAPTCHA dispatch, durable claims,
+  unknown-result baseline and exact-target verification. Use the pinned browser
+  image with `--network none --add-host hh.ru:127.0.0.1`.
+- `manualRuntimeAcceptance.cjs`: headed browserMain, pending state after restart,
+  read/apply denial and disabled-flag refusal over unresolved manual state.
+  Requires a fresh empty tmpfs at `/home/pwuser/profile`, owned by the browser
+  user with mode 0700; never mount an existing account profile.
+- `manualNoVncAcceptance.cjs`: actual noVNC canvas, touch, Cyrillic keyboard input,
+  one transport and failed/successful finish. Install the gateway from its
+  lockfile at `/opt/job-manual` in a disposable child image of the browser image
+  (or set `JARVIS_MANUAL_FIXTURE_GATEWAY` to its `src/server.js`). Add
+  `--network none --add-host fixture.tailnet.ts.net:127.0.0.1`. The fixture starts
+  Xvfb/x11vnc and an HTTPS proxy with temporary certificate and identity headers;
+  it does not use real Tailscale or HH.
+
+For these files retain the browser sandbox/seccomp/capability policy and invoke
+`node --test /path/to/test.cjs` with adjacent source modules available. Run
+`server/test/jobManualAccessAcceptance.cjs` separately against a dedicated test
+PostgreSQL database via `JARVIS_JOB_TEST_DATABASE_URL`; it creates a unique
+fixture schema and tests real message/menu handlers, owner scope and progress.
+Measured results are in [the development record](updates/2026-10-16-hh-mobile-manual-development.md).
+
 Confirmed browser applications require Linux durable-file semantics. Run the
 disposable test-only stack, which builds from both lockfiles and uses an internal
 network, tmpfs PostgreSQL and HH-shaped intercepted pages:

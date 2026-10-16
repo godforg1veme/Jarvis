@@ -64,6 +64,12 @@ guard без немедленного восстановления. В 01:40 М�
 Карточек 328; полный обход и новая доставка ещё не подтверждены. Временный доступ
 закрыт, browser/collector восстановлены. Новый answer POST не отправляли.
 
+Отдельно подготовлен opt-in mobile manual режим: один headed Chromium/Xvfb,
+приватный broker и отдельный noVNC gateway, owner identity через Tailscale Serve.
+Состояние pending/active/checking хранится без TTL и блокирует read/apply.
+Ссылка постоянная, finish возобновляет сбор только после точного target reader.
+Это локальная разработка, не production. [Результаты и оставшийся выпуск](updates/2026-10-16-hh-mobile-manual-development.md).
+
 ### Cloud control plane
 
 - `server/` is a Node.js 20+, CommonJS, Fastify service.

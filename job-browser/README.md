@@ -7,14 +7,23 @@
 [Результат выпуска](../docs/updates/2026-10-15-job-search-release.md).
 Playwright/Chromium согласованы владельцем 15 октября 2026.
 
-Локально добавлена opt-in обработка собственной русскоязычной капчи HH:
+Установлена opt-in обработка собственной русскоязычной капчи HH:
 `JARVIS_HH_CAPTCHA_RECOVERY=1` вместе с отдельным
 [networkless OCR worker](../job-ocr/README.md). По умолчанию выключена.
 После двух минут разрешены только одна инициализация изображения и один точный
 POST формы; фазы записываются на диск до запроса. Неизвестный результат
 не повторяется, восстановление проверяется чтением. Перенаправления POST
-не выполняются. [Результат разработки](../docs/updates/2026-10-15-hh-captcha-recovery-development.md)
-отделён от production и будущей live-проверки на HH.
+не выполняются. [Результат установки и восстановления](../docs/updates/2026-10-16-hh-native-captcha-request.md)
+отделяет отправку ответа от подтверждённого чтения HH.
+
+Локально реализован [постоянный мобильный ручной доступ](../docs/updates/2026-10-16-hh-mobile-manual-development.md)
+через Tailscale/noVNC без TTL. `JARVIS_JOB_MANUAL_ENABLED=1` включает headed
+Chromium под Xvfb, owner-bound coordinator и отдельный credential broker.
+В pending/active/checking сбор и отклики не обращаются к HH. «Готово» ждёт
+in-flight answer, проверяет точный target и только затем разрешает продолжение.
+Отключение flag поверх незавершённого manual state не включает автоматику.
+Gateway не получает profile/cookies, БД или read/apply credentials.
+Этот режим пока не опубликован и не установлен в production.
 
 ## Проверка без аккаунта
 

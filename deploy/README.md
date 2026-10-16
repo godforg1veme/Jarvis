@@ -405,3 +405,60 @@ reused without changing the main assistant model. Live acceptance covers
 cards, edits/translation and restart/dedup; any real application requires a
 selected vacancy and an explicit confirmation of the exact letter in Telegram.
 Keep fixture send results separate from that live acceptance.
+
+### Manual HH captcha from a phone (prepared, opt-in)
+
+The approved [mobile design](../docs/superpowers/specs/2026-10-16-hh-mobile-manual-design.md)
+adds the `job-manual-de` profile. Enable only on DE, after an authorized release.
+The permanent owner URL ends in `/hh/`; it contains no credential and has no
+automatic expiry. The browser still owns the single original HH profile.
+Pending, active and checking manual states block collection and applications.
+The owner starts the screen and selects «Готово»; only a successful read-only
+HH verification resumes collection. A search disabled by its owner stays disabled.
+
+The pinned browser image installs Xvfb `2:21.1.12-1ubuntu1.8` and x11vnc
+`0.9.16-10` from Ubuntu Noble repositories. `displayMain.js` runs one Xvfb
+display with TCP disabled and x11vnc on container loopback `127.0.0.1:5900`.
+Display-child failure stops the browser. Chromium keeps its non-root sandbox,
+profile volume, seccomp policy and existing resource limits. Clipboard transfer
+is disabled. When `JARVIS_JOB_MANUAL_ENABLED=0`, only the prior browser runtime
+starts; no display or VNC process is launched.
+An unresolved persisted manual state prevents startup with that flag disabled;
+disabling the feature must not silently resume collection over a manual session.
+
+Configure the private DE environment without printing its values:
+`JARVIS_JOB_MANUAL_ENABLED=1`, HTTPS Tailscale Serve origin in
+`JARVIS_JOB_MANUAL_ORIGIN`, exact owner Tailscale login in
+`JARVIS_JOB_MANUAL_OWNER_LOGIN`, and a new random manual token of at least 32
+characters in `JARVIS_JOB_MANUAL_TOKEN`. The owner ID is taken from the existing
+`JARVIS_JOB_BROWSER_OWNER_ID`. The manual token must differ from both read and
+apply credentials and is shared only by the gateway and browser. Set
+`JARVIS_JOB_MANUAL_ACCESS_URL` to that origin followed by `/hh/` for Telegram.
+The server and collector never receive the manual credential.
+
+Before installation, verify the actual Jarvis owner and Tailscale identity,
+audit existing Serve routes, and preserve a private copy of its configuration.
+Preserve the exact existing HH profile volume and mounted secret inodes.
+Validate the resolved Compose policy without writing its secret-bearing JSON
+to a log or tracked file:
+
+```bash
+docker compose --profile job-search-de --profile job-manual-de -f deploy/docker-compose.yml config --format json | python3 deploy/scripts/verify-job-manual-config.py
+```
+
+The gateway binds only host `127.0.0.1:19123` and joins only the internal
+`job-manual-control` network shared with the browser. Add only the `/hh/` handler
+to the existing HTTPS Tailscale Serve service, proxying to
+`http://127.0.0.1:19123`; preserve the existing `/` and all other handlers.
+Do not use `tailscale serve reset`, Funnel, public listeners, or raw VNC/CDP
+port publication. Serve must inject authenticated Tailscale identity headers;
+direct loopback requests without identity and requests from another tailnet
+user must be denied. The gateway must not be reachable through another proxy
+that lets a client supply those headers.
+
+After an authorized install, inspect the actual container image and process
+state, verify health and non-public listeners, then test owner Safari through
+Tailscale: screen, keyboard, manual captcha and «Готово». Verify foreign identity
+denial, paused collection, restart persistence and unchanged progress/settings.
+The permanent URL is not proof of owner authentication; record phone acceptance
+separately from isolated tests. See [verification](../docs/verification.md).

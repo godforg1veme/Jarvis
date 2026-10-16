@@ -40,20 +40,20 @@ recoveryId,phase,target,revision. `ManualCoordinator({store,open,verify})`:
 Calls serialized. Transitions persist before effects; checking restart becomes
 active without auto-POST. target is canonical HH vacancy/search, max8192.
 
-- [ ] Добавить тесты без таймера, чужого owner, закрытого shape, unsafe file,
+- [x] Добавить тесты без таймера, чужого owner, закрытого shape, unsafe file,
   concurrent start/finish, stale revision и failed verification:
   ```js
   assert.equal((await manual.finish(revision)).phase, 'active');
   assert.throws(() => manual.assertAutomatic(), { code: 'JOB_HH_MANUAL_ACTIVE' });
   ```
-- [ ] Реализовать 0700 directory/0600 atomic state с O_NOFOLLOW, fsync и
+- [x] Реализовать 0700 directory/0600 atomic state с O_NOFOLLOW, fsync и
   ограничением 16KiB; тесты сначала FAIL на отсутствующем модуле, затем PASS.
-- [ ] `node --test job-browser/test/manualCoordinator.test.js`; отдельный commit.
+- [x] `node --test job-browser/test/manualCoordinator.test.js`.
 
 ## Task 2: Browser handover, guarded manual captcha и broker
 
 **Files:** `browserMain.js`, `hhBrowser.js`, `captchaRecovery.js`,
-создать `manualBrowser.js`, `manualBroker.js`, `manualProtocol.js` и тесты.
+создать `manualBrowser.js`, `manualBroker.js` и тесты.
 
 **Interfaces:** broker GET `/status`, POST `/start|finish` с
 `{revision:integer}`; auth `Bearer manualToken`, configured owner header.
@@ -61,20 +61,20 @@ GET upgrade `/transport` принимает только active/revision и со
 фиксированным VNC loopback port5900. Body4096/maxPayload65536/max2 connections.
 Gateway получает только `{phase,revision}` и закрытые failure codes.
 
-- [ ] Captcha manual failure сохраняет canonical target + original recoveryId
+- [x] Captcha manual failure сохраняет canonical target + original recoveryId
   в coordinator.pending; automatic methods проверяют mode внутри serial queue.
-- [ ] `manualBrowser` владеет одной foreground page; читает frozen form/key,
+- [x] `manualBrowser` владеет одной foreground page; читает frozen form/key,
   допускает точный native captcha request и фиксирует challenge до POST.
   Все остальные POST/WS/apply запрещены. Init bound current target/form.
-- [ ] Finish блокирует input, GET target и штатный search/vacancy reader;
+- [x] Finish блокирует input, GET target и штатный search/vacancy reader;
   verify failure возвращает active. Success marks original captcha resolved.
   No CAPTCHA retry during finish. Raw page/URL/text never in result/log.
-- [ ] Broker constant-time token check before parsing body/upgrade; validate
+- [x] Broker constant-time token check before parsing body/upgrade; validate
   owner, closed request, phase/revision; disconnect on phase change.
-- [ ] Реальные Chromium fixtures: pending blocks reads/apply, manual native
+- [x] Реальные Chromium fixtures: pending blocks reads/apply, manual native
   answer once, unknown restart, redirects, tamper, reader-based finish.
   `node --test job-browser/test/*.test.js`; isolated CAPTCHA/browser acceptance.
-- [ ] Проверить отсутствие регрессии при disabled feature; отдельный commit.
+- [x] Проверить отсутствие регрессии при disabled feature.
 
 ## Task 3: Independent gateway и мобильный UI
 
@@ -87,25 +87,25 @@ returns HTTP server. Origin HTTPS exact ts.net; brokerUrl fixed
 UI routes `/hh/`, `/hh/app.js`, `/hh/style.css`, pinned `/hh/novnc/…`,
 GET `/hh/api/status`, POST `/hh/api/start|finish`, WS `/hh/transport`.
 
-- [ ] Добавить tests HTTP/upgrade: identity missing/foreign, Host/Origin,
+- [x] Добавить tests HTTP/upgrade: identity missing/foreign, Host/Origin,
   CSRF/session, duplicates, body/payload caps, GET no state effects:
   ```js
   assert.equal((await request({ identity:'foreign' })).status, 403);
   assert.equal(startCalls, 0);
   ```
-- [ ] Secure HttpOnly Strict session cookie Path=/hh; random CSRF held only
+- [x] Secure HttpOnly Strict session cookie Path=/hh; random CSRF held only
   session memory; bounded sessions. Serve identity compared exact configured
   login. No response contains broker credential, ownerId or HH target.
-- [ ] Auth before all UI/assets and WS; WS upgrades validated with active
+- [x] Auth before all UI/assets and WS; WS upgrades validated with active
   revision, no client-supplied upstream URL, no compression, bounded buffers.
   Control errors closed, no exception/headers/cookie logging.
-- [ ] Локальный UI с состоянием/Start/Done и noVNC RFB: touch, viewport scale,
+- [x] Локальный UI с состоянием/Start/Done и noVNC RFB: touch, viewport scale,
   keyboard, русский ввод. Clipboard и file transfer disabled. Finish closes
   transport before read; rejected finish permits reconnect, no expiry timer.
-- [ ] Static paths allowlisted; realpath stays in public/noVNC directories,
+- [x] Static paths allowlisted; realpath stays in public/noVNC directories,
   CSP no CDN, no-store, no framing, Referrer-Policy no-referrer.
-- [ ] `npm test --prefix job-manual`; audit pinned production dependencies;
-  screenshot/input UI fixture and successful/failed finish; отдельный commit.
+- [x] `npm test --prefix job-manual`; audit pinned production dependencies;
+  screenshot/input UI fixture and successful/failed finish.
 
 ## Task 4: Collector и Telegram integration
 
@@ -117,35 +117,35 @@ GET `/hh/api/status`, POST `/hh/api/start|finish`, WS `/hh/transport`.
 `jobManualAccessUrl` optional HTTPS exact ts.net `/hh/`, no credentials/query/hash;
 passed to views/delivery by config, never derived from untrusted payload.
 
-- [ ] Add config and views tests:
+- [x] Add config and views tests:
   ```js
   assert.equal(view.buttons.flat().find(b=>b.text==='Открыть HH').url, configuredUrl);
   ```
-- [ ] Manual-active schedules next coordinator poll after10s, preserves
+- [x] Manual-active schedules next coordinator poll after10s, preserves
   checkpoint/progress/settings. Pending is deduplicated attention with same
   recovery ID; no repeated notice. No HH request while active.
-- [ ] Owner/private menu + attention include configured URL button; no new
+- [x] Owner/private menu + attention include configured URL button; no new
   callbacks or guided kinds. Update notice/contract before edits.
-- [ ] Real handlers cover foreign scope/member, disabled config, delivery
+- [x] Real handlers cover foreign scope/member, disabled config, delivery
   unknown/replay, previews disabled. Full `npm test --prefix server`.
-- [ ] Separate commit with current docs pointing to development result.
+- [x] Current docs point to the measured development result.
 
 ## Task 5: Images, Compose и installation preparation
 
 **Files:** browser Dockerfile, new display entrypoint, gateway Dockerfile,
 Compose opt-in profile/env.example, deploy README, verification docs.
 
-- [ ] Read-only inspect current image Xvfb/x11vnc availability; pin apt
+- [x] Read-only inspect current image Xvfb/x11vnc availability; pin apt
   candidates and image inputs. Entrypoint launches Xvfb `-nolisten tcp` and
   x11vnc loopback only, signal cleanup; no startup with missing controls.
-- [ ] Gateway separate manual network; only browser shares it. Bind only
+- [x] Gateway separate manual network; only browser shares it. Bind only
   `127.0.0.1:19123`. Manual token/login/origin configured privately; no defaults
   enabling weak auth. Validate token differs read/apply. Feature default off.
-- [ ] Compose/preflight tests deny public bindings, profile duplication,
+- [x] Compose/preflight tests deny public bindings, profile duplication,
   Docker socket, shared credentials and Funnel; baseline profile unchanged.
-- [ ] Isolated Linux images run coordinator/gateway/Chromium/noVNC integration;
+- [x] Isolated Linux images run coordinator/gateway/Chromium/noVNC integration;
   no production profile, credentials, HH, Telegram or public network.
-- [ ] Record tests, scan/review diff and prepare concrete release proposal.
+- [x] Record tests, scan/review diff and prepare concrete release proposal.
   Current task authorization covers implementation; ask before GitHub/VPS.
 
 ## Task 6: Authorized release and phone acceptance
@@ -167,3 +167,8 @@ Tasks cover state/restart/unknown (1–2), owner access/transport/mobile (3),
 Telegram/progress (4), deployment/isolation/dependencies (5), live phone (6).
 No TTL or link credential; a browser auth session is separate from durable
 manual ownership. No generic remote executor or new model tool is introduced.
+
+
+Implementation tasks 1–5 completed locally and are saved together after integration
+review. [Measured development results](../../updates/2026-10-16-hh-mobile-manual-development.md).
+Task 6 awaits release authorization.

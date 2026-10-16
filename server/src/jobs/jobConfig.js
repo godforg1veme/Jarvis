@@ -8,6 +8,7 @@ const schema = z.object({
   jobSearchModel: z.string().max(255),
   jobSecretKey: z.string().max(128),
   jobPublicOrigin: z.string().max(2048),
+  jobManualAccessUrl: z.string().max(2048),
   hhClientId: z.string().max(255), hhClientSecret: z.string().max(2048),
   hhAppToken: z.string().max(4096),
   hhUserAgent: z.string().max(255),
@@ -24,6 +25,7 @@ function loadJobConfig(env) {
     jobSearchModel: String(env.JARVIS_JOB_MODEL || '').trim(),
     jobSecretKey: String(env.JARVIS_JOB_SECRET_KEY || '').trim(),
     jobPublicOrigin: String(env.JARVIS_JOB_PUBLIC_ORIGIN || '').trim(),
+    jobManualAccessUrl: String(env.JARVIS_JOB_MANUAL_ACCESS_URL || '').trim(),
     hhClientId: String(env.HH_CLIENT_ID || '').trim(),
     hhClientSecret: String(env.HH_CLIENT_SECRET || '').trim(),
     hhAppToken: String(env.HH_APP_TOKEN || '').trim(),
@@ -43,7 +45,18 @@ function loadJobConfig(env) {
       throw new Error('Job public origin must be an HTTPS origin');
     }
   }
+  if (config.jobManualAccessUrl && !isJobManualAccessUrl(config.jobManualAccessUrl)) throw new Error('Invalid job manual access URL');
   return config;
 }
 
-module.exports = { loadJobConfig };
+function isJobManualAccessUrl(value) {
+  if (typeof value !== 'string' || value.length > 2048) return false;
+  try {
+    const url = new URL(value);
+    return url.href === value && value === `${url.origin}/hh/` && url.protocol === 'https:' && !url.username && !url.password
+      && !url.port && url.pathname === '/hh/' && !url.search && !url.hash
+      && /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+ts\.net$/.test(url.hostname);
+  } catch { return false; }
+}
+
+module.exports = { loadJobConfig, isJobManualAccessUrl };

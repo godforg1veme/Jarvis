@@ -69,7 +69,7 @@ class CaptchaRecovery {
       attempt.form = fresh; attempt.answer = answer; attempt.pictureKey = pictureKey;
       await attempt.page.locator('input[name="captchaText"]').fill(answer);
       // Persist before arming the only answer POST. An uncertain attempt is never replayed.
-      attempt.state = await this.journal.write({ ...attempt.state, phase: 'attempted' });
+      attempt.state = await this.journal.write({ ...attempt.state, phase: 'attempted', challengeHash: hash(JSON.stringify(['hh-captcha', pictureKey])) });
       const receipt = attempt.page.waitForResponse((r) => attempt.request && r.request() === attempt.request, { timeout: this.responseTimeoutMs }).catch(() => null);
       attempt.armed = true;
       await attempt.page.locator('form:has(input[name="captchaText"]) button[type="submit"]').click({ timeout: 5000 }).catch(() => {});

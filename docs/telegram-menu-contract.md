@@ -55,6 +55,23 @@ collector → owner-scoped PostgreSQL attention outbox → прежний Bot se
 к conversation; member/чужой chat не получают сообщение. Новых callback или
 guided-input kind нет. Это ещё не подтверждение production-выпуска.
 
+Локальная разработка 16 октября: согласован постоянный ручной доступ HH
+с телефона через Tailscale, без таймера. При настроенном и проверенном
+`JARVIS_JOB_MANUAL_ACCESS_URL` меню владельца и уведомление о капче содержат
+URL-кнопку «Открыть HH». Адрес берётся только из доверенной настройки:
+канонический HTTPS hostname `*.ts.net`, путь ровно `/hh/`, без credentials,
+порта, query и fragment. Bot разрешает только точное совпадение с этой
+настройкой. URL только открывает страницу; права проверяет отдельный gateway.
+Пустая настройка сохраняет прежние меню и уведомление. Member, группа и чужая
+conversation/chat отклоняются прежними handler/claim проверками до выдачи ссылки.
+Новых callbacks и guided-input kind нет, предпросмотр ссылок отключён.
+При ручном режиме сборщик каждые 10 секунд проверяет coordinator через прежний
+RPC, без запросов к HH; первоначальный incident создаёт одно уведомление,
+последующие проверки нового не создают. Filters, checkpoint и progress
+сохраняются; пользовательский выключенный поиск не включается. Кнопка «Готово»
+расположена на странице gateway и только после проверки HH возвращает сбор.
+Это локальное изменение; установка и проверка Safari ещё не выполнены.
+
 ## Persistent bottom keyboard
 
 The keyboard is persistent, resizeable, and exact-text matched. Other text is

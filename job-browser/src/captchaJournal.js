@@ -15,7 +15,9 @@ class CaptchaJournal {
     if (!s.isDirectory() || s.uid !== process.getuid() || (s.mode & 0o077)) throw failure();
   }
   validate(value) {
-    if (!value || Object.keys(value).sort().join(',') !== 'detectedAt,operationId,ownerId,phase,retryAt,targetHash,version'
+    if (!value || !['detectedAt,operationId,ownerId,phase,retryAt,targetHash,version',
+      'challengeHash,detectedAt,operationId,ownerId,phase,retryAt,targetHash,version'].includes(Object.keys(value).sort().join(','))
+      || Object.hasOwn(value, 'challengeHash') && !/^[a-f0-9]{64}$/.test(value.challengeHash || '')
       || value.version !== 1 || value.ownerId !== this.ownerId || !UUID.test(value.operationId || '')
       || !['waiting', 'initializing', 'attempted', 'blocked', 'resolved'].includes(value.phase) || !/^[a-f0-9]{64}$/.test(value.targetHash || '')
       || !Number.isSafeInteger(value.detectedAt) || value.detectedAt < 0 || value.retryAt !== value.detectedAt + 120000) throw failure();

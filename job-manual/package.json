@@ -1,0 +1,9 @@
+{
+  "name": "jarvis-job-manual",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "engines": { "node": ">=22.12" },
+  "scripts": { "start": "node src/server.js", "test": "node --test test/*.test.js" },
+  "dependencies": { "@novnc/novnc": "1.7.0", "ws": "8.22.0" }
+}
