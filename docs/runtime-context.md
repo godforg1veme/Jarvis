@@ -73,11 +73,12 @@ Server/browser/collector установлены из `b0712e69875adbe62db1892007
 [Результат установки](updates/2026-10-16-hh-telegram-captcha.md).
 
 Позднее 16 октября проверка HH снова остановилась: на DE подтверждён OOM внутри
-browser container при продолжающем успешном HTTP health. Подготовлено локальное
-[восстановление браузера и очереди](updates/2026-10-16-hh-captcha-resilience-development.md):
-проверка Chromium, замена вкладки, durable refresh, bounded retries и owner-scoped
-уведомления. На VPS исправление ещё не установлено; прежняя успешная приёмка
-описывает состояние до этого инцидента.
+browser container при продолжающем успешном HTTP health.
+[Восстановление браузера и очереди установлено](updates/2026-10-16-hh-captcha-resilience-release.md)
+из `e6fe29a7e3129a34626223df9bd6a1b980da46be`: проверка Chromium, замена вкладки,
+durable refresh, bounded retries и owner-scoped уведомления. Migration 033 применена.
+Новая картинка получила binding, ответ `solved`; coordinator idle, collector
+продолжил прежний progress. Профиль, настройки и смонтированные секреты сохранены.
 
 ### Cloud control plane
 

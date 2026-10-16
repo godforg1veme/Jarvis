@@ -83,7 +83,7 @@ Reply должен совпасть с owner/user, conversation/private chat, ch
 [Результат](updates/2026-10-16-hh-telegram-captcha.md).
 История прежнего пути: [выпуск web-доступа](updates/2026-10-16-hh-mobile-manual-release.md).
 
-Согласовано владельцем 16 октября, подготовлено локально:
+Согласовано владельцем 16 октября, установлено на DE:
 [восстановление проверки HH](superpowers/specs/2026-10-16-hh-captcha-resilience-design.md).
 Кнопки, callback grammar и подтверждение ответом на фото прежние. При повторных
 ошибках подготовки бот сообщает о задержке и автоматическом повторе с паузой.
@@ -95,7 +95,8 @@ CAPTCHA, без утверждения об успешном доступе к H
 в outbox и перепроверяют owner, Telegram identity, исходные conversation/chat.
 Неактуальное сообщение о задержке снимается после подготовки результата.
 Migration 033 сохраняет request UUID и бюджет повторов фото; новых guided kinds нет.
-Это ещё не установленный на VPS выпуск.
+[Выпуск и реальная проверка](updates/2026-10-16-hh-captcha-resilience-release.md)
+подтвердили доставку новой картинки, принятый ответ и продолжение сбора.
 
 ## Persistent bottom keyboard
 

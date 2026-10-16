@@ -8,6 +8,9 @@
 
 **Spec:** [Approved design](../specs/2026-10-16-hh-captcha-resilience-design.md).
 
+16 октября 2026: после отдельного поручения владельца выпуск завершён;
+[результат DE/NL/Desktop и настоящей CAPTCHA](../../updates/2026-10-16-hh-captcha-resilience-release.md).
+
 ## Global constraints
 
 - No new production dependencies; no publication without a separate owner instruction.

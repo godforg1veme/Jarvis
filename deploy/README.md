@@ -429,7 +429,7 @@ Confirmed read-only access to the original HH target resumes collection;
 unknown results remain blocked. A particular photo expires after ten minutes,
 but the recovery pause has no timer. Refresh replaces the photo binding.
 
-Local resilience update (2026-10-16, not yet deployed): apply migration 033 before
+Resilience update (deployed on DE, 2026-10-16): apply migration 033 before
 starting the changed server. It adds durable request IDs, request timestamps and
 bounded photo retry metadata; existing photos and progress remain intact.
 Install server and browser together: the private challenge protocol gains
@@ -447,7 +447,7 @@ unknown and require explicit refresh. Unknown human answers also block automatic
 challenges. Closed, scoped failure notices use the existing delivery outbox;
 queued delay notices are retired when recovery succeeds. Backoff is 10/20/40/80/
 120 seconds, and status RPC has a five-second timeout. See the
-[development record](../docs/updates/2026-10-16-hh-captcha-resilience-development.md).
+[release record](../docs/updates/2026-10-16-hh-captcha-resilience-release.md).
 
 Validate resolved Compose configuration through the bounded policy checker;
 never print or store its secret-bearing JSON:
