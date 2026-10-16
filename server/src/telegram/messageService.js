@@ -95,6 +95,8 @@ function normalizeTelegramMessage(update) {
     text,
     voice,
     attachment,
+    replyMessageId: /^\d{1,20}$/.test(String(message.reply_to_message?.message_id || '')) ? String(message.reply_to_message.message_id) : null,
+    captchaReplyHint: Array.isArray(message.reply_to_message?.photo) && String(message.reply_to_message?.caption || '').startsWith('HH CAPTCHA ·'),
   };
 }
 
@@ -172,6 +174,7 @@ class TelegramMessageService {
     this.lifeProposalService = options.lifeProposalService || null;
     this.lifeReminderService = options.lifeReminderService || null;
     this.menuService = options.menuService || null;
+    this.jobCaptchaService = options.jobCaptchaService || null;
     this.logger = options.logger || null;
   }
 
@@ -540,6 +543,13 @@ class TelegramMessageService {
       externalChatId: input.chatId,
     });
     const menuContext = telegramMenuContext({ user, conversation, input });
+
+    if (input.replyMessageId) {
+      if (this.jobCaptchaService) {
+        const result = await this.jobCaptchaService.handleReply(input, menuContext);
+        if (result) return { status: 'answered', ...result };
+      } else if (input.captchaReplyHint) return { status: 'answered', answer: 'Проверка HH через Telegram сейчас недоступна.' };
+    }
 
     let guidedDesktopInstruction = null;
     if (this.menuService && !input.attachment && !input.voice) {

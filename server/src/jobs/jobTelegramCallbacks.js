@@ -1,5 +1,5 @@
 const UUID = '[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}';
-const SIMPLE = /^job:(menu|settings|profile|check|pause|resume|connect|disconnect|back)$/;
+const SIMPLE = /^job:(menu|settings|profile|check|captcha|captcha_refresh|pause|resume|connect|disconnect|back)$/;
 const TARGET = new RegExp(`^job:(view|prepare|save|hide|draft|regenerate|edit|translate|send|confirm|cancel|approve|resume_select):(${UUID})$`, 'i');
 const PAGE = /^job:(saved|applications):([0-9]{1,4})$/;
 

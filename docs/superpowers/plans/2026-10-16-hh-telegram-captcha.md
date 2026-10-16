@@ -29,13 +29,13 @@ No host ports, VNC or HH Tailscale URL. Keep all unrelated Tailscale/VPN uses.
 **Consumes:** existing manualState/coordinator/captchaProtocol/dispatch guards.
 **Produces:** status/challenge/answer `/rpc` on8082 with separate CAPTCHA token.
 
-- [ ] Write failing HTTP/Chromium cases for picture binding, expiry, answer
+- [x] Write failing HTTP/Chromium cases for picture binding, expiry, answer
   normalization, duplicate/unknown/stale/restart, readonly success verification.
-- [ ] Implement bounded snapshot/native submit and durable before-POST claim;
+- [x] Implement bounded snapshot/native submit and durable before-POST claim;
   broker closed grammar, errors and distinct credentials. Preserve old state.
-- [ ] Headless runtime, no display/VNC/WS. Delete obsolete browser files/tests
+- [x] Headless runtime, no display/VNC/WS. Delete obsolete browser files/tests
   and dependency entries; adjust image/README and Linux acceptance helpers.
-- [ ] Run Linux unit + real Chromium/runtime acceptance, report exact results.
+- [x] Run Linux unit + real Chromium/runtime acceptance, report exact results.
 
 ### Task 2: Server/photo outbox/reply routing
 
@@ -44,13 +44,13 @@ bot/runtime wiring and tests. Does not edit root docs/deploy/browser.
 **Consumes:** spec RPC wire, existing jobs/Telegram update claim/owner policy.
 **Produces:** owner-only photo delivery, scoped replies, refresh/menu control.
 
-- [ ] Write migration and real-PG tests for atomic message binding/delivery
+- [x] Write migration and real-PG tests for atomic message binding/delivery
   unknown/reply consumption/replay/foreign scope/invalid retry/stale.
-- [ ] Implement bounded CAPTCHA client, repository/service/worker, media send,
+- [x] Implement bounded CAPTCHA client, repository/service/worker, media send,
   pre-history reply routing and new closed callback grammar. No guided kind.
-- [ ] Remove manual URL settings, old URL button/gate/runtime options and tests;
+- [x] Remove manual URL settings, old URL button/gate/runtime options and tests;
   wire CAPTCHA feature/token only server+browser. Preserve other jobs behavior.
-- [ ] Focused Telegram gate, full server suite and real-PG acceptance.
+- [x] Focused Telegram gate, full server suite and real-PG acceptance.
 
 ### Task 3: Deployment packaging and retirement preparation
 
@@ -58,19 +58,20 @@ bot/runtime wiring and tests. Does not edit root docs/deploy/browser.
 No edits to server/browser/root docs. Root deploys actual VPS.
 **Consumes:** new env flag/token and private8082 in existing RPC network.
 
-- [ ] Compose/env remove HH manual service/network/port/settings; add CAPTCHA
-  flag browser and token only server/browser. Collector never has token.
-- [ ] Remove HH systemd proxy and old manual policy scripts/tests; replace
+- [x] Compose/env remove HH manual service/network/port/settings; add CAPTCHA
+  shared flag server/browser/collector and token only server/browser.
+  Collector never has token.
+- [x] Remove HH systemd proxy and old manual policy scripts/tests; replace
   with focused config tests for no ports/gateway and credential distribution.
-- [ ] Update deploy README including guarded removal of only `/hh/`, old
+- [x] Update deploy README including guarded removal of only `/hh/`, old
   HH socket/service/launcher, private gateway and empty network; no TS reset.
-- [ ] Run config tests and normalized Compose with placeholders/no secrets.
+- [x] Run config tests and normalized Compose with placeholders/no secrets.
 
 ### Task 4: Root integration and authorized release
 
-- [ ] Reconcile exact broker/client wire and missing error/unknown paths.
+- [x] Reconcile exact broker/client wire and missing error/unknown paths.
   Review user text privacy and before-POST durable consumption end to end.
-- [ ] Update Telegram contract/change notice and living docs; mark old dated
+- [x] Update Telegram contract/change notice and living docs; mark old dated
   documents superseded. Followup regression/review only for material findings.
 - [ ] Fresh branches/worktrees/PR audit, tests/diff, publish accepted main.
   Immediately sync both VPS and source guards, stage immutable DE release.

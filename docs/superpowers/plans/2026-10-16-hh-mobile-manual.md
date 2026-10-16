@@ -1,5 +1,9 @@
 # HH mobile manual access implementation plan
 
+> История, 16 октября 2026: владелец отменил HH-доступ через Tailscale.
+> Более новый результат: [капча через Telegram](../../updates/2026-10-16-hh-telegram-captcha.md).
+> Описанная здесь web-схема выводится из эксплуатации.
+
 > Execute task by task, review each boundary before integration. Independent
 > gateway work may run in parallel; runtime and integration remain sequential.
 

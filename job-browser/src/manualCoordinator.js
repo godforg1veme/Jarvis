@@ -55,14 +55,18 @@ class ManualCoordinator {
     });
   }
   claim(challengeHash) {
+    return this.claimMany([challengeHash]);
+  }
+  claimMany(hashes) {
     // This method runs from a page route while finish may await navigation;
     // do not queue behind finish (which would deadlock the intercepted request).
     if (!this.canInput()) return Promise.reject(fail('JOB_HH_MANUAL_ACTIVE'));
     const revision = this.state.revision;
     return this.run(async () => {
       if (!this.canInput() || this.state.revision !== revision || this.state.seedRequired
-        || this.state.claims.includes(challengeHash) || this.state.claims.length >= 64) throw fail('JOB_MANUAL_CHALLENGE_ALREADY_ATTEMPTED');
-      await this.write({ claims: [...this.state.claims, challengeHash] });
+        || !Array.isArray(hashes) || !hashes.length || hashes.some(h => !/^[a-f0-9]{64}$/.test(h) || this.state.claims.includes(h))
+        || new Set(hashes).size !== hashes.length || this.state.claims.length + hashes.length > 64) throw fail('JOB_MANUAL_CHALLENGE_ALREADY_ATTEMPTED');
+      await this.write({ claims: [...this.state.claims, ...hashes] });
       return true;
     });
   }

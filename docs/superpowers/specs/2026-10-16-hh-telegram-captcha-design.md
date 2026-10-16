@@ -36,8 +36,9 @@ Manual coordinator и пауза без таймера сохраняются к
 
 Приватный HTTP broker на 8082 в существующей job-browser-rpc сети доступен только
 с отдельным bearer `JARVIS_JOB_CAPTCHA_TOKEN` и `x-jarvis-owner-id`.
-Флаг `JARVIS_HH_CAPTCHA_TELEGRAM=1`. Token отличен от read/apply, передаётся только
-browser и server. Collector его не получает. Нет host ports или WebSocket.
+Флаг `JARVIS_HH_CAPTCHA_TELEGRAM=1` одинаково включён для browser/server/collector.
+Token отличен от read/apply, передаётся только browser и server. Collector его
+не получает. Нет host ports или WebSocket.
 
 Все операции — POST `/rpc`, content-type application/json, closed shape,
 body <=8192; duplicate JSON keys/headers и лишние поля отклоняются до действия.
@@ -61,8 +62,10 @@ PNG <=256KiB и <=1024×256 pixels. Проверяются HH origin, exact targ
 без расширения сетевых полномочий. OCR/модель не решают присланную человеку картинку.
 
 Проверка результата использует временную read-only вкладку, закрываемую в finally.
-Сбор и отклики заблокированы в pending/active/checking. Автоматический OCR и его
-существующий opt-in режим не получают Telegram ответы и новые полномочия.
+Сбор и отклики заблокированы в pending/active/checking. При включённом Telegram
+режиме CAPTCHA сразу передаётся человеку, без предварительной OCR-попытки.
+Существующий OCR opt-in режим остаётся доступным только при выключенном Telegram
+режиме и не получает Telegram ответы или новые полномочия.
 
 ## Server, PostgreSQL, Telegram
 

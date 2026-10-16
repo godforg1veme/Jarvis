@@ -47,30 +47,24 @@ HH-сессией, узкий RPC привязан к одному owner UUID; r
 [Результат выпуска и ограничения](updates/2026-10-15-job-search-release.md),
 [настройка браузера](../job-browser/README.md).
 
-На DE установлен отдельный networkless `job-ocr` с UNIX socket
-и opt-in `JARVIS_HH_CAPTCHA_RECOVERY`. Browser хранит owner-bound журнал капчи;
-инициализация и ответ допускаются по одному разу после паузы, неопределённые
-записи не повторяются. Read credential расширяется только на эти два закрытых
-captcha POST; отклики сохраняют прежний apply credential и подтверждение.
-[Проверки и статус установки](updates/2026-10-15-hh-captcha-recovery-release.md),
-[контракт OCR](../job-ocr/README.md). Флаг включён; попытка 15 октября в 21:33 МСК
-закончилась manual-required, Telegram notice доставлено.
-Исправленный OCR установлен из `8de0cfa`. Следующая попытка прошла OCR, но
-локальный guard заблокировал native XHR с ответом в query вместо body.
-[Установка и ремонт формата запроса](updates/2026-10-16-hh-native-captcha-request.md);
-browser-исправление установлено из `e061386`. Первая попытка 16 октября прошла
-guard без немедленного восстановления. В 01:40 МСК после временного просмотра
-сессии без капчи обычная проверка возобновила сбор: журнал resolved, страница 35.
-Карточек 328; полный обход и новая доставка ещё не подтверждены. Временный доступ
-закрыт, browser/collector восстановлены. Новый answer POST не отправляли.
+Для CAPTCHA подготовлен человеческий ответ через Telegram: headless browser
+держит один прежний HH profile, coordinator и durable claims. Закрытый broker8082
+использует отдельный CAPTCHA credential только у server/browser. Collector
+имеет read credential и проверяет паузу без обращений к HH. Host ports отсутствуют.
 
-На DE установлен opt-in mobile manual режим: один headed Chromium/Xvfb,
-приватный broker и отдельный noVNC gateway, owner identity через Tailscale Serve.
-Состояние pending/active/checking хранится без TTL и блокирует read/apply.
-Ссылка постоянная, finish возобновляет сбор только после точного target reader.
-Из-за Docker internal-network port behavior localhost обслуживает host socket
-proxy без root после запуска; прежний Serve маршрут сохранён.
-[Результат выпуска и проверка телефона](updates/2026-10-16-hh-mobile-manual-release.md).
+Фото содержит только CAPTCHA PNG. Reply привязан к owner/private conversation,
+chat, message ID, challenge/revision и сроку картинки. Ответ расходуется атомарно
+перед единственным native POST; текст не проходит через AI/history/memory.
+После read-only проверки точного target обычный поиск продолжает progress.
+Unknown/replay и старые картинки не разрешают повторную отправку ответа.
+[Согласованный контракт](superpowers/specs/2026-10-16-hh-telegram-captcha-design.md).
+
+Telegram режим сразу передаёт CAPTCHA человеку. Прежний networkless `job-ocr`
+с UNIX socket сохранён для отдельного opt-in fallback при выключенном Telegram
+режиме. Journal/profile/resume/exclusions не сбрасываются. История OCR и прежнего
+[ручного web-доступа](updates/2026-10-16-hh-mobile-manual-release.md) сохранена;
+HH gateway/noVNC/Serve link и host proxy выводятся из эксплуатации. Другие
+Tailscale и VPN применения к этому изменению не относятся.
 
 ### Cloud control plane
 

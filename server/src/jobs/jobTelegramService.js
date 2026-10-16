@@ -44,7 +44,7 @@ class JobTelegramService {
     const search = await this.searchRepository.ensure({ scope });
     const usage = await this.usageRepository.getMonth({ userId: scope.userId });
     const connection = (await this.pool.query('SELECT status,resume_id FROM job_connections WHERE user_id=$1', [scope.userId])).rows[0];
-    return homeView({ search, usage, connection, manualAccessUrl: this.manualAccessUrl });
+    return homeView({ search, usage, connection, captchaEnabled: Boolean(this.captchaService) });
   }
   async begin(scope, kind, targetId, revision, answer) {
     const interaction = await this.interactions.begin({ ...scope, channel: undefined, kind,
@@ -52,6 +52,7 @@ class JobTelegramService {
     return response(answer, [[{ text: 'Отмена', data: `flow:cancel:${interaction.id}` }]]);
   }
   async handle({ scope, context, action, targetId, page = 0 }) {
+    if (action === 'captcha' || action === 'captcha_refresh') return this.captchaService ? this.captchaService.request(scope, action === 'captcha_refresh') : response('Проверка HH через Telegram не настроена.');
     if (action === 'menu' || action === 'back') return this.home(scope);
     const search = await this.searchRepository.ensure({ scope });
     if (action === 'save' || action === 'hide') {

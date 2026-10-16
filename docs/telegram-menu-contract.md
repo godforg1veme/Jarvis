@@ -55,24 +55,30 @@ collector → owner-scoped PostgreSQL attention outbox → прежний Bot se
 к conversation; member/чужой chat не получают сообщение. Новых callback или
 guided-input kind нет. Это ещё не подтверждение production-выпуска.
 
-Локальная разработка 16 октября: согласован постоянный ручной доступ HH
-с телефона через Tailscale, без таймера. При настроенном и проверенном
-`JARVIS_JOB_MANUAL_ACCESS_URL` меню владельца и уведомление о капче содержат
-URL-кнопку «Открыть HH». Адрес берётся только из доверенной настройки:
-канонический HTTPS hostname `*.ts.net`, путь ровно `/hh/`, без credentials,
-порта, query и fragment. Bot разрешает только точное совпадение с этой
-настройкой. URL только открывает страницу; права проверяет отдельный gateway.
-Пустая настройка сохраняет прежние меню и уведомление. Member, группа и чужая
-conversation/chat отклоняются прежними handler/claim проверками до выдачи ссылки.
-Новых callbacks и guided-input kind нет, предпросмотр ссылок отключён.
-При ручном режиме сборщик каждые 10 секунд проверяет coordinator через прежний
-RPC, без запросов к HH; первоначальный incident создаёт одно уведомление,
-последующие проверки нового не создают. Filters, checkpoint и progress
-сохраняются; пользовательский выключенный поиск не включается. Кнопка «Готово»
-расположена на странице gateway и только после проверки HH возвращает сбор.
-Обновление 16 октября: изменение опубликовано и установлено на DE, owner HTTPS
-проверен через Tailscale. Приёмка Safari на телефоне ещё не выполнена.
-[Результат выпуска](updates/2026-10-16-hh-mobile-manual-release.md).
+Согласованное изменение 16 октября: ручная CAPTCHA HH переносится в Telegram.
+Владелец явно подтвердил, что текстовый reply на фото означает ввод и одну
+отправку ответа в HH без второй кнопки подтверждения. Старый HH web/Tailscale
+путь и кнопка «Открыть HH» удаляются; прочие применения Tailscale не меняются.
+[Спецификация](superpowers/specs/2026-10-16-hh-telegram-captcha-design.md).
+
+Owner/private меню поиска получает «Проверить HH» (`job:captcha`). Фото содержит
+только изображение CAPTCHA и фиксированную подпись `HH CAPTCHA · Ответь на это фото…`.
+«Обновить картинку» (`job:captcha_refresh`) явно запрашивает новую картинку.
+Callbacks не содержат ID, ответа, URL или скрытых параметров HH. Подпись служит
+лишь подсказкой маршрутизации, а полномочия определяет привязка message ID в БД.
+Reply должен совпасть с owner/user, conversation/private chat, challenge и сроком.
+Старое, чужое и уже использованное фото отклоняется; обычный текст не является
+подтверждением CAPTCHA. Невалидный ответ не расходует фото.
+
+Путь: collector/manual coordinator → CAPTCHA worker → photo outbox → Bot sendPhoto
+→ update claim → owner/chat/conversation → reply binding → atomic consumption
+→ CAPTCHA-only browser credential → native answer POST → read-only target reader.
+Текст не сохраняется в истории и не передаётся в AI, память или diagnostics.
+Новый guided-input kind не добавляется. Неизвестный результат отправки фото или
+ответа не разрешает повтор под новым ID. Сбор и отклики стоят на паузе до
+проверенного чтения HH; фильтры/progress/checkpoint сохраняются. Выключенный
+владельцем поиск не включается. Новые фотокарточки не рассылаются на каждом tick.
+История прежнего пути: [выпуск web-доступа](updates/2026-10-16-hh-mobile-manual-release.md).
 
 ## Persistent bottom keyboard
 

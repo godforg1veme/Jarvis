@@ -87,58 +87,41 @@ The worker is tested separately without network or credentials; see
 local test database. It applies the forward-only attention migration and checks
 delay, checkpoints, deduplication and owner/private-chat delivery.
 
-Mobile manual HH preparation adds display supervision and Compose policy checks:
+Telegram human CAPTCHA checks:
 
 ```powershell
-node --test job-browser/test/displayMain.test.js
-py deploy/scripts/test-job-manual-config.py
-py deploy/scripts/test-manual-loopback-proxy.py
-npm test --prefix job-manual
+npm test --prefix job-browser
+py deploy/scripts/test-job-captcha-config.py
+node --test server/test/jobTelegramCaptcha.test.js
 ```
 
-Run the browser/manual Chromium tests in the pinned Linux image with a disposable
-profile, no production environment and no live HH connectivity. Verify that the
-disabled flag launches no display children, Xvfb has no TCP listener, raw VNC
-binds only container loopback, and a display-child failure stops Chromium.
-The normalized Compose preflight in [deploy instructions](../deploy/README.md)
-checks loopback-only gateway, dedicated internal network, preserved external
-profile and distinct manual credentials without outputting their values.
-Do not print or save `docker compose config` output because it contains secrets.
-Actual Tailscale Serve header injection, foreign-owner denial and Safari screen,
-keyboard and «Готово» remain separate live checks after release authorization.
-`job-browser/test/displayLinuxAcceptance.cjs` exercises the real Xvfb/x11vnc,
-sandboxed headed Chromium, RFB handshake, `/proc/net/tcp{,6}` listeners and
-fail-closed shutdown. Mount the test directory at `/tests` and invoke
-`node --test /tests/displayLinuxAcceptance.cjs` in the browser candidate image,
-using the production seccomp/capability policy, `--network none`, no owner
-volume and no production env. It requires the browser's existing writable root
-filesystem; keep that separate from the read-only gateway policy.
+Run browser tests on Linux for durable-file semantics without skips. Explicit
+`job-browser/test/captchaTelegramAcceptance.cjs` uses the pinned sandboxed
+Chromium image with `--network none --add-host hh.ru:127.0.0.1` and an isolated
+profile. It checks image-only bounded PNG, exact form/key binding, stale pictures,
+native XHR, durable duplicate/unknown protection and read-only target verification.
+`manualRuntimeAcceptance.cjs` checks the headless runtime and persisted pause;
+`captchaTelegramRuntimeAcceptance.cjs` proves a fresh CAPTCHA handover delivers
+the first human picture without starting legacy OCR or sending an answer POST.
+Both runtime helpers require a fresh empty tmpfs at `/home/pwuser/profile`, owned by the browser
+user with mode0700, never an account volume. Retain the production seccomp,
+capabilities and resource policy. No Xvfb/VNC/noVNC image is needed.
 
-The manual coordinator, durable state and broker unit tests are included in
-`node --test job-browser/test/*.test.js`; run on Linux to exercise durable-file
-semantics without skips. Additional explicit acceptance files are:
+Run `server/test/jobTelegramCaptchaAcceptance.cjs` separately with
+`JARVIS_JOB_TEST_DATABASE_URL` pointing to a dedicated test PostgreSQL database.
+The unique fixture schema applies the forward-only migration and checks real
+message/menu routing, private owner/chat/conversation scope, atomic reply
+consumption, expiry/replacement/replay, unknown photo ACK and no AI/history use.
+Then run the focused Telegram gate in the menu contract and full server tests.
 
-- `manualBrowserAcceptance.cjs`: native CAPTCHA dispatch, durable claims,
-  unknown-result baseline and exact-target verification. Use the pinned browser
-  image with `--network none --add-host hh.ru:127.0.0.1`.
-- `manualRuntimeAcceptance.cjs`: headed browserMain, pending state after restart,
-  read/apply denial and disabled-flag refusal over unresolved manual state.
-  Requires a fresh empty tmpfs at `/home/pwuser/profile`, owned by the browser
-  user with mode 0700; never mount an existing account profile.
-- `manualNoVncAcceptance.cjs`: actual noVNC canvas, touch, Cyrillic keyboard input,
-  one transport and failed/successful finish. Install the gateway from its
-  lockfile at `/opt/job-manual` in a disposable child image of the browser image
-  (or set `JARVIS_MANUAL_FIXTURE_GATEWAY` to its `src/server.js`). Add
-  `--network none --add-host fixture.tailnet.ts.net:127.0.0.1`. The fixture starts
-  Xvfb/x11vnc and an HTTPS proxy with temporary certificate and identity headers;
-  it does not use real Tailscale or HH.
-
-For these files retain the browser sandbox/seccomp/capability policy and invoke
-`node --test /path/to/test.cjs` with adjacent source modules available. Run
-`server/test/jobManualAccessAcceptance.cjs` separately against a dedicated test
-PostgreSQL database via `JARVIS_JOB_TEST_DATABASE_URL`; it creates a unique
-fixture schema and tests real message/menu handlers, owner scope and progress.
-Measured results are in [the development record](updates/2026-10-16-hh-mobile-manual-development.md).
+The normalized Compose policy checker in [deploy instructions](../deploy/README.md)
+checks distinct CAPTCHA credentials only on server/browser, explicit flags on
+all three jobs services, preserved external profile, and absence of HH gateway,
+manual network and host ports. Never print or save secret-bearing Compose JSON.
+Release verification checks that only the retired HH Serve handler, proxy units,
+gateway container and empty private network were removed; unrelated Tailscale
+routes/services remain. Real owner photo delivery/reply and resumed HH reading
+are live acceptance, separate from fixtures.
 
 Confirmed browser applications require Linux durable-file semantics. Run the
 disposable test-only stack, which builds from both lockfiles and uses an internal

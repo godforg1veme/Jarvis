@@ -16,14 +16,18 @@ POST формы; фазы записываются на диск до запро
 не выполняются. [Результат установки и восстановления](../docs/updates/2026-10-16-hh-native-captcha-request.md)
 отделяет отправку ответа от подтверждённого чтения HH.
 
-На DE установлен [постоянный мобильный ручной доступ](../docs/updates/2026-10-16-hh-mobile-manual-release.md)
-через Tailscale/noVNC без TTL. `JARVIS_JOB_MANUAL_ENABLED=1` включает headed
-Chromium под Xvfb, owner-bound coordinator и отдельный credential broker.
-В pending/active/checking сбор и отклики не обращаются к HH. «Готово» ждёт
-in-flight answer, проверяет точный target и только затем разрешает продолжение.
-Отключение flag поверх незавершённого manual state не включает автоматику.
-Gateway не получает profile/cookies, БД или read/apply credentials.
-Вход через настоящий Tailscale проверен; приёмка Safari/капчи с телефона остаётся.
+Подготовлен [ручной ответ через Telegram](../docs/superpowers/specs/2026-10-16-hh-telegram-captcha-design.md):
+`JARVIS_HH_CAPTCHA_TELEGRAM=1` и отдельный `JARVIS_JOB_CAPTCHA_TOKEN` включают
+приватный POST `/rpc` broker на8082 в существующей RPC-сети. Он отдаёт только
+PNG картинки, opaque challenge ID/revision/expiry; принимает человеческий ответ
+на привязанное фото. Chromium всегда headless; веб-экран и отдельный gateway
+удалены. В pending/active/checking сбор и отклики не обращаются к HH.
+Challenge живёт10минут, ручная пауза не истекает. Повторный challenge(false)
+переиспользует картинку, refresh(true) явно заменяет её. Claim ключа и operation
+фиксируется до единственного native answer POST; неизвестный результат не
+повторяется. Только read-only проверка исходного target разрешает продолжение.
+Старые unresolved state/claims сохраняются; отключение flag поверх них не
+включает автоматику. PNG/ответ/form/key не сохраняются в логах или state.
 
 ## Проверка без аккаунта
 

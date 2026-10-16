@@ -56,7 +56,13 @@ class ManualState {
       if (!s.isFile() || s.uid !== process.getuid() || s.mode & 0o077 || s.size > 16384) throw fail();
       const bytes = Buffer.alloc(16385), r = await handle.read(bytes, 0, bytes.length, 0);
       if (r.bytesRead > 16384) throw fail();
-      return validate(JSON.parse(bytes.subarray(0, r.bytesRead).toString('utf8')), this.ownerId);
+      let value = JSON.parse(bytes.subarray(0, r.bytesRead).toString('utf8'));
+      // First manual release omitted seedRequired. Preserve its claims/incident
+      // and conservatively bar the first observed key before any human submit.
+      if (exact(value, ['version', 'ownerId', 'phase', 'recoveryId', 'target', 'revision', 'claims', 'lastAction', 'lastRevision'])) {
+        value = { ...value, seedRequired: value.phase !== 'idle' };
+      }
+      return validate(value, this.ownerId);
     } catch (e) { if (e.code === 'ENOENT') return initial(this.ownerId); throw fail(); }
     finally { await handle?.close(); }
   }

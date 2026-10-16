@@ -1,10 +1,9 @@
-const { isJobManualAccessUrl } = require('./jobConfig');
 function response(answer, buttons = []) {
   return { answer, ...(buttons.length ? { buttons } : {}), plainText: true, disableLinkPreview: true,
     historyAnswer: 'Поиск работы: результат действия показан владельцу.' };
 }
 function button(text, action, id) { return { text, data: `job:${action}${id == null ? '' : `:${id}`}` }; }
-function homeView({ search, usage, connection, manualAccessUrl = '' }) {
+function homeView({ search, usage, connection, captchaEnabled = false }) {
   const enabled = search.settings.activated && !search.settings.paused;
   return response(`Поиск работы\n${enabled ? 'Поиск включён' : 'Поиск выключен'}
 Проверка: каждые ${Math.round(search.settings.intervalMs / 60000)} мин.
@@ -18,7 +17,7 @@ ${search.status === 'attention' ? 'Последняя проверка не за
     [button('Настройки', 'settings'), button('Сохранённые', 'saved', 0)],
     [button('Отклики', 'applications', 0), button('Проверить сейчас', 'check')],
     [button('Профиль и примеры', 'profile'), button('Подключить HH', 'connect')],
-    ...manualAccessButtons(manualAccessUrl),
+    ...(captchaEnabled ? [[button('Проверить HH', 'captcha')]] : []),
     [button('Назад', 'back')],
   ]);
 }
@@ -59,12 +58,9 @@ function listView(rows, page, kind) {
   buttons.push([button('В поиск работы', 'menu')]);
   return response(rows.length ? 'Выбери вакансию:' : 'Пока нет вакансий в этом списке.', buttons);
 }
-function manualAccessButtons(url) { return isJobManualAccessUrl(url) ? [[{ text: 'Открыть HH', url }]] : []; }
-function attentionView(manualAccessUrl = '') {
-  const instructions = manualAccessButtons(manualAccessUrl).length
-    ? 'Открой HH через Tailscale на телефоне, пройди капчу и нажми «Готово» на странице. До подтверждения сбор приостановлен.'
-    : 'Проверьте сессию HH в браузере на VPS; при запросе пройдите капчу вручную.';
-  return { ...response(`Поиск работы: автоматическая попытка прохождения капчи HH не подтвердила доступ. ${instructions} Прогресс поиска сохранён; для этой проверки повторной отправки ответа не будет.`, manualAccessButtons(manualAccessUrl)), buttons: manualAccessButtons(manualAccessUrl) };
+function attentionView(captchaEnabled = false) {
+  if (captchaEnabled) return { ...response('Поиск работы приостановлен из-за капчи HH. Бот пришлёт картинку отдельно; ответь на фото текстом с картинки. Прогресс поиска сохранён.', [[button('Проверить HH', 'captcha')]]), buttons: [[button('Проверить HH', 'captcha')]] };
+  return { ...response('Поиск работы: автоматическая попытка прохождения капчи HH не подтвердила доступ. Проверьте сессию HH в браузере на VPS; при запросе пройдите капчу вручную. Прогресс поиска сохранён; для этой проверки повторной отправки ответа не будет.'), buttons: [] };
 }
-module.exports = { manualAccessButtons, attentionView, response, button, homeView, cardView, draftView, listView, salaryText };
+module.exports = { attentionView, response, button, homeView, cardView, draftView, listView, salaryText };
 const { descriptionSalary } = require('./salaryRules');

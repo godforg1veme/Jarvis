@@ -18,7 +18,7 @@ function createCollectorRuntime({ env = process.env, pool, hhClient, currencyRat
   const collector = new JobCollector({ searchRepository, deliveryRepository: new JobDeliveryRepository(database),
     hhClient: source,
     currencyRates: currencyRates || new CurrencyRates(), now: clock, wait, shouldStop: () => stopping,
-    manualAccessUrl: config.jobManualAccessUrl });
+    captchaEnabled: config.jobCaptchaTelegram });
   const tick = () => {
     if (stopping || running) return running;
     running = (async () => {

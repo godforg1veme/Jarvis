@@ -82,6 +82,10 @@ test('Linux manual state refuses foreign owner, unsafe mode, oversized file and 
     await assert.rejects(assertInactiveWhenDisabled({ root, ownerId }), { code: 'JOB_HH_MANUAL_ACTIVE' });
     await store.write(initial(ownerId));
     assert.equal((await fs.stat(file)).mode & 0o777, 0o600);
+    const old = { ...initial(ownerId), phase: 'active', recoveryId: randomUUID(), target: 'https://hh.ru/vacancy/123', claims: ['b'.repeat(64)] };
+    delete old.seedRequired; await fs.writeFile(file, JSON.stringify(old));
+    const migrated = await store.read(); assert.equal(migrated.seedRequired, true); assert.deepEqual(migrated.claims, old.claims); assert.equal(migrated.recoveryId, old.recoveryId);
+    await store.write(initial(ownerId));
     await assert.rejects(new ManualState({ root, ownerId: randomUUID() }).read(), { code: 'JOB_MANUAL_STATE_DENIED' });
     await fs.chmod(file, 0o644); await assert.rejects(store.read(), { code: 'JOB_MANUAL_STATE_DENIED' });
     await fs.chmod(file, 0o600); await fs.writeFile(file, 'x'.repeat(16385)); await assert.rejects(store.read(), { code: 'JOB_MANUAL_STATE_DENIED' });

@@ -1,7 +1,7 @@
 const { cardView, attentionView } = require('./jobTelegramViews');
 class JobDeliveryWorker {
-  constructor({ pool, searchRepository, deliveryRepository, send, manualAccessUrl = '', intervalMs = 2000 }) {
-    Object.assign(this, { pool, searchRepository, deliveryRepository, send, manualAccessUrl, intervalMs });
+  constructor({ pool, searchRepository, deliveryRepository, send, captchaEnabled = false, intervalMs = 2000 }) {
+    Object.assign(this, { pool, searchRepository, deliveryRepository, send, captchaEnabled, intervalMs });
     this.timer = null; this.running = false;
   }
   async tick() {
@@ -17,7 +17,7 @@ class JobDeliveryWorker {
         view = cardView(vacancy);
       } else if (delivery.kind === 'attention') {
         if (delivery.payload?.reason !== 'HH_CAPTCHA') { await this.deliveryRepository.finish({ deliveryId: delivery.id, outcome: 'failed' }); return; }
-        view = attentionView(this.manualAccessUrl);
+        view = attentionView(this.captchaEnabled);
       } else if (delivery.kind === 'budget') view = { answer: `Поиск работы: расходы API за ${delivery.payload.month} достигли $${delivery.payload.thresholdUsd}. Работа продолжается.`, buttons: [] };
       else { await this.deliveryRepository.finish({ deliveryId: delivery.id, outcome: 'failed' }); return; }
       try {

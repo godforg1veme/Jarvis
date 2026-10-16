@@ -1,40 +1,6 @@
 name: jarvis-family
 
 services:
-  job-manual:
-    profiles: [job-manual-de]
-    build:
-      context: ../job-manual
-    init: true
-    user: "1000:1000"
-    restart: unless-stopped
-    read_only: true
-    cap_drop: [ALL]
-    security_opt: ["no-new-privileges:true"]
-    pids_limit: 64
-    environment:
-      JARVIS_JOB_MANUAL_ORIGIN: ${JARVIS_JOB_MANUAL_ORIGIN:-}
-      JARVIS_JOB_MANUAL_OWNER_LOGIN: ${JARVIS_JOB_MANUAL_OWNER_LOGIN:-}
-      JARVIS_JOB_MANUAL_OWNER_ID: ${JARVIS_JOB_BROWSER_OWNER_ID:-}
-      JARVIS_JOB_MANUAL_TOKEN: ${JARVIS_JOB_MANUAL_TOKEN:-}
-    ports: ["127.0.0.1:19123:8080"]
-    networks: [job-manual-control]
-    depends_on:
-      job-browser:
-        condition: service_healthy
-    tmpfs:
-      - /tmp:rw,nosuid,nodev,noexec,size=16m
-    healthcheck:
-      test: [CMD, node, -e, "fetch('http://127.0.0.1:8080/hh/').then(r=>{if(r.status!==403)process.exit(1)}).catch(()=>process.exit(1))"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 256M
-          pids: 64
   job-ocr:
     profiles: [job-captcha-de]
     platform: linux/amd64
@@ -80,12 +46,12 @@ services:
       JARVIS_JOB_BROWSER_APPLY_ENABLED: ${JARVIS_JOB_BROWSER_APPLY_ENABLED:-0}
       JARVIS_JOB_BROWSER_APPLY_TOKEN: ${JARVIS_JOB_BROWSER_APPLY_TOKEN:-}
       JARVIS_HH_CAPTCHA_RECOVERY: ${JARVIS_HH_CAPTCHA_RECOVERY:-0}
-      JARVIS_JOB_MANUAL_ENABLED: ${JARVIS_JOB_MANUAL_ENABLED:-0}
-      JARVIS_JOB_MANUAL_TOKEN: ${JARVIS_JOB_MANUAL_TOKEN:-}
+      JARVIS_HH_CAPTCHA_TELEGRAM: ${JARVIS_HH_CAPTCHA_TELEGRAM:-0}
+      JARVIS_JOB_CAPTCHA_TOKEN: ${JARVIS_JOB_CAPTCHA_TOKEN:-}
     volumes:
       - job-browser-profile:/home/pwuser/profile
       - job-ocr-socket:/run/job-ocr:ro
-    networks: [job-browser-rpc, job-manual-control]
+    networks: [job-browser-rpc]
     shm_size: 256m
     pids_limit: 256
     cap_drop: [ALL]
@@ -119,7 +85,7 @@ services:
       JARVIS_JOB_SEARCH_ENABLED: ${JARVIS_JOB_SEARCH_ENABLED:-false}
       JARVIS_JOB_COLLECTOR_INTERVAL_MS: ${JARVIS_JOB_COLLECTOR_INTERVAL_MS:-1800000}
       JARVIS_JOB_HISTORY_DAYS: ${JARVIS_JOB_HISTORY_DAYS:-14}
-      JARVIS_JOB_MANUAL_ACCESS_URL: ${JARVIS_JOB_MANUAL_ACCESS_URL:-}
+      JARVIS_HH_CAPTCHA_TELEGRAM: ${JARVIS_HH_CAPTCHA_TELEGRAM:-0}
       JARVIS_JOB_BROWSER_URL: http://job-browser:8080
       JARVIS_JOB_BROWSER_OWNER_ID: ${JARVIS_JOB_BROWSER_OWNER_ID:-}
       JARVIS_JOB_BROWSER_TOKEN: ${JARVIS_JOB_BROWSER_TOKEN:-}
@@ -183,7 +149,8 @@ services:
       JARVIS_JOB_BUDGET_USD: ${JARVIS_JOB_BUDGET_USD:-3}
       JARVIS_JOB_SECRET_KEY: ${JARVIS_JOB_SECRET_KEY:-}
       JARVIS_JOB_PUBLIC_ORIGIN: ${JARVIS_JOB_PUBLIC_ORIGIN:-}
-      JARVIS_JOB_MANUAL_ACCESS_URL: ${JARVIS_JOB_MANUAL_ACCESS_URL:-}
+      JARVIS_JOB_CAPTCHA_TOKEN: ${JARVIS_JOB_CAPTCHA_TOKEN:-}
+      JARVIS_HH_CAPTCHA_TELEGRAM: ${JARVIS_HH_CAPTCHA_TELEGRAM:-0}
       JARVIS_JOB_BROWSER_URL: http://job-browser:8080
       JARVIS_JOB_BROWSER_OWNER_ID: ${JARVIS_JOB_BROWSER_OWNER_ID:-}
       JARVIS_JOB_BROWSER_TOKEN: ${JARVIS_JOB_BROWSER_TOKEN:-}
@@ -353,8 +320,6 @@ services:
           memory: 256M
 
 networks:
-  job-manual-control:
-    internal: true
   job-browser-rpc:
     internal: false
   backend:

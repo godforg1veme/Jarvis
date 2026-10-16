@@ -406,79 +406,61 @@ cards, edits/translation and restart/dedup; any real application requires a
 selected vacancy and an explicit confirmation of the exact letter in Telegram.
 Keep fixture send results separate from that live acceptance.
 
-### Manual HH captcha from a phone (installed on DE, opt-in)
+### Human HH CAPTCHA replies through Telegram
 
-The approved [mobile design](../docs/superpowers/specs/2026-10-16-hh-mobile-manual-design.md)
-adds the `job-manual-de` profile. Enable only on DE, after an authorized release.
-The [16 October release result](../docs/updates/2026-10-16-hh-mobile-manual-release.md)
-records the installed topology and outstanding phone acceptance.
-The permanent owner URL ends in `/hh/`; it contains no credential and has no
-automatic expiry. The browser still owns the single original HH profile.
-Pending, active and checking manual states block collection and applications.
-The owner starts the screen and selects «Готово»; only a successful read-only
-HH verification resumes collection. A search disabled by its owner stays disabled.
+The [approved Telegram CAPTCHA design](../docs/superpowers/specs/2026-10-16-hh-telegram-captcha-design.md)
+replaces the old HH browser gateway. One headless, sandboxed Chromium keeps the
+original owner profile and durable recovery state. Collection and applications
+remain paused while a CAPTCHA is unresolved; changing transport does not clear
+claims, filters, checkpoints or a search disabled by its owner.
 
-The pinned browser image installs Xvfb `2:21.1.12-1ubuntu1.8` and x11vnc
-`0.9.16-10` from Ubuntu Noble repositories. `displayMain.js` runs one Xvfb
-display with TCP disabled and x11vnc on container loopback `127.0.0.1:5900`.
-Display-child failure stops the browser. Chromium keeps its non-root sandbox,
-profile volume, seccomp policy and existing resource limits. Clipboard transfer
-is disabled. When `JARVIS_JOB_MANUAL_ENABLED=0`, only the prior browser runtime
-starts; no display or VNC process is launched.
-An unresolved persisted manual state prevents startup with that flag disabled;
-disabling the feature must not silently resume collection over a manual session.
+Set `JARVIS_HH_CAPTCHA_TELEGRAM=1` only in the private DE environment after
+verifying the configured Jarvis owner. Generate a separate random
+`JARVIS_JOB_CAPTCHA_TOKEN`, different from read and apply credentials. Only the
+server and browser receive it. The collector never receives this credential.
+The private HTTP broker is `job-browser:8082` in the existing
+`job-browser-rpc` network. It has no host port, WebSocket, VNC, CDP or web gateway.
+The existing optional OCR mode remains separate.
 
-Configure the private DE environment without printing its values:
-`JARVIS_JOB_MANUAL_ENABLED=1`, HTTPS Tailscale Serve origin in
-`JARVIS_JOB_MANUAL_ORIGIN`, exact owner Tailscale login in
-`JARVIS_JOB_MANUAL_OWNER_LOGIN`, and a new random manual token of at least 32
-characters in `JARVIS_JOB_MANUAL_TOKEN`. The owner ID is taken from the existing
-`JARVIS_JOB_BROWSER_OWNER_ID`. The manual token must differ from both read and
-apply credentials and is shared only by the gateway and browser. Set
-`JARVIS_JOB_MANUAL_ACCESS_URL` to that origin followed by `/hh/` for Telegram.
-The server and collector never receive the manual credential.
+The bot sends only the bounded CAPTCHA image to the owner's private Telegram
+chat. An explicit reply to that photo authorizes entering and submitting that
+answer once. The answer bypasses dialogue, memory and model processing.
+Confirmed read-only access to the original HH target resumes collection;
+unknown results remain blocked. A particular photo expires after ten minutes,
+but the recovery pause has no timer. Refresh replaces the photo binding.
 
-Before installation, verify the actual Jarvis owner and Tailscale identity,
-audit existing Serve routes, and preserve a private copy of its configuration.
-Preserve the exact existing HH profile volume and mounted secret inodes.
-Validate the resolved Compose policy without writing its secret-bearing JSON
-to a log or tracked file:
+Validate resolved Compose configuration through the bounded policy checker;
+never print or store its secret-bearing JSON:
 
 ```bash
-docker compose --profile job-search-de --profile job-manual-de -f deploy/docker-compose.yml config --format json | python3 deploy/scripts/verify-job-manual-config.py
+docker compose --profile job-search-de -f deploy/docker-compose.yml config --format json | python3 deploy/scripts/verify-job-captcha-config.py
+python3 deploy/scripts/test-job-captcha-config.py
 ```
 
-The gateway binds only host `127.0.0.1:19123` and joins only the internal
-`job-manual-control` network shared with the browser. Add only the `/hh/` handler
-to the existing HTTPS Tailscale Serve service, proxying to
-`http://127.0.0.1:19123`; preserve the existing `/` and all other handlers.
-Do not use `tailscale serve reset`, Funnel, public listeners, or raw VNC/CDP
-port publication. Serve must inject authenticated Tailscale identity headers;
-direct loopback requests without identity and requests from another tailnet
-user must be denied. The gateway must not be reachable through another proxy
-that lets a client supply those headers.
+For an authorized upgrade, preserve the exact external profile volume,
+mounted secret inodes, recovery journal and previous owner progress. Remove
+obsolete HH manual environment keys from the active private release environment
+without printing values. Build and install only changed DE services and verify
+the actual running image, private listeners and health. NL receives source
+synchronization without starting job services.
 
-Docker 29 can omit the effective published port when the container has only an
-internal network. Check both actual `NetworkSettings.Ports` and a localhost
-request. If the declared loopback binding is absent, install the checked-in
-`deploy/job-browser/jarvis-job-manual-proxy.socket` and `.service` under
-`/etc/systemd/system/`, and `deploy/scripts/manual-loopback-proxy.py` as root-owned
-`/usr/local/libexec/jarvis-manual-loopback-proxy.py` (0755). Enable only the socket
-with `systemctl enable --now jarvis-job-manual-proxy.socket` after daemon-reload.
-Do not install this socket if Docker already owns that port. This uses the
-distribution's `systemd-socket-proxyd`, not another container network or public
-listener. The launcher inspects only the fixed gateway/network, rejects changed
-boundaries, drops root and all supplementary groups, then proxies to that
-container's current internal address. Each activation resolves the address again.
-After recreating the gateway, restart the proxy service if active, so existing
-connections cannot retain the old destination. Keep the socket on loopback.
-On the current VPS the existing Serve handler is on HTTPS port 10000; leave it
-unchanged and add HTTPS 443 with `/hh/` only. The proxy target must include `/hh/`
-(`http://127.0.0.1:19123/hh/`) because Serve removes the mount prefix.
+Retire only the verified HH-specific transport. Inspect and privately preserve
+the current Tailscale Serve configuration before changing it. The prior setup
+used HTTPS443 `/hh/` for the HH gateway and HTTPS10000 `/` for a separate use.
+Remove only `/hh/` and its HTTPS443 listener if no handlers remain; preserve
+HTTPS10000 `/` and every unrelated route. Never reset or uninstall Tailscale.
 
-After an authorized install, inspect the actual container image and process
-state, verify health and non-public listeners, then test owner Safari through
-Tailscale: screen, keyboard, manual captcha and «Готово». Verify foreign identity
-denial, paused collection, restart persistence and unchanged progress/settings.
-The permanent URL is not proof of owner authentication; record phone acceptance
-separately from isolated tests. See [verification](../docs/verification.md).
+Stop and remove only `jarvis-job-manual-proxy.socket` and
+`jarvis-job-manual-proxy.service`, their checked unit files under
+`/etc/systemd/system/`, and the checked launcher
+`/usr/local/libexec/jarvis-manual-loopback-proxy.py`. Reload systemd after unit
+removal. Remove the verified HH gateway container and its dedicated network
+only after confirming it has no unrelated endpoints. Do not use broad Compose
+orphan removal, network pruning, volume deletion or production source cleanup.
+Preserve PostgreSQL, OCR, the HH profile, VPN and unrelated Tailscale services.
+
+Finally verify the old HH listener, proxy units, gateway and unused network are
+gone. Test real Telegram photo delivery, explicit human reply and confirmed HH
+read access separately from fixture acceptance. A lost photo ACK or answer POST
+must not cause automatic replay under another operation ID. Root verification
+instructions and dated release results record the actual deployment outcome.

@@ -4,10 +4,10 @@ const { createHash } = require('node:crypto');
 
 class JobCollector {
   constructor({ searchRepository, deliveryRepository, hhClient, currencyRates = null,
-    manualAccessUrl = '', now = () => new Date(), wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), maxRequests = 500, shouldStop = () => false }) {
+    captchaEnabled = false, now = () => new Date(), wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), maxRequests = 500, shouldStop = () => false }) {
     this.search = searchRepository; this.delivery = deliveryRepository; this.hh = hhClient;
     this.currencyRates = currencyRates; this.now = now; this.wait = wait; this.maxRequests = maxRequests;
-    this.shouldStop = shouldStop; this.manualAccessUrl = manualAccessUrl;
+    this.shouldStop = shouldStop; this.captchaEnabled = captchaEnabled;
   }
   async runOnce({ userId, now = this.now(), force = false }) {
     const job = await this.search.claimSearch({ userId, now, force });
@@ -75,7 +75,7 @@ class JobCollector {
       const code = /^JOB_[A-Z_]+$/.test(error.code || '') ? error.code : 'JOB_COLLECTION_FAILED';
       const waiting = code === 'JOB_HH_CAPTCHA_WAITING' && Number.isInteger(error.retryAfterMs)
         && error.retryAfterMs >= 1000 && error.retryAfterMs <= 120000;
-      const manual = code === 'JOB_HH_MANUAL_ACTIVE' || (code === 'JOB_HH_CAPTCHA_MANUAL_REQUIRED' && Boolean(this.manualAccessUrl));
+      const manual = code === 'JOB_HH_MANUAL_ACTIVE' || (code === 'JOB_HH_CAPTCHA_MANUAL_REQUIRED' && this.captchaEnabled);
       await this.search.finishSearch({ userId, leaseId: job.lease_id, checkpoint: null,
         nextCheckAt: manual ? new Date(this.now().getTime() + 10000) : waiting ? new Date(this.now().getTime() + error.retryAfterMs)
           : new Date(now.getTime() + Math.max(settings.intervalMs, error.retryAfterMs || 0)), failureCode: code });
