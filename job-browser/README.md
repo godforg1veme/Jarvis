@@ -16,14 +16,14 @@ POST формы; фазы записываются на диск до запро
 не выполняются. [Результат установки и восстановления](../docs/updates/2026-10-16-hh-native-captcha-request.md)
 отделяет отправку ответа от подтверждённого чтения HH.
 
-Локально реализован [постоянный мобильный ручной доступ](../docs/updates/2026-10-16-hh-mobile-manual-development.md)
+На DE установлен [постоянный мобильный ручной доступ](../docs/updates/2026-10-16-hh-mobile-manual-release.md)
 через Tailscale/noVNC без TTL. `JARVIS_JOB_MANUAL_ENABLED=1` включает headed
 Chromium под Xvfb, owner-bound coordinator и отдельный credential broker.
 В pending/active/checking сбор и отклики не обращаются к HH. «Готово» ждёт
 in-flight answer, проверяет точный target и только затем разрешает продолжение.
 Отключение flag поверх незавершённого manual state не включает автоматику.
 Gateway не получает profile/cookies, БД или read/apply credentials.
-Этот режим пока не опубликован и не установлен в production.
+Вход через настоящий Tailscale проверен; приёмка Safari/капчи с телефона остаётся.
 
 ## Проверка без аккаунта
 

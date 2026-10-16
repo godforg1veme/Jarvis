@@ -406,10 +406,12 @@ cards, edits/translation and restart/dedup; any real application requires a
 selected vacancy and an explicit confirmation of the exact letter in Telegram.
 Keep fixture send results separate from that live acceptance.
 
-### Manual HH captcha from a phone (prepared, opt-in)
+### Manual HH captcha from a phone (installed on DE, opt-in)
 
 The approved [mobile design](../docs/superpowers/specs/2026-10-16-hh-mobile-manual-design.md)
 adds the `job-manual-de` profile. Enable only on DE, after an authorized release.
+The [16 October release result](../docs/updates/2026-10-16-hh-mobile-manual-release.md)
+records the installed topology and outstanding phone acceptance.
 The permanent owner URL ends in `/hh/`; it contains no credential and has no
 automatic expiry. The browser still owns the single original HH profile.
 Pending, active and checking manual states block collection and applications.
