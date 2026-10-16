@@ -36,7 +36,8 @@ test('mobile UI touch flow, Cyrillic keyboard and failed/successful finish', { s
     await page.getByRole('button', { name: 'Обновить проверку' }).tap();
     await page.waitForFunction(() => window.remoteUrl.endsWith('revision=3'));
     await page.getByRole('button', { name: 'Готово', exact: true }).tap();
-    await page.locator('#screen canvas').waitFor();
+    await page.waitForFunction(() => document.querySelector('#status').textContent.includes('HH пока не подтвердил доступ'));
+    assert.equal(await page.locator('#screen canvas').count(), 0);
     assert.match(await page.locator('#status').textContent(), /Сбор приостановлен/);
     await page.getByRole('button', { name: 'Готово', exact: true }).tap();
     await page.waitForFunction(() => document.getElementById('status').textContent.includes('не требуется'));

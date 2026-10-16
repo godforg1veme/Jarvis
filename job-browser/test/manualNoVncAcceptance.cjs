@@ -85,8 +85,10 @@ test('real noVNC renders headed display, touch and Cyrillic input, then verifies
     await page.locator('#keyboard').fill('Привет');
     await hh.waitForFunction(() => document.querySelector('#answer').value === 'Привет');
     await page.getByRole('button', { name: 'Готово', exact: true }).tap();
-    await page.waitForFunction(() => document.querySelector('#status').textContent.includes('Сбор приостановлен'));
+    await page.waitForFunction(() => document.querySelector('#status').textContent.includes('HH пока не подтвердил доступ'));
     assert.equal(coordinator.status().phase, 'active');
+    assert.equal(await canvas.count(), 0);
+    await page.getByRole('button', { name: 'Обновить проверку', exact: true }).tap();
     await page.waitForFunction(() => { const c = document.querySelector('#screen canvas'); return c && c.width > 500; });
     verified = true; await page.getByRole('button', { name: 'Готово', exact: true }).tap();
     await page.waitForFunction(() => document.querySelector('#status').textContent.includes('не требуется'));

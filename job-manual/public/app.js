@@ -1,11 +1,11 @@
 import RFB from '/hh/novnc/core/rfb.js';
 import { bindKeyboard } from '/hh/input.js';
 const el = id => document.getElementById(id);
-let state = null, csrf = null, rfb = null, busy = false;
+let state = null, csrf = null, rfb = null, busy = false, notice = '';
 const labels = { idle: 'Ручная проверка сейчас не требуется.', pending: 'Нужна ручная проверка. Сбор приостановлен.', active: 'Ручная проверка открыта. Сбор приостановлен.', checking: 'Проверяем доступ к HH…' };
 function disconnect() { if (rfb) { const old = rfb; rfb = null; old.disconnect(); } el('screen').replaceChildren(); }
 function render() {
-  el('status').textContent = state ? labels[state.phase] : 'Нет связи. Обнови страницу, когда подключение восстановится.';
+  el('status').textContent = state ? [labels[state.phase], notice].filter(Boolean).join(' ') : 'Нет связи. Обнови страницу, когда подключение восстановится.';
   el('start').hidden = state?.phase !== 'pending'; el('done').hidden = state?.phase !== 'active';
   el('refresh').hidden = state?.phase !== 'active';
   el('connect').hidden = state?.phase !== 'active' || !!rfb;
@@ -33,13 +33,14 @@ function connect() {
 }
 async function action(name) {
   if (busy || !state || !csrf) return;
-  busy = true; disconnect(); render();
+  busy = true; notice = ''; disconnect(); render();
   try {
     const response = await fetch(`/hh/api/${name}`, { method: 'POST', credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: JSON.stringify({ revision: state.revision }) });
     const result = await response.json(); if (!result.ok) throw new Error(); state = result.value;
+    if (name === 'finish' && state.phase === 'active') notice = 'HH пока не подтвердил доступ. Нажми «Обновить проверку» сверху, чтобы получить новую картинку, затем подключись к экрану.';
   } catch { state = null; } finally { busy = false; await status(); }
-  if (state?.phase === 'active') connect();
+  if (state?.phase === 'active' && name === 'start') connect();
 }
 el('start').addEventListener('click', () => action('start')); el('done').addEventListener('click', () => action('finish'));
 el('refresh').addEventListener('click', () => action('start'));

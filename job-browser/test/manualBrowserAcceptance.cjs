@@ -14,7 +14,7 @@ const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
 test('actual Chromium manual captcha: one challenge, dispatch drain, exact read, durable restart and legacy unknown', { timeout: 90000 }, async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'manual-browser-')); await fs.chmod(root, 0o700);
   const ownerId = randomUUID(), recoveryId = randomUUID(), target = 'https://hh.ru/vacancy/123';
-  let solved = false, posts = 0, writes = 0, gets = 0, key = 'fixture-key', delay = null;
+  let solved = false, posts = 0, inits = 0, writes = 0, gets = 0, key = 'fixture-key', delay = null;
   const denied = [];
   const browser = await chromium.launch({ headless: true, chromiumSandbox: true });
   const context = await browser.newContext({ serviceWorkers: 'block' });
@@ -22,7 +22,7 @@ test('actual Chromium manual captcha: one challenge, dispatch drain, exact read,
   const fixture = async (route) => {
     const req = route.request(), u = new URL(req.url());
     if (req.method() === 'POST') {
-      if (u.pathname === '/captcha') return route.fulfill({ contentType: 'application/json', body: '{"key":"fixture"}' });
+      if (u.pathname === '/captcha') { inits++; return route.fulfill({ contentType: 'application/json', body: '{"key":"fixture"}' }); }
       if (u.pathname === '/account/captcha') { posts++; solved = true; return route.fulfill({ status: 204 }); }
       writes++; return route.abort();
     }
@@ -84,6 +84,21 @@ test('actual Chromium manual captcha: one challenge, dispatch drain, exact read,
     key = 'fresh-fixture-key'; await manual.start(manual.status().revision); await answer();
     for (let i = 0; i < 60 && posts < 2; i++) await new Promise((r) => setTimeout(r, 20));
     assert.equal(posts, 2); await manual.finish(manual.status().revision);
+    // Failed read-only verification preserves the interactive picture and input,
+    // closes its temporary page and never initializes a new CAPTCHA by POST.
+    solved = false; key = 'preserved-picture-key';
+    await manual.pending({ target, recoveryId }); await manual.start(manual.status().revision); await freeze();
+    const visiblePage = pageController.page;
+    await visiblePage.locator('[name=captchaText]').fill('черновик ответа');
+    const visibleUrl = visiblePage.url(), pagesBefore = context.pages().length, initsBefore = inits;
+    assert.equal((await manual.finish(manual.status().revision)).phase, 'active');
+    assert.equal(pageController.page, visiblePage); assert.equal(visiblePage.url(), visibleUrl);
+    assert.equal(await visiblePage.locator('[name=captchaText]').inputValue(), 'черновик ответа');
+    assert.equal(await visiblePage.locator('#picture').evaluate(img => img.complete && img.naturalWidth > 0), true);
+    assert.equal(context.pages().length, pagesBefore); assert.equal(posts, 2); assert.equal(writes, 0);
+    assert.equal(inits, initsBefore);
+    // Finish this fixture incident before exercising a different target.
+    solved = true; assert.equal((await manual.finish(manual.status().revision)).phase, 'idle');
     // A valid but different search target must not resolve the incident.
     const search = 'https://hh.ru/search/vacancy?text=fixture&search_period=14&order_by=publication_time&items_on_page=20&page=0';
     await manual.pending({ target: search, recoveryId }); await manual.start(manual.status().revision);

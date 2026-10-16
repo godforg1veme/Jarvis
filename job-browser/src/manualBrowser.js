@@ -78,28 +78,36 @@ class ManualBrowser {
     await this.drain();
     if (!this.page || this.page.isClosed() || !validTarget(target)) return false;
     this.frozen = null; this.initAllowed = false;
-    const response = await this.page.goto(target, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await this.page.waitForTimeout(1500);
-    const current = new URL(this.page.url());
-    if (current.href !== target || response?.status() !== 200) return false;
-    const observation = await this.page.evaluate(() => ({ text: document.body?.innerText?.slice(0, 64000) || '',
-      vacancyLinks: document.querySelectorAll('[data-qa="vacancy-serp__vacancy"]').length,
-      vacancyContent: Boolean(document.querySelector('[data-qa="vacancy-description"]')),
-      iframeSources: [...document.querySelectorAll('iframe')].slice(0, 100).filter((n) => n.getClientRects().length).map((n) => n.src) }));
-    const signal = classifyPage({ ...observation, pathname: current.pathname, status: response.status() });
-    if (new URL(target).pathname === '/search/vacancy') {
-      if (!['search', 'unknown'].includes(signal.state) || current.pathname !== '/search/vacancy') return false;
-      await readSearchPage(this.page);
-    } else {
-      if (signal.state !== 'vacancy' || current.href !== target) return false;
-      await readVacancyPage(this.page, current.pathname.split('/').pop());
+    // Verification must not navigate the owner's interactive CAPTCHA page.
+    // Its separate page has no permitted POSTs, including CAPTCHA initialization.
+    const reader = await this.context.newPage();
+    try {
+      const response = await reader.goto(target, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await reader.waitForTimeout(1500);
+      const current = new URL(reader.url());
+      if (current.href !== target || response?.status() !== 200) return false;
+      const observation = await reader.evaluate(() => ({ text: document.body?.innerText?.slice(0, 64000) || '',
+        vacancyLinks: document.querySelectorAll('[data-qa="vacancy-serp__vacancy"]').length,
+        vacancyContent: Boolean(document.querySelector('[data-qa="vacancy-description"]')),
+        iframeSources: [...document.querySelectorAll('iframe')].slice(0, 100).filter((n) => n.getClientRects().length).map((n) => n.src) }));
+      const signal = classifyPage({ ...observation, pathname: current.pathname, status: response.status() });
+      if (new URL(target).pathname === '/search/vacancy') {
+        if (!['search', 'unknown'].includes(signal.state) || current.pathname !== '/search/vacancy') return false;
+        await readSearchPage(reader);
+      } else {
+        if (signal.state !== 'vacancy' || current.href !== target) return false;
+        await readVacancyPage(reader, current.pathname.split('/').pop());
+      }
+      if (this.journal) {
+        const state = await this.journal.read();
+        if (!state || state.operationId !== recoveryId) return false;
+        await this.journal.write({ ...state, phase: 'resolved' });
+      }
+      return true;
+    } finally {
+      await reader.close().catch(() => {});
+      if (this.page && !this.page.isClosed()) await this.page.bringToFront().catch(() => {});
     }
-    if (this.journal) {
-      const state = await this.journal.read();
-      if (!state || state.operationId !== recoveryId) return false;
-      await this.journal.write({ ...state, phase: 'resolved' });
-    }
-    return true;
   }
   async close() { clearInterval(this.timer); await this.page?.close().catch(() => {}); }
 }
