@@ -1,11 +1,19 @@
 # Карта документации Jarvis
 
+[Русский](#русский) | [English](#english)
+
+## Русский
+
+Описание проекта и текущие записи переведены на два языка:
+[локальное обновление документации от 16 октября](updates/2026-10-16-bilingual-project-docs.md).
+Эти изменения пока не опубликованы.
+
 Текущий статус ниже опирается на записи о проверках. Правила для агентов
 находятся в [AGENTS.md](../AGENTS.md), порядок публикации в
 [release-workflow.md](release-workflow.md). Планы описывают намерения;
 работающую версию подтверждают код, проверки и фактическое развёртывание.
 
-## Текущее состояние
+### Текущее состояние
 
 | Направление | Что подтверждено | Что ещё проверить |
 | --- | --- | --- |
@@ -55,7 +63,7 @@ HH CAPTCHA: Windows, GitHub и оба VPS-исходника совпадают;
 [порядок выпуска и проверка версий](updates/2026-10-09-release-workflow.md),
 [VPN и подписки](updates/2026-10-08-vpn-probe-resilience.md).
 
-## Основные документы
+### Основные документы
 
 | Документ | Для чего читать |
 | --- | --- |
@@ -75,7 +83,7 @@ HH CAPTCHA: Windows, GitHub и оба VPS-исходника совпадают;
 на уровень выше. [Skill jarvis-release](../.agents/skills/jarvis-release/SKILL.md)
 использует руководство по выпуску, без независимой копии правил.
 
-## Записи, которые объясняют нынешний статус
+### Записи, которые объясняют нынешний статус
 
 - [Голос и реальные Telegram-сценарии](updates/2026-09-23-telegram-dialogue-acceptance.md).
 - [Life OS v2](updates/2026-09-15-jarvis-life-os-v2.md) и
@@ -90,16 +98,17 @@ HH CAPTCHA: Windows, GitHub и оба VPS-исходника совпадают;
   и [таймеры/сертификат NL](updates/2026-09-24-vpn-probe-timers-and-nl-dns-acme.md).
 - [Последняя VPN-сверка](updates/2026-10-08-vpn-probe-resilience.md).
 
-## История решений
+### История решений
 
 Первоначальные договорённости по поиску работы зафиксированы до реализации.
 [Исходные договорённости от 14 октября 2026 года](superpowers/specs/2026-10-14-job-search-initial-agreements.md)
 сохраняют согласованный контекст и открытые вопросы.
 [Спецификация от 15 октября](superpowers/specs/2026-10-15-job-search-design.md)
 согласована владельцем; подготовлен
-[план реализации](superpowers/plans/2026-10-15-job-search.md). Локально реализуются
-сбор, карточки и письма; текущий результат и ограничение API HH описаны в
-[записи разработки](updates/2026-10-15-job-search-development.md). Функция не выпущена.
+[план реализации](superpowers/plans/2026-10-15-job-search.md). На том этапе сбор,
+карточки и письма реализовывались локально; результат и ограничение API HH описаны в
+[записи разработки](updates/2026-10-15-job-search-development.md). На момент этой
+записи функция не была выпущена; более поздний статус приведён выше.
 
 [Specs](superpowers/specs/) и [plans](superpowers/plans/) хранят решения и
 исполнение. [Updates](updates/) хранят результаты выпусков. Ищи по подсистеме
@@ -110,3 +119,121 @@ HH CAPTCHA: Windows, GitHub и оба VPS-исходника совпадают;
 [Прежняя подробная карта](history/2026-10-08-documentation-map.md) и
 [прежний AGENTS](history/2026-10-08-agent-context.md) сохранены как архив.
 Они не заменяют текущие правила и живую проверку.
+
+## English
+
+The project description and current records now have both language versions:
+[local documentation update from 16 October](updates/2026-10-16-bilingual-project-docs.md).
+These changes have not been published yet.
+
+The status below is based on verification records. [AGENTS.md](../AGENTS.md)
+contains the rules for agents; [release-workflow.md](release-workflow.md)
+describes publishing. Plans describe intentions. Code, checks, and actual
+deployment establish what is running.
+
+### Current status
+
+| Area | Confirmed | Still to check |
+| --- | --- | --- |
+| Cloud and memory | Fastify/PostgreSQL, Telegram/Desktop text, owner-scoped memory, documents, and production hybrid retrieval | Live scenarios across multiple devices |
+| Desktop | Version 1.0.2 installed; code and bundled Node match the accepted version | Live microphone and paired Desktop voice |
+| Telegram | Real owner text/voice, Mission → Life OS return; automated owner/member and subscription flows | Member-client restrictions, gallery/deletion, and actions that change state |
+| Life OS | Event Spine, Mission, Timeline, commitments, recovery, origin-bound proposals; workflow against real PostgreSQL | Real external providers and Recovery that changes state on a paired Desktop |
+| Vision | Camo at 1280×720, two screens, explicit leases, and the first local memory/analysis workflow | Deployed provider and remote/Telegram acceptance |
+| VPN | DE/NL services active; four active subscriptions export four endpoints; VLESS 443/8443 passed in both directions | Hysteria hopping DE→NL had mixed results; Happ refresh/traffic on a phone |
+| VPN Supervisor | Limited NL Xray restart with owner confirmation and postchecks; peer timers enabled | Restore disabled; external timer failures do not yet create Telegram incidents |
+| Operations | Server, PostgreSQL, and ASR healthy; hopping DNAT present and persisted in UFW on both nodes | Persistence after reboot and automatic ACME renewal; backups deferred by the owner |
+| Further work | Cloud and Windows are the main product components | PWA, server executors, schedules, and real account connectors |
+| Job search | Browser and CAPTCHA queue recovery installed after OOM; new photo delivered, answer accepted, existing collection resumed | [Release record](updates/2026-10-16-hh-captcha-resilience-release.md). Live HH application submission and sustained operation under load remain unchecked |
+
+The [job-search button update](updates/2026-10-15-job-search-buttons.md) is
+installed on DE, with enable/disable controls and a permanent bottom-menu entry.
+[HH link previews were also disabled](updates/2026-10-15-job-link-previews.md)
+in new messages, and 260 previously sent cards were updated.
+
+The CAPTCHA history includes [OCR and one automatic attempt](updates/2026-10-15-hh-captcha-recovery-release.md),
+[diagnosis](updates/2026-10-15-hh-ocr-diagnosis.md),
+[image preprocessing](updates/2026-10-15-hh-ocr-preprocessing-development.md),
+and the [native request fix](updates/2026-10-16-hh-native-captcha-request.md).
+
+At the owner's request, the former HH web access through Tailscale was replaced
+with [replies to Telegram photos](updates/2026-10-16-hh-telegram-captcha.md).
+Images expire after 10 minutes; the search pause has no timer. The owner reads
+the image in this workflow. Automatic OCR does not run while Telegram mode is
+enabled. On 16 October, the owner confirmed that the CAPTCHA was solved.
+The server confirmed `solved`, cleared the manual pause, and resumed collection:
+the page advanced from 15 to 18 and sent cards increased from 583 to 602.
+These figures describe the acceptance check, not ongoing search metrics.
+Earlier mobile-page results remain in the history.
+
+Later that day, the browser stopped preparing the next CAPTCHA after running out
+of memory. The [fix was installed on DE](updates/2026-10-16-hh-captcha-resilience-release.md):
+a new image reached Telegram, and the server confirmed `solved`, an idle
+coordinator, and continued progress from the saved position. Refresh requests
+survive failures; health checks test Chromium, and failures receive clear messages.
+
+The last component comparison was performed on 16 October 2026 after HH CAPTCHA
+recovery: Windows, GitHub, and both VPS source checkouts matched; Desktop 1.0.2
+and the server matched the accepted code. Server/browser run from
+`e6fe29a7e3129a34626223df9bd6a1b980da46be`; the collector retained its existing
+container because the operations it uses did not change. Documentation commits
+do not require rebuilding. See the [HH recovery release](updates/2026-10-16-hh-captcha-resilience-release.md),
+[release process and version checks](updates/2026-10-09-release-workflow.md),
+and [VPN and subscriptions](updates/2026-10-08-vpn-probe-resilience.md).
+
+### Main documents
+
+| Document | Purpose |
+| --- | --- |
+| `README.md` | Product purpose, capabilities, and startup |
+| `AGENTS.md` | Short mandatory rules for all agents |
+| `release-workflow.md` | Branches, GitHub, VPS/Desktop, Markdown updates, and release flow |
+| `runtime-context.md` | Cloud and Windows subsystems, trust boundaries, and deployment records |
+| `verification.md` | Verification commands for changed components |
+| `telegram-button-architecture.md` | Routing, diagnostics, trust, and mandatory pre-edit notice |
+| `telegram-menu-contract.md` | Emitted buttons, callbacks, confirmations, and regression gate |
+| `../deploy/README.md` | Ubuntu/Compose/Host Agent installation and maintenance |
+| `VPN_RESILIENCE_RUNBOOK.md` | VLESS/Hysteria/Happ checks and limits of evidence |
+| `VPN_SUPERVISOR_REPAIR_GUIDE.md` | Permitted repairs and reconciliation using the original ID |
+| `VPN_PC_SETUP.md` | VPN client setup on the computer |
+
+Documents in the table are in this directory; the root README/AGENTS files are
+one level above. The [jarvis-release skill](../.agents/skills/jarvis-release/SKILL.md)
+uses the release guide without maintaining an independent set of rules.
+
+### Records explaining the current status
+
+- [Voice and real Telegram scenarios](updates/2026-09-23-telegram-dialogue-acceptance.md).
+- [Life OS v2](updates/2026-09-15-jarvis-life-os-v2.md) and
+  [Telegram parity](updates/2026-09-15-telegram-life-os-parity.md).
+- [First Vision workflow](updates/2026-09-09-vision-implementation.md).
+- [Desktop 1.0.2 and maintenance](updates/2026-09-29-remaining-maintenance.md).
+- [Partial subscription availability](updates/2026-09-29-subscription-partial-availability.md),
+  [recovery using the original ID](updates/2026-09-29-subscription-missing-repair.md),
+  and [hopping persistence](updates/2026-09-29-hysteria-hopping-persistence.md).
+- [Actual monitoring scope](updates/2026-09-24-vpn-monitoring-alerting-and-repair-scope.md),
+  [host-bound Supervisor](updates/2026-09-24-vpn-supervisor-host-bound-callback-routing.md),
+  and [NL timers/certificate](updates/2026-09-24-vpn-probe-timers-and-nl-dns-acme.md).
+- [Latest VPN comparison](updates/2026-10-08-vpn-probe-resilience.md).
+
+### Decision history
+
+The original job-search agreements were recorded before implementation.
+The [agreements from 14 October 2026](superpowers/specs/2026-10-14-job-search-initial-agreements.md)
+preserve the agreed context and open questions. The owner approved the
+[15 October specification](superpowers/specs/2026-10-15-job-search-design.md),
+and an [implementation plan](superpowers/plans/2026-10-15-job-search.md) was prepared.
+At that stage, collection, cards, and letters were being implemented locally;
+the result and HH API limitation are in the
+[development record](updates/2026-10-15-job-search-development.md). The feature
+had not been released when that record was written; later status appears above.
+
+[Specs](superpowers/specs/) and [plans](superpowers/plans/) preserve decisions
+and execution. [Updates](updates/) preserve release results. Search by subsystem
+and date; a later confirmed record takes precedence over an earlier plan.
+Check old links to `docs/specs/` and `docs/plans/`: current files are under
+`docs/superpowers/`.
+
+The [former detailed map](history/2026-10-08-documentation-map.md) and
+[former AGENTS](history/2026-10-08-agent-context.md) remain archived.
+Current rules and live verification take precedence over them.
