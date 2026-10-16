@@ -150,16 +150,16 @@ Compose opt-in profile/env.example, deploy README, verification docs.
 
 ## Task 6: Authorized release and phone acceptance
 
-- [ ] After explicit release instruction: fresh branch/worktree/PR audit,
+- [x] After explicit release instruction: fresh branch/worktree/PR audit,
   source guard, main publication, both VPS source sync, immutable releases.
-- [ ] Preserve profile/env/secret inodes/mounts. Install only changed DE
+- [x] Preserve profile/env/secret inodes/mounts. Install only changed DE
   components; add `/hh/` Serve mapping without reset/other-route changes.
 - [ ] Probe direct denial/identity denial/owner access and no public VNC/CDP.
   Inspect actual image files, health and service state after any uncertain step.
 - [ ] Owner enables Tailscale on iPhone; Safari image/keyboard/Done verified.
   Foreign identity denied, paused collection proven, successful target read
   resumes original progress, inactive page retains permanent URL.
-- [ ] Record actual results and incomplete live checks; no Desktop reinstall.
+- [x] Record actual results and incomplete live checks; no Desktop reinstall.
 
 ## Self-review
 
@@ -171,4 +171,6 @@ manual ownership. No generic remote executor or new model tool is introduced.
 
 Implementation tasks 1–5 completed locally and are saved together after integration
 review. [Measured development results](../../updates/2026-10-16-hh-mobile-manual-development.md).
-Task 6 awaits release authorization.
+Task 6 release was authorized and installed. [Release results](../../updates/2026-10-16-hh-mobile-manual-release.md).
+Real iPhone acceptance and a separate foreign Tailscale account remain unverified;
+owner HTTPS and gateway-level foreign identity denial passed.
