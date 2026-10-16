@@ -4,8 +4,8 @@
 
 16 октября 2026. Требования уточнены владельцем в текущей задаче.
 Владелец согласовал сценарий и уточнил использование опыта в кастомном AI-режиме.
-Реализация подготовлена локально; результат проверок и граница выпуска:
-[запись разработки](../../updates/2026-10-16-job-letter-modes-development.md).
+Реализация установлена на DE после отдельного поручения:
+[результат выпуска](../../updates/2026-10-16-job-letter-modes-release.md).
 
 ### Сценарий
 
@@ -94,9 +94,9 @@ invalid retry, closed context, успешный ввод, single consumption, ex
 
 16 October 2026. The owner clarified the requirements in this task.
 The owner approved this design and clarified that custom AI mode also uses
-profile facts and examples. Implementation is local; see the
-[development result](../../updates/2026-10-16-job-letter-modes-development.md)
-for checks and release status.
+profile facts and examples. Implementation was deployed on DE after separate
+authorization; see the [release result](../../updates/2026-10-16-job-letter-modes-release.md)
+for checks and remaining live acceptance.
 
 Facts and style examples become optional. When present, AI receives both:
 facts constrain experience claims, and examples guide style. An absent or empty

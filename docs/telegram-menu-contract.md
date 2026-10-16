@@ -9,7 +9,7 @@ source changes; verify the deployed revision before a server rollout.
 
 ## Change control
 
-Локальная разработка 16 октября 2026, согласована владельцем; ещё не выпущена:
+Установлено на DE 16 октября 2026 после поручения владельца:
 [четыре варианта сопроводительного](superpowers/specs/2026-10-16-job-letter-modes-design.md).
 Owner/private меню поиска добавляет «Редактировать базовое сопроводительное»
 (`job:base_letter`). Обычный многострочный текст заменяет базовое письмо только
@@ -41,7 +41,7 @@ profile revision и делает прежние подтверждения не�
 на исходном operation ID. Новые scopes/права не добавляются; callback ≤64 байта,
 тексты не попадают в callbacks, diagnostics и общую историю.
 
-Local development, 16 October 2026, owner approved; not deployed. The job menu
+Deployed on DE, 16 October 2026, after owner authorization. The job menu
 adds a confirmed base-letter editor. Prepare now opens four explicit modes:
 saved base without AI, saved base adapted with AI, custom input without AI,
 and custom input adapted with AI. Facts/examples are optional and included in
@@ -53,7 +53,8 @@ expiry, revision checks, atomic consumption, original-operation reconciliation
 and private history. New source selection excludes unrelated previous-draft text.
 Outer whitespace is normalized by the existing Telegram rule; internal text and
 paragraphs are preserved. See the linked specification and development result
-for automated checks; real Telegram/HH acceptance awaits an authorized release.
+for automated checks. The [release result](updates/2026-10-16-job-letter-modes-release.md)
+confirms server rendering; real Telegram taps and an HH application remain unverified.
 
 Выпуск от 15 октября 2026: согласованный owner-only путь
 «Главное → Поиск работы» с inline-карточками и подтверждениями установлен

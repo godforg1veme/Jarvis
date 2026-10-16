@@ -17,10 +17,10 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
-Локально подготовлены [четыре варианта сопроводительного](updates/2026-10-16-job-letter-modes-development.md):
+На DE установлены [четыре варианта сопроводительного](updates/2026-10-16-job-letter-modes-release.md):
 базовое, улучшенное с AI, кастомное без AI и с AI. Факты и примеры необязательны;
-оба AI-режима учитывают их при наличии. Изменения ещё не выпущены, работающий
-Telegram сохраняет прежнее поведение до отдельного разрешения на публикацию.
+оба AI-режима учитывают их при наличии. Редактор и выбор вариантов проверены
+на работающем сервере; реальные нажатия в Telegram и HH-отклик ещё не проверены.
 
 | Направление | Что подтверждено | Что ещё проверить |
 | --- | --- | --- |
@@ -61,10 +61,11 @@ Telegram сохраняет прежнее поведение до отдель�
 и продолжение прежнего progress. Запросы обновления сохраняются при сбоях;
 health проверяет Chromium, а ошибки получают понятные сообщения.
 
-Последняя сверка компонентов выполнена 16 октября 2026 года после восстановления
-HH CAPTCHA: Windows, GitHub и оба VPS-исходника совпадают; Desktop 1.0.2
-и сервер соответствуют принятому коду. Server/browser работают из
-`e6fe29a7e3129a34626223df9bd6a1b980da46be`; collector сохранил прежний контейнер,
+Последняя сверка компонентов выполнена 16 октября 2026 года после
+[выпуска сопроводительных](updates/2026-10-16-job-letter-modes-release.md):
+Windows, GitHub и оба VPS-исходника совпадают; Desktop 1.0.2 и сервер соответствуют
+принятому коду. Server работает из `2e1da534e80366d6644a225f5b3f5ac0b526ec7e`,
+browser — из `e6fe29a7e3129a34626223df9bd6a1b980da46be`; collector сохранил прежний контейнер,
 его используемые операции не менялись. Документальные коммиты не требуют пересборки.
 Подробности: [выпуск восстановления HH](updates/2026-10-16-hh-captcha-resilience-release.md),
 [порядок выпуска и проверка версий](updates/2026-10-09-release-workflow.md),
@@ -142,11 +143,11 @@ deployment establish what is running.
 
 ### Current status
 
-[Four cover-letter modes](updates/2026-10-16-job-letter-modes-development.md)
-are implemented locally: base, AI-improved, custom without AI and custom with AI.
-Facts/examples are optional and included in both AI modes when present. This
-change is not deployed; Telegram retains its current behavior pending separate
-release authorization.
+[Four cover-letter modes](updates/2026-10-16-job-letter-modes-release.md)
+are deployed on DE: base, AI-improved, custom without AI and custom with AI.
+Facts/examples are optional and included in both AI modes when present. The
+editor and mode selection were checked on the running server; real Telegram
+taps and an HH application remain unverified.
 
 | Area | Confirmed | Still to check |
 | --- | --- | --- |
@@ -187,10 +188,11 @@ a new image reached Telegram, and the server confirmed `solved`, an idle
 coordinator, and continued progress from the saved position. Refresh requests
 survive failures; health checks test Chromium, and failures receive clear messages.
 
-The last component comparison was performed on 16 October 2026 after HH CAPTCHA
-recovery: Windows, GitHub, and both VPS source checkouts matched; Desktop 1.0.2
-and the server matched the accepted code. Server/browser run from
-`e6fe29a7e3129a34626223df9bd6a1b980da46be`; the collector retained its existing
+The last component comparison was performed on 16 October 2026 after the
+[cover-letter release](updates/2026-10-16-job-letter-modes-release.md).
+Windows, GitHub, and both VPS source checkouts matched; Desktop 1.0.2 and the server
+matched the accepted code. Server runs from `2e1da534e80366d6644a225f5b3f5ac0b526ec7e`;
+browser runs from `e6fe29a7e3129a34626223df9bd6a1b980da46be`; the collector retained its existing
 container because the operations it uses did not change. Documentation commits
 do not require rebuilding. See the [HH recovery release](updates/2026-10-16-hh-captcha-resilience-release.md),
 [release process and version checks](updates/2026-10-09-release-workflow.md),

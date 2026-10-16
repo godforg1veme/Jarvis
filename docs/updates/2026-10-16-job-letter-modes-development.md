@@ -2,6 +2,9 @@
 
 ## Русский
 
+Более новый результат от 16 октября: [функция выпущена на DE](2026-10-16-job-letter-modes-release.md).
+Ниже сохранён результат локального этапа до разрешения на публикацию.
+
 16 октября 2026. Подготовлено локально в `codex/job-letter-modes` после согласования
 владельцем. GitHub и VPS не обновлялись; установленный Desktop не менялся.
 
@@ -41,6 +44,9 @@ guided input. Базовое письмо хранится в профиле о�
 Browser и collector не менялись; Desktop пересобирать не требуется.
 
 ## English
+
+Later result on 16 October: [deployed on DE](2026-10-16-job-letter-modes-release.md).
+The record below preserves the local stage before publishing was authorized.
 
 16 October 2026. Implemented locally on `codex/job-letter-modes` after owner
 approval. GitHub and VPS nodes were not updated; installed Desktop is unchanged.
