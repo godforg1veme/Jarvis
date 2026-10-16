@@ -47,7 +47,7 @@ HH-сессией, узкий RPC привязан к одному owner UUID; r
 [Результат выпуска и ограничения](updates/2026-10-15-job-search-release.md),
 [настройка браузера](../job-browser/README.md).
 
-Для CAPTCHA подготовлен человеческий ответ через Telegram: headless browser
+Для CAPTCHA на DE установлен человеческий ответ через Telegram: headless browser
 держит один прежний HH profile, coordinator и durable claims. Закрытый broker8082
 использует отдельный CAPTCHA credential только у server/browser. Collector
 имеет read credential и проверяет паузу без обращений к HH. Host ports отсутствуют.
@@ -63,8 +63,11 @@ Telegram режим сразу передаёт CAPTCHA человеку. Пре
 с UNIX socket сохранён для отдельного opt-in fallback при выключенном Telegram
 режиме. Journal/profile/resume/exclusions не сбрасываются. История OCR и прежнего
 [ручного web-доступа](updates/2026-10-16-hh-mobile-manual-release.md) сохранена;
-HH gateway/noVNC/Serve link и host proxy выводятся из эксплуатации. Другие
+HH gateway/noVNC/Serve link и host proxy удалены из работающего окружения. Другие
 Tailscale и VPN применения к этому изменению не относятся.
+Server/browser/collector установлены из `b0712e69875adbe62db1892007da65f34d4d636f`.
+Настоящее фото доставлено; ответ владельца и возобновление ещё ожидаются.
+[Результат установки](updates/2026-10-16-hh-telegram-captcha.md).
 
 ### Cloud control plane
 

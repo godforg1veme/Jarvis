@@ -73,10 +73,12 @@ No edits to server/browser/root docs. Root deploys actual VPS.
   Review user text privacy and before-POST durable consumption end to end.
 - [x] Update Telegram contract/change notice and living docs; mark old dated
   documents superseded. Followup regression/review only for material findings.
-- [ ] Fresh branches/worktrees/PR audit, tests/diff, publish accepted main.
+- [x] Fresh branches/worktrees/PR audit, tests/diff, publish accepted main.
   Immediately sync both VPS and source guards, stage immutable DE release.
-- [ ] Check owner/profile/env and existing Serve config privately. Install
+- [x] Check owner/profile/env and existing Serve config privately. Install
   server/browser/collector; remove only HH gateway/proxy/Serve route/network.
   Preserve other services, original HH progress, profile and claims.
-- [ ] Verify hashes/health/actual no-ports/no HH TS remnants; real owner photo
-  delivery and human reply acceptance. Record remaining checks candidly.
+- [x] Verify hashes/health/actual no-ports/no HH TS remnants and real owner photo
+  delivery. Record remaining checks candidly.
+- [ ] Human reply acceptance and confirmed collection resumption: awaits owner
+  reply to the real Telegram photo. Agent must not answer or force a CAPTCHA.
