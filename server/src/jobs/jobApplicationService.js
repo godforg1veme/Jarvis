@@ -16,8 +16,8 @@ function applicationView(operation) {
 }
 
 class JobApplicationService {
-  constructor({ pool, repository, searchRepository, adapter = null }) {
-    Object.assign(this, { pool, repository, searchRepository, adapter });
+  constructor({ pool, repository, searchRepository, adapter = null, historyRepository = null }) {
+    Object.assign(this, { pool, repository, searchRepository, adapter, historyRepository });
   }
   async requireAdapter({ scope }) {
     await assertJobScope(this.pool, scope);
@@ -34,14 +34,20 @@ class JobApplicationService {
     if (!inspected.vacancy || inspected.vacancy.externalId !== row.external_id || inspected.vacancy.archived) throw jobError('JOB_HH_NOT_FOUND');
     const latest = await this.searchRepository.upsertVacancy({ externalId: row.external_id, snapshot: inspected.vacancy });
     if (latest.revision !== row.vacancy_revision) throw jobError('JOB_REVISION_CONFLICT');
-    if (inspected.existingApplicationId) return { outcome: 'already_applied', externalId: inspected.existingApplicationId };
+    if(inspected.existingApplication){
+      if(inspected.existingApplication.vacancyId!==row.external_id||inspected.existingApplication.resumeHash!==connection.resume_id
+        ||inspected.existingApplication.topicId!==inspected.existingApplicationId)throw jobError('JOB_HH_INVALID_RESPONSE');
+      if(this.historyRepository)await this.historyRepository.observe({scope,item:inspected.existingApplication});
+    }
+    if (inspected.existingApplicationId || inspected.reasonCode==='JOB_HH_ALREADY_APPLIED') return { outcome: 'already_applied', externalId: inspected.existingApplicationId };
     if (inspected.manualRequired || inspected.vacancy.manualRequired) return { outcome: 'manual_required' };
     return null;
   }
   async prepareConfirmation({ scope, draftId }) {
     await this.requireAdapter({ scope });
     const blocked = await this.inspect({ scope, draftId });
-    if (blocked) return response(blocked.outcome === 'already_applied' ? 'В источнике уже есть отклик. Повторный не отправлен.' : 'Для этой вакансии нужны дополнительные действия в источнике. Письмо не отправлено.');
+    if (blocked) return response(blocked.outcome === 'already_applied' ? 'На эту вакансию уже есть отклик. Повторный не отправлен.' : 'Для этой вакансии нужны дополнительные действия в источнике. Письмо не отправлено.',
+      blocked.outcome==='already_applied'?[[button('Отклики','applications',0)]]:[]);
     const c = await this.repository.prepare({ scope, draftId });
     return response(`Проверь отклик перед отправкой\n${c.frozen.title}\n${c.frozen.company}
 Резюме: ${c.frozen.resumeId}\n${c.frozen.url}\n\n${c.frozen.text}\n\nПодтвердить отправку именно этого текста?`,
@@ -58,7 +64,8 @@ class JobApplicationService {
     }
     // Inspection is read-only. The atomic claim below rechecks all local versions.
     const blocked = await this.inspect({ scope, draftId: confirmation.target_id });
-    if (blocked) return response(blocked.outcome === 'already_applied' ? 'В источнике уже есть отклик. Повторный не отправлен.' : 'В источнике нужны дополнительные действия. Отклик не отправлен.');
+    if (blocked) return response(blocked.outcome === 'already_applied' ? 'На эту вакансию уже есть отклик. Повторный не отправлен.' : 'В источнике нужны дополнительные действия. Отклик не отправлен.',
+      blocked.outcome==='already_applied'?[[button('Отклики','applications',0)]]:[]);
     const { operation, execute } = await this.repository.claim({ scope, confirmationId });
     if (!execute) return applicationView(operation);
     let result;

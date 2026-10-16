@@ -117,7 +117,7 @@ Telegram/PG/RPC/Chromium E2E и установлены на DE. Новая от�
 Compose-профиль `job-search-de` содержит отдельные `job-browser` и
 `job-collector`. Браузер находится только в сети `job-browser-rpc`, без host
 ports, DB/model/Telegram env и CDP. Сборщик также подключён к backend для PG.
-RPC принимает закрытые `search`, `vacancy`, `resumes`, `connection`, `inspect`
+RPC принимает закрытые `search`, `vacancy`, `resumes`, `connection`, `inspect`, `history`
 с отдельным read-секретом и единственным owner UUID. `submit`/`reconcile`
 выключены по умолчанию; требуют `JARVIS_JOB_BROWSER_APPLY_ENABLED=1` и другого
 случайного `JARVIS_JOB_BROWSER_APPLY_TOKEN`. Apply credential получает только

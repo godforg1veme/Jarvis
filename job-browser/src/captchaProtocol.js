@@ -7,7 +7,8 @@ function targetUrl(value) {
   try {
     const u = new URL(value);
     return u.origin === ORIGIN && !u.username && !u.password && !u.hash
-      && (/^\/vacancy\/\d{1,20}$/.test(u.pathname) || u.pathname === '/search/vacancy') ? u : null;
+      && (/^\/vacancy\/\d{1,20}$/.test(u.pathname) || u.pathname === '/search/vacancy'
+        || ['/applicant/negotiations','/applicant/resumes'].includes(u.pathname)&&require('./manualState').validTarget(value)) ? u : null;
   } catch { return null; }
 }
 function validInit({ url, method, contentType, body }) {

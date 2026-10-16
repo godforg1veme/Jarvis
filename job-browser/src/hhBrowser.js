@@ -5,6 +5,8 @@ const { readApplicationForm } = require('./hhApplicationForm');
 const { readResumePrivacy, readEmployerId, evaluatePrivacy } = require('./hhPrivacy');
 const { dispatchCaptcha } = require('./captchaDispatch');
 const { bounded } = require('./browserHealth');
+const { readHistoryPage } = require('./hhHistoryReader');
+const {readExistingApplication,visibleAppliedAction}=require('./existingApplication');
 const failure = (code) => Object.assign(new Error(code), { code });
 const CAPABILITIES = Object.freeze({ dateWindows: false, maxPages: 1000 });
 
@@ -85,11 +87,13 @@ class HhBrowser {
         && response?.status() === 200 && current.pathname === '/applicant/vacancy_response';
       const privacyCandidate = expected === 'resume_privacy' && signal.state === 'unknown'
         && response?.status() === 200 && /^\/resume\/[a-zA-Z0-9]+$/.test(current.pathname);
-      if (signal.state !== expected && !zeroCandidate && !formCandidate && !privacyCandidate) throw failure('JOB_HH_DOM_CHANGED');
+      const historyCandidate = expected === 'history' && signal.state === 'unknown'
+        && response?.status() === 200 && current.pathname === '/applicant/negotiations';
+      if (signal.state !== expected && !zeroCandidate && !formCandidate && !privacyCandidate && !historyCandidate) throw failure('JOB_HH_DOM_CHANGED');
       return { page, captchaAttempt: attempt, releaseReadGuard: () => page.unroute('**/*', readGuard) };
     } catch (error) {
       await page.close().catch(() => {});
-      if (this.onManualRequired && ['search', 'vacancy'].includes(expected)
+      if (this.onManualRequired && ['search', 'vacancy', 'history', 'authenticated'].includes(expected)
         && (['JOB_HH_CAPTCHA_REQUIRED', 'JOB_HH_CAPTCHA_MANUAL_REQUIRED'].includes(error.code) || attempt?.permitted === 1)) {
         const recoveryId = await this.onManualRequired(url, error);
         throw Object.assign(failure('JOB_HH_CAPTCHA_MANUAL_REQUIRED'), { recoveryId });
@@ -132,6 +136,14 @@ class HhBrowser {
     return this.run(() => this.read(`https://hh.ru/vacancy/${externalId}`, 'vacancy', (page) => readVacancyPage(page, externalId)));
   }
   listResumes() { return this.run(() => this.read('https://hh.ru/applicant/resumes', 'authenticated', readResumes)); }
+  history({ section, page }) {
+    if (!['active','archived'].includes(section) || !Number.isInteger(page) || page < 0 || page >= 1000) return Promise.reject(failure('JOB_INVALID_SEARCH'));
+    return this.run(async () => {
+      const resumes = await this.read('https://hh.ru/applicant/resumes', 'authenticated', readResumes);
+      if (!this.primaryResumeId || !resumes.some(r => r.id === this.primaryResumeId)) throw failure('JOB_HH_RESUME_UNAVAILABLE');
+      return this.read(`https://hh.ru/applicant/negotiations?filter=${section}&page=${page}`, 'history', p => readHistoryPage(p, {section,page}));
+    });
+  }
   inspect({ externalId, resumeId }) {
     return this.run(() => this.inspectNow({ externalId, resumeId }));
   }
@@ -140,11 +152,12 @@ class HhBrowser {
     const resumes = await this.read('https://hh.ru/applicant/resumes', 'authenticated', readResumes);
     if (!resumes.some((resume) => resume.id === resumeId)) return { resumeAvailable: false, manualRequired: true,
       reasonCode: 'JOB_HH_RESUME_UNAVAILABLE', vacancy: null };
-    const details = await this.read(`https://hh.ru/vacancy/${externalId}`, 'vacancy', async (page) => ({
-      vacancy: await readVacancyPage(page, externalId), employerId: await readEmployerId(page),
-      alreadyApplied: await page.locator('[data-qa="vacancy-response-link-view-topic"], [data-qa="vacancy-response-link-top-again"]').count() > 0,
-    }));
-    if (details.alreadyApplied) return { vacancy: details.vacancy, resumeAvailable: true, manualRequired: true, reasonCode: 'JOB_HH_ALREADY_APPLIED' };
+    const details = await this.read(`https://hh.ru/vacancy/${externalId}`, 'vacancy', async page => {
+      const vacancy=await readVacancyPage(page,externalId);
+      return{vacancy,employerId:await readEmployerId(page),existing:await readExistingApplication(page,{externalId:String(externalId),resumeId,vacancy}),visibleApplied:await visibleAppliedAction(page)};
+    });
+    if(details.existing)return{vacancy:details.vacancy,resumeAvailable:true,manualRequired:true,reasonCode:'JOB_HH_ALREADY_APPLIED',existingApplicationId:details.existing.topicId,existingApplication:details.existing};
+    if(details.visibleApplied)return{vacancy:details.vacancy,resumeAvailable:true,manualRequired:true,reasonCode:'JOB_HH_FORM_CHANGED'};
     const privacy = await this.read(`https://hh.ru/resume/${resumeId}`, 'resume_privacy', (page) => readResumePrivacy(page, { resumeId }));
     const permission = evaluatePrivacy({ privacy, employerId: details.employerId });
     if (!permission.allowed) return { vacancy: details.vacancy, resumeAvailable: true, manualRequired: true, reasonCode: permission.reasonCode };

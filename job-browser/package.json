@@ -8,6 +8,7 @@
   },
   "scripts": {
     "test": "node --test test/*.test.js",
+    "test:history": "node --test test/historyAcceptance.cjs",
     "probe": "node src/probe.js"
   },
   "dependencies": {

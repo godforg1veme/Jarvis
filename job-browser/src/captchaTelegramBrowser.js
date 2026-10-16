@@ -1,8 +1,9 @@
 const { randomUUID, createHash } = require('node:crypto');
 const { validInit, validAnswerRequest, readForm, sameForm, validPictureKey } = require('./captchaProtocol');
 const { normalizeAnswer } = require('./captchaTelegramProtocol');
-const { readSearchPage, readVacancyPage } = require('./hhPageReader');
-const { classifyPage } = require('./pageSignals');
+const { readSearchPage, readVacancyPage, readResumes } = require('./hhPageReader');
+const {readHistoryPage}=require('./hhHistoryReader');
+const { classifyPage, classifySession } = require('./pageSignals');
 const { dispatchCaptcha } = require('./captchaDispatch');
 const { validTarget, fail } = require('./manualState');
 const { bounded } = require('./browserHealth');
@@ -175,6 +176,12 @@ class CaptchaTelegramBrowser {
       if (new URL(target).pathname === '/search/vacancy') {
         if (!['search', 'unknown'].includes(signal.state) || current.pathname !== '/search/vacancy') return false;
         await readSearchPage(reader);
+      } else if(current.pathname==='/applicant/negotiations') {
+        if(signal.state!=='unknown')return false;
+        await readHistoryPage(reader,{section:current.searchParams.get('filter'),page:Number(current.searchParams.get('page'))});
+      } else if(current.pathname==='/applicant/resumes') {
+        if(!classifySession({...observation,pathname:current.pathname,status:response.status()}).authenticated)return false;
+        await readResumes(reader);
       } else {
         if (signal.state !== 'vacancy') return false;
         await readVacancyPage(reader, current.pathname.split('/').pop());

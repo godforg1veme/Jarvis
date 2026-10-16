@@ -59,6 +59,8 @@ class JobTelegramService {
     const search = await this.searchRepository.ensure({ scope });
     const letter = await this.letterFlow.handle({ scope, context, action, targetId });
     if (letter) return letter;
+    const history=this.historyService&&await this.historyService.handle({scope,action,targetId,page});
+    if(history)return history;
     if (action === 'save' || action === 'hide') {
       await this.searchRepository.mark({ scope, vacancyId: targetId, action });
       return response(action === 'save' ? 'Вакансия сохранена в Jarvis.' : 'Вакансия скрыта в Jarvis.', [[button('В поиск работы', 'menu')]]);

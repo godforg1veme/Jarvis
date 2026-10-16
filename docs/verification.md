@@ -61,6 +61,31 @@ npm test
 npm start
 ```
 
+HH history tracking (local development, 2026-10-16):
+
+```powershell
+node --test server/test/jobHistory.test.js
+# Requires JARVIS_JOB_TEST_DATABASE_URL pointing to a disposable test PostgreSQL:
+npm run test:jobs:history --prefix server
+npm run test:jobs:postgres --prefix server
+# Headless Chromium fixtures, no live HH calls:
+$env:PLAYWRIGHT_CHANNEL='msedge'
+npm run test:history --prefix job-browser
+```
+
+Реальный PostgreSQL и настоящие Telegram handlers проверяют migration 035,
+старую историю, разные резюме, статусы, идемпотентность, lease/restart/CAPTCHA,
+неполную пагинацию, чужой scope и сохранение unknown. Chromium fixtures проверяют
+закрытое чтение, отсутствие переходов в чаты и изменений HH. Четыре прежних
+browser-теста Linux filesystem/durable-state пропускаются на Windows;
+их нельзя считать пройденными. Полная проверка runtime migrations требует pgvector.
+
+Real PostgreSQL and actual Telegram handlers exercise migration 035, historical
+records, multiple resumes, states, idempotency, leases/restarts/CAPTCHA, incomplete
+pagination, foreign scope and preserved unknown operations. Chromium fixtures verify
+bounded reads without chat navigation or HH mutations. Four existing Linux filesystem
+tests skip on Windows; a full runtime migration check also needs pgvector.
+
 Cover-letter modes (local development, 2026-10-16):
 
 ```powershell

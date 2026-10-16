@@ -1,6 +1,6 @@
 const UUID = '[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}';
-const SIMPLE = /^job:(menu|settings|profile|base_letter|check|captcha|captcha_refresh|pause|resume|connect|disconnect|back)$/;
-const TARGET = new RegExp(`^job:(view|prepare|base|improved|custom|custom_ai|save|hide|draft|regenerate|edit|translate|send|confirm|cancel|approve|resume_select):(${UUID})$`, 'i');
+const SIMPLE = /^job:(menu|settings|profile|base_letter|applications_sync|check|captcha|captcha_refresh|pause|resume|connect|disconnect|back)$/;
+const TARGET = new RegExp(`^job:(view|prepare|base|improved|custom|custom_ai|application|application_refresh|save|hide|draft|regenerate|edit|translate|send|confirm|cancel|approve|resume_select):(${UUID})$`, 'i');
 const PAGE = /^job:(saved|applications):([0-9]{1,4})$/;
 
 function parseJobCallback(value) {

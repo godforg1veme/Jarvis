@@ -17,6 +17,10 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
+Локально готов [учёт старых и новых откликов HH](updates/2026-10-16-job-application-tracking-development.md):
+единый список, отдельные статусы отправки и работодателя, первый импорт и
+обновление по кнопке. На VPS функция пока не установлена; публикация ожидает поручения.
+
 На DE установлены [четыре варианта сопроводительного](updates/2026-10-16-job-letter-modes-release.md):
 базовое, улучшенное с AI, кастомное без AI и с AI. Факты и примеры необязательны;
 оба AI-режима учитывают их при наличии. Редактор и выбор вариантов проверены
@@ -142,6 +146,10 @@ describes publishing. Plans describe intentions. Code, checks, and actual
 deployment establish what is running.
 
 ### Current status
+
+[Tracking old and new HH applications](updates/2026-10-16-job-application-tracking-development.md)
+is ready locally: a merged list, separate submission and employer states, an initial
+import and explicit refresh. It is not installed on the VPS nodes; publication awaits authorization.
 
 [Four cover-letter modes](updates/2026-10-16-job-letter-modes-release.md)
 are deployed on DE: base, AI-improved, custom without AI and custom with AI.

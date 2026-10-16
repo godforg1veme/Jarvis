@@ -46,6 +46,7 @@ function createRpcServer({ browser, ownerId, token, submissions = null, applyTok
         respond(res, 403, { ok: false, code: 'JOB_BROWSER_ACCESS_DENIED' }); return;
       }
       const value = input.operation === 'search' ? await browser.search(input.args)
+        : input.operation === 'history' ? await browser.history(input.args)
         : input.operation === 'vacancy' ? await browser.getVacancy(input.args)
           : input.operation === 'inspect' ? await browser.inspect(input.args)
             : input.operation === 'submit' ? await submissions.submit({ userId: input.userId, ...input.args })

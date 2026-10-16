@@ -9,6 +9,31 @@ source changes; verify the deployed revision before a server rollout.
 
 ## Change control
 
+Согласовано владельцем 16 октября 2026, реализовано локально, не установлено:
+[учёт откликов](superpowers/specs/2026-10-16-job-application-tracking-design.md).
+«Поиск работы → Отклики» (`job:applications:<page>`) объединяет журнал Jarvis
+и обнаруженные на HH записи. Первый вход ставит импорт в очередь;
+`job:applications_sync` запускает или продолжает обновление active + archived.
+Карточки `job:application:<uuid>` показывают источник, резюме, известную дату,
+отдельные статусы отправки/работодателя и сохранённое собственное письмо.
+`job:application_refresh:<uuid>` использует ту же очередь;
+«Показать текущие данные» перечитывает сохранённую карточку.
+Подтверждённый существующий отклик даёт ответ «На эту вакансию уже есть отклик.
+Повторный не отправлен.» и кнопку «Отклики». Чужие IDs и неприватный scope отклоняются.
+Новых guided kinds нет; callbacks ограничены 64 байтами. Отправка и её подтверждения
+не меняются. CAPTCHA допускает дополнительную read-only проверку точных targets
+`/applicant/resumes` и `/applicant/negotiations?filter=active|archived&page=<0..999>`;
+подтверждение native answer сохраняется. Нет периодических проверок и уведомлений.
+
+Owner-approved on 16 October 2026; implemented locally, not deployed. The Applications
+menu merges Jarvis operations and observed HH history. First opening queues an import;
+explicit refresh reads active and archived sections. Detail cards distinguish source,
+resume, reliable dates, submission and employer states, and known own approved text.
+The callback forms above retain owner/private scope and the 64-byte limit; there are
+no new guided kinds. CAPTCHA verification adds only the exact read targets above.
+Submission confirmations remain unchanged. No scheduled account checks or notifications.
+See the [development result](updates/2026-10-16-job-application-tracking-development.md).
+
 Установлено на DE 16 октября 2026 после поручения владельца:
 [четыре варианта сопроводительного](superpowers/specs/2026-10-16-job-letter-modes-design.md).
 Owner/private меню поиска добавляет «Редактировать базовое сопроводительное»

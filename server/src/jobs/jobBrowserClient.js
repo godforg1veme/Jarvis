@@ -1,5 +1,6 @@
 const { jobError } = require('./jobSchemas');
 const { readBoundedJson } = require('./boundedHttp');
+const { historySchema, itemSchema } = require('./jobHistorySchema');
 const UUID = /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i;
 const CAPABILITIES = Object.freeze({ dateWindows: false, maxPages: 1000 });
 const CODES = new Set(['JOB_HH_MANUAL_ACTIVE', 'JOB_HH_CAPTCHA_WAITING', 'JOB_HH_CAPTCHA_MANUAL_REQUIRED', 'JOB_HH_DOM_CHANGED', 'JOB_COLLECTION_WINDOW_SATURATED', 'JOB_COLLECTION_WINDOW_EXPIRED',
@@ -30,6 +31,7 @@ class JobBrowserClient {
       search: ({ query, publishedFrom, publishedTo, page = 0 }) => this.request(userId, 'search', { query, publishedFrom, publishedTo, page }),
       getVacancy: ({ externalId }) => this.request(userId, 'vacancy', { externalId: String(externalId) }),
       listResumes: () => this.request(userId, 'resumes', {}),
+      history: ({section,page}) => this.request(userId, 'history', {section,page}),
       inspect: ({ externalId, resumeId }) => this.request(userId, 'inspect', { externalId: String(externalId), resumeId }),
     };
   }
@@ -54,6 +56,11 @@ class JobBrowserClient {
       throw error;
     }
     const value = result.value;
+    if (operation === 'history') {
+      const parsed = historySchema.safeParse(value);
+      if (!parsed.success || value.page !== args.page || value.section !== args.section) throw jobError('JOB_HH_INVALID_RESPONSE');
+      return parsed.data;
+    }
     if (operation === 'connection' && (!/^[a-zA-Z0-9]{1,100}$/.test(value?.resumeId || '')
       || typeof value?.title !== 'string' || !value.title.trim() || value.title.length > 500)) throw jobError('JOB_HH_INVALID_RESPONSE');
     if (writing && (!value || !['unknown', 'sent', 'failed', 'manual_required', 'already_applied'].includes(value.outcome)
@@ -68,6 +75,10 @@ class JobBrowserClient {
       || !value.every((item) => /^[a-zA-Z0-9]{1,100}$/.test(item?.id || '') && typeof item.title === 'string' && item.title.length <= 500))) throw jobError('JOB_HH_INVALID_RESPONSE');
     if (operation === 'inspect' && (!value || typeof value.resumeAvailable !== 'boolean' || typeof value.manualRequired !== 'boolean'
       || (value.vacancy?.externalId !== args.externalId && !(value.resumeAvailable === false && value.manualRequired === true && value.vacancy === null)))) throw jobError('JOB_HH_INVALID_RESPONSE');
+    if(operation==='inspect'&&value.existingApplication){
+      const known=itemSchema.safeParse(value.existingApplication);
+      if(!known.success||known.data.vacancyId!==args.externalId||known.data.resumeHash!==args.resumeId||known.data.topicId!==value.existingApplicationId)throw jobError('JOB_HH_INVALID_RESPONSE');
+    }
     return value;
   }
 }

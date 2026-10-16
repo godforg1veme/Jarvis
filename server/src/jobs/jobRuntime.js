@@ -17,12 +17,16 @@ const { JobApplicationService } = require('./jobApplicationService');
 const { JobRecoveryWorker } = require('./jobRecovery');
 const { JobBrowserClient } = require('./jobBrowserClient');
 const { JobBrowserConnectionService } = require('./jobBrowserConnectionService');
+const {JobHistoryRepository}=require('./jobHistoryRepository');
+const {JobHistorySyncRepository}=require('./jobHistorySyncRepository');
+const {JobHistoryWorker}=require('./jobHistoryWorker');
+const {JobHistoryTelegram}=require('./jobHistoryTelegram');
 
 function createJobRuntime({ config, pool, interactions, send, sendPhoto, fetchImpl, applicationAdapter = null }) {
   if (!config.jobSearchEnabled) return null;
-  let connectionService = null;
+  let connectionService = null, browserClient = null;
   if (config.jobBrowserOwnerId && config.jobBrowserToken) {
-    const browserClient = new JobBrowserClient({ baseUrl: config.jobBrowserUrl, ownerId: config.jobBrowserOwnerId,
+    browserClient = new JobBrowserClient({ baseUrl: config.jobBrowserUrl, ownerId: config.jobBrowserOwnerId,
       token: config.jobBrowserToken, fetchImpl });
     connectionService = new JobBrowserConnectionService({ pool, browserClient });
   }
@@ -42,7 +46,11 @@ function createJobRuntime({ config, pool, interactions, send, sendPhoto, fetchIm
     modelAdapter: new JobModelAdapter({ config, fetchImpl }), defaultModel: config.jobSearchModel });
   const settingsService = new JobSettingsService({ pool, searchRepository, profileRepository });
   const applicationRepository = new JobApplicationRepository(pool);
-  const applicationService = new JobApplicationService({ pool, repository: applicationRepository, searchRepository, adapter: applicationAdapter });
+  const historyRepository=new JobHistoryRepository(pool);
+  const historySync=new JobHistorySyncRepository(pool,historyRepository);
+  const historyWorker=browserClient?new JobHistoryWorker({repository:historySync,client:browserClient}):null;
+  const historyService=new JobHistoryTelegram({repository:historyRepository,syncRepository:historySync,available:Boolean(browserClient)});
+  const applicationService = new JobApplicationService({ pool, repository: applicationRepository, searchRepository, adapter: applicationAdapter, historyRepository });
   if (config.jobCaptchaTelegram && !config.jobCaptchaToken) throw new Error('JOB_CAPTCHA_CONFIG_INVALID');
   let captchaService = null, captchaWorker = null;
   if (config.jobCaptchaTelegram && config.jobCaptchaToken) {
@@ -52,11 +60,11 @@ function createJobRuntime({ config, pool, interactions, send, sendPhoto, fetchIm
     captchaWorker = new JobCaptchaWorker({ repository, client, ownerId: config.jobBrowserOwnerId, sendPhoto });
   }
   const telegramService = new JobTelegramService({ pool, searchRepository, profileRepository, draftRepository,
-    usageRepository, interactions, draftService, settingsService, applicationService, connectionService, captchaService, defaultModel: config.jobSearchModel });
+    usageRepository, interactions, draftService, settingsService, applicationService, connectionService, captchaService, historyService, defaultModel: config.jobSearchModel });
   const deliveryWorker = new JobDeliveryWorker({ pool, searchRepository, deliveryRepository, send, captchaEnabled: Boolean(captchaService) });
   const recoveryWorker = new JobRecoveryWorker({ pool, applicationRepository });
-  return { captchaService, telegramService, deliveryWorker, applicationService, applicationRepository,
-    async start() { await recoveryWorker.start(); deliveryWorker.start(); captchaWorker?.start(); },
-    async close() { await Promise.all([deliveryWorker.close(), recoveryWorker.close(), captchaWorker?.close()]); } };
+  return { captchaService, telegramService, deliveryWorker, applicationService, applicationRepository, historyWorker, historyRepository, historySync,
+    async start() { await recoveryWorker.start(); deliveryWorker.start(); captchaWorker?.start(); historyWorker?.start(); },
+    async close() { await Promise.all([deliveryWorker.close(), recoveryWorker.close(), captchaWorker?.close(),historyWorker?.close()]); } };
 }
 module.exports = { createJobRuntime };

@@ -4,6 +4,8 @@ const exact = (value, keys) => value && typeof value === 'object' && !Array.isAr
 function validRequest(value, ownerId) {
   if (!exact(value, ['userId', 'operation', 'args']) || !UUID.test(value.userId) || value.userId !== ownerId) return false;
   const args = value.args;
+  if (value.operation === 'history') return exact(args, ['section','page']) && ['active','archived'].includes(args.section)
+    && Number.isInteger(args.page) && args.page >= 0 && args.page < 1000;
   if (['submit', 'reconcile'].includes(value.operation)) return exact(args, ['operationId', 'externalId', 'resumeId', 'letter'])
     && UUID.test(args.operationId || '') && typeof args.externalId === 'string' && /^\d{1,20}$/.test(args.externalId)
     && typeof args.resumeId === 'string' && /^[a-zA-Z0-9]{1,100}$/.test(args.resumeId)

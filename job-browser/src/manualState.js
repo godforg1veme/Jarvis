@@ -12,7 +12,10 @@ function validTarget(value) {
     const u = new URL(value);
     if (u.origin !== 'https://hh.ru' || u.username || u.password || u.hash) return false;
     if (/^\/vacancy\/\d{1,20}$/.test(u.pathname)) return !u.search;
+    if(u.pathname==='/applicant/resumes')return !u.search;
     const q = u.searchParams;
+    if(u.pathname==='/applicant/negotiations')return q.size===2&&q.getAll('filter').length===1&&['active','archived'].includes(q.get('filter'))
+      &&q.getAll('page').length===1&&/^(?:0|[1-9]\d{0,2})$/.test(q.get('page'));
     return u.pathname === '/search/vacancy' && q.size === 5
       && ['text', 'search_period', 'order_by', 'items_on_page', 'page'].every((n) => q.getAll(n).length === 1)
       && q.get('text').trim().length > 0 && q.get('text').length <= 200

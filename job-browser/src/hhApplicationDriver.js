@@ -5,6 +5,7 @@ const { readResumePrivacy, readEmployerId, evaluatePrivacy } = require('./hhPriv
 const { prepareApplicationPage } = require('./hhApplication');
 const { validateSubmissionRequest, normalizeSubmissionReceipt } = require('./submissionProtocol');
 const { readApplicationReference, verifyChatLetter } = require('./applicationProof');
+const {visibleAppliedAction}=require('./existingApplication');
 
 const unknown = () => ({ outcome: 'unknown' });
 const manual = () => ({ outcome: 'manual_required', verified: true });
@@ -30,7 +31,7 @@ class HhApplicationDriver {
     // Refresh the employer and privacy policy before the only permitted mutation.
     const source = await hh.read(`https://hh.ru/vacancy/${input.externalId}`, 'vacancy', async (node) => ({
       vacancy: await readVacancyPage(node, input.externalId), employerId: await readEmployerId(node),
-      applied: await node.locator('[data-qa="vacancy-response-link-view-topic"], [data-qa="vacancy-response-link-top-again"]').count() > 0,
+      applied: await visibleAppliedAction(node),
     }));
     if (source.vacancy.archived || source.applied) return manual();
     const privacy = await hh.read(`https://hh.ru/resume/${input.resumeId}`, 'resume_privacy',
