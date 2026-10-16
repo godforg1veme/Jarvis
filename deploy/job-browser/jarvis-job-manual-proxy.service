@@ -9,6 +9,7 @@ User=root
 Group=root
 NoNewPrivileges=true
 CapabilityBoundingSet=CAP_SETUID CAP_SETGID
+AmbientCapabilities=CAP_SETUID CAP_SETGID
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true

@@ -46,6 +46,10 @@ def main():
     os.setgroups([])
     os.setgid(65534)
     os.setuid(65534)
+    assert os.getuid() == 65534 and os.geteuid() == 65534 and not os.getgroups()
+    with open('/proc/self/status') as status:
+        capabilities = dict(line.split(':', 1) for line in status if line.startswith(('CapPrm:', 'CapEff:', 'CapAmb:')))
+    assert len(capabilities) == 3 and all(int(value.strip(), 16) == 0 for value in capabilities.values())
     os.execve(PROXY, [PROXY, '--exit-idle-time=30s', endpoint], {
         'LISTEN_PID': str(os.getpid()), 'LISTEN_FDS': '1', 'PATH': '/usr/bin:/bin'})
 
