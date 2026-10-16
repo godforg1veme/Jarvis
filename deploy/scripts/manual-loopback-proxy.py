@@ -10,6 +10,7 @@ import json
 import os
 import subprocess
 import sys
+import traceback
 
 CONTAINER = 'jarvis-family-job-manual-1'
 NETWORK = 'jarvis-family_job-manual-control'
@@ -52,6 +53,8 @@ def main():
 if __name__ == '__main__':
     try:
         main()
-    except Exception:
-        print('JOB_MANUAL_LOOPBACK_PROXY_FAILED', file=sys.stderr)
+    except Exception as error:
+        print(json.dumps({'code': 'JOB_MANUAL_LOOPBACK_PROXY_FAILED',
+                          'kind': type(error).__name__,
+                          'line': traceback.extract_tb(error.__traceback__)[-1].lineno}), file=sys.stderr)
         sys.exit(1)
