@@ -2,6 +2,9 @@
 
 [Русский](#русский) | [English](#english)
 
+Позднее установлено на DE / Subsequently deployed on DE:
+[результат выпуска / release result](2026-10-16-job-settings-panel-release.md).
+
 ## Русский
 
 16 октября 2026. Реализовано локально в `codex/job-settings-panel`, не установлено

@@ -17,9 +17,10 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
-Локально готова [панель настроек поиска с кнопками](updates/2026-10-16-job-settings-panel-development.md):
+На DE установлена [панель настроек поиска с кнопками](updates/2026-10-16-job-settings-panel-release.md):
 отдельные параметры, готовые значения, ввод своего, списки фраз и подтверждение
-изменения. В работающий бот ещё не установлена.
+изменения. Rendering и callbacks проверены; реальные нажатия в Telegram остаются
+для пользовательской проверки.
 
 На DE установлен [учёт старых и новых откликов HH](updates/2026-10-16-job-application-tracking-release.md):
 единый список, отдельные статусы отправки и работодателя, первый импорт и
@@ -152,9 +153,10 @@ deployment establish what is running.
 
 ### Current status
 
-The [button-based job settings panel](updates/2026-10-16-job-settings-panel-development.md)
-is ready locally: separate fields, presets, custom values, phrase lists and
-explicit save confirmation. It is not installed in the running bot yet.
+The [button-based job settings panel](updates/2026-10-16-job-settings-panel-release.md)
+is deployed on DE: separate fields, presets, custom values, phrase lists and
+explicit save confirmation. Rendering and callbacks passed; actual Telegram taps
+remain for user acceptance.
 
 [Tracking old and new HH applications](updates/2026-10-16-job-application-tracking-release.md)
 is deployed on DE: a merged list, separate submission and employer states, an initial

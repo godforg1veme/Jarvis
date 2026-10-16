@@ -9,7 +9,7 @@ source changes; verify the deployed revision before a server rollout.
 
 ## Change control
 
-Согласовано владельцем 16 октября 2026; реализовано локально, не установлено:
+Согласовано владельцем и установлено на DE 16 октября 2026:
 [панель настроек поиска](superpowers/specs/2026-10-16-job-settings-panel-design.md).
 `job:settings` показывает компактные кнопки дохода, города, удалённых вакансий,
 интервала, глубины истории, модели AI, порога уведомления, запросов и исключений.
@@ -31,7 +31,7 @@ Migration 036 добавляет `job_setting_value`, закрытый context
 Старый уже выданный `job_settings_edit` работает до истечения, новая панель его
 не создаёт. Изменения не затрагивают HH-подтверждения, профиль и письма.
 
-Owner-approved on 16 October 2026; implemented locally, not deployed. Settings
+Owner-approved and deployed on DE on 16 October 2026. Settings
 now opens a compact button panel with separate field screens, presets/custom
 values, configured/current model choices and paginated query/exclusion lists.
 Opening the panel starts no input or AI request. Each change has an explicit
@@ -40,7 +40,7 @@ above remain closed and bounded to 64 bytes; revisions, expiry, owner/private
 scope and single consumption remain enforced. Migration 036 adds one closed
 guided kind/context. Legacy pending editors remain compatible, and HH submission
 confirmations, profiles and letters are unchanged. See the
-[development result](updates/2026-10-16-job-settings-panel-development.md).
+[release result](updates/2026-10-16-job-settings-panel-release.md).
 
 Согласовано владельцем и установлено на DE 16 октября 2026:
 [учёт откликов](superpowers/specs/2026-10-16-job-application-tracking-design.md).
