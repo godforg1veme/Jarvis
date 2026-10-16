@@ -66,7 +66,10 @@ Telegram режим сразу передаёт CAPTCHA человеку. Пре
 HH gateway/noVNC/Serve link и host proxy удалены из работающего окружения. Другие
 Tailscale и VPN применения к этому изменению не относятся.
 Server/browser/collector установлены из `b0712e69875adbe62db1892007da65f34d4d636f`.
-Настоящее фото доставлено; ответ владельца и возобновление ещё ожидаются.
+16 октября 2026 владелец подтвердил прохождение настоящей CAPTCHA через Telegram.
+Проверка owner-scoped состояния: ответ `solved`, coordinator idle, collector
+с активной lease продолжил прежний progress; доставка выросла с 583 до 602 карточек.
+Сценарий фото → reply → однократная отправка → проверка HH → продолжение принят.
 [Результат установки](updates/2026-10-16-hh-telegram-captcha.md).
 
 ### Cloud control plane

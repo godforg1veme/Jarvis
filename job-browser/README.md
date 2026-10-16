@@ -16,7 +16,8 @@ POST формы; фазы записываются на диск до запро
 не выполняются. [Результат установки и восстановления](../docs/updates/2026-10-16-hh-native-captcha-request.md)
 отделяет отправку ответа от подтверждённого чтения HH.
 
-Подготовлен [ручной ответ через Telegram](../docs/superpowers/specs/2026-10-16-hh-telegram-captcha-design.md):
+На DE установлен и 16 октября 2026 принят владельцем
+[ручной ответ через Telegram](../docs/updates/2026-10-16-hh-telegram-captcha.md):
 `JARVIS_HH_CAPTCHA_TELEGRAM=1` и отдельный `JARVIS_JOB_CAPTCHA_TOKEN` включают
 приватный POST `/rpc` broker на8082 в существующей RPC-сети. Он отдаёт только
 PNG картинки, opaque challenge ID/revision/expiry; принимает человеческий ответ

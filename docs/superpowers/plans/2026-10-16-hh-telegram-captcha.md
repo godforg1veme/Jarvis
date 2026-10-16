@@ -80,5 +80,6 @@ No edits to server/browser/root docs. Root deploys actual VPS.
   Preserve other services, original HH progress, profile and claims.
 - [x] Verify hashes/health/actual no-ports/no HH TS remnants and real owner photo
   delivery. Record remaining checks candidly.
-- [ ] Human reply acceptance and confirmed collection resumption: awaits owner
-  reply to the real Telegram photo. Agent must not answer or force a CAPTCHA.
+- [x] Human reply acceptance and confirmed collection resumption: owner confirmed
+  success on 16 October 2026; scoped read verified solved/idle, active collection,
+  page 15→18 and sent cards 583→602. See the dated release record.
