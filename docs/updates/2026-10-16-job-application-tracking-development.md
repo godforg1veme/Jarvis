@@ -1,7 +1,10 @@
 # Учёт откликов HH / HH application tracking
 
 16 октября 2026 / 16 October 2026. Реализовано локально, не опубликовано.
-Implemented locally, not deployed.
+Implemented locally, not deployed at the time of this record.
+
+Позднее установлено на DE / Subsequently deployed on DE:
+[результат выпуска / release result](2026-10-16-job-application-tracking-release.md).
 
 ## Русский
 

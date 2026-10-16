@@ -9,7 +9,7 @@ source changes; verify the deployed revision before a server rollout.
 
 ## Change control
 
-Согласовано владельцем 16 октября 2026, реализовано локально, не установлено:
+Согласовано владельцем и установлено на DE 16 октября 2026:
 [учёт откликов](superpowers/specs/2026-10-16-job-application-tracking-design.md).
 «Поиск работы → Отклики» (`job:applications:<page>`) объединяет журнал Jarvis
 и обнаруженные на HH записи. Первый вход ставит импорт в очередь;
@@ -25,14 +25,14 @@ source changes; verify the deployed revision before a server rollout.
 `/applicant/resumes` и `/applicant/negotiations?filter=active|archived&page=<0..999>`;
 подтверждение native answer сохраняется. Нет периодических проверок и уведомлений.
 
-Owner-approved on 16 October 2026; implemented locally, not deployed. The Applications
+Owner-approved and deployed on DE on 16 October 2026. The Applications
 menu merges Jarvis operations and observed HH history. First opening queues an import;
 explicit refresh reads active and archived sections. Detail cards distinguish source,
 resume, reliable dates, submission and employer states, and known own approved text.
 The callback forms above retain owner/private scope and the 64-byte limit; there are
 no new guided kinds. CAPTCHA verification adds only the exact read targets above.
 Submission confirmations remain unchanged. No scheduled account checks or notifications.
-See the [development result](updates/2026-10-16-job-application-tracking-development.md).
+See the [release result](updates/2026-10-16-job-application-tracking-release.md).
 
 Установлено на DE 16 октября 2026 после поручения владельца:
 [четыре варианта сопроводительного](superpowers/specs/2026-10-16-job-letter-modes-design.md).

@@ -17,9 +17,10 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
-Локально готов [учёт старых и новых откликов HH](updates/2026-10-16-job-application-tracking-development.md):
+На DE установлен [учёт старых и новых откликов HH](updates/2026-10-16-job-application-tracking-release.md):
 единый список, отдельные статусы отправки и работодателя, первый импорт и
-обновление по кнопке. На VPS функция пока не установлена; публикация ожидает поручения.
+обновление по кнопке. Чтение active/archived проверено; первый полный импорт
+и реальные нажатия в Telegram остаются для пользовательской проверки.
 
 На DE установлены [четыре варианта сопроводительного](updates/2026-10-16-job-letter-modes-release.md):
 базовое, улучшенное с AI, кастомное без AI и с AI. Факты и примеры необязательны;
@@ -147,9 +148,10 @@ deployment establish what is running.
 
 ### Current status
 
-[Tracking old and new HH applications](updates/2026-10-16-job-application-tracking-development.md)
-is ready locally: a merged list, separate submission and employer states, an initial
-import and explicit refresh. It is not installed on the VPS nodes; publication awaits authorization.
+[Tracking old and new HH applications](updates/2026-10-16-job-application-tracking-release.md)
+is deployed on DE: a merged list, separate submission and employer states, an initial
+import and explicit refresh. Active/archived reading passed; the first full import
+and real Telegram taps remain for user acceptance.
 
 [Four cover-letter modes](updates/2026-10-16-job-letter-modes-release.md)
 are deployed on DE: base, AI-improved, custom without AI and custom with AI.
