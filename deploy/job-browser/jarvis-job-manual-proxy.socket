@@ -1,0 +1,12 @@
+[Unit]
+Description=Jarvis private HH manual gateway loopback socket
+After=docker.service
+Requires=docker.service
+
+[Socket]
+ListenStream=127.0.0.1:19123
+NoDelay=true
+Accept=false
+
+[Install]
+WantedBy=sockets.target

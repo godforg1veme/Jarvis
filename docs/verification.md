@@ -92,6 +92,7 @@ Mobile manual HH preparation adds display supervision and Compose policy checks:
 ```powershell
 node --test job-browser/test/displayMain.test.js
 py deploy/scripts/test-job-manual-config.py
+py deploy/scripts/test-manual-loopback-proxy.py
 npm test --prefix job-manual
 ```
 

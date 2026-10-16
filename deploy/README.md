@@ -456,6 +456,24 @@ direct loopback requests without identity and requests from another tailnet
 user must be denied. The gateway must not be reachable through another proxy
 that lets a client supply those headers.
 
+Docker 29 can omit the effective published port when the container has only an
+internal network. Check both actual `NetworkSettings.Ports` and a localhost
+request. If the declared loopback binding is absent, install the checked-in
+`deploy/job-browser/jarvis-job-manual-proxy.socket` and `.service` under
+`/etc/systemd/system/`, and `deploy/scripts/manual-loopback-proxy.py` as root-owned
+`/usr/local/libexec/jarvis-manual-loopback-proxy.py` (0755). Enable only the socket
+with `systemctl enable --now jarvis-job-manual-proxy.socket` after daemon-reload.
+Do not install this socket if Docker already owns that port. This uses the
+distribution's `systemd-socket-proxyd`, not another container network or public
+listener. The launcher inspects only the fixed gateway/network, rejects changed
+boundaries, drops root and all supplementary groups, then proxies to that
+container's current internal address. Each activation resolves the address again.
+After recreating the gateway, restart the proxy service if active, so existing
+connections cannot retain the old destination. Keep the socket on loopback.
+On the current VPS the existing Serve handler is on HTTPS port 10000; leave it
+unchanged and add HTTPS 443 with `/hh/` only. The proxy target must include `/hh/`
+(`http://127.0.0.1:19123/hh/`) because Serve removes the mount prefix.
+
 After an authorized install, inspect the actual container image and process
 state, verify health and non-public listeners, then test owner Safari through
 Tailscale: screen, keyboard, manual captcha and «Готово». Verify foreign identity
