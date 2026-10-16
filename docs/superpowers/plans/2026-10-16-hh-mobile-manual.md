@@ -154,7 +154,7 @@ Compose opt-in profile/env.example, deploy README, verification docs.
   source guard, main publication, both VPS source sync, immutable releases.
 - [x] Preserve profile/env/secret inodes/mounts. Install only changed DE
   components; add `/hh/` Serve mapping without reset/other-route changes.
-- [ ] Probe direct denial/identity denial/owner access and no public VNC/CDP.
+- [x] Probe direct denial/identity denial/owner access and no public VNC/CDP.
   Inspect actual image files, health and service state after any uncertain step.
 - [ ] Owner enables Tailscale on iPhone; Safari image/keyboard/Done verified.
   Foreign identity denied, paused collection proven, successful target read
