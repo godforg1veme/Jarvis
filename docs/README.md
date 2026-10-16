@@ -5,8 +5,10 @@
 ## Русский
 
 Описание проекта и текущие записи переведены на два языка:
-[локальное обновление документации от 16 октября](updates/2026-10-16-bilingual-project-docs.md).
-Эти изменения пока не опубликованы.
+[обновление документации от 16 октября](updates/2026-10-16-bilingual-project-docs.md).
+Изменения опубликованы в GitHub и получены обоими VPS; сверка исходников,
+Desktop, сервера и Host Agent прошла. Отличия сохранённого образа сборщика
+и наблюдение перезапуска браузера перечислены в записи обновления.
 
 Текущий статус ниже опирается на записи о проверках. Правила для агентов
 находятся в [AGENTS.md](../AGENTS.md), порядок публикации в
@@ -123,8 +125,10 @@ HH CAPTCHA: Windows, GitHub и оба VPS-исходника совпадают;
 ## English
 
 The project description and current records now have both language versions:
-[local documentation update from 16 October](updates/2026-10-16-bilingual-project-docs.md).
-These changes have not been published yet.
+[documentation update from 16 October](updates/2026-10-16-bilingual-project-docs.md).
+The changes were published to GitHub and received by both VPS nodes; source,
+Desktop, server, and Host Agent comparisons passed. Differences in the retained
+collector image and an observed browser restart are listed in the update record.
 
 The status below is based on verification records. [AGENTS.md](../AGENTS.md)
 contains the rules for agents; [release-workflow.md](release-workflow.md)
