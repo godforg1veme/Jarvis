@@ -17,6 +17,7 @@ ${search.status === 'attention' ? 'Последняя проверка не за
     [button('Настройки', 'settings'), button('Сохранённые', 'saved', 0)],
     [button('Отклики', 'applications', 0), button('Проверить сейчас', 'check')],
     [button('Профиль и примеры', 'profile'), button('Подключить HH', 'connect')],
+    [button('Редактировать базовое сопроводительное', 'base_letter')],
     ...(captchaEnabled ? [[button('Проверить HH', 'captcha')]] : []),
     [button('Назад', 'back')],
   ]);
@@ -44,9 +45,19 @@ ${v.url}`, [
 }
 function draftView(draft) {
   return response(`Черновик сопроводительного\n\n${draft.text}\n\nПисьмо ещё не отправлено.`, [
-    [button('Перегенерировать', 'regenerate', draft.id), button('Изменить', 'edit', draft.id)],
-    [button('Перевести', 'translate', draft.id), button('Отправить отклик', 'send', draft.id)],
+    [button('Перегенерировать с AI', 'regenerate', draft.id), button('Изменить с AI', 'edit', draft.id)],
+    [button('Перевести с AI', 'translate', draft.id), button('Отправить отклик', 'send', draft.id)],
+    ...(draft.vacancy_id ? [[button('Выбрать другой вариант', 'prepare', draft.vacancy_id)]] : []),
     [button('Отмена', 'cancel', draft.id)],
+  ]);
+}
+function letterModeView(vacancy, draft = null) {
+  return response(`Сопроводительное к вакансии «${vacancy.snapshot.title}»\nВыбери вариант. Факты и примеры необязательны; AI учитывает их, если они есть.\nПеред отправкой покажу итоговый текст для подтверждения.`, [
+    [button('Базовое', 'base', vacancy.id), button('Улучшенное', 'improved', vacancy.id)],
+    [button('Кастомное (без AI)', 'custom', vacancy.id)],
+    [button('Кастомное (с AI)', 'custom_ai', vacancy.id)],
+    ...(draft ? [[button('Текущий черновик', 'draft', draft.id)]] : []),
+    [button('Назад к вакансии', 'view', vacancy.id)],
   ]);
 }
 function listView(rows, page, kind) {
@@ -62,5 +73,5 @@ function attentionView(captchaEnabled = false) {
   if (captchaEnabled) return { ...response('Поиск работы приостановлен из-за капчи HH. Бот пришлёт картинку отдельно; ответь на фото текстом с картинки. Прогресс поиска сохранён.', [[button('Проверить HH', 'captcha')]]), buttons: [[button('Проверить HH', 'captcha')]] };
   return { ...response('Поиск работы: автоматическая попытка прохождения капчи HH не подтвердила доступ. Проверьте сессию HH в браузере на VPS; при запросе пройдите капчу вручную. Прогресс поиска сохранён; для этой проверки повторной отправки ответа не будет.'), buttons: [] };
 }
-module.exports = { attentionView, response, button, homeView, cardView, draftView, listView, salaryText };
+module.exports = { attentionView, response, button, homeView, cardView, draftView, letterModeView, listView, salaryText };
 const { descriptionSalary } = require('./salaryRules');

@@ -2,6 +2,7 @@ const { assertJobScope, jobError } = require('./jobSchemas');
 const { parseJobCallback } = require('./jobTelegramCallbacks');
 const { response, button, homeView, cardView, draftView, listView } = require('./jobTelegramViews');
 const { parseSettingsEdit, parseProfileEdit } = require('./jobSettingsService');
+const { JobLetterFlow } = require('./jobLetterFlow');
 
 function jobScope(context) {
   if (context.user?.role !== 'owner' || context.chatType !== 'private' || String(context.chatId) !== String(context.telegramUserId)) throw jobError('JOB_SCOPE_DENIED');
@@ -22,19 +23,20 @@ function publicJobFailure(error) {
     JOB_HH_NOT_CONNECTED: 'Нужно подключение HH с правом отправки и выбранное основное резюме.',
     JOB_HH_RESUME_UNAVAILABLE: 'Основное резюме недоступно. Другое резюме автоматически не выбрано.',
     JOB_HH_NOT_FOUND: 'Вакансия недоступна или архивирована. Отклик не отправлен.',
+    JOB_INVALID_LETTER: 'Пришли непустой текст длиной до 10 000 символов.',
     JOB_NOT_FOUND: 'Эта вакансия или письмо недоступны.', JOB_SENSITIVE_INPUT: 'Не присылай ключи и пароли в профиль.' };
   return response(messages[error?.code] || 'Не удалось завершить действие. Открой актуальный раздел и попробуй снова.', [[button('В поиск работы', 'menu')]]);
 }
 
 class JobTelegramService {
-  constructor(options) { Object.assign(this, options); }
+  constructor(options) { Object.assign(this, options); this.letterFlow = new JobLetterFlow(this); }
   async handleCallback(data, context) {
     const parsed = parseJobCallback(data); if (!parsed) return data.startsWith('job:') ? response('Кнопка недоступна.') : null;
     try { const scope = jobScope(context); await assertJobScope(this.pool, scope);
       if (!['approve', 'confirm'].includes(parsed.action)) await this.pool.query(`UPDATE job_confirmations SET status='cancelled'
         WHERE user_id=$1 AND conversation_id=$2 AND chat_id=$3 AND status='pending' AND kind IN ('settings','profile')`,
       [scope.userId, scope.conversationId, scope.chatId]);
-      if (['menu', 'back', 'draft', 'cancel', 'regenerate', 'edit', 'translate'].includes(parsed.action)) await this.pool.query(`UPDATE job_confirmations SET status='cancelled'
+      if (['menu', 'back', 'draft', 'cancel', 'regenerate', 'edit', 'translate', 'prepare', 'base_letter', 'base', 'improved', 'custom', 'custom_ai'].includes(parsed.action)) await this.pool.query(`UPDATE job_confirmations SET status='cancelled'
         WHERE user_id=$1 AND conversation_id=$2 AND chat_id=$3 AND kind='apply' AND status='pending'`,
       [scope.userId, scope.conversationId, scope.chatId]);
       return await this.handle({ scope, context, ...parsed });
@@ -55,6 +57,8 @@ class JobTelegramService {
     if (action === 'captcha' || action === 'captcha_refresh') return this.captchaService ? this.captchaService.request(scope, action === 'captcha_refresh') : response('Проверка HH через Telegram не настроена.');
     if (action === 'menu' || action === 'back') return this.home(scope);
     const search = await this.searchRepository.ensure({ scope });
+    const letter = await this.letterFlow.handle({ scope, context, action, targetId });
+    if (letter) return letter;
     if (action === 'save' || action === 'hide') {
       await this.searchRepository.mark({ scope, vacancyId: targetId, action });
       return response(action === 'save' ? 'Вакансия сохранена в Jarvis.' : 'Вакансия скрыта в Jarvis.', [[button('В поиск работы', 'menu')]]);
@@ -74,15 +78,10 @@ class JobTelegramService {
         WHERE a.user_id=$1 ORDER BY a.created_at DESC LIMIT 10 OFFSET $2`, [scope.userId, page * 10])).rows;
       return listView(rows, page, 'applications');
     }
-    if (action === 'view' || action === 'prepare') {
+    if (action === 'view') {
       const vacancy = await this.searchRepository.getVacancy({ userId: scope.userId, vacancyId: targetId });
       if (!vacancy) throw jobError('JOB_NOT_FOUND');
-      if (action === 'view') return cardView(vacancy);
-      const current = await this.draftRepository.current({ userId: scope.userId, vacancyId: targetId });
-      const profile = await this.profileRepository.get({ userId: scope.userId });
-      const reusable = current && current.vacancy_revision === vacancy.revision && current.profile_revision === profile?.revision;
-      return draftView(reusable ? current : await this.draftService.generate({ scope, vacancyId: targetId,
-        parentDraftId: current?.id || null, requestId: context.requestId }));
+      return cardView(vacancy);
     }
     if (action === 'regenerate' || action === 'edit' || action === 'translate' || action === 'draft' || action === 'send' || action === 'cancel') {
       const draft = await this.draftRepository.get({ userId: scope.userId, draftId: targetId });
@@ -119,7 +118,7 @@ class JobTelegramService {
     if (action === 'profile') {
       const profile = await this.profileRepository.ensure({ scope });
       return this.begin(scope, 'job_profile_edit', profile.id, profile.revision,
-        `Профиль для писем. Подтверждённых фактов: ${profile.profile.facts.length}.
+        `Профиль для писем (необязательно). AI учитывает заполненные факты и примеры. Подтверждённых фактов: ${profile.profile.facts.length}.
 ${profile.profile.facts.map((x) => x.text).join('\n')}
 Добавь подтверждённые сведения строками «факт: ...», образцы стиля — «пример: ...».
 Укажи роль, задачу и свой вклад. Не присылай внутренние документы, ключи и пароли.
@@ -135,6 +134,8 @@ ${profile.profile.facts.map((x) => x.text).join('\n')}
     if (!interaction.kind.startsWith('job_')) return null;
     try {
       const scope = jobScope(context); await assertJobScope(this.pool, scope);
+      const letter = await this.letterFlow.handlePendingText(text, { scope, context, interaction });
+      if (letter) return letter;
       const value = String(text).trim();
       if (!value || value.length > 10000) return response('Введи текст длиной до 10 000 символов.');
       const { targetId, revision } = interaction.context;

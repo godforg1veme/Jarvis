@@ -1,4 +1,5 @@
 const { assertJobScope, uuid, jobError } = require('./jobSchemas');
+const { createHash } = require('node:crypto');
 const { jobTransaction } = require('./jobTransaction');
 const { buildJobPrompt, parseJobLetter } = require('./jobPrompt');
 
@@ -6,20 +7,44 @@ class JobDraftService {
   constructor({ pool, searchRepository, profileRepository, draftRepository, usageRepository, modelAdapter, defaultModel = '', now = () => new Date() }) {
     Object.assign(this, { pool, searchRepository, profileRepository, draftRepository, usageRepository, modelAdapter, defaultModel, now });
   }
-  async generate({ scope, vacancyId, requestId, parentDraftId = null, instruction = '', language = 'auto' }) {
+  async createManual({ scope, vacancyId, mode, text, parentDraftId = null, expectedProfileRevision, expectedVacancyRevision }) {
+    await assertJobScope(this.pool, scope);
+    if (!['base', 'custom'].includes(mode) || typeof text !== 'string' || !text.trim() || text.length > 10000) throw jobError('JOB_INVALID_DRAFT');
+    const vacancy = await this.searchRepository.getVacancy({ userId: scope.userId, vacancyId });
+    if (!vacancy) throw jobError('JOB_NOT_FOUND');
+    const profile = await this.profileRepository.ensure({ scope });
+    this.checkRevisions(profile, vacancy, expectedProfileRevision, expectedVacancyRevision);
+    if (mode === 'base' && text !== profile.profile.baseLetter) throw jobError('JOB_REVISION_CONFLICT');
+    return this.draftRepository.append({ scope, vacancyId, parentDraftId, profileRevision: profile.revision,
+      vacancyRevision: vacancy.revision, text, facts: [], mode, sourceText: text });
+  }
+  checkRevisions(profile, vacancy, profileRevision, vacancyRevision) {
+    if ((profileRevision != null && profile.revision !== profileRevision)
+      || (vacancyRevision != null && vacancy.revision !== vacancyRevision)) throw jobError('JOB_REVISION_CONFLICT');
+  }
+  async generate({ scope, vacancyId, requestId, parentDraftId = null, instruction = '', language = 'auto', mode, sourceText,
+    expectedProfileRevision, expectedVacancyRevision }) {
     await assertJobScope(this.pool, scope);
     uuid.parse(vacancyId);
     if (typeof requestId !== 'string' || !requestId || requestId.length > 150) throw jobError('JOB_INVALID_REQUEST');
     const vacancy = await this.searchRepository.getVacancy({ userId: scope.userId, vacancyId });
-    const profile = await this.profileRepository.get({ userId: scope.userId });
+    const profile = await this.profileRepository.ensure({ scope });
     const settings = await this.searchRepository.getSettings({ userId: scope.userId });
     if (!vacancy) throw jobError('JOB_NOT_FOUND');
-    if (!profile?.profile.confirmed) throw jobError('JOB_PROFILE_UNCONFIRMED');
+    this.checkRevisions(profile, vacancy, expectedProfileRevision, expectedVacancyRevision);
     const model = settings?.settings.model || this.defaultModel;
     if (!model) throw jobError('JOB_MODEL_NOT_CONFIGURED');
     const previous = parentDraftId ? await this.draftRepository.get({ userId: scope.userId, draftId: parentDraftId }) : null;
     if (parentDraftId && (!previous?.current || previous.vacancy_id !== vacancyId)) throw jobError('JOB_REVISION_CONFLICT');
-    const messages = buildJobPrompt({ vacancy: vacancy.snapshot, profile: profile.profile, instruction, language, previousText: previous?.text || '' });
+    const continuingDraft = mode == null;
+    mode = mode || previous?.letter_mode || 'legacy_ai';
+    if (mode === 'base') mode = 'improved';
+    if (mode === 'custom') mode = 'custom_ai';
+    if (!['legacy_ai', 'improved', 'custom_ai'].includes(mode)) throw jobError('JOB_INVALID_DRAFT');
+    sourceText = sourceText ?? previous?.source_text ?? '';
+    const messages = buildJobPrompt({ vacancy: vacancy.snapshot, profile: profile.profile, instruction, language, sourceText,
+      previousText: continuingDraft ? previous?.text || '' : '' });
+    const inputHash = createHash('sha256').update(JSON.stringify({ mode, sourceText, instruction, language })).digest('hex');
     const task = await jobTransaction(this.pool, async (client) => {
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`job-generate:${scope.userId}:${vacancyId}`]);
       const existing = (await client.query('SELECT * FROM job_tasks WHERE user_id=$1 AND request_id=$2', [scope.userId, requestId])).rows[0];
@@ -28,9 +53,11 @@ class JobDraftService {
         AND payload->>'vacancyId'=$2`, [scope.userId, vacancyId]);
       if (running.rowCount) throw jobError('JOB_GENERATION_BUSY');
       return (await client.query(`INSERT INTO job_tasks(user_id,request_id,kind,payload,status)
-        VALUES($1,$2,'generate',$3,'running') RETURNING *`, [scope.userId, requestId, { vacancyId, parentDraftId }])).rows[0];
+        VALUES($1,$2,'generate',$3,'running') RETURNING *`, [scope.userId, requestId, { vacancyId, parentDraftId, mode, inputHash }])).rows[0];
     });
     if (task.payload.vacancyId !== vacancyId || task.payload.parentDraftId !== parentDraftId) throw jobError('JOB_INVALID_REQUEST');
+    if (task.payload.mode && task.payload.mode !== mode) throw jobError('JOB_INVALID_REQUEST');
+    if (task.payload.inputHash && task.payload.inputHash !== inputHash) throw jobError('JOB_INVALID_REQUEST');
     if (task.status === 'complete') return this.draftRepository.get({ userId: scope.userId, draftId: task.result_id });
     if (task.status === 'unknown') throw jobError('JOB_GENERATION_OUTCOME_UNKNOWN');
     // An existing running request never starts another billable model call.
@@ -45,7 +72,7 @@ class JobDraftService {
         costUsd: result.usage?.cost ?? null, outcome: 'success', occurredAt: this.now() });
       const letter = parseJobLetter(result.text, profile.profile);
       const draft = await this.draftRepository.append({ scope, vacancyId, parentDraftId, profileRevision: profile.revision,
-        vacancyRevision: vacancy.revision, text: letter.text, facts: letter.factIds });
+        vacancyRevision: vacancy.revision, text: letter.text, facts: letter.factIds, mode, sourceText });
       await this.pool.query("UPDATE job_tasks SET status='complete',result_id=$1 WHERE id=$2", [draft.id, task.id]);
       return draft;
     } catch (error) {

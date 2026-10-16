@@ -133,7 +133,11 @@ test('real message/menu handlers + PG: guided retries, consumption, scopes, draf
     await cb(preview.buttons[0][0].data);
     const vacancy = await search.upsertVacancy({ externalId: '555', snapshot: { title: 'AI Engineer', description: 'LLM', publishedAt: '2026-10-15', url: 'https://hh.ru/vacancy/555' } });
     await search.recordMatch({ userId: f.owner, vacancyId: vacancy.id, filterRevision: 1 });
-    const update = callbackUpdate(`job:prepare:${vacancy.id}`);
+    assert.match((await cb(`job:prepare:${vacancy.id}`)).answer, /Выбери вариант/);
+    await cb('job:base_letter');
+    const basePreview = await msg('Owner base fixture letter');
+    await cb(basePreview.buttons[0][0].data);
+    const update = callbackUpdate(`job:improved:${vacancy.id}`);
     const generated = await messages.handleCallback(update);
     assert.match(generated.answer, /Private fixture letter 1/);
     assert.equal((await messages.handleCallback(update)).status, 'duplicate'); assert.equal(calls, 1);

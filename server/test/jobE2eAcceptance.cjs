@@ -102,6 +102,9 @@ test('E2E local HTTP + actual bot + PG: configure, collect, letter, approval, lo
     await callback('job:profile');
     preview = await message('факт: Participated in a fixture automation project\nпример: Brief factual style.');
     await callback(findButton(preview, 'Подтвердить'));
+    await callback('job:base_letter');
+    preview = await message('Owner base fixture letter');
+    await callback(findButton(preview, 'Подтвердить'));
     collector = createCollectorRuntime({ env: { JARVIS_JOB_SEARCH_ENABLED: 'true' }, pool: fixture.pool,
       hhClient: hh, currencyRates: { async get() { return null; } }, wait: async () => {} });
     await collector.tick();
@@ -111,12 +114,14 @@ test('E2E local HTTP + actual bot + PG: configure, collect, letter, approval, lo
     assert.equal(sent.length, beforeCard + 1);
     const card = sent.at(-1); assert.match(card.text, /Fixture company/);
     assert.equal(card.parse_mode, undefined);
-    const prepared = await callback(findButton(card, 'Подготовить отклик'));
+    const chooser = await callback(findButton(card, 'Подготовить отклик'));
+    assert.equal(modelCalls, 0);
+    const prepared = await callback(findButton(chooser.reply, 'Улучшенное'));
     assert.equal(modelCalls, 1); assert.match(prepared.reply.text, /Fixture cover letter 1/);
     await bot.handleUpdate(prepared.update); assert.equal(modelCalls, 1);
-    await callback(findButton(prepared.reply, 'Изменить'));
+    await callback(findButton(prepared.reply, 'Изменить с AI'));
     const edited = await message('Make it shorter'); assert.match(edited.text, /Fixture cover letter 2/);
-    await callback(findButton(edited, 'Перевести'));
+    await callback(findButton(edited, 'Перевести с AI'));
     await message('français'); assert.equal(modelCalls, 2);
     const translated = await message('английский'); assert.match(translated.text, /Fixture cover letter 3/);
     assert.equal(modelCalls, 3);

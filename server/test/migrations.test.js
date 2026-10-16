@@ -42,7 +42,7 @@ test('migration files are ordered and narrowly named', () => {
     '028_telegram_subscription_interaction_kinds.sql',
     '029_job_search.sql',
     '030_job_search_interactions.sql',
-    '031_job_captcha_attention.sql', '032_job_telegram_captcha.sql', '033_job_captcha_resilience.sql',
+    '031_job_captcha_attention.sql', '032_job_telegram_captcha.sql', '033_job_captcha_resilience.sql', '034_job_letter_modes.sql',
   ]);
 });
 
@@ -86,7 +86,7 @@ test('Telegram update outcome migration stores only closed operational status an
 });
 
 test('guided Telegram kinds emitted by VPN flows and the final database constraint stay in sync', () => {
-  const migration = fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, '030_job_search_interactions.sql'), 'utf8');
+  const migration = fs.readFileSync(path.join(DEFAULT_MIGRATIONS_DIR, '034_job_letter_modes.sql'), 'utf8');
   const constraint = /ADD CONSTRAINT telegram_interactions_kind_check CHECK \(kind IN \(([\s\S]*?)\)\);/.exec(migration);
   assert.ok(constraint, 'final Telegram interaction kind constraint must exist');
   const persistedKinds = Array.from(constraint[1].matchAll(/'([^']+)'/g), (match) => match[1]);

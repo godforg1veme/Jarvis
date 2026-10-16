@@ -28,6 +28,9 @@ const KINDS = new Set([
   'job_profile_edit',
   'job_draft_edit',
   'job_draft_translate',
+  'job_base_letter_edit',
+  'job_custom_letter',
+  'job_custom_letter_ai',
 ]);
 
 function validateContext(kind, value) {

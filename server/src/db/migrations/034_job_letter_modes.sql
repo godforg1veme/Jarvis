@@ -1,0 +1,16 @@
+ALTER TABLE job_drafts
+ ADD COLUMN letter_mode text NOT NULL DEFAULT 'legacy_ai'
+ CHECK (letter_mode IN ('legacy_ai','base','improved','custom','custom_ai')),
+ ADD COLUMN source_text text NOT NULL DEFAULT '' CHECK (char_length(source_text)<=10000);
+
+ALTER TABLE telegram_interactions DROP CONSTRAINT telegram_interactions_kind_check;
+ALTER TABLE telegram_interactions ADD CONSTRAINT telegram_interactions_kind_check CHECK (kind IN (
+  'vpn_subscription_create_label', 'vpn_subscription_rename_label', 'vpn_access_label',
+  'device_pairing_name', 'device_instruction', 'memory_add', 'memory_correct_replacement',
+  'life_project_create', 'life_project_update', 'life_person_create', 'life_person_update',
+  'life_relationship_create', 'life_project_link_create', 'life_family_grant_create',
+  'life_family_grant_confirm', 'life_reminder_create', 'life_reminder_reschedule',
+  'life_source_create', 'life_source_update', 'life_preference_set',
+  'job_settings_edit', 'job_profile_edit', 'job_draft_edit', 'job_draft_translate',
+  'job_base_letter_edit', 'job_custom_letter', 'job_custom_letter_ai'
+));

@@ -17,6 +17,11 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
+Локально подготовлены [четыре варианта сопроводительного](updates/2026-10-16-job-letter-modes-development.md):
+базовое, улучшенное с AI, кастомное без AI и с AI. Факты и примеры необязательны;
+оба AI-режима учитывают их при наличии. Изменения ещё не выпущены, работающий
+Telegram сохраняет прежнее поведение до отдельного разрешения на публикацию.
+
 | Направление | Что подтверждено | Что ещё проверить |
 | --- | --- | --- |
 | Облако и память | Fastify/PostgreSQL, Telegram/Desktop text, owner-scoped memory, документы и production hybrid retrieval | Live multi-device сценарии |
@@ -136,6 +141,12 @@ describes publishing. Plans describe intentions. Code, checks, and actual
 deployment establish what is running.
 
 ### Current status
+
+[Four cover-letter modes](updates/2026-10-16-job-letter-modes-development.md)
+are implemented locally: base, AI-improved, custom without AI and custom with AI.
+Facts/examples are optional and included in both AI modes when present. This
+change is not deployed; Telegram retains its current behavior pending separate
+release authorization.
 
 | Area | Confirmed | Still to check |
 | --- | --- | --- |

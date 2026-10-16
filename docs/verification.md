@@ -61,6 +61,30 @@ npm test
 npm start
 ```
 
+Cover-letter modes (local development, 2026-10-16):
+
+```powershell
+node --test server/test/jobLetterModes.test.js server/test/jobTelegram.test.js server/test/jobModelAdapter.test.js
+# Dedicated disposable PostgreSQL only; no live HH/model/Telegram calls:
+node --test server/test/jobLetterModesAcceptance.cjs
+npm run test:jobs:postgres --prefix server
+```
+
+Проверка применяет migration 034 и настоящие message/menu handlers с interaction
+repository: четыре режима, пустой профиль, факты/примеры в обоих AI-режимах,
+сохранение/замена базового, отсутствие вызова модели и расходов в ручных режимах,
+invalid retry, closed context, single consumption, expiry, чужие scopes,
+ревизии и неизменный текст в подтверждении отправки. Unknown не повторяет POST.
+Модель и HH в этих проверках подставные; реальные Telegram-нажатия и HH-отклик
+проверяются отдельно после разрешённого выпуска.
+
+The fixture applies migration 034 and actual message/menu handlers with the real
+interaction repository. It covers all four modes, optional facts/examples,
+source-aware AI inputs, base replacement, no model calls or usage in manual modes,
+invalid retry, closed contexts, single consumption, expiry, foreign scopes,
+revisions, exact-text confirmation and original-ID unknown reconciliation.
+Model and HH responses are fixtures; live Telegram/HH acceptance remains separate.
+
 Job browser collector integration (opt-in, isolated PostgreSQL fixture only):
 
 ```powershell

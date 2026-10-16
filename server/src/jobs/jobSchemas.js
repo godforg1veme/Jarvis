@@ -14,6 +14,7 @@ const settingsSchema = z.object({
 }).strict();
 const profileSchema = z.object({
   confirmed: z.boolean(),
+  baseLetter: z.string().max(10000).default(''),
   facts: z.array(z.object({ id: z.string().regex(/^[a-z][a-z0-9_-]{0,39}$/),
     text: z.string().trim().min(1).max(2000), confirmed: z.literal(true) }).strict()).max(80),
   examples: z.array(z.string().trim().min(1).max(6000)).max(10),

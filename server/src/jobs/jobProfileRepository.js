@@ -4,7 +4,8 @@ const { jobTransaction } = require('./jobTransaction');
 class JobProfileRepository {
   constructor(pool) { this.pool = pool; }
   async get({ userId }) {
-    return (await this.pool.query('SELECT * FROM job_profiles WHERE user_id=$1', [uuid.parse(userId)])).rows[0] || null;
+    const row = (await this.pool.query('SELECT * FROM job_profiles WHERE user_id=$1', [uuid.parse(userId)])).rows[0];
+    return row ? { ...row, profile: profileSchema.parse(row.profile) } : null;
   }
   async ensure({ scope }) {
     await assertJobScope(this.pool, scope);

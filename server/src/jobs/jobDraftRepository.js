@@ -11,15 +11,17 @@ class JobDraftRepository {
     return (await this.pool.query('SELECT * FROM job_drafts WHERE user_id=$1 AND vacancy_id=$2 AND current',
       [uuid.parse(userId), uuid.parse(vacancyId)])).rows[0] || null;
   }
-  async append({ scope, vacancyId, profileRevision, vacancyRevision, parentDraftId = null, text, facts }) {
+  async append({ scope, vacancyId, profileRevision, vacancyRevision, parentDraftId = null, text, facts, mode = 'legacy_ai', sourceText = '' }) {
     if (typeof text !== 'string' || !text.trim() || text.length > 10000 || !Array.isArray(facts)) throw jobError('JOB_INVALID_DRAFT');
+    if (!['legacy_ai', 'base', 'improved', 'custom', 'custom_ai'].includes(mode)
+      || typeof sourceText !== 'string' || sourceText.length > 10000) throw jobError('JOB_INVALID_DRAFT');
     return jobTransaction(this.pool, async (client) => {
       await assertJobScope(client, scope);
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`job-owner:${scope.userId}`]);
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`job-draft:${scope.userId}:${vacancyId}`]);
       const allowed = await client.query(`SELECT v.id FROM job_vacancies v JOIN job_matches m ON m.vacancy_id=v.id
         JOIN job_profiles p ON p.user_id=m.user_id WHERE v.id=$1 AND m.user_id=$2
-        AND v.revision=$3 AND p.revision=$4 AND p.profile->>'confirmed'='true'`,
+        AND v.revision=$3 AND p.revision=$4`,
       [uuid.parse(vacancyId), scope.userId, vacancyRevision, profileRevision]);
       if (!allowed.rowCount) throw jobError('JOB_REVISION_CONFLICT');
       const current = (await client.query('SELECT id FROM job_drafts WHERE user_id=$1 AND vacancy_id=$2 AND current FOR UPDATE',
@@ -30,8 +32,8 @@ class JobDraftRepository {
       await client.query(`UPDATE job_confirmations SET status='stale' WHERE user_id=$1 AND kind='apply'
         AND status='pending' AND frozen->>'vacancyId'=$2`, [scope.userId, vacancyId]);
       return (await client.query(`INSERT INTO job_drafts(user_id,vacancy_id,parent_draft_id,profile_revision,
-        vacancy_revision,text,fact_ids) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [scope.userId, vacancyId, parentDraftId, profileRevision, vacancyRevision, text.trim(), JSON.stringify(facts)])).rows[0];
+        vacancy_revision,text,fact_ids,letter_mode,source_text) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      [scope.userId, vacancyId, parentDraftId, profileRevision, vacancyRevision, text.trim(), JSON.stringify(facts), mode, sourceText])).rows[0];
     });
   }
 }

@@ -6,7 +6,7 @@ class JobApplicationRepository {
   constructor(pool, { now = () => new Date() } = {}) { this.pool = pool; this.now = now; }
   async snapshot(client, { scope, draftId }) {
     const row = (await client.query(`SELECT d.*,v.external_id,v.snapshot,v.revision AS latest_vacancy_revision,
-      p.revision AS latest_profile_revision,p.profile->>'confirmed' AS profile_confirmed,
+      p.revision AS latest_profile_revision,
       c.resume_id,c.revision AS connection_revision,c.status AS connection_status
       FROM job_drafts d JOIN job_vacancies v ON v.id=d.vacancy_id
       JOIN job_matches m ON m.vacancy_id=v.id AND m.user_id=d.user_id
@@ -14,8 +14,7 @@ class JobApplicationRepository {
       WHERE d.id=$1 AND d.user_id=$2 AND d.current
       FOR SHARE OF v,p,c`, [uuid.parse(draftId), scope.userId])).rows[0];
     if (!row) throw jobError('JOB_NOT_FOUND');
-    if (row.profile_revision !== row.latest_profile_revision || row.vacancy_revision !== row.latest_vacancy_revision
-      || row.profile_confirmed !== 'true') throw jobError('JOB_REVISION_CONFLICT');
+    if (row.profile_revision !== row.latest_profile_revision || row.vacancy_revision !== row.latest_vacancy_revision) throw jobError('JOB_REVISION_CONFLICT');
     if (row.connection_status !== 'connected' || !row.resume_id) throw jobError('JOB_HH_NOT_CONNECTED');
     return row;
   }

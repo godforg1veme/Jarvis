@@ -9,6 +9,52 @@ source changes; verify the deployed revision before a server rollout.
 
 ## Change control
 
+Локальная разработка 16 октября 2026, согласована владельцем; ещё не выпущена:
+[четыре варианта сопроводительного](superpowers/specs/2026-10-16-job-letter-modes-design.md).
+Owner/private меню поиска добавляет «Редактировать базовое сопроводительное»
+(`job:base_letter`). Обычный многострочный текст заменяет базовое письмо только
+после показа полного текста и `job:approve:<uuid>` в исходном чате.
+Факты и примеры необязательны для подготовки и отправки отклика.
+
+`job:prepare:<vacancy-uuid>` теперь показывает выбор, не вызывает модель:
+«Базовое» (`job:base:<uuid>`) и «Кастомное (без AI)» (`job:custom:<uuid>`)
+готовят авторский текст без AI. «Улучшенное» (`job:improved:<uuid>`) адаптирует
+сохранённое базовое, «Кастомное (с AI)» (`job:custom_ai:<uuid>`) — введённый для
+вакансии текст. Оба AI-режима получают вакансию, исходное письмо, факты и примеры.
+Кастомное письмо не заменяет общее базовое. Без базового первые два варианта
+предлагают редактор или выбор кастомного. Есть возврат к текущему черновику.
+Явные действия над черновиком называются «Перегенерировать с AI», «Изменить с AI»
+и «Перевести с AI»; смена варианта не переносит посторонний прежний текст в AI.
+
+Новые guided kinds: `job_base_letter_edit`, `job_custom_letter`,
+`job_custom_letter_ai`; migration 034 расширяет PostgreSQL CHECK вместе с
+repository allowlist. Context закрыт: `{targetId, revision}`; для редактора это
+профиль, для кастомного ввода — вакансия. Срок, исходные owner/user/conversation/chat,
+invalid retry и atomic consumption сохраняются. Письма ограничены 10 000 символов;
+внешние пробелы удаляются по прежнему правилу Telegram, абзацы и внутренний текст
+сохраняются. Ручные варианты не требуют модели и не создают usage/model tasks.
+
+Каждый вариант сначала показывает черновик; `job:send:<draft-uuid>` и отдельное
+`job:confirm:<confirmation-uuid>` сохраняют подтверждение точного текста, вакансии
+и резюме. Смена варианта отменяет pending send, замена базового увеличивает
+profile revision и делает прежние подтверждения неактуальными. Unknown остаётся
+на исходном operation ID. Новые scopes/права не добавляются; callback ≤64 байта,
+тексты не попадают в callbacks, diagnostics и общую историю.
+
+Local development, 16 October 2026, owner approved; not deployed. The job menu
+adds a confirmed base-letter editor. Prepare now opens four explicit modes:
+saved base without AI, saved base adapted with AI, custom input without AI,
+and custom input adapted with AI. Facts/examples are optional and included in
+both AI modes. Custom text never overwrites the shared base. Manual modes need
+no model configuration or billable tasks. AI draft controls are labelled explicitly.
+Migration 034 adds the three guided kinds above with closed ID/revision contexts.
+Every mode retains the final exact-text HH confirmation, owner/private-chat scope,
+expiry, revision checks, atomic consumption, original-operation reconciliation
+and private history. New source selection excludes unrelated previous-draft text.
+Outer whitespace is normalized by the existing Telegram rule; internal text and
+paragraphs are preserved. See the linked specification and development result
+for automated checks; real Telegram/HH acceptance awaits an authorized release.
+
 Выпуск от 15 октября 2026: согласованный owner-only путь
 «Главное → Поиск работы» с inline-карточками и подтверждениями установлен
 на DE; в первом выпуске нижняя клавиатура не менялась. Последующее
