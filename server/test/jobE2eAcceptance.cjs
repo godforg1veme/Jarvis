@@ -96,11 +96,17 @@ test('E2E local HTTP + actual bot + PG: configure, collect, letter, approval, lo
     const findButton = (reply, label) => reply.reply_markup.inline_keyboard.flat().find((x) => x.text === label).callback_data;
     await message('/start'); assert.equal(sent.at(-1).reply_markup.inline_keyboard[0][0].callback_data, 'job:menu');
     await callback('job:menu');
-    await callback('job:settings');
-    let preview = await message('запрос - AI Engineering\nвключить');
-    await callback(findButton(preview, 'Подтвердить'));
+    const settings = await callback('job:settings');
+    const queries = await callback(settings.reply.reply_markup.inline_keyboard.flat()
+      .find((x) => x.callback_data.startsWith('job:cfg:queries:')).callback_data);
+    const phrase = await callback(queries.reply.reply_markup.inline_keyboard.flat()
+      .find((x) => x.text.endsWith(' AI Engineering')).callback_data);
+    const removal = await callback(findButton(phrase.reply, 'Удалить'));
+    await callback(findButton(removal.reply, 'Сохранить'));
+    await callback('job:resume');
+    assert.equal((await jobs.telegramService.searchRepository.getSettings({userId:fixture.owner})).settings.queries.includes('AI Engineering'),false);
     await callback('job:profile');
-    preview = await message('факт: Participated in a fixture automation project\nпример: Brief factual style.');
+    let preview = await message('факт: Participated in a fixture automation project\nпример: Brief factual style.');
     await callback(findButton(preview, 'Подтвердить'));
     await callback('job:base_letter');
     preview = await message('Owner base fixture letter');
