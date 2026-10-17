@@ -14,6 +14,7 @@ import { BackupsPage } from './pages/BackupsPage';
 import type { Overview } from './types';
 import './styles.css';
 import './extended.css';
+import './bootstrap.css';
 
 const pages = new Set<PageKey>(['overview', 'infrastructure', 'services', 'connections', 'parser', 'incidents', 'events', 'backups', 'sessions']);
 function pageFromHash(): PageKey {
@@ -50,12 +51,17 @@ function LoginView({ onApproved }: { onApproved: (overview: Overview) => void })
 
 function App() {
   const [overview, setOverview] = useState<Overview | null>(null);
-  const [authorized, setAuthorized] = useState<boolean | null>(null);
+  const [access, setAccess] = useState<'checking' | 'unauthenticated' | 'unavailable' | 'authorized'>('checking');
+  const authorized = access === 'authorized';
   const [page, setPage] = useState<PageKey>(pageFromHash());
   const [liveRevision, setLiveRevision] = useState(0);
   const bootstrap = useCallback(async () => {
-    try { setOverview(await getOverview()); setAuthorized(true); }
-    catch (error) { if (error instanceof ApiError && error.status === 401) setAuthorized(false); else setAuthorized(false); }
+    setAccess('checking');
+    try { setOverview(await getOverview()); setAccess('authorized'); }
+    catch (error) {
+      setOverview(null);
+      setAccess(error instanceof ApiError && error.status === 401 ? 'unauthenticated' : 'unavailable');
+    }
   }, []);
   useEffect(() => { void bootstrap(); }, [bootstrap]);
   useEffect(() => { const handler = () => setPage(pageFromHash()); window.addEventListener('hashchange', handler); return () => window.removeEventListener('hashchange', handler); }, []);
@@ -64,13 +70,14 @@ function App() {
     const stream = new EventSource('/ops/api/stream');
     const refresh = () => setLiveRevision((value) => value + 1);
     stream.addEventListener('snapshot', refresh); stream.addEventListener('event', refresh); stream.addEventListener('refresh', refresh);
-    stream.addEventListener('error', () => { void getOverview().catch((error) => { if (error instanceof ApiError && error.status === 401) { stream.close(); setOverview(null); setAuthorized(false); } }); });
+    stream.addEventListener('error', () => { void getOverview().catch((error) => { if (error instanceof ApiError && error.status === 401) { stream.close(); setOverview(null); setAccess('unauthenticated'); } }); });
     const timer = window.setInterval(refresh, 30000);
     return () => { window.clearInterval(timer); stream.close(); };
   }, [authorized]);
   const navigate = (next: PageKey) => { window.location.hash = `/${next}`; setPage(next); };
-  if (authorized === null) return <main className="boot">JARVIS OPS / INITIALIZING</main>;
-  if (!authorized || !overview) return <LoginView onApproved={(value) => { setOverview(value); setAuthorized(true); }} />;
+  if (access === 'checking') return <main className="boot" role="status" aria-busy="true">JARVIS OPS / INITIALIZING</main>;
+  if (access === 'unavailable') return <main className="login bootstrap-unavailable"><div className="login-brand">J</div><p>JARVIS / OPERATIONS</p><h1>Панель временно недоступна</h1><section><p role="alert">Не удалось подключиться к серверу. Проверьте соединение и повторите подключение.</p><button onClick={() => void bootstrap()}>Повторить подключение</button></section></main>;
+  if (!authorized || !overview) return <LoginView onApproved={(value) => { setOverview(value); setAccess('authorized'); }} />;
   return <AppShell page={page} onNavigate={navigate}>
     {page === 'overview' ? <OverviewPage initial={overview} refreshToken={liveRevision} /> : null}
     {page === 'infrastructure' ? <InfrastructurePage refreshToken={liveRevision} /> : null}
@@ -80,7 +87,7 @@ function App() {
     {page === 'incidents' ? <IncidentsPage refreshToken={liveRevision} /> : null}
     {page === 'events' ? <EventsPage refreshToken={liveRevision} /> : null}
     {page === 'backups' ? <BackupsPage refreshToken={liveRevision} /> : null}
-    {page === 'sessions' ? <SessionsPage onLoggedOut={() => { setOverview(null); setAuthorized(false); }} /> : null}
+    {page === 'sessions' ? <SessionsPage onLoggedOut={() => { setOverview(null); setAccess('unauthenticated'); }} /> : null}
   </AppShell>;
 }
 
