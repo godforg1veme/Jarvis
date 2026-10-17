@@ -139,11 +139,11 @@
     </main>
     <dialog id="life-project-dialog" class="life-project-dialog" aria-labelledby="life-project-dialog-title">
       <form id="life-project-form" method="dialog">
-        <header><div><p class="life-kicker">NEW FOCUS</p><h3 id="life-project-dialog-title">Новый проект</h3></div><button value="cancel" aria-label="Закрыть">×</button></header>
+        <header><div><p class="life-kicker">NEW FOCUS</p><h3 id="life-project-dialog-title">Новый проект</h3></div><button value="cancel" formnovalidate aria-label="Закрыть">×</button></header>
         <label>Название<input id="life-project-name" maxlength="160" required placeholder="Например, Life OS"></label>
         <label>Область<select id="life-project-area"><option value="">Без области</option></select></label>
         <label>Коротко о результате<textarea id="life-project-summary" maxlength="2000" rows="4" placeholder="Что должно измениться, когда проект будет завершён?"></textarea></label>
-        <footer><button value="cancel" class="life-button-quiet">Отмена</button><button id="life-project-submit" value="default" class="life-button-primary">Создать проект</button></footer>
+        <footer><button value="cancel" formnovalidate class="life-button-quiet">Отмена</button><button id="life-project-submit" value="default" class="life-button-primary">Создать проект</button></footer>
       </form>
     </dialog>
     <dialog id="life-detail-dialog" class="life-project-dialog life-detail-dialog" aria-labelledby="life-detail-dialog-title">
@@ -155,11 +155,11 @@
     </dialog>
     <dialog id="life-person-dialog" class="life-project-dialog" aria-labelledby="life-person-dialog-title">
       <form id="life-person-form" method="dialog">
-        <header><div><p class="life-kicker">PEOPLE GRAPH</p><h3 id="life-person-dialog-title">Добавить человека</h3></div><button value="cancel" aria-label="Закрыть">×</button></header>
+        <header><div><p class="life-kicker">PEOPLE GRAPH</p><h3 id="life-person-dialog-title">Добавить человека</h3></div><button value="cancel" formnovalidate aria-label="Закрыть">×</button></header>
         <label>Отображаемое имя<input id="life-person-name" maxlength="160" required autocomplete="off"></label>
         <label>Связь<select id="life-person-type"><option value="family">Семья</option><option value="partner">Партнёр</option><option value="friend">Друг</option><option value="colleague">Коллега</option><option value="client">Клиент</option><option value="provider">Поставщик</option><option value="other">Другое</option></select></label>
         <label>Псевдонимы<input id="life-person-aliases" maxlength="500" placeholder="Через запятую"></label>
-        <footer><button value="cancel" class="life-button-quiet">Отмена</button><button value="default" class="life-button-primary">Добавить</button></footer>
+        <footer><button value="cancel" formnovalidate class="life-button-quiet">Отмена</button><button value="default" class="life-button-primary">Добавить</button></footer>
       </form>
     </dialog>
   </section>

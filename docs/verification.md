@@ -4,6 +4,46 @@
 
 ## Commands and Verification
 
+Audit remediation F01–F13 (local development, 2026-10-17):
+
+```powershell
+npm test --prefix server
+node --test cloud/*.test.js voice/cloudVoiceService.test.js tts/windowsSapiService.test.js
+$env:PYTHONPATH='host-agent'
+$env:PYTHONDONTWRITEBYTECODE='1'
+python -m unittest discover -s host-agent/tests
+node scripts/testDesktopIpcBoundary.js
+node scripts/testVoiceOverlayContract.js
+node scripts/testToolGateway.js
+node scripts/testVisionIpc.js
+node scripts/testVisionMediaPermission.js
+node scripts/checkCloudPackageAssets.js
+$env:PLAYWRIGHT_CHANNEL='msedge'
+node scripts/testLifeDialogCancellation.cjs
+node scripts/testOperationsServiceDialog.cjs
+node scripts/testOperationsBootstrap.cjs
+npm test --prefix ops-ui
+npm run build --prefix ops-ui
+```
+
+Browser fixtures используют существующий Playwright из `job-browser/node_modules`
+и Edge (либо явно заданный `PLAYWRIGHT_CHANNEL`). Operations tests запускают и
+останавливают собственные локальные Vite; все API синтетические, реальные
+изменяющие действия не выполняются. Server suite включает регрессии subscription
+logs, streaming downloads, journal-to-server unknown, lifecycle и store bounds.
+Три Linux filesystem/metadata теста Host Agent пропускаются на Windows.
+Живые Electron/PostgreSQL, production shutdown и клиентские действия проверяются
+отдельно после согласованного выпуска. [Результат](updates/2026-10-17-audit-remediation-development.md).
+
+Browser fixtures use the existing Playwright in `job-browser/node_modules` and
+Edge (or an explicit `PLAYWRIGHT_CHANNEL`). Operations tests start and stop their
+own local Vite servers; all API responses are synthetic and no real mutations
+run. The server suite includes subscription logging, streaming downloads,
+journal-to-server unknown outcomes, lifecycle and store-bound regressions.
+Three Host Agent Linux filesystem/metadata tests skip on Windows. Running
+Electron/PostgreSQL, production shutdown and actual client actions require
+separate checks after an authorized release. [Results](updates/2026-10-17-audit-remediation-development.md).
+
 Windows client:
 
 Use Node.js 22.12+ (verified on 24.14.1). For a fresh dependency installation,

@@ -1,3 +1,4 @@
+const { trackWorker } = require('../lifecycle');
 const crypto = require('node:crypto');
 
 const { validateResponse } = require('../operations/hostAgentProtocol');
@@ -14,6 +15,7 @@ class VpnRecoveryWorker {
     this.now = options.now || (() => new Date());
     this.timer = null;
     this.running = false;
+    trackWorker(this, 'tick');
   }
 
   async reconcile(record) {

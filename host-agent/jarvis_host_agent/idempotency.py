@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from .protocol import ProtocolError
+from .operations import READ_ONLY_OPERATIONS
 
 
 def canonical_json(value: Any) -> str:
@@ -80,7 +81,14 @@ class IdempotencyJournal:
                 connection.execute("INSERT INTO requests (request_id,request_hash,response_json,created_at) VALUES (?,?,?,strftime('%Y-%m-%dT%H:%M:%fZ','now'))", (request["requestId"], request_hash, response_json))
             except sqlite3.IntegrityError:
                 return self.get(request) or response
-            # Keep mutation claims: deleting them would permit old signed
-            # changing requests to be executed again after a restart.
-            connection.execute("DELETE FROM requests WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-7 days') AND json_extract(response_json,'$.operation') NOT IN ('service.start','service.stop','service.restart','backup.run')")
+            # Expire only explicitly read-only responses. Mutation claims,
+            # including pending/unknown outcomes and legacy unclassified rows,
+            # must survive so an original signed request cannot run again.
+            read_operations = sorted(READ_ONLY_OPERATIONS)
+            placeholders = ",".join("?" for _ in read_operations)
+            connection.execute(
+                "DELETE FROM requests WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-7 days') "
+                f"AND json_extract(response_json,'$.operation') IN ({placeholders})",
+                read_operations,
+            )
         return response

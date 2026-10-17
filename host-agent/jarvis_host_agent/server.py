@@ -16,27 +16,7 @@ from .config import HostAgentConfig, load_config
 from .hysteria_vpn_manager import DEFAULT_AUTH_HOST, DEFAULT_AUTH_PORT, handle_hysteria_auth
 from .idempotency import IdempotencyJournal, request_mac
 from .protocol import MAX_ENVELOPE_BYTES, ProtocolError, validate_request
-
-
-# These operations intentionally return a one-time client URI.  A URI may cross
-# the authenticated Unix socket, but it must never enter the durable operation
-# journal: that journal backs `operation.status` and survives process restarts.
-# Exports are read-only, so durable at-most-once semantics are neither needed
-# nor appropriate here.
-EPHEMERAL_SECRET_OPERATIONS = frozenset({
-    "vpn.client.export",
-    "vpn.hysteria2.client.export",
-})
-
-# These are changing operations, so their claims must remain durable.  Only a
-# closed public projection of their result is journaled; the one-time URI is
-# returned to the current authenticated caller and is otherwise irrecoverable.
-SECRET_OUTPUT_MUTATIONS = frozenset({
-    "vpn.client.issue",
-    "vpn.client.rotate",
-    "vpn.hysteria2.client.issue",
-    "vpn.hysteria2.client.rotate",
-})
+from .operations import CHANGING_OPERATIONS, EPHEMERAL_SECRET_OPERATIONS, SECRET_OUTPUT_MUTATIONS
 
 
 def journal_safe_result(result: dict[str, Any]) -> dict[str, Any]:
@@ -99,7 +79,7 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter, con
             original = journal.get_response(request["arguments"]["requestId"])
             result = {"state": "succeeded", "data": {"found": original is not None, "response": original}}
             payload = journal.put(request, response_for(request, result))
-        elif request["operation"] in {"service.start", "service.stop", "service.restart", "backup.run", "vpn.client.issue", "vpn.client.revoke", "vpn.client.rotate", "vpn.client.export", "vpn.restart", "vpn.hysteria2.client.issue", "vpn.hysteria2.client.revoke", "vpn.hysteria2.client.rotate", "vpn.hysteria2.client.export", "vpn.hysteria2.restart", "vpn.external_probe.credential.install", "vpn.external_probe.run", "vpn.external_probe.monitor.enable", "vpn.external_probe.monitor.disable"}:
+        elif request["operation"] in CHANGING_OPERATIONS:
             placeholder = response_for(request, {"state": "unknown", "errorCode": "ACTION_OUTCOME_PENDING"})
             if journal.claim(request, placeholder):
                 loop = asyncio.get_running_loop()

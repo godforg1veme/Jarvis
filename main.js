@@ -112,7 +112,10 @@ function getWorkspacePreparationService() {
 }
 
 function isTrustedMainRenderer(event) {
-  return !!(mainWindow && !mainWindow.isDestroyed() && event?.sender?.id === mainWindow.webContents.id);
+  return !!(mainWindow && !mainWindow.isDestroyed()
+    && !mainWindow.webContents.isDestroyed()
+    && event?.sender === mainWindow.webContents
+    && event?.senderFrame === mainWindow.webContents.mainFrame);
 }
 
 function sendCloudEvent(channel, payload) {
@@ -721,7 +724,7 @@ function createVoiceOverlayWindow() {
     focusable: false,
     show: true,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'desktop', 'preload', 'voiceOverlay.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
@@ -757,7 +760,7 @@ function createTranscriptionBarWindow() {
     focusable: false,
     show: showTranscriptionBar,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'desktop', 'preload', 'transcriptionBar.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
@@ -808,7 +811,7 @@ function createHologramWidgetWindow() {
     hasShadow: false,
     show: showHologramWidget,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'desktop', 'preload', 'hologramWidget.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
@@ -1161,9 +1164,6 @@ app.whenReady().then(() => {
     toggleWindow();
   });
 
-  // Whitelist of allowed tool modules
-  const ALLOWED_TOOLS = ['runProgram', 'powershell', 'searchFiles', 'sysinfo', 'fileCommander'];
-
   // --- IPC Handlers ---
   ipcMain.handle('cloud:get-state', (event) => {
     if (!isTrustedMainRenderer(event) || !desktopCloudClient) return { ok: false, error: 'Access denied.' };
@@ -1247,26 +1247,6 @@ app.whenReady().then(() => {
     voiceLabWindow.hide();
     return { ok: true };
   });
-  ipcMain.handle('execute-tool', async (event, { tool, args }) => {
-    if (!ALLOWED_TOOLS.includes(tool)) {
-      return { ok: false, type: 'error', title: 'Ошибка', content: `Неизвестный инструмент: ${tool}` };
-    }
-    try {
-      const toolModule = require(`./tools/${tool}`);
-      const result = await toolModule.execute(args);
-      if (tool === 'runProgram' && result?.needsRecovery) {
-        const snapshot = await getAppRecoveryService().start(result.query, {
-          inputChannel: 'text',
-          normalizedQuery: result.normalizedQuery,
-        });
-        return recoveryResult(snapshot);
-      }
-      if (tool === 'runProgram' && result?.needsSelection) return registerAppSelection(result);
-      return result;
-    } catch (err) {
-      return { ok: false, type: 'error', title: 'Ошибка', content: err.message, error: err.message };
-    }
-  });
 
   ipcMain.handle('launch-selected-app', async (event, request) => {
     try {
@@ -1319,21 +1299,6 @@ app.whenReady().then(() => {
       };
     } catch (error) {
       return { ok: false, error: error.message };
-    }
-  });
-
-  ipcMain.handle('confirm-command', async (event, { tool, args }) => {
-    broadcastCoreMode('alert', { tool, args });
-    try {
-      if (!ALLOWED_TOOLS.includes(tool)) {
-        return { ok: false, type: 'error', title: 'Ошибка', content: `Неизвестный инструмент: ${tool}` };
-      }
-      const toolModule = require(`./tools/${tool}`);
-      return await toolModule.execute(args, true);
-    } catch (err) {
-      return { ok: false, type: 'error', title: 'Ошибка', content: err.message, error: err.message };
-    } finally {
-      setTimeout(() => broadcastCoreMode('idle'), 1500);
     }
   });
 

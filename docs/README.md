@@ -17,6 +17,13 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
+Локально исправлены [13 подтверждённых проблем аудита](updates/2026-10-17-audit-remediation-development.md):
+IPC и подтверждения Desktop, журналы и повторное выполнение, download/shutdown,
+пределы хранилищ и ошибки интерфейса. Server 723/723, cloud 73/73,
+Host Agent 146 прошли и 3 пропущены на Windows; Operations tests/build и
+browser fixtures прошли. Ветка `codex/audit-remediation` ещё не опубликована;
+оба VPS и установленный Desktop этих исправлений не получили.
+
 На DE установлена [панель настроек поиска с кнопками](updates/2026-10-16-job-settings-panel-release.md):
 отдельные параметры, готовые значения, ввод своего, списки фраз и подтверждение
 изменения. Rendering и callbacks проверены; реальные нажатия в Telegram остаются
@@ -152,6 +159,13 @@ describes publishing. Plans describe intentions. Code, checks, and actual
 deployment establish what is running.
 
 ### Current status
+
+All [13 confirmed audit findings](updates/2026-10-17-audit-remediation-development.md)
+are fixed locally: Desktop IPC and confirmations, journals and replay safety,
+downloads/shutdown, store bounds and UI failures. Server passed 723/723, cloud
+73/73; Host Agent passed 146 with three Windows skips. Operations tests/build
+and browser fixtures passed. Branch `codex/audit-remediation` is unpublished;
+neither VPS node nor the installed Desktop has received these fixes.
 
 The [button-based job settings panel](updates/2026-10-16-job-settings-panel-release.md)
 is deployed on DE: separate fields, presets, custom values, phrase lists and

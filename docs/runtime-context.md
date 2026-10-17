@@ -35,6 +35,22 @@ See `docs/README.md` for current implementation status and historical records.
 
 ## Current Architecture
 
+### Local audit remediation, 17 October 2026
+
+These source changes await publication; the [development record](updates/2026-10-17-audit-remediation-development.md)
+tracks verification and deployment separately. `server/src/lifecycle.js` stops
+worker admission/timers synchronously and drains admitted tasks before the pool.
+All resources are attempted within one eight-second shutdown budget; a timeout
+does not cancel an external mutation or authorize replay. Jobs and Operations
+share the same deadline. Host Agent housekeeping expires only explicitly read-only
+responses; changing and unclassified claims remain durable.
+
+Rate-limit and Vision stores sweep expired records incrementally, with default
+caps of 10,000 rate keys, 1,000 leases and 256 capture requests per lease. Full
+stores reject admission without evicting live counters or replay guards. Telegram
+document downloads enforce the byte limit while streaming and one 30-second
+deadline across metadata, fetch and body reads.
+
 ### Job search
 
 Выпущен на DE 15 октября 2026: домен `server/src/jobs`, существующий Telegram
@@ -151,7 +167,14 @@ durable refresh, bounded retries и owner-scoped уведомления. Migrati
 
 - Target OS: Windows; runtime: Electron + Node.js CommonJS.
 - `main.js` owns Electron lifecycle, tray, shortcuts, windows, and IPC wiring.
-- `preload.js` exposes explicit renderer capabilities.
+- `preload.js` exposes explicit main-renderer capabilities. The overlay,
+  transcription bar and widget use separate minimal preloads in `desktop/preload/`.
+  Raw `execute-tool`/`confirm-command` handlers are removed; privileged main-window
+  handlers require the exact main webContents and its main frame.
+- `cloud/desktopCloudClient.js` persists command claims before execution. A corrupt,
+  unreadable or unexpectedly replaced journal blocks commands; missing history
+  reports an unknown outcome. Completed result bodies are capped at 100, while
+  original IDs remain as compact claims without an agreed replay expiry.
 - `renderer/` contains the launcher, task UI, voice overlay, and Voice Lab.
 - `renderer/life-os/` is the Desktop-first Mission Control surface. Its preload
   bridge exposes only bounded Life OS operations; proposal payloads do not

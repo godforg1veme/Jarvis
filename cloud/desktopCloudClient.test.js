@@ -34,6 +34,212 @@ class HandshakeSocket {
   emit(name, event = {}) { this.listeners.get(name)(event); }
 }
 
+function journalClient(userDataPath, executeRemoteCommand = async () => ({ ok: true })) {
+  const client = new DesktopCloudClient({
+    userDataPath, safeStorage: fakeSafeStorage(), WebSocket: FailingSocket,
+    capabilities: { localActions: ['file.write'] }, executeRemoteCommand,
+  });
+  const results = [];
+  client._sendSessionMessage = (type, payload) => results.push({ type, ...payload });
+  return { client, results, execute: (commandId = 'cmd-journal-test') => client._handleRemoteCommand({
+    payload: { commandId, action: 'file.write', args: {}, confirmed: true },
+  }) };
+}
+
+test('corrupt and invalid command journals block changing execution without replacing the file', async () => {
+  for (const content of ['{broken', '[]', 'null', '{"bad-id":{"status":"running"}}',
+    '{"cmd-old":{"status":"completed"}}', '{"cmd-old":{"status":"other"}}']) {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-journal-'));
+    const journalPath = path.join(directory, 'cloud-command-journal.json');
+    try {
+      fs.writeFileSync(journalPath, content);
+      let executions = 0;
+      const { client, results, execute } = journalClient(directory, async () => { executions += 1; return { ok: true }; });
+      await execute();
+      await execute();
+      assert.equal(executions, 0, content);
+      assert.equal(fs.readFileSync(journalPath, 'utf8'), content);
+      assert.equal(client.getState().commandJournalStatus, 'blocked');
+      assert.equal(results[0].result.code, 'COMMAND_JOURNAL_CORRUPT');
+      assert.equal(JSON.stringify(results).includes(content), false);
+    } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+  }
+});
+
+test('journal permission read errors fail closed and expose only a safe code', async (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-journal-'));
+  const journalPath = path.join(directory, 'cloud-command-journal.json');
+  try {
+    fs.writeFileSync(journalPath, '{}');
+    const originalRead = fs.readFileSync;
+    const readMock = t.mock.method(fs, 'readFileSync', function (filename, ...args) {
+      if (filename === journalPath) throw Object.assign(new Error('private-read-error'), { code: 'EACCES' });
+      return originalRead.call(this, filename, ...args);
+    });
+    let executions = 0;
+    const { client, results, execute } = journalClient(directory, async () => { executions += 1; return { ok: true }; });
+    readMock.mock.restore();
+    await execute();
+    assert.equal(executions, 0);
+    assert.equal(client.getState().commandJournalError, 'COMMAND_JOURNAL_UNAVAILABLE');
+    assert.equal(results[0].result.code, 'COMMAND_JOURNAL_UNAVAILABLE');
+    assert.equal(JSON.stringify(results).includes('private-read-error'), false);
+    assert.equal(fs.readFileSync(journalPath, 'utf8'), '{}');
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('first-run journal persists a checksummed version and replays the original result after restart', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-journal-'));
+  try {
+    let executions = 0;
+    const executor = async () => { executions += 1; return { ok: true, value: 42 }; };
+    const first = journalClient(directory, executor);
+    await first.execute();
+    const disk = JSON.parse(fs.readFileSync(path.join(directory, 'cloud-command-journal.json'), 'utf8'));
+    assert.equal(disk.version, 1);
+    assert.match(disk.checksum, /^[a-f0-9]{64}$/);
+    assert.equal(disk.entries['cmd-journal-test'].status, 'completed');
+    const restarted = journalClient(directory, executor);
+    await restarted.execute();
+    assert.equal(executions, 1);
+    assert.deepEqual(restarted.results[0].result, first.results[0].result);
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('checksum mismatch and unsupported journal versions block execution and preserve evidence', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-journal-'));
+  const journalPath = path.join(directory, 'cloud-command-journal.json');
+  try {
+    await journalClient(directory).execute();
+    const valid = JSON.parse(fs.readFileSync(journalPath, 'utf8'));
+    for (const invalid of [{ ...valid, checksum: '0'.repeat(64) }, { ...valid, version: 2 }]) {
+      const content = JSON.stringify(invalid);
+      fs.writeFileSync(journalPath, content);
+      let executions = 0;
+      const harness = journalClient(directory, async () => { executions += 1; return { ok: true }; });
+      await harness.execute('cmd-new');
+      assert.equal(executions, 0);
+      assert.equal(harness.results[0].result.code, 'COMMAND_JOURNAL_CORRUPT');
+      assert.equal(fs.readFileSync(journalPath, 'utf8'), content);
+    }
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('legacy journals retain running, unknown and old completed ID claims beyond the result cache limit', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-journal-'));
+  const journalPath = path.join(directory, 'cloud-command-journal.json');
+  try {
+    const entries = Object.fromEntries(Array.from({ length: 110 }, (_, index) => [
+      `cmd-running-${index}`, { status: 'running', action: 'file.write' },
+    ]));
+    entries['cmd-uncertain'] = { status: 'completed', result: { ok: false, executionUnknown: true } };
+    for (let index = 0; index < 105; index += 1) {
+      entries[`cmd-complete-${index}`] = { status: 'completed', result: { ok: true, value: index } };
+    }
+    fs.writeFileSync(journalPath, JSON.stringify(entries));
+    let executions = 0;
+    const executor = async () => { executions += 1; return { ok: true }; };
+    const harness = journalClient(directory, executor);
+    assert.equal(harness.client.getState().commandJournalStatus, 'ready');
+    await harness.execute('cmd-new');
+    const migrated = JSON.parse(fs.readFileSync(journalPath, 'utf8'));
+    assert.equal(migrated.version, 1);
+    assert.equal(Object.keys(migrated.entries).length, Object.keys(entries).length + 1);
+    assert.equal(migrated.entries['cmd-running-0'].status, 'running');
+    assert.equal(migrated.entries['cmd-uncertain'].result.executionUnknown, true);
+    assert.equal(migrated.entries['cmd-complete-0'].status, 'unknown');
+    assert.equal(Object.values(migrated.entries).filter((entry) => entry.status === 'completed'
+      && entry.result.executionUnknown !== true).length, 100);
+    const restarted = journalClient(directory, executor);
+    for (const id of ['cmd-running-0', 'cmd-running-109', 'cmd-uncertain', 'cmd-complete-0', 'cmd-complete-104']) {
+      await restarted.execute(id);
+    }
+    assert.equal(executions, 1);
+    assert.equal(restarted.results[0].result.executionUnknown, true);
+    assert.equal(restarted.results[2].result.executionUnknown, true);
+    assert.equal(restarted.results[3].result.executionUnknown, true);
+    assert.deepEqual(restarted.results[4].result, { ok: true, value: 104 });
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('removal or replacement of an existing journal blocks new commands without recreating it', async () => {
+  for (const replacement of [null, '{changed']) {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-journal-'));
+    const journalPath = path.join(directory, 'cloud-command-journal.json');
+    try {
+      let executions = 0;
+      const harness = journalClient(directory, async () => { executions += 1; return { ok: true }; });
+      await harness.execute('cmd-first');
+      if (replacement === null) fs.unlinkSync(journalPath);
+      else fs.writeFileSync(journalPath, replacement);
+      await harness.execute('cmd-next');
+      await harness.execute('cmd-next');
+      assert.equal(executions, 1);
+      assert.equal(harness.client.getState().commandJournalStatus, 'blocked');
+      assert.equal(harness.results[1].result.code, 'COMMAND_JOURNAL_UNAVAILABLE');
+      if (replacement === null) assert.equal(fs.existsSync(journalPath), false);
+      else assert.equal(fs.readFileSync(journalPath, 'utf8'), replacement);
+    } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+  }
+});
+
+test('journal write and rename failures remain blocked after filesystem access recovers', async (t) => {
+  for (const method of ['writeFileSync', 'renameSync']) {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-journal-'));
+    const journalPath = path.join(directory, 'cloud-command-journal.json');
+    try {
+      fs.writeFileSync(journalPath, '{}');
+      let executions = 0;
+      const harness = journalClient(directory, async () => { executions += 1; return { ok: true }; });
+      const original = fs[method];
+      const failure = t.mock.method(fs, method, function (filename, ...args) {
+        if (String(filename).startsWith(journalPath)) throw Object.assign(new Error('private-write-error'), { code: 'EACCES' });
+        return original.call(this, filename, ...args);
+      });
+      await harness.execute();
+      failure.mock.restore();
+      await harness.execute();
+      await harness.execute('cmd-next');
+      assert.equal(executions, 0);
+      assert.equal(harness.client.getState().commandJournalStatus, 'blocked');
+      assert.equal(JSON.stringify(harness.results).includes('private-write-error'), false);
+      assert.equal(fs.readFileSync(journalPath, 'utf8'), '{}');
+    } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+  }
+});
+
+test('failure to persist completion retains the running claim and reports unknown on restart', async (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-journal-'));
+  const journalPath = path.join(directory, 'cloud-command-journal.json');
+  let failure;
+  try {
+    let executions = 0;
+    const executor = async () => {
+      executions += 1;
+      const originalRename = fs.renameSync;
+      failure = t.mock.method(fs, 'renameSync', function (filename, ...args) {
+        if (String(filename).startsWith(journalPath)) throw new Error('private-rename-error');
+        return originalRename.call(this, filename, ...args);
+      });
+      return { ok: true };
+    };
+    const harness = journalClient(directory, executor);
+    await harness.execute();
+    failure.mock.restore();
+    assert.equal(harness.results[0].result.executionUnknown, true);
+    assert.equal(harness.client.commandJournal['cmd-journal-test'].status, 'running');
+    await harness.execute('cmd-next');
+    const restarted = journalClient(directory, executor);
+    await restarted.execute();
+    assert.equal(executions, 1);
+    assert.equal(restarted.results[0].result.executionUnknown, true);
+    assert.equal(JSON.stringify(harness.results).includes('private-rename-error'), false);
+  } finally {
+    if (failure) failure.mock.restore();
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test('cloud client stores the device token separately from its readable state', async () => {
   const userDataPath = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-cloud-client-'));
   try {

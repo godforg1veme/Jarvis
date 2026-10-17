@@ -1,9 +1,11 @@
+const { trackWorker } = require('../../lifecycle');
 const { listMigrationFiles } = require('../../db/migrate');
 
 class HealthCheckWorker {
   constructor({ pool, repository, hostId, incidentEngine, provider, getPollingHealth, logger }) {
     Object.assign(this, { pool, repository, hostId, incidentEngine, provider, getPollingHealth, logger });
     this.running = false; this.timer = null; this.startedAt = Date.now();
+    trackWorker(this, 'runOnce');
   }
   start() { if (!this.timer) { this.timer = setInterval(() => { void this.runOnce(); }, 30000); void this.runOnce(); } }
   stop() { clearInterval(this.timer); this.timer = null; }

@@ -1,5 +1,8 @@
+const { trackWorker } = require('../lifecycle');
 class JobHistoryWorker{
-  constructor({repository,client,intervalMs=1500,report=code=>process.stderr.write(`${code}\n`)}){Object.assign(this,{repository,client,intervalMs,report});this.running=false;this.timer=null;}
+  constructor({repository,client,intervalMs=1500,report=code=>process.stderr.write(`${code}\n`)}){Object.assign(this,{repository,client,intervalMs,report});this.running=false;this.timer=null;
+    trackWorker(this, 'tick');
+  }
   async tick(){
     if(this.running)return;this.running=true;let run;
     try{run=await this.repository.claim();if(!run)return;
@@ -9,6 +12,7 @@ class JobHistoryWorker{
     finally{this.running=false;}
   }
   start(){if(!this.timer){this.timer=setInterval(()=>{void this.tick().catch(()=>this.report('JOB_HISTORY_QUEUE_UNAVAILABLE'));},this.intervalMs);this.timer.unref?.();}}
-  async close(){clearInterval(this.timer);this.timer=null;while(this.running)await new Promise(r=>setTimeout(r,10));}
+  stop() { clearInterval(this.timer); this.timer = null; }
+  close() { return this.stop(); }
 }
 module.exports={JobHistoryWorker};

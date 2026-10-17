@@ -1,3 +1,4 @@
+const { trackWorker } = require('../lifecycle');
 const { jobTransaction } = require('./jobTransaction');
 
 async function recoverJobGenerations(pool) {
@@ -13,6 +14,7 @@ class JobRecoveryWorker {
   constructor({ pool, applicationRepository, intervalMs = 30000 }) {
     Object.assign(this, { pool, applicationRepository, intervalMs });
     this.timer = null; this.inFlight = null;
+    trackWorker(this, 'tick');
   }
   tick() {
     if (this.inFlight) return this.inFlight;
@@ -23,16 +25,19 @@ class JobRecoveryWorker {
     return this.inFlight;
   }
   async start() {
+    this.stopping = false;
     await this.tick();
+    if (this.stopping) return;
     if (!this.timer) {
       this.timer = setInterval(() => { void this.tick().catch(() => {}); }, this.intervalMs);
       this.timer.unref?.();
     }
   }
-  async close() {
+  stop() {
+    this.stopping = true;
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
-    await this.inFlight;
   }
+  close() { return this.stop(); }
 }
 module.exports = { recoverJobGenerations, JobRecoveryWorker };

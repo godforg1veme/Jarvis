@@ -1,5 +1,8 @@
+const { trackWorker } = require('../../lifecycle');
 class RetentionWorker {
-  constructor(options) { this.repository = options.repository; this.incidentEngine = options.incidentEngine; this.intervalMs = options.intervalMs || 3600000; this.logger = options.logger; this.timer = null; this.running = false; }
+  constructor(options) { this.repository = options.repository; this.incidentEngine = options.incidentEngine; this.intervalMs = options.intervalMs || 3600000; this.logger = options.logger; this.timer = null; this.running = false;
+    trackWorker(this, 'runOnce');
+  }
   start() { if (!this.timer) { this.timer = setInterval(() => { void this.runOnce(); }, this.intervalMs); } }
   stop() { if (this.timer) clearInterval(this.timer); this.timer = null; }
   async runOnce() {

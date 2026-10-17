@@ -1,3 +1,4 @@
+const { trackWorker } = require('../lifecycle');
 const { cardView, attentionView } = require('./jobTelegramViews');
 const { captchaNoticeView } = require('./jobCaptchaNotices');
 const { assertJobScope } = require('./jobSchemas');
@@ -5,6 +6,7 @@ class JobDeliveryWorker {
   constructor({ pool, searchRepository, deliveryRepository, send, captchaEnabled = false, intervalMs = 2000 }) {
     Object.assign(this, { pool, searchRepository, deliveryRepository, send, captchaEnabled, intervalMs });
     this.timer = null; this.running = false;
+    trackWorker(this, 'tick');
   }
   async tick() {
     if (this.running) return;
@@ -56,6 +58,6 @@ class JobDeliveryWorker {
   }
   start() { if (!this.timer) { this.timer = setInterval(() => { void this.tick().catch(() => {}); }, this.intervalMs); this.timer.unref?.(); } }
   stop() { if (this.timer) clearInterval(this.timer); this.timer = null; }
-  async close() { this.stop(); while (this.running) await new Promise((resolve) => setTimeout(resolve, 10)); }
+  close() { return this.stop(); }
 }
 module.exports = { JobDeliveryWorker };

@@ -1,3 +1,4 @@
+const { trackWorker } = require('../lifecycle');
 const crypto = require('node:crypto');
 
 const RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
@@ -146,13 +147,18 @@ class VisualMemoryService {
 class VisualMemoryWorker {
   constructor({ service, intervalMs = 60_000, logger = console }) {
     this.service = service; this.intervalMs = intervalMs; this.logger = logger; this.timer = null;
+    trackWorker(this, 'runOnce');
   }
   start() {
     if (this.timer) return;
-    this.timer = setInterval(() => this.service.cleanupExpired().catch((error) => this.logger.warn({ errorCode: String(error?.code || error?.name || 'CLEANUP_FAILED').slice(0, 80) }, 'visual memory cleanup failed')), this.intervalMs);
+    this.timer = setInterval(() => void this.runOnce(), this.intervalMs);
     if (typeof this.timer.unref === 'function') this.timer.unref();
   }
   stop() { if (this.timer) clearInterval(this.timer); this.timer = null; }
+  async runOnce() {
+    try { await this.service.cleanupExpired(); }
+    catch (_) { this.logger.warn({ errorCode: 'CLEANUP_FAILED' }, 'visual memory cleanup failed'); }
+  }
 }
 
 module.exports = { PENDING_MS, RETENTION_MS, SECRET_PATTERNS, VisualMemoryService, VisualMemoryWorker, isVisualMemoryQuery, searchableTokens };

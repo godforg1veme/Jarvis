@@ -11,6 +11,7 @@ const AUTHENTICATION_TIMEOUT_MS = 10000;
 const DEFAULT_CLOUD_SERVER_URL = 'https://jarvis.rilora.ru';
 const COMMAND_JOURNAL_FILE = 'cloud-command-journal.json';
 const MAX_COMMAND_JOURNAL_ENTRIES = 100;
+const COMMAND_JOURNAL_VERSION = 1;
 const VPN_EXPORT_DIR = 'vpn-exports';
 
 function normalizeServerUrl(value, options = {}) {
@@ -41,6 +42,32 @@ function safeJsonParse(value, fallback) {
   try { return JSON.parse(value); } catch (_) { return fallback; }
 }
 
+function journalChecksum(entries) {
+  return crypto.createHash('sha256').update(JSON.stringify(entries)).digest('hex');
+}
+
+function validJournalEntries(entries) {
+  if (!entries || typeof entries !== 'object' || Array.isArray(entries)) return false;
+  return Object.entries(entries).every(([id, entry]) => {
+    if (!(/^[a-f0-9-]{36}$/i.test(id) || /^cmd-[a-zA-Z0-9_.:-]{1,128}$/.test(id))
+      || !entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
+    if (entry.status === 'unknown') return true;
+    if (entry.status === 'running') return typeof entry.action === 'string' && entry.action.length > 0;
+    return entry.status === 'completed' && entry.result && typeof entry.result === 'object'
+      && !Array.isArray(entry.result);
+  });
+}
+
+function compactCommandJournal(journal) {
+  // Bound cached result bodies, never the ID claims: no replay expiry is negotiated.
+  const completed = Object.entries(journal).filter(([, entry]) => entry.status === 'completed'
+    && entry.result.executionUnknown !== true);
+  for (const [id] of completed.slice(0, -MAX_COMMAND_JOURNAL_ENTRIES)) {
+    journal[id] = { status: 'unknown' };
+  }
+  return journal;
+}
+
 class DesktopCloudClient {
   constructor(options) {
     this.userDataPath = options.userDataPath;
@@ -60,6 +87,8 @@ class DesktopCloudClient {
     this.publicPath = path.join(this.userDataPath, PUBLIC_STATE_FILE);
     this.secretPath = path.join(this.userDataPath, SECRET_FILE);
     this.commandJournalPath = path.join(this.userDataPath, COMMAND_JOURNAL_FILE);
+    this.commandJournalError = null;
+    this.commandJournalRevision = null;
     this.commandJournal = this._readCommandJournal();
     this.publicState = this._readPublicState();
     this.socket = null;
@@ -97,30 +126,52 @@ class DesktopCloudClient {
   }
 
   _readCommandJournal() {
+    let raw;
     try {
-      const value = safeJsonParse(fs.readFileSync(this.commandJournalPath, 'utf8'), {});
-      if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-      return Object.fromEntries(Object.entries(value)
-        .filter(([key, item]) => (/^[a-f0-9-]{36}$/i.test(key) || /^cmd-[a-zA-Z0-9_.:-]{1,128}$/.test(key)) && item && typeof item === 'object')
-        .slice(-MAX_COMMAND_JOURNAL_ENTRIES));
+      raw = fs.readFileSync(this.commandJournalPath, 'utf8');
+    } catch (error) {
+      if (error.code !== 'ENOENT') this.commandJournalError = 'COMMAND_JOURNAL_UNAVAILABLE';
+      return {};
+    }
+    try {
+      const value = JSON.parse(raw);
+      const versioned = value && Object.hasOwn(value, 'version');
+      const entries = versioned ? value.entries : value;
+      if (!validJournalEntries(entries) || (versioned && (value.version !== COMMAND_JOURNAL_VERSION
+        || value.checksum !== journalChecksum(entries)))) throw new Error('Invalid journal');
+      this.commandJournalRevision = raw;
+      return compactCommandJournal(entries);
     } catch (_) {
+      this.commandJournalError = 'COMMAND_JOURNAL_CORRUPT';
       return {};
     }
   }
 
-  _writeCommandJournal() {
-    fs.mkdirSync(this.userDataPath, { recursive: true });
-    const entries = Object.entries(this.commandJournal).slice(-MAX_COMMAND_JOURNAL_ENTRIES);
-    const temporary = `${this.commandJournalPath}.${process.pid}.tmp`;
-    fs.writeFileSync(temporary, `${JSON.stringify(Object.fromEntries(entries))}\n`, 'utf8');
-    fs.renameSync(temporary, this.commandJournalPath);
+  _writeCommandJournal(entries) {
+    if (this.commandJournalError) throw new Error(this.commandJournalError);
+    try {
+      let current = null;
+      try { current = fs.readFileSync(this.commandJournalPath, 'utf8'); } catch (error) {
+        if (error.code !== 'ENOENT' || this.commandJournalRevision !== null) throw error;
+      }
+      if (current !== this.commandJournalRevision) throw new Error('Journal changed outside this session');
+      fs.mkdirSync(this.userDataPath, { recursive: true });
+      const raw = `${JSON.stringify({ version: COMMAND_JOURNAL_VERSION, entries, checksum: journalChecksum(entries) })}\n`;
+      const temporary = `${this.commandJournalPath}.${process.pid}.tmp`;
+      fs.writeFileSync(temporary, raw, 'utf8');
+      fs.renameSync(temporary, this.commandJournalPath);
+      this.commandJournalRevision = raw;
+    } catch (_) {
+      this.commandJournalError = 'COMMAND_JOURNAL_UNAVAILABLE';
+      this._emitState();
+      throw new Error(this.commandJournalError);
+    }
   }
 
   _rememberCommand(commandId, entry) {
-    this.commandJournal[commandId] = entry;
-    const entries = Object.entries(this.commandJournal).slice(-MAX_COMMAND_JOURNAL_ENTRIES);
-    this.commandJournal = Object.fromEntries(entries);
-    this._writeCommandJournal();
+    const journal = compactCommandJournal({ ...this.commandJournal, [commandId]: entry });
+    this._writeCommandJournal(journal);
+    this.commandJournal = journal;
   }
 
   _writeCredentials({ serverUrl, device, token }) {
@@ -150,6 +201,8 @@ class DesktopCloudClient {
       defaultServerUrl: this.defaultServerUrl,
       deviceId: this.publicState.deviceId || '',
       deviceName: this.publicState.deviceName || '',
+      commandJournalStatus: this.commandJournalError ? 'blocked' : 'ready',
+      commandJournalError: this.commandJournalError,
       ...extra,
     });
   }
@@ -166,6 +219,8 @@ class DesktopCloudClient {
       defaultServerUrl: this.defaultServerUrl,
       deviceId: this.publicState.deviceId || '',
       deviceName: this.publicState.deviceName || '',
+      commandJournalStatus: this.commandJournalError ? 'blocked' : 'ready',
+      commandJournalError: this.commandJournalError,
     };
   }
 
@@ -567,6 +622,13 @@ class DesktopCloudClient {
   async _handleRemoteCommand(message) {
     const payload = message.payload || {};
     const commandId = payload.commandId;
+    if (this.commandJournalError) {
+      this._sendSessionMessage('command.result', { commandId, result: {
+        ok: false, executionUnknown: true, code: this.commandJournalError,
+        error: 'Local commands are blocked. Restore access to the command journal and reconcile original command IDs before restarting Desktop.',
+      } });
+      return;
+    }
     const cached = this.commandJournal[commandId];
     if (cached) {
       const result = cached.status === 'completed'
@@ -578,8 +640,12 @@ class DesktopCloudClient {
 
     const actions = Array.isArray(this.capabilities.localActions) ? this.capabilities.localActions : [];
     if (!actions.includes(payload.action)) {
-      const result = { ok: false, action: payload.action, error: 'Action is not available on this Desktop.' };
-      this._rememberCommand(commandId, { status: 'completed', result });
+      let result = { ok: false, action: payload.action, error: 'Action is not available on this Desktop.' };
+      try {
+        this._rememberCommand(commandId, { status: 'completed', result });
+      } catch (_) {
+        result = { ok: false, code: this.commandJournalError, error: 'Desktop command journal is unavailable; command was not executed.' };
+      }
       this._sendSessionMessage('command.result', { commandId, result });
       return;
     }
@@ -590,6 +656,7 @@ class DesktopCloudClient {
       const result = {
         ok: false,
         action: payload.action,
+        code: this.commandJournalError,
         error: 'Desktop command journal is unavailable; command was not executed.',
       };
       this._sendSessionMessage('command.result', { commandId, result });
@@ -622,6 +689,7 @@ class DesktopCloudClient {
         ok: false,
         action: payload.action,
         executionUnknown: true,
+        code: this.commandJournalError,
         error: 'Command completed but its local journal could not be updated.',
       };
     }

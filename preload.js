@@ -1,9 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('jarvis', {
-  // Execute a tool (run, powershell, find, sys)
-  executeTool: (tool, args) => ipcRenderer.invoke('execute-tool', { tool, args }),
-
   // Launch a candidate app directly from the selection UI
   launchSelectedApp: (candidateId) => ipcRenderer.invoke('launch-selected-app', { candidateId }),
   selectAppRecovery: (recoveryId, candidateId) => ipcRenderer.invoke('app-recovery-select', { recoveryId, candidateId }),
@@ -11,9 +8,6 @@ contextBridge.exposeInMainWorld('jarvis', {
   cancelAppRecovery: (recoveryId) => ipcRenderer.invoke('app-recovery-cancel', { recoveryId }),
   getAppRecoveryDetails: (recoveryId, candidateId) => ipcRenderer.invoke('app-recovery-details', { recoveryId, candidateId }),
   onAppRecoveryState: (callback) => ipcRenderer.on('app-recovery-state', (_event, snapshot) => callback(snapshot)),
-
-  // Confirm dangerous command
-  confirmCommand: (tool, args) => ipcRenderer.invoke('confirm-command', { tool, args }),
 
   // History
   getHistory: () => ipcRenderer.invoke('get-history'),

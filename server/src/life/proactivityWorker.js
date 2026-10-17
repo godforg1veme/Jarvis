@@ -1,3 +1,4 @@
+const { trackWorker } = require('../lifecycle');
 const { ProactivityEngine } = require('./proactivity/proactivityEngine');
 
 class ProactivityWorker {
@@ -14,6 +15,7 @@ class ProactivityWorker {
     this.logger = options.logger || null;
     this.timer = null;
     this.running = false;
+    trackWorker(this, 'tick');
   }
 
   async evaluateEvent(event, linked = null) {

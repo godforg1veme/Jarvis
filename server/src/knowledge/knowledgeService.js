@@ -1,3 +1,4 @@
+const { trackWorker } = require('../lifecycle');
 const crypto = require('node:crypto');
 const { storageKeyForId } = require('./documentStorage');
 const { chunkText, extractDocumentText } = require('./documentText');
@@ -276,6 +277,7 @@ class KnowledgeWorker {
     this.intervalMs = Math.min(Math.max(Number(options.intervalMs || 2000), 250), 60000);
     this.timer = null;
     this.running = false;
+    trackWorker(this, 'runOnce');
   }
 
   start() {

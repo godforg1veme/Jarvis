@@ -2,10 +2,44 @@ const Fastify = require('fastify');
 const { buildRoutingHtmlPage } = require('./vpn/vpnRoutingService');
 const { hashToken } = require('./vpn/vpnSubscriptionService');
 
+function subscriptionLogPath(url) {
+  // Decode ASCII escapes for classification only; preserve the actual request.
+  // This also covers malformed/escaped paths handled by Fastify's default 404.
+  const prefix = (url || '').slice(0, 64).replace(/%([0-9a-f]{2})/gi,
+    (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+  const match = /^\/(sub|happ-sub)\//.exec(prefix);
+  return match ? `/${match[1]}/:token` : null;
+}
+
+function safeRequestLog(request) {
+  // A subscription URL is a bearer credential. Drop the complete query too:
+  // clients can repeat the credential there under an arbitrary parameter name.
+  return {
+    method: request.method,
+    url: subscriptionLogPath(request.url) || request.url,
+    version: request.headers && request.headers['accept-version'],
+    host: request.host,
+    remoteAddress: request.ip,
+    remotePort: request.socket ? request.socket.remotePort : undefined,
+  };
+}
+
+function safeSubscriptionError(error) {
+  // Message, stack, cause and arbitrary provider properties can contain the URL.
+  // Keep only a closed diagnostic and a numeric HTTP outcome for this route.
+  const statusCode = Number(error && error.statusCode);
+  return {
+    type: 'SubscriptionRequestError',
+    ...(Number.isInteger(statusCode) && statusCode >= 400 && statusCode <= 599
+      ? { statusCode } : {}),
+  };
+}
+
 function loggerOptions(config) {
   if (config.logLevel === 'silent') return false;
   return {
     level: config.logLevel,
+    serializers: { req: safeRequestLog },
     redact: {
       paths: [
         'req.headers.authorization',
@@ -53,6 +87,20 @@ function buildApp(options = {}) {
     trustProxy: config.trustProxy,
     bodyLimit: 1024 * 1024,
     requestIdHeader: false,
+    // Fastify's default 404/error messages can interpolate the raw URL outside
+    // the req serializer. Emit only closed lifecycle messages for this prefix.
+    logController: new Fastify.LogController({
+      disableRequestLogging: (request) => Boolean(subscriptionLogPath(request.url)),
+    }),
+  });
+
+  app.addHook('onRequest', async (request) => {
+    if (subscriptionLogPath(request.url)) request.log.info({ req: request }, 'incoming request');
+  });
+  app.addHook('onResponse', async (request, reply) => {
+    if (subscriptionLogPath(request.url)) {
+      request.log.info({ res: reply, responseTime: reply.elapsedTime }, 'request completed');
+    }
   });
 
   app.addHook('onSend', async (request, reply, payload) => {
@@ -80,7 +128,8 @@ function buildApp(options = {}) {
     reply.type('text/html; charset=utf-8').send(buildRoutingHtmlPage());
   });
 
-  app.get('/sub/:token', async (request, reply) => {
+  const subscriptionLogOptions = { logSerializers: { err: safeSubscriptionError } };
+  app.get('/sub/:token', subscriptionLogOptions, async (request, reply) => {
     const svc = options.vpnSubscriptionService || app.vpnSubscriptionService;
     if (!svc) {
       reply.code(503).type('application/json').send({ error: 'SERVICE_UNAVAILABLE' });
@@ -94,7 +143,7 @@ function buildApp(options = {}) {
     reply.code(result.status).type(result.contentType).send(result.body);
   });
 
-  app.get('/happ-sub/:token', async (request, reply) => {
+  app.get('/happ-sub/:token', subscriptionLogOptions, async (request, reply) => {
     const svc = options.vpnSubscriptionService || app.vpnSubscriptionService;
     if (!svc) {
       reply.code(503).type('text/html; charset=utf-8').send('<h1>503 Сервис недоступен</h1>');
@@ -125,7 +174,10 @@ function buildApp(options = {}) {
   });
 
   app.setErrorHandler((error, request, reply) => {
-    request.log.error({ err: error, requestId: request.id }, 'request failed');
+    request.log.error({
+      err: subscriptionLogPath(request.url) ? safeSubscriptionError(error) : error,
+      requestId: request.id,
+    }, 'request failed');
     const statusCode = error && error.name === 'ZodError'
       ? 400
       : Number(error.statusCode) >= 400 && Number(error.statusCode) < 500

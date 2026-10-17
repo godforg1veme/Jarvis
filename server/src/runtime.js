@@ -1,3 +1,4 @@
+const { createResourceCloser } = require('./lifecycle');
 const { InputFile } = require('grammy');
 const { buildApp } = require('./app');
 const { AssistantService } = require('./assistant/assistantService');
@@ -116,6 +117,7 @@ async function createRuntime(config, overrides = {}) {
   const readinessChecks = pool ? [databaseReadinessCheck(pool)] : [];
   const app = overrides.app || buildApp({ config, readinessChecks });
   let bot = overrides.bot || null;
+  let pollingTask = null;
   let jobRuntime = null;
   let pollingHealth = { at: 0, ok: false };
 
@@ -706,6 +708,25 @@ async function createRuntime(config, overrides = {}) {
     }
   }
 
+  const closeRuntime = createResourceCloser([
+    ...Object.entries({ jobRuntime, operationsRuntime }).filter(([, value]) => value).map(([name, value]) => ({
+      name, close: (deadline) => value.close({ deadline }),
+    })),
+    ...Object.entries({ knowledgeWorker, visualMemoryWorker, commandWorker, vpnRecoveryWorker,
+      lifeProjectionWorker, proactivityWorker, reminderWorker }).filter(([, value]) => value).map(([name, value]) => ({
+      name, close: () => value.stop(),
+    })),
+    { name: 'telegram', close: () => {
+      if (bot && (typeof bot.isRunning !== 'function' || bot.isRunning())) return bot.stop();
+    } },
+    // grammY stop() aborts polling but explicitly does not await middleware.
+    { name: 'telegramHandlers', close: () => pollingTask },
+    { name: 'http', close: () => app.close() },
+  ], {
+    final: pool ? [{ name: 'database', close: () => pool.end() }] : [],
+    timeoutMs: overrides.shutdownTimeoutMs,
+  });
+
   return {
     app,
     bot,
@@ -735,22 +756,11 @@ async function createRuntime(config, overrides = {}) {
       if (lifeProjectionWorker) lifeProjectionWorker.start();
       if (config.lifeOsProactivityEnabled && proactivityWorker) proactivityWorker.start();
       if (config.lifeOsRemindersEnabled && reminderWorker) reminderWorker.start();
-      if (bot) void bot.start().catch((error) => app.log.error({ err: error }, 'Telegram polling stopped'));
+      if (bot) pollingTask = bot.start().catch(() => {
+        app.log.error({ code: 'TELEGRAM_POLLING_STOPPED' }, 'Telegram polling stopped');
+      });
     },
-    async close() {
-      if (jobRuntime) await jobRuntime.close();
-      if (knowledgeWorker) knowledgeWorker.stop();
-      if (visualMemoryWorker) visualMemoryWorker.stop();
-      if (commandWorker) commandWorker.stop();
-      if (vpnRecoveryWorker) vpnRecoveryWorker.stop();
-      if (lifeProjectionWorker) lifeProjectionWorker.stop();
-      if (proactivityWorker) proactivityWorker.stop();
-      if (reminderWorker) reminderWorker.stop();
-      if (operationsRuntime) await operationsRuntime.close();
-      if (bot && (typeof bot.isRunning !== 'function' || bot.isRunning())) await bot.stop();
-      await app.close();
-      if (pool) await pool.end();
-    },
+    close: closeRuntime,
   };
 }
 

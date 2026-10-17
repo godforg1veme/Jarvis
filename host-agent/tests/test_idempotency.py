@@ -1,11 +1,26 @@
 import tempfile
 import unittest
+import uuid
 from pathlib import Path
 
 from jarvis_host_agent.idempotency import IdempotencyJournal
 
 
 class IdempotencyTests(unittest.TestCase):
+    def test_old_vpn_restart_claim_survives_read_housekeeping_and_restart(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal = IdempotencyJournal(Path(directory))
+            request = {'requestId': str(uuid.uuid4()), 'operation': 'vpn.restart'}
+            pending = {'operation': 'vpn.restart', 'result': {'state': 'unknown'}}
+            self.assertTrue(journal.claim(request, pending))
+            with journal._connect() as connection:
+                connection.execute("UPDATE requests SET created_at='2000-01-01T00:00:00.000Z'")
+            journal.put({'requestId': str(uuid.uuid4()), 'operation': 'host.snapshot'},
+                        {'operation': 'host.snapshot', 'result': {'state': 'succeeded'}})
+            restarted = IdempotencyJournal(Path(directory))
+            self.assertEqual(restarted.get_response(request['requestId']), pending)
+            self.assertFalse(restarted.claim(request, pending))
+
     def test_claim_survives_restart_without_repeating_action(self):
         with tempfile.TemporaryDirectory() as directory:
             request = {'requestId': '2d2f9f55-6859-49d9-b54d-9d42d4251d52', 'operation': 'service.restart'}

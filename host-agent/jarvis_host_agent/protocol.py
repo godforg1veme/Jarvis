@@ -10,6 +10,7 @@ import json
 import re
 from datetime import datetime
 from typing import Any, Mapping
+from .operations import OPERATIONS
 
 PROTOCOL_VERSION = 1
 MAX_ENVELOPE_BYTES = 64 * 1024
@@ -17,40 +18,6 @@ MAX_ERROR_CODE_LENGTH = 80
 REQUEST_ID_RE = re.compile(r"^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$", re.IGNORECASE)
 SERVICE_ID_RE = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
 ERROR_CODE_RE = re.compile(r"^[A-Z0-9_]{1,80}$")
-
-OPERATIONS = frozenset((
-    "host.snapshot",
-    "inventory.snapshot",
-    "services.snapshot",
-    "service.logs.read",
-    "service.start",
-    "service.stop",
-    "service.restart",
-    "backup.status",
-    "backup.run",
-    "parser.snapshot",
-    "operation.status",
-    "vpn.status",
-    "vpn.clients.list",
-    "vpn.client.issue",
-    "vpn.client.revoke",
-    "vpn.client.rotate",
-    "vpn.client.export",
-    "vpn.restart",
-    "vpn.hysteria2.status",
-    "vpn.hysteria2.clients.list",
-    "vpn.hysteria2.client.issue",
-    "vpn.hysteria2.client.revoke",
-    "vpn.hysteria2.client.rotate",
-    "vpn.hysteria2.client.export",
-    "vpn.hysteria2.restart",
-    "vpn.health.snapshot",
-    "vpn.external_probe.snapshot",
-    "vpn.external_probe.credential.install",
-    "vpn.external_probe.run",
-    "vpn.external_probe.monitor.enable",
-    "vpn.external_probe.monitor.disable",
-))
 
 VPN_CLIENT_ID_RE = re.compile(r"^vpn-[a-f0-9]{12}$")
 VPN_LABEL_RE = re.compile(r"^[A-Za-zА-Яа-яЁё0-9_. -]{1,40}$")

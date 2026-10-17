@@ -1,3 +1,4 @@
+const { trackWorker } = require('../lifecycle');
 const TRUSTED_LINK_FIELDS = Object.freeze({
   areaId: ['area', 'area.context'],
   projectId: ['project', 'project.context'],
@@ -30,6 +31,7 @@ class LifeProjectionWorker {
     this.logger = options.logger || null;
     this.timer = null;
     this.running = false;
+    trackWorker(this, 'tick');
   }
 
   async processEvent(event, claimToken) {

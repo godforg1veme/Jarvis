@@ -40,6 +40,49 @@ const elements = {
 let state = { paired: false, connection: 'unpaired', voiceEnabled: false };
 let visionState = { state: 'off', startedAt: null, preview: null };
 let visionBusy = false;
+const decidedCommandIds = new Set();
+
+function confirmationCommandId(result) {
+  const idPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+  const declaredId = result.confirmation?.commandId;
+  if (declaredId != null && (typeof declaredId !== 'string' || !idPattern.test(declaredId))) return null;
+  const commandButtons = (Array.isArray(result.buttons) ? result.buttons.flat() : [])
+    .map((button) => /^cmd:(confirm|reject):([a-f0-9-]{36})$/i.exec(typeof button?.data === 'string' ? button.data : ''))
+    .filter(Boolean);
+  if (commandButtons.some((match) => !idPattern.test(match[2]))) return null;
+  const ids = new Set(commandButtons.map((match) => match[2].toLowerCase()));
+  if (declaredId) ids.add(declaredId.toLowerCase());
+  if (ids.size !== 1) return null;
+  // Without the structured confirmation, require the server's complete decision pair.
+  if (!declaredId && !['confirm', 'reject'].every((action) => commandButtons.some((match) => match[1].toLowerCase() === action))) return null;
+  return [...ids][0];
+}
+
+function confirmationButtons(result) {
+  const commandId = confirmationCommandId(result);
+  if (!commandId || decidedCommandIds.has(commandId)) return null;
+  return ['confirm', 'reject'].map((decision) => ({
+    text: decision === 'confirm' ? '✅ Подтвердить' : '❌ Отклонить',
+    primary: decision === 'confirm',
+    onClick: async () => {
+      if (decidedCommandIds.has(commandId)) return;
+      // A transport failure may follow a committed decision. Never resend it blindly.
+      decidedCommandIds.add(commandId);
+      const text = `/${decision} ${commandId}`;
+      appendMessage('user', text);
+      try {
+        const response = await cloud.sendMessage(text);
+        if (response?.ok && typeof response.answer === 'string' && response.answer.trim()) {
+          appendMessage('assistant', response.answer);
+        } else {
+          appendMessage('system', `Результат подтверждения неизвестен. Проверьте состояние: /command ${commandId}`);
+        }
+      } catch (_) {
+        appendMessage('system', `Результат подтверждения неизвестен. Проверьте состояние: /command ${commandId}`);
+      }
+    },
+  }));
+}
 
 function clearEmptyChat() {
   const empty = elements.messages.querySelector('.empty-chat');
@@ -179,47 +222,93 @@ async function refreshVisionSources() {
     ? prior : 'auto';
 }
 
-async function openMemoryDetail(memoryId) {
-  elements.visionMemoryDetail.replaceChildren(document.createTextNode('Загружаю зашифрованный снимок…'));
-  const result = await cloud.getVisionMemory(memoryId);
+async function openMemoryDetail(memoryId, preserveDetail = false) {
+  if (!preserveDetail) elements.visionMemoryDetail.replaceChildren(document.createTextNode('Загружаю зашифрованный снимок…'));
+  let result;
+  try { result = await cloud.getVisionMemory(memoryId); } catch (_) { /* Render a safe read failure below. */ }
   if (!result?.ok) {
-    elements.visionMemoryDetail.replaceChildren(document.createTextNode(result?.error || 'Снимок недоступен.'));
+    if (preserveDetail) appendMessage('system', 'Не удалось обновить карточку снимка. Откройте её снова, чтобы проверить состояние.');
+    else elements.visionMemoryDetail.replaceChildren(document.createTextNode('Снимок недоступен.'));
     return;
   }
   const record = result.memory;
   const observation = result.observation;
+  const displaySummary = typeof record.corrected_summary === 'string' && record.corrected_summary.trim()
+    ? record.corrected_summary : observation.sceneSummary;
   const image = document.createElement('img');
   image.src = `data:${result.image.contentType};base64,${result.image.data}`;
   image.alt = `Визуальный снимок от ${new Date(record.captured_at).toLocaleString('ru-RU')}`;
-  const title = document.createElement('h3'); title.textContent = observation.sceneSummary;
+  const title = document.createElement('h3'); title.textContent = displaySummary;
   const meta = document.createElement('p');
   meta.textContent = `${new Date(record.captured_at).toLocaleString('ru-RU')} · ${record.source_id} · уверенность ${observation.confidence === null ? '—' : Math.round(observation.confidence * 100) + '%'}`;
   const actions = document.createElement('div'); actions.className = 'memory-detail-actions';
+  const feedback = document.createElement('p'); feedback.setAttribute('role', 'status'); feedback.setAttribute('aria-live', 'polite');
+  let pending = false;
+  async function mutateMemory(request, onSuccess) {
+    if (pending) return;
+    pending = true;
+    for (const button of [pin, correct, remove]) button.disabled = true;
+    feedback.textContent = 'Сохраняю изменение…';
+    try {
+      let result;
+      try { result = await request(); } catch (_) { /* An absent acknowledgement is an unknown outcome. */ }
+      if (result?.ok !== true) {
+        feedback.textContent = result?.ok === false
+          ? 'Не удалось изменить снимок. Обновите ленту, чтобы проверить его состояние.'
+          : 'Результат изменения не подтверждён. Обновите ленту, чтобы проверить его состояние.';
+        return;
+      }
+      feedback.textContent = 'Изменение сохранено.';
+      await onSuccess();
+    } finally {
+      pending = false;
+      for (const button of [pin, correct, remove]) button.disabled = false;
+    }
+  }
   const pin = document.createElement('button'); pin.type = 'button'; pin.textContent = record.pinned ? 'Открепить' : 'Закрепить навсегда';
-  pin.addEventListener('click', async () => { await cloud.updateVisionMemory(memoryId, { pinned: !record.pinned }); await loadMemoryTimeline(); await openMemoryDetail(memoryId); });
+  pin.addEventListener('click', async () => mutateMemory(
+    () => cloud.updateVisionMemory(memoryId, { pinned: !record.pinned }),
+    async () => {
+      record.pinned = !record.pinned;
+      pin.textContent = record.pinned ? 'Открепить' : 'Закрепить навсегда';
+      await loadMemoryTimeline();
+    },
+  ));
   const correct = document.createElement('button'); correct.type = 'button'; correct.textContent = 'Исправить описание';
   correct.addEventListener('click', async () => {
-    const summary = window.prompt('Как правильно описать этот снимок?', observation.sceneSummary);
+    if (pending) return;
+    const summary = window.prompt('Как правильно описать этот снимок?', displaySummary);
     if (summary === null) return;
-    await cloud.updateVisionMemory(memoryId, { correctedSummary: summary.slice(0, 4000) });
-    await openMemoryDetail(memoryId);
+    await mutateMemory(
+      () => cloud.updateVisionMemory(memoryId, { correctedSummary: summary.slice(0, 4000) }),
+      () => openMemoryDetail(memoryId, true),
+    );
   });
   const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'danger'; remove.textContent = 'Удалить полностью';
   remove.addEventListener('click', async () => {
+    if (pending) return;
     if (!window.confirm('Полностью удалить этот снимок и его зашифрованные данные?')) return;
-    await cloud.deleteVisionMemory(memoryId);
-    elements.visionMemoryDetail.replaceChildren(document.createTextNode('Снимок удалён.'));
-    await loadMemoryTimeline();
+    await mutateMemory(() => cloud.deleteVisionMemory(memoryId), async () => {
+      if (elements.visionMemoryDetail.contains(actions)) {
+        elements.visionMemoryDetail.replaceChildren(document.createTextNode('Снимок удалён.'));
+      }
+      await loadMemoryTimeline();
+    });
   });
   actions.append(pin, correct, remove);
-  elements.visionMemoryDetail.replaceChildren(image, title, meta, actions);
+  elements.visionMemoryDetail.replaceChildren(image, title, meta, actions, feedback);
 }
 
 async function loadMemoryTimeline() {
   elements.visionMemoryList.replaceChildren(document.createTextNode('Загружаю ленту…'));
-  const result = await cloud.listVisionMemories();
-  if (!result?.ok || !result.memories?.length) {
-    elements.visionMemoryList.replaceChildren(document.createTextNode(result?.error || 'Визуальная память пока пуста.'));
+  let result;
+  try { result = await cloud.listVisionMemories(); } catch (_) { /* Do not confuse an offline list with an empty memory. */ }
+  if (!result?.ok) {
+    elements.visionMemoryList.replaceChildren(document.createTextNode('Не удалось загрузить ленту. Откройте её снова, чтобы проверить состояние снимков.'));
+    return;
+  }
+  if (!result.memories?.length) {
+    elements.visionMemoryList.replaceChildren(document.createTextNode('Визуальная память пока пуста.'));
     return;
   }
   const fragment = document.createDocumentFragment();
@@ -434,33 +523,7 @@ elements.messageForm.addEventListener('submit', async (event) => {
       }
       return;
     }
-    let msgButtons = null;
-    if (result.confirmation || (result.buttons && result.buttons.length)) {
-      msgButtons = [
-        {
-          text: '✅ Подтвердить',
-          primary: true,
-          onClick: async () => {
-            appendMessage('user', '/confirm');
-            const confirmResult = await cloud.sendMessage('/confirm');
-            if (confirmResult?.ok) {
-              appendMessage('assistant', confirmResult.answer);
-            }
-          },
-        },
-        {
-          text: '❌ Отклонить',
-          primary: false,
-          onClick: async () => {
-            appendMessage('user', '/reject');
-            const rejectResult = await cloud.sendMessage('/reject');
-            if (rejectResult?.ok) {
-              appendMessage('assistant', rejectResult.answer);
-            }
-          },
-        },
-      ];
-    }
+    const msgButtons = confirmationButtons(result);
     appendMessage('assistant', result.answer, null, { buttons: msgButtons });
     if (quantumCore) {
       quantumCore.setMode('speech');

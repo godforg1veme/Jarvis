@@ -1,3 +1,4 @@
+const { trackWorker } = require('../../lifecycle');
 const { createHash } = require('node:crypto');
 const { nextOccurrence } = require('./nextOccurrence');
 const { occurrenceKey } = require('./reminderRepository');
@@ -45,6 +46,7 @@ class ReminderWorker {
     this.logger = options.logger || null;
     this.timer = null;
     this.running = false;
+    trackWorker(this, 'tick');
   }
 
   start() {

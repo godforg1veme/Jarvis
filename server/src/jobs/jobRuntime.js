@@ -1,3 +1,4 @@
+const { createResourceCloser } = require('../lifecycle');
 const { JobCaptchaClient } = require('./jobCaptchaClient');
 const { JobCaptchaRepository } = require('./jobCaptchaRepository');
 const { JobCaptchaService } = require('./jobCaptchaService');
@@ -64,8 +65,10 @@ function createJobRuntime({ config, pool, interactions, send, sendPhoto, fetchIm
     settingsModels: [config.jobSearchModel, config.openrouterModel, config.openrouterFallbackModel], defaultModel: config.jobSearchModel });
   const deliveryWorker = new JobDeliveryWorker({ pool, searchRepository, deliveryRepository, send, captchaEnabled: Boolean(captchaService) });
   const recoveryWorker = new JobRecoveryWorker({ pool, applicationRepository });
+  const close = createResourceCloser(Object.entries({ deliveryWorker, recoveryWorker, captchaWorker, historyWorker })
+    .filter(([, worker]) => worker).map(([name, worker]) => ({ name, close: () => worker.stop() })));
   return { captchaService, telegramService, deliveryWorker, applicationService, applicationRepository, historyWorker, historyRepository, historySync,
     async start() { await recoveryWorker.start(); deliveryWorker.start(); captchaWorker?.start(); historyWorker?.start(); },
-    async close() { await Promise.all([deliveryWorker.close(), recoveryWorker.close(), captchaWorker?.close(),historyWorker?.close()]); } };
+    close };
 }
 module.exports = { createJobRuntime };

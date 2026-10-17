@@ -1,3 +1,4 @@
+const { createResourceCloser } = require('../lifecycle');
 const { HostAgentClient } = require('./hostAgentClient');
 const { CollectorWorker } = require('./collectors/collectorWorker');
 const { OperationsRepository } = require('./repositories/operationsRepository');
@@ -101,6 +102,13 @@ async function createOperationsRuntime({ config, pool, logger, app, getBot, getP
   const connectionService = overrides.connectionService || new ConnectionAdminService(new ConnectionAdminRepository(pool), { onDeviceRevoked });
   registerConnectionRoutes(app, { service: connectionService, requireSession, requireSameOrigin: sameOrigin });
   await registerOperationsStatic(app);
+  const close = createResourceCloser([
+    ...Object.entries({ collector, nlCollector, rollupWorker, retentionWorker, operationRecoveryWorker,
+      healthCheckWorker, logCollector }).filter(([, worker]) => worker).map(([name, worker]) => ({
+      name, close: () => worker.stop(),
+    })),
+    { name: 'eventStream', close: () => sseHub.close() },
+  ]);
   return {
     enabled: true,
     host,
@@ -109,7 +117,7 @@ async function createOperationsRuntime({ config, pool, logger, app, getBot, getP
     sessionService,
     approvalHandler: createTelegramApprovalHandler({ service: sessionService, ownerTelegramId: config.operationsOwnerTelegramId }),
     async start() { collector.start(); if (nlCollector) nlCollector.start(); rollupWorker.start(); retentionWorker.start(); operationRecoveryWorker.start(); healthCheckWorker.start(); logCollector.start(); },
-    async close() { collector.stop(); if (nlCollector) nlCollector.stop(); rollupWorker.stop(); retentionWorker.stop(); operationRecoveryWorker.stop(); healthCheckWorker.stop(); logCollector.stop(); sseHub.close(); },
+    close,
   };
 }
 

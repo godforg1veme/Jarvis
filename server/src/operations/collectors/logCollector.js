@@ -1,3 +1,4 @@
+const { trackWorker } = require('../../lifecycle');
 const crypto = require('node:crypto');
 
 // Store operational summaries only. Arbitrary log bodies can contain family
@@ -32,7 +33,9 @@ function normalizeOperationalLogs(output, now = new Date()) {
 }
 
 class LogCollector {
-  constructor({ client, repository, hostId, logger }) { Object.assign(this, { client, repository, hostId, logger }); this.running = false; this.timer = null; }
+  constructor({ client, repository, hostId, logger }) { Object.assign(this, { client, repository, hostId, logger }); this.running = false; this.timer = null;
+    trackWorker(this, 'runOnce');
+  }
   start() { if (!this.timer) { this.timer = setInterval(() => { void this.runOnce(); }, 60000); void this.runOnce(); } }
   stop() { clearInterval(this.timer); this.timer = null; }
   async runOnce() {

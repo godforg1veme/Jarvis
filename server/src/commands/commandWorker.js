@@ -1,3 +1,4 @@
+const { trackWorker } = require('../lifecycle');
 class CommandWorker {
   constructor(options = {}) {
     this.repository = options.repository;
@@ -5,6 +6,7 @@ class CommandWorker {
     this.intervalMs = Math.min(Math.max(Number(options.intervalMs || 5000), 1000), 60000);
     this.timer = null;
     this.running = false;
+    trackWorker(this, 'runOnce');
   }
 
   start() {

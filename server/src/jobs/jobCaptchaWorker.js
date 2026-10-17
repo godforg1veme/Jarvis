@@ -1,9 +1,11 @@
+const { trackWorker } = require('../lifecycle');
 const { CAPTION, refreshButtons } = require('./jobCaptchaService');
 class JobCaptchaWorker {
   constructor({ repository, client, ownerId, sendPhoto, intervalMs = 10000, sendTimeoutMs = 30000,
     now = Date.now, report = code => process.stderr.write(`${code}\n`) }) {
     Object.assign(this, { repository, client, ownerId, sendPhoto, intervalMs, sendTimeoutMs, now, report });
     this.timer = null; this.running = false; this.failures = 0; this.retryAt = 0; this.requestId = null;
+    trackWorker(this, 'tick');
   }
   async tick() {
     if (this.running) return;
@@ -77,6 +79,7 @@ class JobCaptchaWorker {
   }
   reset() { this.failures = 0; this.retryAt = 0; }
   start() { if (!this.timer) { this.timer = setInterval(() => { void this.tick().catch(() => this.report('JOB_CAPTCHA_QUEUE_UNAVAILABLE')); }, this.intervalMs); this.timer.unref?.(); void this.tick().catch(() => this.report('JOB_CAPTCHA_QUEUE_UNAVAILABLE')); } }
-  async close() { clearInterval(this.timer); this.timer = null; while (this.running) await new Promise(r => setTimeout(r, 10)); }
+  stop() { clearInterval(this.timer); this.timer = null; }
+  close() { return this.stop(); }
 }
 module.exports = { JobCaptchaWorker };

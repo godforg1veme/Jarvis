@@ -127,20 +127,63 @@ async function sendResult(ctx, result, options = {}) {
   }
 }
 
-async function downloadTelegramAttachment(ctx, token, maxBytes = 20 * 1024 * 1024, fetchImpl = globalThis.fetch) {
+async function downloadTelegramAttachment(ctx, token, maxBytes = 20 * 1024 * 1024, fetchImpl = globalThis.fetch, { timeoutMs = 30_000 } = {}) {
+  const controller = new AbortController();
+  let timer;
+  let reader;
+  let response;
+  let completed = false;
+  // Cancellation must not extend the deadline, even for a broken transport.
+  const cancel = (body) => {
+    try { Promise.resolve(body?.cancel()).catch(() => {}); } catch (_) {}
+  };
   try {
-    const file = await ctx.getFile();
+    if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0
+      || !Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) throw new Error('invalid download limits');
+    const deadline = new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        reject(new Error('download deadline exceeded'));
+      }, timeoutMs);
+    });
+    const bounded = (pending) => Promise.race([pending, deadline]);
+    const file = await bounded(ctx.getFile(controller.signal));
     if (!file || !file.file_path) throw new Error('missing file path');
-    const response = await fetchImpl(`https://api.telegram.org/file/bot${token}/${file.file_path}`);
+    response = await bounded(Promise.resolve(fetchImpl(`https://api.telegram.org/file/bot${token}/${file.file_path}`, {
+      signal: controller.signal, redirect: 'error',
+    })).then((result) => {
+      // A custom transport may settle after the deadline despite being aborted.
+      if (controller.signal.aborted) { cancel(result.body); throw new Error('download deadline exceeded'); }
+      return result;
+    }));
     if (!response.ok) throw new Error('file response failed');
     const declaredSize = Number(response.headers.get('content-length') || 0);
     if (declaredSize > maxBytes) throw new Error('file is too large');
-    const data = Buffer.from(await response.arrayBuffer());
-    if (data.length === 0 || data.length > maxBytes) throw new Error('file is too large');
+    if (!response.body) throw new Error('missing file body');
+    reader = response.body.getReader();
+    const chunks = [];
+    let total = 0;
+    for (;;) {
+      const { done, value } = await bounded(reader.read());
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) throw new Error('file is too large');
+      chunks.push(Buffer.from(value));
+    }
+    if (total === 0) throw new Error('empty file body');
+    const data = Buffer.concat(chunks, total);
+    completed = true;
     return data;
   } catch {
     // Do not retain a caught network error: Telegram's file URL contains the bot token.
     throw new Error('Telegram document download failed');
+  } finally {
+    clearTimeout(timer);
+    if (!completed) {
+      controller.abort();
+      cancel(reader || response?.body);
+    }
+    try { reader?.releaseLock(); } catch (_) {}
   }
 }
 

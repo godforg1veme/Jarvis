@@ -1,3 +1,4 @@
+const { trackWorker } = require('../../lifecycle');
 const crypto = require('node:crypto');
 const { z } = require('zod');
 
@@ -78,6 +79,7 @@ class CollectorWorker {
     this.lastStates = new Map();
     this.timer = null;
     this.running = false;
+    trackWorker(this, 'runOnce');
   }
   start() { if (!this.timer) { this.timer = setInterval(() => { void this.runOnce(); }, this.intervalMs); void this.runOnce(); } }
   stop() { if (this.timer) clearInterval(this.timer); this.timer = null; }
