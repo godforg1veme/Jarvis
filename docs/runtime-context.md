@@ -35,10 +35,10 @@ See `docs/README.md` for current implementation status and historical records.
 
 ## Current Architecture
 
-### Local audit remediation, 17 October 2026
+### Audit remediation, 17 October 2026
 
-These source changes await publication; the [development record](updates/2026-10-17-audit-remediation-development.md)
-tracks verification and deployment separately. `server/src/lifecycle.js` stops
+These changes are deployed; the [release record](updates/2026-10-17-audit-remediation-release.md)
+tracks verification and client checks separately. `server/src/lifecycle.js` stops
 worker admission/timers synchronously and drains admitted tasks before the pool.
 All resources are attempted within one eight-second shutdown budget; a timeout
 does not cancel an external mutation or authorize replay. Jobs and Operations

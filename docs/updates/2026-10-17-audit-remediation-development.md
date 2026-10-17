@@ -4,6 +4,9 @@
 
 ## Русский
 
+Более новый результат: [выпуск и установка 17 октября](2026-10-17-audit-remediation-release.md).
+Ниже сохранён локальный статус до поручения на публикацию.
+
 Исправлены 13 подтверждённых проблем F01–F13 из аудита 16 октября.
 Для каждой задачи работал отдельный субагент; координатор проверил изменения
 и взаимодействие компонентов. Пользователь ограничил работу этими находками:
@@ -62,6 +65,9 @@ PostgreSQL и работающим Electron не заменяется этими
 сборка `npm run dist:win`, разрешённая установка Desktop и живые smoke checks.
 
 ## English
+
+Newer result: [publication and installation on 17 October](2026-10-17-audit-remediation-release.md).
+The local status before publication was authorized is preserved below.
 
 All 13 confirmed findings F01–F13 from the 16 October audit were fixed.
 Each task had a separate subagent; the coordinator reviewed the changes and

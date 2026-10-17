@@ -32,6 +32,10 @@ Browser fixtures используют существующий Playwright из `
 изменяющие действия не выполняются. Server suite включает регрессии subscription
 logs, streaming downloads, journal-to-server unknown, lifecycle и store bounds.
 Три Linux filesystem/metadata теста Host Agent пропускаются на Windows.
+Полный server suite в Linux image запускается с `TZ=Europe/Moscow`: существующий
+тест commitment проверяет локальные часы через `getHours()`. После установки
+Host Agent запускай тесты из полного source tree с `PYTHONPATH=/opt/jarvis-host-agent`,
+чтобы проверить установленные модули и сохранить доступ к repository fixtures.
 Живые Electron/PostgreSQL, production shutdown и клиентские действия проверяются
 отдельно после согласованного выпуска. [Результат](updates/2026-10-17-audit-remediation-development.md).
 
@@ -40,7 +44,11 @@ Edge (or an explicit `PLAYWRIGHT_CHANNEL`). Operations tests start and stop thei
 own local Vite servers; all API responses are synthetic and no real mutations
 run. The server suite includes subscription logging, streaming downloads,
 journal-to-server unknown outcomes, lifecycle and store-bound regressions.
-Three Host Agent Linux filesystem/metadata tests skip on Windows. Running
+Three Host Agent Linux filesystem/metadata tests skip on Windows. The full
+server suite in a Linux image uses `TZ=Europe/Moscow`: an existing commitment
+test asserts local hours with `getHours()`. After Host Agent installation, run
+tests from the complete source tree with `PYTHONPATH=/opt/jarvis-host-agent`
+so installed modules and adjacent repository fixtures are both available. Running
 Electron/PostgreSQL, production shutdown and actual client actions require
 separate checks after an authorized release. [Results](updates/2026-10-17-audit-remediation-development.md).
 

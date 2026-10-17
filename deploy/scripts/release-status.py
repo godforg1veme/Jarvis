@@ -13,7 +13,7 @@ import sys
 import time
 
 CANONICAL_REMOTE = "https://github.com/godforg1veme/Jarvis.git"
-DESKTOP_DIRS = {"actions", "agents", "assets", "cloud", "renderer", "shared",
+DESKTOP_DIRS = {"actions", "agents", "assets", "cloud", "desktop", "renderer", "shared",
                 "startup", "tools", "tts", "vision", "voice"}
 
 
