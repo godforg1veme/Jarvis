@@ -17,6 +17,12 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
+[Выпущено единое время МСК UTC+3](updates/2026-10-19-moscow-time-release.md):
+ввод напоминаний без пояса и все пользовательские часы используют Москву.
+Server на DE обновлён, Desktop 1.0.2 пересобран и установлен. Проверены
+760/760 server tests, PostgreSQL acceptance 1/1 и браузеры в трёх зонах.
+Старые напоминания не сдвигаются; телефон и доставка требуют приёмки.
+
 На DE включена [очередь бесплатных моделей OpenRouter](updates/2026-10-19-free-first-routing-release.md):
 семь согласованных free, затем два DeepSeek по оценке стоимости. Цены и квота
 обновляются при использовании раз в 15 минут; новые ID не добавляются.
@@ -26,7 +32,7 @@ generation-квитанция подтвердила стоимость. Исх�
 [Telegram Mini App выпущен на DE](updates/2026-10-18-telegram-mini-app-release.md):
 3D-ядро, Telegram ID, роли и личные разрешения, админка, аудит, личный диалог
 и чтение своих разделов. [Последующее исправление](updates/2026-10-18-mini-app-entry-help-removal.md)
-убрало «Помощь» и зависимость входа от внешнего SDK. Последние Linux server tests:
+убрало «Помощь» и зависимость входа от внешнего SDK. Linux server tests при этом выпуске:
 742/742; первый выпуск прошёл 8 PostgreSQL acceptance и все 40 migrations.
 Кнопка запуска настроена, исходники обоих VPS синхронизированы. Настоящий вход
 после исправления, Telegram Web cookies, телефонный FPS и два аккаунта ещё требуют
@@ -209,6 +215,12 @@ deployment establish what is running.
 
 ### Current status
 
+[Fixed Moscow UTC+3 time is released](updates/2026-10-19-moscow-time-release.md):
+timezone-less reminder input and user-facing clocks use Moscow. DE server
+is updated; Desktop 1.0.2 was rebuilt and installed. Server tests passed
+760/760, PostgreSQL acceptance 1/1, plus browser checks in three timezones.
+Existing reminders are not shifted; phone input and delivery need acceptance.
+
 [Free-first OpenRouter routing](updates/2026-10-19-free-first-routing-release.md)
 is enabled on DE: seven approved free models, then two DeepSeek candidates
 ranked by estimated cost. Prices/quota refresh on use every 15 minutes; no new
@@ -218,9 +230,9 @@ cost $0, confirmed by a separate generation receipt. Both VPS sources are synchr
 The [Telegram Mini App is deployed on DE](updates/2026-10-18-telegram-mini-app-release.md):
 3D core, Telegram IDs, roles and personal overrides, administration, audit,
 private chat and own-section reads. A [subsequent fix](updates/2026-10-18-mini-app-entry-help-removal.md)
-removed Help and the entry dependency on the remote SDK. Latest Linux server
-tests: 742/742; the first release passed 8 PostgreSQL acceptance tests and all
-40 migrations. The launch button is configured and both VPS source checkouts
+removed Help and the entry dependency on the remote SDK. Linux server tests
+at that release: 742/742; the first release passed 8 PostgreSQL acceptance tests
+and all 40 migrations. The launch button is configured and both VPS source checkouts
 are synchronized. Actual login after the fix, Telegram Web cookies, phone FPS
 and two accounts still need acceptance; a second HH account needs its own connection.
 The [chat handoff for the next agent](updates/2026-10-18-mini-app-agent-handoff.md)

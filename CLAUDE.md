@@ -7,3 +7,7 @@
 
 По Mini App и ролям начни с [README клиента](mini-app/README.md) и
 [выжимки решений 18 октября](docs/updates/2026-10-18-mini-app-agent-handoff.md).
+
+По моделям и времени: [free-first](docs/updates/2026-10-19-free-first-routing-release.md)
+и [МСК UTC+3](docs/updates/2026-10-19-moscow-time-release.md).
+Models and time: the same release records include English sections.

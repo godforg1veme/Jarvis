@@ -20,6 +20,7 @@ Jarvis: облачный мозг и память, локальные руки �
 | Подробности подсистем и развёртывания | Нужный раздел [docs/runtime-context.md](docs/runtime-context.md) |
 | Тесты и проверки | [docs/verification.md](docs/verification.md) |
 | Telegram | [архитектура кнопок](docs/telegram-button-architecture.md) и [контракт меню](docs/telegram-menu-contract.md), оба целиком перед изменением пути |
+| Время МСК, parser и старые напоминания | [контекст времени](docs/runtime-context.md#time-display-and-input--отображение-и-ввод-времени) и [результат выпуска](docs/updates/2026-10-19-moscow-time-release.md) |
 | OpenRouter, очередь моделей и цены | [контекст провайдеров](docs/runtime-context.md#openrouter-model-routing) и [результат выпуска](docs/updates/2026-10-19-free-first-routing-release.md) |
 | Mini App, роли и личные разрешения | [mini-app/README.md](mini-app/README.md); [выжимка решений и проверок 18 октября](docs/updates/2026-10-18-mini-app-agent-handoff.md) |
 | Установка и обслуживание VPS | [deploy/README.md](deploy/README.md) |

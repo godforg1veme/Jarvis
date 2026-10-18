@@ -2,6 +2,25 @@
 
 Корневой [AGENTS.md](../AGENTS.md) задаёт обязательные правила. Здесь сохранены подробности подсистем и датированные результаты. Читай нужный раздел по задаче; текущий статус сверяй с [картой документации](README.md) и живой системой.
 
+## Time display and input / Отображение и ввод времени
+
+Пользовательские даты и часы используют фиксированный МСК UTC+3 (`Etc/GMT-3`),
+независимо от зоны сервера или устройства, включая исторические даты.
+`shared/time.js` — общий форматтер, строгий parser напоминаний и `moscowIso`.
+Ввод без пояса означает +03:00; явные Z/offset сохраняют абсолютный момент.
+Неверная дата проверяется до consumption пошагового ввода. Доверенное время
+для модели формирует сервер. UTC хранения и wire timestamps не меняются;
+старые напоминания не исправляются массовым сдвигом.
+[Результат выпуска и проверки](updates/2026-10-19-moscow-time-release.md).
+
+User-facing dates and clocks use fixed Moscow UTC+3 (`Etc/GMT-3`), independent
+of server/device timezone, including historical dates. `shared/time.js` provides
+the shared formatter, strict reminder parser and `moscowIso`. Zone-less input
+means +03:00; explicit Z/offset preserves its instant. Invalid dates are rejected
+before guided-input consumption. The server supplies the trusted model clock.
+Storage UTC and wire timestamps remain canonical; existing reminders are never
+bulk shifted. [Release and verification](updates/2026-10-19-moscow-time-release.md).
+
 ## Product
 
 Jarvis is a hybrid personal and family AI-assistant platform:

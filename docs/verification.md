@@ -1,5 +1,28 @@
 # Проверки перед выпуском
 
+Московское время, выпуск 19 октября:
+[результат и ограничения](updates/2026-10-19-moscow-time-release.md).
+760/760 server tests локально и в Linux `TZ=UTC`; PostgreSQL acceptance 1/1
+с 40 migrations и настоящими handlers на отдельной БД. Operations UI 3/3 и build,
+cloud 73/73, Life OS renderer/browser в UTC/LA/Tokyo, Mini App build/browser прошли.
+Установленный Desktop: 144 файла, native Electron и wake runtime совпадают.
+Старые напоминания, телефонный ввод и доставка: см. ограничения выпуска.
+
+Moscow time, October 19 release:
+[results and limits](updates/2026-10-19-moscow-time-release.md).
+760/760 server tests locally and in Linux `TZ=UTC`; PostgreSQL acceptance 1/1
+with 40 migrations and real handlers on an isolated database. Operations UI 3/3
+and build, cloud 73/73, Life OS renderer/browser in UTC/LA/Tokyo and Mini App
+build/browser passed. All 144 installed Desktop files, native Electron and
+wake runtime match. See the release for existing-reminder and client limits.
+
+To run the PostgreSQL test, set `JARVIS_MOSCOW_TEST_DATABASE_URL` privately to
+an isolated test database, never production. It creates and removes its own schema:
+
+```powershell
+node --test server/test/moscowTimePostgresAcceptance.cjs
+```
+
 OpenRouter free-first, выпуск 19 октября:
 [результат и ограничения](updates/2026-10-19-free-first-routing-release.md).
 14 routing tests, focused suite 33/33, весь server suite 756/756 прошли.

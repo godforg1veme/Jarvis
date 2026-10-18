@@ -2,7 +2,7 @@
 
 Поручение владельца 19 октября: все пользовательские даты/часы отображать
 в МСК UTC+3, исправить пример с 23:46 → 02:46, обновить MD о моделях и времени,
-сразу опубликовать в GitHub и на обоих VPS. Установка Desktop отдельно не поручена.
+сразу опубликовать в GitHub и на обоих VPS. Установка Desktop отдельно подтверждена владельцем и выполнена.
 
 ## Решение
 
@@ -20,10 +20,13 @@ reminders не сдвигаются. В браузерах зона явная, 
   Life OS/Vision, file list и доверенное серверное время модели.
 - [x] Unit tests в UTC/LA/Tokyo и на границе полуночи, browser Life OS в трёх зонах,
   Operations tests/build, полный server suite.
-- [ ] Настоящий PostgreSQL: полные migrations, handlers, invalid retry, foreign
+- [x] Настоящий PostgreSQL: полные migrations, handlers, invalid retry, foreign
   user/chat, single consumption, reschedule и expiry на отдельной БД.
-- [ ] Сборка Desktop `npm run dist:win`; EXE не устанавливать без отдельного запроса.
-- [ ] Git main, source guard на DE/NL, immutable server release с сохранённым env,
+- [x] Сборка Desktop `npm run dist:win`; EXE установлен по отдельному запросу,
+  144 файла и native/runtime сверены.
+- [x] Git main, source guard на DE/NL, immutable server release с сохранённым env,
   Linux tests, замена только server, health и сравнение container IDs.
-- [ ] Bilingual MD результата, статус моделей, незакрытые клиентские проверки и
+- [x] Bilingual MD результата, статус моделей, незакрытые клиентские проверки и
   фактическое состояние установленного Desktop; синхронизация MD обоих VPS.
+
+Результат: [выпуск МСК](../../updates/2026-10-19-moscow-time-release.md).

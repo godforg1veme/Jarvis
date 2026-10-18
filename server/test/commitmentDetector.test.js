@@ -6,9 +6,8 @@ test('detects a Russian commitment and resolves tomorrow evening deterministical
   const detector = new CommitmentDetector({ now: () => new Date('2026-09-12T10:00:00+03:00') });
   const result = await detector.detect({ event_type: 'voice.transcribed', summary: 'Завтра вечером я продолжу проект Life OS' });
   assert.equal(result.title, 'Завтра вечером я продолжу проект Life OS');
-  assert.equal(result.dueAt.getDate(), 13);
-  assert.equal(result.dueAt.getHours(), 18);
-  assert.equal(result.dueWindowEndAt.getHours(), 22);
+  assert.equal(result.dueAt.toISOString(), '2026-09-13T15:00:00.000Z');
+  assert.equal(result.dueWindowEndAt.toISOString(), '2026-09-13T19:00:00.000Z');
   assert.equal(result.temporalPrecision, 'day_part');
   assert.equal(result.confidence, 0.9);
 });
