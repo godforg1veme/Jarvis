@@ -81,6 +81,8 @@ fallback User-Agent существующего `HhClient`, DE container — на
 `HH_USER_AGENT` (значение не выводилось). Оба получили HTTP 403, `Server: ddos-guard`,
 JSON `type=forbidden`. Запросы были только на чтение, без owner cookies и
 авторизационных данных.
+В server-контейнере `HH_APP_TOKEN` не настроен, поэтому запрос проверил только
+доступ без API-токена; доступ к API с авторизацией этим не проверен.
 Репозиторий уже содержит `HhClient`, но production collector выбирает браузерный
 RPC. [Официальный API поиска вакансий](https://github.com/hhru/api/blob/master/docs/vacancies.md),
 [описание `captcha_required` в API](https://github.com/hhru/api/blob/master/docs/errors.md).
@@ -181,6 +183,8 @@ HTTP 403, `Server: ddos-guard`, and JSON `type=forbidden`. The probes used no ow
 cookies or authorization credentials. The repository already contains `HhClient`,
 while the production collector selects browser RPC. [Official vacancy-search API](https://github.com/hhru/api/blob/master/docs/vacancies.md),
 [API `captcha_required` flow](https://github.com/hhru/api/blob/master/docs/errors.md).
+`HH_APP_TOKEN` is not configured in the server container, so this only tested
+unauthenticated access; authenticated API access remains untested.
 
 Jarvis sends the answer through Playwright `route.fetch()`. Its documentation
 describes this path through `APIRequestContext`; page routing occurs before the

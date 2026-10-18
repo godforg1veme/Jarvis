@@ -23,7 +23,8 @@ native-запрос и browser/API cookies проверены без отпра�
 Linux browser — 71/71. Одобренная отправка в 18:37 МСК снова дала 403/unknown;
 CSRF совпал с cookie, пояснение недоступно классификатору. Read-only поиск API
 из Windows и DE тоже дал 403 от ddos-guard. Вероятен сетевой отказ до проверки
-капчи; точная причина не установлена.
+капчи; точная причина не установлена. `HH_APP_TOKEN` не настроен, авторизованный
+доступ к API не проверялся.
 
 [Живой ответ OCR прошёл HH после одобрения владельца](updates/2026-10-18-hh-ocr-live-acceptance.md):
 одна отправка, POST 302, проверка целевой страницы 200, `solved`; сбор возобновился.
@@ -197,7 +198,8 @@ The past 403's exact cause is unknown; a bounded HH response classifier is insta
 with Linux browser checks 71/71. The approved submission at 18:37 Moscow time
 again returned 403/unknown; CSRF matched the cookie, but the classifier could not
 inspect an explanation. Read-only API searches from Windows and DE also returned
-403 from ddos-guard. A network-layer rejection is likely; the exact cause remains unknown.
+403 from ddos-guard. A network-layer rejection is likely; the exact cause remains
+unknown. `HH_APP_TOKEN` is unset, so authenticated API access was not tested.
 
 [A live OCR answer passed HH after owner approval](updates/2026-10-18-hh-ocr-live-acceptance.md):
 one submission, POST 302, target verification 200, `solved`; collection resumed.
