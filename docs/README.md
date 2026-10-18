@@ -17,9 +17,13 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
+[Живой ответ OCR прошёл HH после одобрения владельца](updates/2026-10-18-hh-ocr-live-acceptance.md):
+одна отправка, POST 302, проверка целевой страницы 200, `solved`; сбор возобновился.
+Полностью автономный цикл этим тестом не подтверждён.
+
 [Разбор неподтверждённой ручной отправки HH](updates/2026-10-18-hh-captcha-receipt-diagnosis.md):
 найдена потеря сведений о HTTP/verifier; долговечная закрытая квитанция для обоих
-путей установлена на DE, Linux browser — 66/66. Причина последней настоящей попытки пока не доказана.
+путей установлена на DE, Linux browser — 66/66. Причина предыдущего unknown пока не доказана.
 
 [Приватный журнал попыток OCR установлен на DE](updates/2026-10-18-hh-captcha-evidence.md):
 картинка, ответ и закрытые результаты для разбора новых неудач. Linux browser — 62/62;
@@ -33,7 +37,7 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 остановка после unknown и сохранение бюджета при перезапуске. Проверены 1 709
 изображений, CPU parity 73/73 и изолированные Linux browser/worker/socket.
 Первая живая попытка не подтвердила доступ: автоматика остановилась, фото
-отправлено владельцу. Прохождение настоящей капчи OCR пока не подтверждено.
+отправлено владельцу. Более новый живой тест ответа OCR подтверждён по ссылке выше.
 
 [13 подтверждённых исправлений аудита выпущены](updates/2026-10-17-audit-remediation-release.md):
 server/Operations UI на DE, Host Agent на DE/NL, Desktop пересобран и установлен.
@@ -179,9 +183,13 @@ deployment establish what is running.
 
 ### Current status
 
+[A live OCR answer passed HH after owner approval](updates/2026-10-18-hh-ocr-live-acceptance.md):
+one submission, POST 302, target verification 200, `solved`; collection resumed.
+This test does not confirm a fully autonomous cycle.
+
 [Unconfirmed human HH submission investigation](updates/2026-10-18-hh-captcha-receipt-diagnosis.md):
 HTTP/verifier details were not retained; a durable closed receipt for both paths
-is installed on DE, with Linux browser checks 66/66. The cause of the last actual attempt remains unproven.
+is installed on DE, with Linux browser checks 66/66. The cause of the previous unknown remains unproven.
 
 [Private OCR attempt evidence is installed on DE](updates/2026-10-18-hh-captcha-evidence.md):
 image, answer and closed outcomes for new failure analysis. Linux browser checks passed 62/62;
@@ -195,7 +203,7 @@ original rectification and weights, now up to three automatic attempts before a 
 photo, unknown-result stop and a restart-safe budget. Checks cover 1,709 images,
 73/73 CPU parity and isolated Linux browser/worker/socket behavior. The first live
 attempt did not confirm access; automation stopped and a photo was sent to the
-owner. Solving an actual HH challenge with OCR remains unconfirmed.
+owner. The newer live OCR answer test is confirmed in the linked record above.
 
 All [13 confirmed audit fixes are deployed](updates/2026-10-17-audit-remediation-release.md):
 server/Operations UI on DE, Host Agent on DE/NL, Desktop rebuilt and installed.

@@ -53,6 +53,11 @@ deadline across metadata, fetch and body reads.
 
 ### Job search
 
+[Живой тест 18 октября, 16:46 МСК](updates/2026-10-18-hh-ocr-live-acceptance.md):
+ответ установленной OCR-модели после отдельного одобрения владельца отправлен
+один раз; POST 302 / target GET 200 / solved, сбор возобновился с progress.
+Это не приёмка полностью автономного цикла; старый unknown не воспроизвёлся.
+
 Квитанция всех CAPTCHA-отправок сохраняется в owner-bound manual state,
 экспортируется локально через `exportCaptchaReceipt.js`, без ручного текста.
 [Разбор unknown и выпуск](updates/2026-10-18-hh-captcha-receipt-diagnosis.md)
