@@ -18,9 +18,12 @@ async function fixture(t) {
 test('Linux evidence round trip is durable, private, closed and owner-bound', linux, async t => {
   const f = await fixture(t), record = await f.start();
   await f.store.update(record.id, { answer: 'проверка картинки', phase: 'dispatch_started' });
+  await f.store.update(record.id, { phase: 'unknown', receipt: { received: true, permitted: 1, httpStatus: 403,
+    verification: 'captcha', serverError: 'xsrf_rejected', requestKind: 'xhr', imageAgeMs: 1000, pageAgeMs: 4000, csrfCookieMatch: 'match' } });
   const restarted = new CaptchaAttemptStore({ root: f.root, ownerId: f.ownerId });
   const value = await restarted.read(record.id);
   assert.equal(value.pngBase64, pngBase64); assert.equal(value.answer, 'проверка картинки');
+  assert.equal(value.receipt.serverError, 'xsrf_rejected');
   assert.equal((await fs.stat(f.root)).mode & 0o777, 0o700);
   assert.equal((await fs.stat(f.store.file(record.id))).mode & 0o777, 0o600);
   await assert.rejects(new CaptchaAttemptStore({ root: f.root, ownerId: randomUUID() }).export());

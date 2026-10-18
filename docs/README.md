@@ -17,6 +17,10 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
+[Исследуется новый 403 после корректного OCR](updates/2026-10-18-hh-captcha-403-investigation.md):
+native-запрос и browser/API cookies проверены без отправки ответов. Точная причина
+старого 403 пока неизвестна; готовится ограниченный классификатор ответа HH.
+
 [Живой ответ OCR прошёл HH после одобрения владельца](updates/2026-10-18-hh-ocr-live-acceptance.md):
 одна отправка, POST 302, проверка целевой страницы 200, `solved`; сбор возобновился.
 Полностью автономный цикл этим тестом не подтверждён.
@@ -182,6 +186,10 @@ describes publishing. Plans describe intentions. Code, checks, and actual
 deployment establish what is running.
 
 ### Current status
+
+[A new 403 after correct OCR is under investigation](updates/2026-10-18-hh-captcha-403-investigation.md):
+native requests and browser/API cookies were checked without submitting answers.
+The past 403's exact cause is unknown; a bounded HH response classifier is being prepared.
 
 [A live OCR answer passed HH after owner approval](updates/2026-10-18-hh-ocr-live-acceptance.md):
 one submission, POST 302, target verification 200, `solved`; collection resumed.

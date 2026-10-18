@@ -30,7 +30,8 @@ async function scenario({ mode, recognize = async () => 'проверка кар
     store: { read: async () => structuredClone(saved), write: async value => (saved = structuredClone(validate(value, ownerId))) },
     open: url => controller.open(url), verify: (url, id) => controller.verify(url, id),
   });
-  controller = new CaptchaTelegramBrowser({ context, coordinator, receiptTimeout: 200, dispatch: async route => {
+  // Keep the fixture bounded while allowing filesystem/header work under a CPU limit.
+  controller = new CaptchaTelegramBrowser({ context, coordinator, receiptTimeout: 1500, dispatch: async route => {
     const req = route.request(), u = new URL(req.url());
     if (u.pathname === '/captcha') { key++; await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ key: `picture-${key}` }) }); return; }
     posts++;
@@ -40,8 +41,8 @@ async function scenario({ mode, recognize = async () => 'проверка кар
     if (mode === 'unknown') return route.abort();
     if (mode === 'success' || mode === 'second' && posts === 2 || mode === 'third' && posts === 3) solved = true;
     await route.fulfill({ status: 204 });
-    return { acknowledged: mode !== 'redirect', httpStatus: mode === 'redirect' ? 302 : 200,
-      redirectKind: mode === 'redirect' ? 'captcha' : 'none' };
+    return { acknowledged: !['redirect', 'xsrf'].includes(mode), httpStatus: mode === 'xsrf' ? 403 : mode === 'redirect' ? 302 : 200,
+      redirectKind: mode === 'redirect' ? 'captcha' : 'none', serverError: mode === 'xsrf' ? 'xsrf_rejected' : 'not_applicable' };
   } });
   const archive = await mkdtemp(path.join(os.tmpdir(), 'hh-captcha-acceptance-'));
   const memory = new Map();
@@ -92,8 +93,9 @@ async function scenario({ mode, recognize = async () => 'проверка кар
       assert.equal((await client.answer({ challengeId: photo.challengeId, revision: photo.revision,
         operationId: randomUUID(), text: expected })).outcome, 'unknown');
     } else for (let i = 0; i < 5; i++) await worker.tick();
-    const wanted = human || mode === 'success' || mode === 'unknown' || mode === 'redirect' ? 1 : mode === 'second' ? 2 : 3;
-    assert.equal(posts, wanted); assert.equal(photos, solved ? 0 : 1);
+    const wanted = human || ['success', 'unknown', 'redirect', 'xsrf'].includes(mode) ? 1 : mode === 'second' ? 2 : 3;
+    assert.equal(posts, wanted, JSON.stringify({ mode, receipt: saved.lastReceipt, automaticPhase: saved.automatic?.phase,
+      evidencePhases: (await evidence.export()).map(v => v.phase) })); assert.equal(photos, solved ? 0 : 1);
     assert.equal(coordinator.status().phase, solved ? 'idle' : 'active');
     if (!solved) assert.equal(saved.automatic.phase, 'human');
     const records = await evidence.export();
@@ -101,11 +103,15 @@ async function scenario({ mode, recognize = async () => 'проверка кар
     assert.ok(records.every(v => v.answer === expected && Buffer.from(v.pngBase64, 'base64').length > 33));
     if (!human) {
       assert.equal(records.at(-1).phase, solved ? 'solved' : mode === 'reject' ? 'new_challenge' : 'unknown');
-      assert.equal(records.at(-1).receipt.httpStatus, mode === 'unknown' ? null : mode === 'redirect' ? 302 : 200);
+      assert.equal(records.at(-1).receipt.httpStatus, mode === 'unknown' ? null : mode === 'xsrf' ? 403 : mode === 'redirect' ? 302 : 200);
     }
     assert.equal(saved.lastReceipt.outcome, solved ? 'solved' : mode === 'reject' ? 'new_challenge' : 'unknown');
     assert.equal(saved.lastReceipt.stage, 'finished');
-    assert.equal(saved.lastReceipt.httpStatus, mode === 'unknown' ? null : mode === 'redirect' ? 302 : 200);
+    assert.equal(saved.lastReceipt.httpStatus, mode === 'unknown' ? null : mode === 'xsrf' ? 403 : mode === 'redirect' ? 302 : 200);
+    if (mode === 'xsrf') {
+      assert.equal(saved.lastReceipt.serverError, 'xsrf_rejected');
+      assert.equal(records.at(-1).receipt.serverError, 'xsrf_rejected');
+    }
     assert.equal(saved.lastReceipt.redirect, mode === 'redirect' ? 'captcha' : 'none');
     assert.equal(saved.lastReceipt.verification, solved ? 'verified' : 'captcha');
     assert.equal(saved.lastReceipt.view, mode === 'unknown' ? 'other' : 'captcha');
@@ -122,6 +128,10 @@ test('real Chromium + broker + Telegram worker: first/second/third success, thre
 
 test('human answer preserves a durable redirect receipt without archiving human text', { timeout: 20000 }, async () => {
   await scenario({ mode: 'redirect', human: true });
+});
+
+test('HTTP 403 server reason reaches durable receipt without another automatic POST', { timeout: 15000 }, async () => {
+  await scenario({ mode: 'xsrf' });
 });
 
 test('actual fine-tuned CPU model through PNG, Chromium native form, broker and Telegram worker', {

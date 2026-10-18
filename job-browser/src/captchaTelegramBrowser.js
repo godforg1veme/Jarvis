@@ -7,6 +7,7 @@ const { classifyPage, classifySession } = require('./pageSignals');
 const { dispatchCaptcha } = require('./captchaDispatch');
 const { validTarget, fail } = require('./manualState');
 const { bounded } = require('./browserHealth');
+const { SERVER_ERRORS, xsrfCookieMatch } = require('./captchaResponse');
 const hashKey = key => createHash('sha256').update(JSON.stringify(['hh-captcha', key])).digest('hex');
 const hashOperation = id => createHash('sha256').update(JSON.stringify(['hh-telegram-operation', id])).digest('hex');
 function validPng(bytes) {
@@ -34,6 +35,7 @@ class CaptchaTelegramBrowser {
       this.page = await bounded(() => this.context.newPage(), 5000);
     } catch (error) { this.onUnhealthy(); throw error; }
     const page = this.page; page.once('crash', () => this.crashed.add(page));
+    this.openedAt = this.now();
     await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 30000 });
   }
   async picture() {
@@ -146,7 +148,10 @@ class CaptchaTelegramBrowser {
     if (!filled || filled.key !== current.key || !sameForm(filled.form, current.form)) return { outcome: 'stale' };
     this.receipt = { operationHash, startedAt: this.now(), stage: 'prepared', received: false, permitted: 0,
       httpStatus: null, redirect: 'none', verification: 'not_checked', verificationStatus: null,
-      view: 'unavailable', visibleError: 'unavailable', outcome: 'pending' };
+      view: 'unavailable', visibleError: 'unavailable', outcome: 'pending', serverError: 'not_inspected',
+      requestKind: 'unobserved', csrfCookieMatch: 'unavailable',
+      imageAgeMs: Math.min(600000, Math.max(0, this.now() - (current.expires - 600000))),
+      pageAgeMs: this.openedAt === undefined ? null : Math.min(600000, Math.max(0, this.now() - this.openedAt)) };
     await this.saveReceipt({});
     await this.coordinator.claimMany([hashKey(current.key), operationHash]);
     current.used = true;
@@ -166,7 +171,9 @@ class CaptchaTelegramBrowser {
     const rejected = received && armed.permitted === 1 && (!this.automatic
       || armed.acknowledged === true && this.lastVerification === 'captcha');
     this.lastAttemptReceipt = { received, permitted: armed.permitted, httpStatus: armed.httpStatus || null,
-      verification: result.phase === 'idle' ? 'verified' : this.lastVerification === 'captcha' ? 'captcha' : 'unconfirmed' };
+      verification: result.phase === 'idle' ? 'verified' : this.lastVerification === 'captcha' ? 'captcha' : 'unconfirmed',
+      serverError: this.receipt.serverError, requestKind: this.receipt.requestKind, imageAgeMs: this.receipt.imageAgeMs,
+      pageAgeMs: this.receipt.pageAgeMs, csrfCookieMatch: this.receipt.csrfCookieMatch };
     const outcome = result.phase === 'idle' ? 'solved' : rejected ? 'new_challenge' : 'unknown';
     await this.saveReceipt({ stage: 'finished', outcome, verification: this.verificationReason || 'not_checked',
       verificationStatus: this.verificationStatus ?? null });
@@ -175,7 +182,7 @@ class CaptchaTelegramBrowser {
   async permit(route) {
     const req = route.request();
     if (!this.page || this.page.isClosed() || req.frame() !== this.page.mainFrame() || !this.coordinator.canInput()) return false;
-    const headers = req.headers(), input = { url: req.url(), method: req.method(), contentType: headers['content-type'], body: req.postDataBuffer(),
+    const headers = req.allHeaders ? await req.allHeaders() : req.headers(), input = { url: req.url(), method: req.method(), contentType: headers['content-type'], body: req.postDataBuffer(),
       csrfToken: headers['x-xsrftoken'], navigation: req.isNavigationRequest(), resourceType: req.resourceType() };
     if (this.initAllowed && validInit(input)) {
       this.initAllowed = false;
@@ -188,12 +195,15 @@ class CaptchaTelegramBrowser {
       || !validAnswerRequest(input, armed.current.form, armed.current.target, armed.text, armed.current.key)) return false;
     armed.permitted++; armed.request = req;
     const dispatched = (async () => {
-      await this.saveReceipt({ stage: 'dispatching', permitted: 1 });
+      await this.saveReceipt({ stage: 'dispatching', permitted: 1,
+        requestKind: input.navigation ? 'form' : input.resourceType === 'xhr' ? 'xhr' : 'other',
+        csrfCookieMatch: xsrfCookieMatch(headers.cookie, input.csrfToken || armed.current.form.inputs.find(v => v.name === '_xsrf')?.value) });
       const result = await this.dispatch(route);
       armed.acknowledged = result?.acknowledged === true;
       armed.httpStatus = Number.isInteger(result?.httpStatus) && result.httpStatus >= 100 && result.httpStatus <= 599 ? result.httpStatus : null;
       await this.saveReceipt({ stage: 'response', httpStatus: armed.httpStatus,
-        redirect: ['none', 'captcha', 'same_origin', 'external', 'invalid'].includes(result?.redirectKind) ? result.redirectKind : 'none' });
+        redirect: ['none', 'captcha', 'same_origin', 'external', 'invalid'].includes(result?.redirectKind) ? result.redirectKind : 'none',
+        serverError: SERVER_ERRORS.includes(result?.serverError) ? result.serverError : 'body_unavailable' });
     })();
     this.dispatches.add(dispatched);
     try { await dispatched; } finally { this.dispatches.delete(dispatched); }

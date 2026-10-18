@@ -9,6 +9,11 @@ source changes; verify the deployed revision before a server rollout.
 
 ## Change control
 
+18 октября: [исследование 403](updates/2026-10-18-hh-captcha-403-investigation.md)
+добавляет закрытую категорию ответа HH, тип запроса, возраст картинки и исход
+сопоставления CSRF/cookie в private receipt. Значения секретов/headers и тело сайта
+не сохраняются. Telegram-путь, подпись, подтверждение и unknown/retry прежние.
+
 18 октября: [квитанция ручной и автоматической отправки](updates/2026-10-18-hh-captcha-receipt-diagnosis.md)
 содержит только закрытые status/stage/category, без текста ответа и данных HH.
 Она дополняет owner-bound manual state и локальный экспорт; Telegram-путь,

@@ -6,10 +6,10 @@ const { UUID } = require('./rpcProtocol');
 const { validPng } = require('./captchaTelegramBrowser');
 const { normalizeAnswer } = require('./captchaTelegramProtocol');
 const { MAX_AUTOMATIC_ATTEMPTS } = require('./captchaLimits');
+const { validEvidenceReceipt } = require('./captchaReceipt');
 const MAX_RECORDS = 64, TTL_MS = 48 * 3600000, MAX_BYTES = 354000;
 const PHASES = ['image_saved', 'answer_saved', 'ocr_invalid', 'ocr_failed', 'dispatch_started', 'solved',
   'new_challenge', 'unknown', 'stale', 'already_used', 'submission_failed'];
-const VERIFICATIONS = ['captcha', 'verified', 'unconfirmed'];
 const denied = () => Object.assign(new Error('JOB_CAPTCHA_EVIDENCE_UNAVAILABLE'), { code: 'JOB_CAPTCHA_EVIDENCE_UNAVAILABLE' });
 const exact = (v, keys) => v && typeof v === 'object' && !Array.isArray(v)
   && Object.keys(v).length === keys.length && keys.every(k => Object.hasOwn(v, k));
@@ -22,10 +22,7 @@ function validate(v, ownerId) {
     || typeof v.pngBase64 !== 'string' || v.pngBase64.length > 349528) throw denied();
   const png = Buffer.from(v.pngBase64, 'base64');
   if (png.toString('base64') !== v.pngBase64 || !validPng(png)) throw denied();
-  if (v.receipt !== null && (!exact(v.receipt, ['received', 'permitted', 'httpStatus', 'verification'])
-    || typeof v.receipt.received !== 'boolean' || ![0, 1].includes(v.receipt.permitted)
-    || v.receipt.httpStatus !== null && (!Number.isInteger(v.receipt.httpStatus) || v.receipt.httpStatus < 100 || v.receipt.httpStatus > 599)
-    || !VERIFICATIONS.includes(v.receipt.verification))) throw denied();
+  if (v.receipt !== null && !validEvidenceReceipt(v.receipt)) throw denied();
   return v;
 }
 class CaptchaAttemptStore {

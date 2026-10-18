@@ -7,6 +7,11 @@
 [Результат выпуска](../docs/updates/2026-10-15-job-search-release.md).
 Playwright/Chromium согласованы владельцем 15 октября 2026.
 
+[Разбор HTTP 403](../docs/updates/2026-10-18-hh-captcha-403-investigation.md):
+receipt содержит `serverError`, тип запроса и возраст картинки/страницы.
+Пояснение HH классифицируется только для небольшого объявленного несжатого
+текстового ответа; raw body, headers, cookies и tokens не сохраняются.
+
 Последняя закрытая квитанция любой отправки сохраняется в manual state;
 `node src/exportCaptchaReceipt.js` читает её без POST/refresh.
 [Поля, ограничения и разбор unknown](../docs/updates/2026-10-18-hh-captcha-receipt-diagnosis.md).

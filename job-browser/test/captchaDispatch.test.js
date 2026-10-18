@@ -23,3 +23,13 @@ test('initialization accepts bounded JSON only and never returns a redirect to t
     await dispatchCaptcha(route); assert.equal(aborted, status !== 200); assert.equal(Boolean(fulfilled), status === 200);
   }
 });
+test('403 reason is classified before disposal and raw HH error content is not forwarded', async () => {
+  const bytes = Buffer.from('<h1>Forbidden: XSRF cookie does not match POST argument</h1>');
+  let rendered;
+  const route = { request: () => ({ url: () => 'https://hh.ru/account/captcha' }),
+    fetch: async () => ({ status: () => 403, headers: () => ({ 'content-type': 'text/html', 'content-length': String(bytes.length) }), body: async () => bytes }),
+    fulfill: async value => { rendered = value; } };
+  const result = await dispatchCaptcha(route);
+  assert.equal(result.httpStatus, 403); assert.equal(result.serverError, 'xsrf_rejected');
+  assert.equal(result.acknowledged, false); assert.equal(rendered.status, 204); assert.equal(rendered.body, undefined);
+});
