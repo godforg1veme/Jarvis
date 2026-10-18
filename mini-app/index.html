@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#080e14">
+  <title>Jarvis · Mini App — образец</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/style.css">
+  <script type="importmap">{"imports":{"three":"/vendor/three.module.js"}}</script>
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <div class="preview-notice">Дизайн-превью · вымышленные Telegram ID · изменения только в этой вкладке</div>
+  <main class="shell">
+    <header class="topbar"><a class="brand" href="#home" aria-label="Jarvis — главная"><span class="brand-mark">J</span> JARVIS<span class="brand-caption">MINI APP</span></a><span class="owner-badge">Владелец</span></header>
+    <section id="home" class="view">
+      <div class="eyebrow">ЛИЧНЫЙ ЦЕНТР УПРАВЛЕНИЯ</div>
+      <div class="hero">
+        <div class="hero-copy"><h1>Всё под<br>твоим контролем.</h1><p>Твои задачи, знания и устройства.<br>Одно пространство — твои правила.</p><a class="primary" href="#admin">Управлять доступом <span aria-hidden="true">↗</span></a><div class="hero-note"><span class="status-dot"></span> JARVIS CORE / 3D PREVIEW</div></div>
+        <div class="core-panel">
+          <div id="core-stage" role="img" aria-label="Объёмное ядро Jarvis: вращающиеся металлические кольца вокруг голубой сферы"><div class="core-fallback"><span>J</span></div><span class="core-wordmark" aria-hidden="true">J A R V I S</span><span id="core-loading" class="core-loading" role="status">Подготовка 3D…</span></div>
+          <div class="core-caption"><span id="core-status">ИНТЕРАКТИВНОЕ ЯДРО</span><span>01 / CORE</span></div>
+          <div class="motion-controls"><button id="pause" type="button" aria-pressed="false">Пауза</button><label for="speed">Скорость <input id="speed" type="range" min="0.25" max="1.8" step="0.05" value="0.7"></label><button id="reset-core" type="button" aria-label="Сбросить поворот ядра">Сброс</button></div>
+          <p class="drag-hint">Проведи по ядру, чтобы повернуть его</p>
+        </div>
+      </div>
+      <div class="section-heading"><h2>Твоё пространство</h2><span>06 РАЗДЕЛОВ</span></div>
+      <div id="modules" class="modules"></div>
+    </section>
+    <section id="admin" class="view" hidden>
+      <div class="eyebrow">АДМИНИСТРИРОВАНИЕ</div>
+      <div class="section-heading"><div><h1>Люди и доступ</h1><p class="muted">Права по ролям. Исключения — персонально.</p></div><button class="primary" id="invite" type="button">+ Добавить</button></div>
+      <div class="tabs" role="tablist" aria-label="Управление доступом"><button id="users-tab" role="tab" aria-controls="users-panel" aria-selected="true" type="button">Пользователи <span id="user-count">3</span></button><button id="roles-tab" role="tab" aria-controls="roles-panel" aria-selected="false" tabindex="-1" type="button">Роли</button></div>
+      <div id="users-panel" role="tabpanel" aria-labelledby="users-tab"><label class="search-label" for="search">Найти пользователя</label><input id="search" type="search" placeholder="Имя или Telegram ID" autocomplete="off"><div id="users" class="user-list"></div></div>
+      <div id="roles-panel" role="tabpanel" aria-labelledby="roles-tab" hidden><div id="roles" class="user-list"></div><button id="add-role" class="secondary" type="button">+ Создать роль</button></div>
+      <p class="privacy-note">Администрирование не открывает чужую переписку, память и документы.</p>
+    </section>
+    <section id="assistant" class="view" hidden><div class="eyebrow">ЛИЧНЫЙ АССИСТЕНТ</div><h1>Пространство диалога</h1><p class="muted">В этом образце проверяем дизайн и движение ядра. Серверный диалог ещё не подключён.</p><a class="secondary" href="#home">На главную</a></section>
+    <nav class="bottom-nav" aria-label="Основная навигация"><a href="#home" data-nav="home">Главная</a><a href="#assistant" data-nav="assistant">Ассистент</a><a href="#admin" data-nav="admin">Управление</a></nav>
+  </main>
+  <dialog id="editor"><form id="editor-form"><div class="dialog-heading"><div><div class="eyebrow" id="editor-eyebrow">ПЕРСОНАЛЬНЫЕ ПРАВА</div><h2 id="editor-title">Доступ пользователя</h2></div><button class="icon-button" id="close-editor" type="button" aria-label="Закрыть">×</button></div><div id="editor-body"></div><p id="editor-error" class="form-error" role="alert"></p><div class="dialog-footer"><button class="secondary" id="cancel-editor" type="button">Отмена</button><button class="primary" type="submit">Сохранить в превью</button></div></form></dialog>
+  <div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>

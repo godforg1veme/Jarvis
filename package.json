@@ -27,6 +27,7 @@
     "files": [
       "**/*",
       "!server/**",
+      "!mini-app/**",
       "!docs/**",
       "!build/**",
       "!models/**",

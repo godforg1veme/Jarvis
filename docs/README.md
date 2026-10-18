@@ -17,6 +17,13 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
+Подготовлен [локальный образец Telegram Mini App](../mini-app/README.md):
+настоящее 3D-ядро Three.js, экраны ролей и личных исключений по Telegram ID.
+Browser fixtures прошли; реальные Telegram вход, серверные права и API ещё
+не подключены. Образец работает только локально, изменения держатся в памяти
+вкладки. [Спецификация](superpowers/specs/2026-10-18-telegram-mini-app-design.md)
+подготовлена для проверки владельцем; на VPS изменений нет.
+
 [Исследуется новый 403 после корректного OCR](updates/2026-10-18-hh-captcha-403-investigation.md):
 native-запрос и browser/API cookies проверены без отправки ответов. Точная причина
 старого 403 пока неизвестна; ограниченный классификатор ответа HH установлен на DE,
@@ -191,6 +198,14 @@ describes publishing. Plans describe intentions. Code, checks, and actual
 deployment establish what is running.
 
 ### Current status
+
+A [local Telegram Mini App preview](../mini-app/README.md) is ready:
+an actual Three.js core and screens for roles and per-user overrides keyed by
+Telegram ID. Browser fixtures passed; real Telegram authentication, server
+permissions and APIs are not connected yet. The preview is local only and
+keeps edits in tab memory. The
+[specification](superpowers/specs/2026-10-18-telegram-mini-app-design.md) is ready
+for owner review; no VPS changes have been made.
 
 [A new 403 after correct OCR is under investigation](updates/2026-10-18-hh-captcha-403-investigation.md):
 native requests and browser/API cookies were checked without submitting answers.
