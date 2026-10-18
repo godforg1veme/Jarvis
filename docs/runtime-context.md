@@ -12,6 +12,7 @@ Jarvis is a hybrid personal and family AI-assistant platform:
 - the Electron application is the Windows client and execution edge for local
   voice, apps, files, windows, and approved remote actions;
 - Telegram is the first cloud client, not the whole product;
+- Telegram Mini App adds a Three.js interface, private chat and access administration;
 - PWA remains planned. Server ASR is deployed as a private GigaAM
   `v3_e2e_rnnt` ONNX worker on DE-4. Allowlisted Telegram `voice` notes route
   through it, persist only a `voice_transcript`, and retain no raw audio.
@@ -133,6 +134,42 @@ browser container при продолжающем успешном HTTP health.
 durable refresh, bounded retries и owner-scoped уведомления. Migration 033 применена.
 Новая картинка получила binding, ответ `solved`; coordinator idle, collector
 продолжил прежний progress. Профиль, настройки и смонтированные секреты сохранены.
+
+### OpenRouter model routing
+
+`server/src/providers/freeFirstProvider.js` is the opt-in primary text router;
+`openRouterCatalog.js` bounds and caches the account-filtered model catalog.
+`JARVIS_OPENROUTER_FREE_FIRST` defaults to false. The approved free order is
+fixed; primary/fallback OpenRouter model IDs form the paid pool. This mode uses
+the primary key for the entire queue, without continuing to legacy account or
+Gemini fallbacks. Explicit job/Vision model selection is independent.
+
+Refresh happens on use after 15 minutes; it updates metadata, not the allowlist.
+Provider price ceilings protect zero-price routing even between refreshes.
+A missing fresh catalog fails closed. Tool-capable requests never retry after
+dispatch; unknown network outcomes do not switch models. Contract, current
+verification and rollout status: [development record](updates/2026-10-19-free-first-routing-development.md).
+
+### Telegram Mini App and access control
+
+The component contract is maintained in [mini-app/README.md](../mini-app/README.md).
+The [October 18 handoff](updates/2026-10-18-mini-app-agent-handoff.md) summarizes
+owner decisions, deployed revisions, checks and unfinished client acceptance.
+
+- `mini-app/` builds explicit static assets served at `/mini/`; its fictional-data
+  preview is excluded from production. Three.js renders locally without a generation API.
+- `server/src/miniApp/` verifies signed Telegram initData, manages revocable hashed
+  sessions and enforces Origin/CSRF. SDK and raw fragment data use the same server
+  validation; SDK failure does not grant access.
+- `server/src/access/` owns roles, personal inherit/allow/deny, revisions and audit.
+  The protected owner derives from `JARVIS_OPERATIONS_OWNER_TELEGRAM_ID`.
+  Administrator status does not confer ownership of another person's private data.
+- Permissions are checked beyond menu visibility: Telegram handlers, Desktop
+  HTTP/WebSocket, model context/dispatch and background Life OS delivery.
+  Disabling the Mini App UI preserves established access restrictions.
+- Migrations 037/038 store access/session data and assistant request receipts.
+  Uncertain requests retain their original operation ID for reconciliation.
+  A jobs permission does not share the existing owner's HH browser.
 
 ### Cloud control plane
 

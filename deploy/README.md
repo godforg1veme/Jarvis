@@ -498,3 +498,17 @@ gone. Test real Telegram photo delivery, explicit human reply and confirmed HH
 read access separately from fixture acceptance. A lost photo ACK or answer POST
 must not cause automatic replay under another operation ID. Root verification
 instructions and dated release results record the actual deployment outcome.
+
+## Free-first OpenRouter text routing (opt-in)
+
+Local development on October 19, not yet installed: set
+`JARVIS_OPENROUTER_FREE_FIRST=true` only as part of an authorized rollout.
+The primary provider must be `openrouter`. The seven approved free IDs precede
+the paid IDs in `OPENROUTER_MODEL` / `OPENROUTER_FALLBACK_MODEL`, ranked by
+estimated request cost. All use the primary `OPENROUTER_API_KEY`; legacy backup
+accounts and Gemini do not continue this queue. Existing fallback key/model
+pair validation remains. Explicit HH/Vision model settings are unchanged.
+
+The catalog and quota refresh on use every 15 minutes; model IDs are never
+automatically added. Missing metadata fails closed and zero-price routing is
+protected by provider price caps. See [contract and tests](../docs/updates/2026-10-19-free-first-routing-development.md).

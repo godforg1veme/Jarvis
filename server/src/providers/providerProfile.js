@@ -1,11 +1,12 @@
 function providerProfileForConfig(config) {
   const provider = String(config.modelProvider || 'unknown');
-  const model = provider === 'openrouter'
+  const model = config.openrouterFreeFirst ? 'free-first'
+    : provider === 'openrouter'
     ? String(config.openrouterModel || '')
     : provider === 'salad'
       ? String(config.saladModel || '')
       : 'echo';
-  const needsReinforcement = /deepseek\/deepseek-v4-flash-0731/i.test(model);
+  const needsReinforcement = config.openrouterFreeFirst || /deepseek\/deepseek-v4-flash-0731/i.test(model);
   return Object.freeze({
     provider,
     model,

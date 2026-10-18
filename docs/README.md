@@ -17,14 +17,21 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
-На DE выпущены [удаление «Помощи» и исправление входа без SDK](updates/2026-10-18-mini-app-entry-help-removal.md). Linux: 742/742, публичный отказ неверной подписи проверен; настоящий вход ещё требует клиентской приёмки.
+Локально подготовлена [очередь бесплатных моделей OpenRouter](updates/2026-10-19-free-first-routing-development.md):
+семь согласованных free, затем два DeepSeek по оценке стоимости. Цены и квота
+обновляются при использовании раз в 15 минут; новые ID не добавляются.
+756 server tests прошли. На VPS режим ещё не включён.
 
 [Telegram Mini App выпущен на DE](updates/2026-10-18-telegram-mini-app-release.md):
 3D-ядро, Telegram ID, роли и личные разрешения, админка, аудит, личный диалог
-и чтение своих разделов. Кнопка запуска настроена в боте; оба VPS синхронизированы.
-Linux: 741 server test, 8 PostgreSQL acceptance и все 40 migrations прошли.
-Browser наборы прошли локально. Реальные Telegram/phone/cookies и два аккаунта
-ещё требуют приёмки; второй HH требует отдельного подключения.
+и чтение своих разделов. [Последующее исправление](updates/2026-10-18-mini-app-entry-help-removal.md)
+убрало «Помощь» и зависимость входа от внешнего SDK. Последние Linux server tests:
+742/742; первый выпуск прошёл 8 PostgreSQL acceptance и все 40 migrations.
+Кнопка запуска настроена, исходники обоих VPS синхронизированы. Настоящий вход
+после исправления, Telegram Web cookies, телефонный FPS и два аккаунта ещё требуют
+приёмки; второй HH требует собственного подключения.
+[Выжимка чата для следующего агента](updates/2026-10-18-mini-app-agent-handoff.md)
+содержит решения, проверенного владельца, версии и следующий шаг.
 
 [Исследуется новый 403 после корректного OCR](updates/2026-10-18-hh-captcha-403-investigation.md):
 native-запрос и browser/API cookies проверены без отправки ответов. Точная причина
@@ -201,15 +208,21 @@ deployment establish what is running.
 
 ### Current status
 
-[Help removal and entry without the remote SDK](updates/2026-10-18-mini-app-entry-help-removal.md) are deployed on DE. Linux: 742/742; public invalid-signature rejection passed. Actual login still needs client acceptance.
+[Free-first OpenRouter routing](updates/2026-10-19-free-first-routing-development.md)
+is implemented locally: seven approved free models, then two DeepSeek candidates
+ranked by estimated cost. Prices/quota refresh on use every 15 minutes; no new
+IDs are added. All 756 server tests passed. Not yet enabled on the VPS.
 
 The [Telegram Mini App is deployed on DE](updates/2026-10-18-telegram-mini-app-release.md):
 3D core, Telegram IDs, roles and personal overrides, administration, audit,
-private chat and own-section reads. The bot launch button is configured;
-both VPS source checkouts are synchronized. Linux passed 741 server tests,
-8 PostgreSQL acceptance tests and all 40 migrations. Browser suites passed
-locally. Actual Telegram/phone/cookies and two accounts still need acceptance;
-a second HH account needs a separate connection.
+private chat and own-section reads. A [subsequent fix](updates/2026-10-18-mini-app-entry-help-removal.md)
+removed Help and the entry dependency on the remote SDK. Latest Linux server
+tests: 742/742; the first release passed 8 PostgreSQL acceptance tests and all
+40 migrations. The launch button is configured and both VPS source checkouts
+are synchronized. Actual login after the fix, Telegram Web cookies, phone FPS
+and two accounts still need acceptance; a second HH account needs its own connection.
+The [chat handoff for the next agent](updates/2026-10-18-mini-app-agent-handoff.md)
+records decisions, the verified owner, revisions and the next step.
 
 [A new 403 after correct OCR is under investigation](updates/2026-10-18-hh-captcha-403-investigation.md):
 native requests and browser/API cookies were checked without submitting answers.

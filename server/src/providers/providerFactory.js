@@ -2,6 +2,7 @@ const { EchoProvider } = require('./echoProvider');
 const { FallbackProvider } = require('./fallbackProvider');
 const { GeminiProvider } = require('./geminiProvider');
 const { OpenAiCompatibleProvider } = require('./openAiCompatibleProvider');
+const { FreeFirstProvider } = require('./freeFirstProvider');
 
 function providerByName(name, config, options = {}) {
   if (!name || name === 'echo') return new EchoProvider();
@@ -57,6 +58,7 @@ function createOpenRouterFallback(config, options = {}) {
 }
 
 function createAnswerProvider(config, options = {}) {
+  if (config.openrouterFreeFirst) return new FreeFirstProvider(config, options);
   const providers = [providerByName(config.modelProvider, config, options)];
   if (config.modelFallbackProvider) providers.push(providerByName(config.modelFallbackProvider, config, options));
   const openRouterFallback = createOpenRouterFallback(config, options);

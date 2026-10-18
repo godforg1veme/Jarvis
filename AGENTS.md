@@ -8,7 +8,8 @@
 Jarvis: облачный мозг и память, локальные руки на устройствах. Облако хранит
 пользователей, диалоги, память, документы и задания. Electron на Windows работает
 с голосом, приложениями, файлами и окнами. Telegram является первым облачным
-клиентом; PWA остаётся в планах. Модель и провайдер выбираются настройками.
+клиентом; Telegram Mini App даёт личное пространство и администрирование доступа.
+Отдельная PWA остаётся в планах. Модель и провайдер выбираются настройками.
 
 ## Что читать по задаче
 
@@ -19,6 +20,8 @@ Jarvis: облачный мозг и память, локальные руки �
 | Подробности подсистем и развёртывания | Нужный раздел [docs/runtime-context.md](docs/runtime-context.md) |
 | Тесты и проверки | [docs/verification.md](docs/verification.md) |
 | Telegram | [архитектура кнопок](docs/telegram-button-architecture.md) и [контракт меню](docs/telegram-menu-contract.md), оба целиком перед изменением пути |
+| OpenRouter, очередь моделей и цены | [контекст провайдеров](docs/runtime-context.md#openrouter-model-routing) и [результат разработки](docs/updates/2026-10-19-free-first-routing-development.md) |
+| Mini App, роли и личные разрешения | [mini-app/README.md](mini-app/README.md); [выжимка решений и проверок 18 октября](docs/updates/2026-10-18-mini-app-agent-handoff.md) |
 | Установка и обслуживание VPS | [deploy/README.md](deploy/README.md) |
 | VPN-диагностика и допустимый ремонт | [runbook](docs/VPN_RESILIENCE_RUNBOOK.md) и [Supervisor](docs/VPN_SUPERVISOR_REPAIR_GUIDE.md) |
 
@@ -39,6 +42,8 @@ updates и `docs/history/` сохраняют историю; новые пра�
 - `actions/`, `tools/`: ограниченные локальные операции; пути проектов остаются
   в `tools/workspaceRegistry.js`. `agent_runtime/`: Python/LangGraph-планировщик.
 - `ops-ui/`: Operations UI; `host-agent/`: ограниченный Linux-исполнитель.
+- `mini-app/`: Telegram Mini App и Three.js; `server/src/miniApp/` — вход,
+  сессии и API; `server/src/access/` — серверные роли и личные разрешения.
 - `runtimeDataPath.js`: записываемые настройки/индексы в development `data/`,
   в установленном приложении `%APPDATA%/jarvis/data/`.
 
@@ -129,6 +134,19 @@ revision, expiry, deduplication, grammar и origin-bound подтвержден�
 и чужой scope через настоящие message/menu handlers, без stub `begin`.
 Diagnostics содержат только закрытые kind/phase/outcome/failure code/update ID,
 без текста пользователя, callbacks, исключений и секретов.
+
+### Mini App и доступ
+
+Пользователь определяется числовым Telegram ID; username и email не дают прав.
+Единственный главный владелец задаётся `JARVIS_OPERATIONS_OWNER_TELEGRAM_ID`;
+обычная роль или пользовательская галочка не назначает и не снимает владельца.
+Проверяй актуальные права на сервере, включая уже открытые сессии и фоновые
+действия. Администрирование доступа не разрешает чтение чужих личных данных.
+
+`tgWebAppData` из URL и SDK — недоверенные данные до серверной проверки подписи,
+срока и membership. Недоступность SDK не разрешает обход входа. Вымышленное
+3D-превью отделено от production. Выданное право на HH не подключает второй
+аккаунт и не открывает браузер владельца. Контракты и проверки: `mini-app/README.md`.
 
 ## Код, зависимости и локальные файлы
 

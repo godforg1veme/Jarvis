@@ -74,9 +74,10 @@ node --test server/test/miniAppPostgresAcceptance.cjs server/test/miniAppIntegra
 Первый тест требует работающий preview; `MINI_PREVIEW_URL` меняет адрес.
 Browser tests используют имеющиеся Playwright из job-browser и Edge.
 Артефакты: игнорируемая `.superpowers/mini-app-preview/`.
-Прошли 741 server test, 8 настоящих изолированных PostgreSQL acceptance,
-production browser fixtures и 3D preview. Linux Docker build, 741 server test,
-8 PostgreSQL acceptance и полный pipeline 40 migrations также прошли.
+Последняя правка прошла 742 server tests локально и в Linux image, а также
+production browser fixtures с недоступным SDK и отказом сервера. Первый выпуск
+прошёл 8 настоящих PostgreSQL acceptance, полный pipeline 40 migrations и
+отдельные 3D preview fixtures.
 Выпуск на DE и кнопка бота проверены. Реальный Telegram/CHIPS cookie,
 телефонный FPS и второй HH остаются для клиентской приёмки.
 
@@ -155,10 +156,11 @@ node --test server/test/miniAppPostgresAcceptance.cjs server/test/miniAppIntegra
 
 The first test requires a running preview; `MINI_PREVIEW_URL` overrides its URL.
 Browser tests use existing job-browser Playwright and Edge. Artifacts remain
-under ignored `.superpowers/mini-app-preview/`. Verification passed 741 server
-tests, 8 actual isolated PostgreSQL acceptance tests, production browser
-fixtures and the 3D preview. Linux Docker build, 741 server tests,
-8 PostgreSQL acceptance tests and the full 40-migration pipeline also passed.
+under ignored `.superpowers/mini-app-preview/`. The latest fix passed 742
+server tests locally and in the Linux image, plus production browser fixtures
+with an unavailable SDK and server rejection. The first release passed 8 actual
+PostgreSQL acceptance tests, the full 40-migration pipeline and separate 3D
+preview fixtures.
 DE deployment and the bot button were verified. Actual Telegram/CHIPS cookies,
 phone FPS and a second HH account still need client acceptance.
 

@@ -41,6 +41,7 @@ const baseSchema = z.object({
   saladAuthMode: z.enum(['bearer', 'salad-api-key']),
   openrouterApiKey: z.string().max(2048),
   openrouterModel: z.string().max(255),
+  openrouterFreeFirst: z.boolean(),
   openrouterFallbackApiKey: z.string().max(2048),
   openrouterFallbackModel: z.string().max(255),
   openrouterReasoningEffort: z.enum(['', 'max', 'xhigh', 'high', 'medium', 'low', 'minimal', 'none']),
@@ -209,6 +210,7 @@ function loadConfig(env = process.env) {
     saladAuthMode: String(env.SALAD_AUTH_MODE || 'bearer').trim().toLowerCase(),
     openrouterApiKey: String(env.OPENROUTER_API_KEY || '').trim(),
     openrouterModel: String(env.OPENROUTER_MODEL || '').trim(),
+    openrouterFreeFirst: parseBoolean(env.JARVIS_OPENROUTER_FREE_FIRST),
     openrouterFallbackApiKey: String(env.OPENROUTER_FALLBACK_API_KEY || '').trim(),
     openrouterFallbackModel: String(env.OPENROUTER_FALLBACK_MODEL || '').trim(),
     openrouterReasoningEffort: String(env.OPENROUTER_REASONING_EFFORT || '').trim().toLowerCase(),
@@ -267,6 +269,9 @@ function loadConfig(env = process.env) {
   };
 
   const config = { ...baseSchema.parse(raw), ...loadJobConfig(env) };
+  if (config.openrouterFreeFirst && config.modelProvider !== 'openrouter') {
+    throw new Error('JARVIS_OPENROUTER_FREE_FIRST requires the OpenRouter primary provider');
+  }
   if (config.miniAppEnabled) {
     if (!config.databaseUrl || !config.telegramBotToken || config.operationsOwnerTelegramId === '0') {
       throw new Error('Mini App requires database, Telegram bot and configured owner');

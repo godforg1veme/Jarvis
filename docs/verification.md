@@ -1,5 +1,34 @@
 # Проверки перед выпуском
 
+OpenRouter free-first, локальный этап 19 октября:
+[результат и ограничения](updates/2026-10-19-free-first-routing-development.md).
+14 routing tests, focused suite 33/33, весь server suite 756/756 прошли.
+Проверены цены/caps, очередь, квота, cache refresh и запрет повтора action-capable
+запроса. Новые проверки используют fixture API; новый router на VPS не выпущен.
+
+OpenRouter free-first, October 19 local stage:
+[results and limits](updates/2026-10-19-free-first-routing-development.md).
+14 routing tests, focused suite 33/33 and full server suite 756/756 passed.
+Coverage includes prices/caps, order, quota, cache refresh and action-capable
+no-retry. New tests use fixture APIs; the router is not deployed on the VPS.
+
+```powershell
+node --test server/test/openRouterRouting.test.js server/test/providers.test.js server/test/config.test.js
+npm test --prefix server
+```
+
+Последняя правка Mini App: [вход без SDK и удаление «Помощи»](updates/2026-10-18-mini-app-entry-help-removal.md).
+742 server tests прошли локально и в Linux image; production browser fixtures
+включают недоступный SDK, успешный fixture-вход и отказ сервера. Публичная проба
+подтвердила отправку synthetic fragment и отказ неверной подписи; настоящий
+вход владельца после исправления ещё не подтверждён.
+
+Latest Mini App fix: [entry without the SDK and Help removal](updates/2026-10-18-mini-app-entry-help-removal.md).
+742 server tests passed locally and in the Linux image; production browser
+fixtures cover an unavailable SDK, successful fixture login and server rejection.
+A public probe confirmed synthetic-fragment submission and invalid-signature
+rejection; actual owner login after the fix remains unconfirmed.
+
 Telegram Mini App, выпуск 18 октября:
 [результат](updates/2026-10-18-telegram-mini-app-release.md).
 Linux Docker: 741 server test, 8 PostgreSQL acceptance, все 40 migrations прошли

@@ -14,6 +14,7 @@ class OpenAiCompatibleProvider {
     this.timeoutMs = options.timeoutMs || 60000;
     this.authMode = options.authMode || 'bearer';
     this.reasoning = options.reasoning || null;
+    this.providerRouting = options.providerRouting || null;
     this.fetch = options.fetchImpl || globalThis.fetch;
   }
 
@@ -35,6 +36,7 @@ class OpenAiCompatibleProvider {
         stream: false,
       };
       if (this.reasoning) body.reasoning = this.reasoning;
+      if (this.providerRouting) body.provider = this.providerRouting;
       if (maxTokens !== undefined) {
         if (!Number.isInteger(maxTokens) || maxTokens < 1 || maxTokens > 16384) throw new Error('invalid provider token limit');
         body.max_tokens = maxTokens;
@@ -47,7 +49,14 @@ class OpenAiCompatibleProvider {
         signal: controller.signal,
         redirect: 'error',
       });
-      if (!response.ok) throw new Error(`${this.name} request failed with HTTP ${response.status}`);
+      if (!response.ok) {
+        const seconds = Number(response.headers.get('retry-after'));
+        await response.body?.cancel();
+        throw Object.assign(new Error(`${this.name} request failed with HTTP ${response.status}`), {
+          status: response.status,
+          retryAfterMs: Number.isFinite(seconds) && seconds >= 0 ? Math.min(seconds * 1000, 3600000) : 0,
+        });
+      }
       const declaredLength = Number(response.headers.get('content-length') || 0);
       if (declaredLength > MAX_PROVIDER_RESPONSE_BYTES) throw new Error(`${this.name} response is too large`);
       const chunks = []; let byteCount = 0;
