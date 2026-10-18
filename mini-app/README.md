@@ -4,7 +4,9 @@
 
 ## Русский
 
-18 октября 2026 подготовлена первая локальная версия. Вход проверяет подписанные
+18 октября 2026 Mini App выпущен на DE; в боте настроена кнопка «Открыть Jarvis».
+[Проверки и ограничения выпуска](../docs/updates/2026-10-18-telegram-mini-app-release.md).
+Вход проверяет подписанные
 Telegram initData; личность определяется числовым Telegram ID. Email не нужен.
 Вне Telegram клиент не выдаёт демонстрационных прав.
 
@@ -47,7 +49,8 @@ Dockerfile сервера содержит отдельный этап сбор�
 через штатное окружение. Выключение UI сохраняет уже заведённые проверки прав.
 
 После отдельного поручения на выпуск HTTPS URL `https://<домен>/mini/`
-настраивается в Main Mini App / menu button бота через BotFather. Только
+настраивается как menu button через Bot API; Main Mini App можно задать
+отдельно в BotFather. Только
 Mini App получает ограниченное разрешение Telegram Web framing; другие
 страницы сохраняют DENY. Cookie имеет HttpOnly/Secure/SameSite=None/Partitioned.
 
@@ -69,17 +72,19 @@ node --test server/test/miniAppPostgresAcceptance.cjs server/test/miniAppIntegra
 Browser tests используют имеющиеся Playwright из job-browser и Edge.
 Артефакты: игнорируемая `.superpowers/mini-app-preview/`.
 Прошли 741 server test, 8 настоящих изолированных PostgreSQL acceptance,
-production browser fixtures и 3D preview. PostgreSQL применял целевые SQL
-migrations в отдельных схемах, без несвязанного pgvector. Полный Linux Docker
-build, реальный Telegram/CHIPS cookie, BotFather launch, телефонный FPS и
-второй HH пока не проверены. На VPS ничего не выпущено.
+production browser fixtures и 3D preview. Linux Docker build, 741 server test,
+8 PostgreSQL acceptance и полный pipeline 40 migrations также прошли.
+Выпуск на DE и кнопка бота проверены. Реальный Telegram/CHIPS cookie,
+телефонный FPS и второй HH остаются для клиентской приёмки.
 
 [Спецификация](../docs/superpowers/specs/2026-10-18-telegram-mini-app-design.md),
-[результат](../docs/updates/2026-10-18-telegram-mini-app-development.md).
+[результат](../docs/updates/2026-10-18-telegram-mini-app-release.md).
 
 ## English
 
-The first local version was prepared on October 18, 2026. The server verifies
+The Mini App was deployed on DE on October 18, 2026; the bot menu opens it.
+[Release checks and limits](../docs/updates/2026-10-18-telegram-mini-app-release.md).
+The server verifies
 signed Telegram initData and identifies users by numeric Telegram ID. Email is
 unnecessary. Clients outside Telegram receive no demo privileges.
 
@@ -123,7 +128,8 @@ Secrets use the normal environment. Disabling the UI preserves established
 permission enforcement.
 
 After separate release authorization, configure HTTPS URL
-`https://<domain>/mini/` as the bot's Main Mini App / menu button via BotFather.
+`https://<domain>/mini/` as the bot menu button using the Bot API. Main Mini App
+can be configured separately in BotFather.
 Only the Mini App receives restricted Telegram Web framing; other pages keep
 DENY. Cookies use HttpOnly/Secure/SameSite=None/Partitioned.
 
@@ -145,10 +151,10 @@ The first test requires a running preview; `MINI_PREVIEW_URL` overrides its URL.
 Browser tests use existing job-browser Playwright and Edge. Artifacts remain
 under ignored `.superpowers/mini-app-preview/`. Verification passed 741 server
 tests, 8 actual isolated PostgreSQL acceptance tests, production browser
-fixtures and the 3D preview. PostgreSQL applied target SQL migrations in isolated
-schemas without unrelated pgvector. Full Linux Docker build, actual Telegram/
-CHIPS cookies, BotFather launch, phone FPS and a second HH account remain
-unverified. Nothing has been released to the VPS.
+fixtures and the 3D preview. Linux Docker build, 741 server tests,
+8 PostgreSQL acceptance tests and the full 40-migration pipeline also passed.
+DE deployment and the bot button were verified. Actual Telegram/CHIPS cookies,
+phone FPS and a second HH account still need client acceptance.
 
 [Specification](../docs/superpowers/specs/2026-10-18-telegram-mini-app-design.md),
-[results](../docs/updates/2026-10-18-telegram-mini-app-development.md).
+[results](../docs/updates/2026-10-18-telegram-mini-app-release.md).

@@ -4,6 +4,8 @@
 
 ## Русский
 
+Более новый результат: [выпуск на DE 18 октября](2026-10-18-telegram-mini-app-release.md). Ниже сохранён локальный этап.
+
 18 октября 2026, локальная ветка `codex/telegram-mini-app`. Владелец согласовал
 макет, Three.js, Telegram ID вместо email, роли с личными исключениями и
 письменную спецификацию. GitHub и VPS пока не обновлялись.
@@ -67,6 +69,8 @@ HH browser пока привязан к одному владельцу: вто�
 [план](../superpowers/plans/2026-10-18-telegram-mini-app.md).
 
 ## English
+
+Newer result: [DE release on October 18](2026-10-18-telegram-mini-app-release.md). The local stage is preserved below.
 
 October 18, 2026, local branch `codex/telegram-mini-app`. The owner approved the
 design, Three.js, Telegram IDs instead of email, roles with personal overrides

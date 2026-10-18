@@ -17,12 +17,12 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
-Подготовлена [первая локальная версия Telegram Mini App](updates/2026-10-18-telegram-mini-app-development.md):
-3D-ядро, проверяемый Telegram вход, серверные роли и личные разрешения,
-админка, аудит, личный диалог и чтение своих разделов. 741 server test,
-8 настоящих PostgreSQL acceptance и оба browser набора прошли. На VPS
-не выпущено; реальные Telegram/phone/cookies и Linux Docker/Caddy ещё
-не проверены. Второй HH требует отдельного подключения.
+[Telegram Mini App выпущен на DE](updates/2026-10-18-telegram-mini-app-release.md):
+3D-ядро, Telegram ID, роли и личные разрешения, админка, аудит, личный диалог
+и чтение своих разделов. Кнопка запуска настроена в боте; оба VPS синхронизированы.
+Linux: 741 server test, 8 PostgreSQL acceptance и все 40 migrations прошли.
+Browser наборы прошли локально. Реальные Telegram/phone/cookies и два аккаунта
+ещё требуют приёмки; второй HH требует отдельного подключения.
 
 [Исследуется новый 403 после корректного OCR](updates/2026-10-18-hh-captcha-403-investigation.md):
 native-запрос и browser/API cookies проверены без отправки ответов. Точная причина
@@ -199,12 +199,13 @@ deployment establish what is running.
 
 ### Current status
 
-The [first local Telegram Mini App version](updates/2026-10-18-telegram-mini-app-development.md)
-is ready: 3D core, verified Telegram authentication, server roles and personal
-permissions, administration, audit, private chat and own-section reads.
-741 server tests, 8 actual PostgreSQL acceptance tests and both browser suites
-passed. It is not deployed; real Telegram/phone/cookies and Linux Docker/Caddy
-remain unverified. A second HH account requires a separate connection.
+The [Telegram Mini App is deployed on DE](updates/2026-10-18-telegram-mini-app-release.md):
+3D core, Telegram IDs, roles and personal overrides, administration, audit,
+private chat and own-section reads. The bot launch button is configured;
+both VPS source checkouts are synchronized. Linux passed 741 server tests,
+8 PostgreSQL acceptance tests and all 40 migrations. Browser suites passed
+locally. Actual Telegram/phone/cookies and two accounts still need acceptance;
+a second HH account needs a separate connection.
 
 [A new 403 after correct OCR is under investigation](updates/2026-10-18-hh-captcha-403-investigation.md):
 native requests and browser/API cookies were checked without submitting answers.

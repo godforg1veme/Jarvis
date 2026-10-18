@@ -1,16 +1,19 @@
 # Проверки перед выпуском
 
-Telegram Mini App, локальная разработка 18 октября:
-[результат](updates/2026-10-18-telegram-mini-app-development.md).
-741 server test и 8 acceptance на отдельном PostgreSQL прошли; оба browser
-набора проверяют production client и отдельный 3D preview. Полный Docker/Caddy
-build, реальные Telegram cookies/клиенты и второй HH ещё не проверены.
+Telegram Mini App, выпуск 18 октября:
+[результат](updates/2026-10-18-telegram-mini-app-release.md).
+Linux Docker: 741 server test, 8 PostgreSQL acceptance, все 40 migrations прошли
+на отдельной БД. Оба browser набора прошли локально. HTTPS, production migrations
+и кнопка бота проверены. Реальные Telegram cookies/клиенты, телефонный FPS
+и второй HH ещё не проверены. На DE используется tunnel, не Caddy.
 
-Telegram Mini App, local development on October 18:
-[results](updates/2026-10-18-telegram-mini-app-development.md).
-741 server tests and 8 isolated PostgreSQL acceptance tests passed; both browser
-suites cover the production client and separate 3D preview. Complete Docker/Caddy
-build, actual Telegram cookies/clients and a second HH account remain unverified.
+Telegram Mini App, October 18 release:
+[results](updates/2026-10-18-telegram-mini-app-release.md).
+Linux Docker passed 741 server tests, 8 PostgreSQL acceptance tests and all 40
+migrations on an isolated DB. Both browser suites passed locally. HTTPS,
+production migrations and the bot menu were verified. Actual Telegram
+cookies/clients, phone FPS and a second HH account remain unverified.
+DE uses the tunnel, not Caddy.
 
 ```powershell
 npm run build --prefix mini-app
