@@ -9,19 +9,19 @@ source changes; verify the deployed revision before a server rollout.
 
 ## Change control
 
-18 октября, локальная правка по запросу владельца: раздел «Помощь», нижняя кнопка,
+18 октября, выпущено на DE по запросу владельца: раздел «Помощь», нижняя кнопка,
 справочный ответ и `/help` удалены. Старый текст кнопки обрабатывается как обычный
-ввод с текущими правами. После выпуска клавиатура обновится при открытии «Главное».
+ввод с текущими правами. Клавиатура обновится при открытии «Главное».
 Mini App также читает исходный `tgWebAppData` из fragment, если внешний SDK
 недоступен; серверная проверка подписи, TTL и membership обязательна.
-[Результаты локальной проверки](updates/2026-10-18-mini-app-entry-help-removal.md).
+[Результаты выпуска](updates/2026-10-18-mini-app-entry-help-removal.md).
 
-October 18, owner-requested local change: Help section, bottom button, descriptive
+October 18, owner-requested change deployed on DE: Help section, bottom button, descriptive
 answer and `/help` navigation are removed. Old button text uses ordinary input
-with current authorization. After release, opening Home refreshes the keyboard.
+with current authorization. Opening Home refreshes the keyboard.
 The Mini App also reads raw fragment `tgWebAppData` when the remote SDK is
 unavailable; server signature, TTL and membership validation remain mandatory.
-[Local verification](updates/2026-10-18-mini-app-entry-help-removal.md).
+[Release verification](updates/2026-10-18-mini-app-entry-help-removal.md).
 
 18 октября 2026, согласовано владельцем в текущей задаче, выпущено на DE:
 [Telegram Mini App и роли](updates/2026-10-18-telegram-mini-app-release.md).
@@ -328,7 +328,7 @@ enabled search; real owner tap-through of the new buttons remains unverified.
 Strings and mappings live in `server/src/telegram/telegramMenu.js`. `/start`
 remains the Home alias. The owner requested complete removal of Help on October 18:
 no Help button, section, descriptive answer or `/help` navigation alias remains
-in the pending local change. Old Help text follows ordinary authorized input. Owner-only handlers recheck server
+in the October 18 release. Old Help text follows ordinary authorized input. Owner-only handlers recheck server
 authorization even if a user types a label or submits callback data directly.
 
 ## Inline controls

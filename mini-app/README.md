@@ -9,7 +9,7 @@
 Вход проверяет подписанные
 Telegram initData; личность определяется числовым Telegram ID. Email не нужен.
 Вне Telegram клиент не выдаёт демонстрационных прав.
-Локальная правка входа: если внешний SDK недоступен, исходные данные запуска
+Исправление входа выпущено на DE: если внешний SDK недоступен, исходные данные запуска
 читаются из fragment и проверяются сервером тем же способом.
 [Проверки и статус публикации](../docs/updates/2026-10-18-mini-app-entry-help-removal.md).
 
@@ -90,7 +90,7 @@ The Mini App was deployed on DE on October 18, 2026; the bot menu opens it.
 The server verifies
 signed Telegram initData and identifies users by numeric Telegram ID. Email is
 unnecessary. Clients outside Telegram receive no demo privileges.
-Local entry fix: if the remote SDK is unavailable, raw launch data is read from
+Entry fix deployed on DE: if the remote SDK is unavailable, raw launch data is read from
 the fragment and validated by the server in the same way.
 [Checks and publication status](../docs/updates/2026-10-18-mini-app-entry-help-removal.md).
 

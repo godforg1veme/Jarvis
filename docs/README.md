@@ -17,7 +17,7 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
-Локально подготовлены [удаление «Помощи» и исправление входа без SDK](updates/2026-10-18-mini-app-entry-help-removal.md). Ещё не выпущены.
+На DE выпущены [удаление «Помощи» и исправление входа без SDK](updates/2026-10-18-mini-app-entry-help-removal.md). Linux: 742/742, публичный отказ неверной подписи проверен; настоящий вход ещё требует клиентской приёмки.
 
 [Telegram Mini App выпущен на DE](updates/2026-10-18-telegram-mini-app-release.md):
 3D-ядро, Telegram ID, роли и личные разрешения, админка, аудит, личный диалог
@@ -201,7 +201,7 @@ deployment establish what is running.
 
 ### Current status
 
-[Help removal and entry without the remote SDK](updates/2026-10-18-mini-app-entry-help-removal.md) are prepared locally, not deployed.
+[Help removal and entry without the remote SDK](updates/2026-10-18-mini-app-entry-help-removal.md) are deployed on DE. Linux: 742/742; public invalid-signature rejection passed. Actual login still needs client acceptance.
 
 The [Telegram Mini App is deployed on DE](updates/2026-10-18-telegram-mini-app-release.md):
 3D core, Telegram IDs, roles and personal overrides, administration, audit,
