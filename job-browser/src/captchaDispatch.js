@@ -8,7 +8,7 @@ async function dispatchCaptcha(route) {
     if (u.pathname !== '/captcha') {
       await route.fulfill({ status: 204, headers: { 'cache-control': 'no-store' } });
       // The synthetic 204 is not evidence of the upstream result.
-      return { acknowledged: response.status() === 200 };
+      return { acknowledged: response.status() === 200, httpStatus: response.status() };
     }
     const headers = response.headers();
     if (response.status() !== 200 || !/^application\/json(?:;|$)/i.test(headers['content-type'] || '')

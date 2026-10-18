@@ -110,6 +110,7 @@ class CaptchaTelegramBrowser {
   }
   answer(input) { return this.run(() => this.submitAnswer(input)); }
   async submitAnswer(input) {
+    this.lastAttemptReceipt = null;
     const text = normalizeAnswer(input.text); if (!text) return { outcome: 'invalid' };
     const operationHash = hashOperation(input.operationId);
     if (this.coordinator.state.claims.includes(operationHash)) return { outcome: 'already_used' };
@@ -140,6 +141,8 @@ class CaptchaTelegramBrowser {
     if (result.phase === 'idle') this.current = null;
     const rejected = received && armed.permitted === 1 && (!this.automatic
       || armed.acknowledged === true && this.lastVerification === 'captcha');
+    this.lastAttemptReceipt = { received, permitted: armed.permitted, httpStatus: armed.httpStatus || null,
+      verification: result.phase === 'idle' ? 'verified' : this.lastVerification === 'captcha' ? 'captcha' : 'unconfirmed' };
     return { outcome: result.phase === 'idle' ? 'solved' : rejected ? 'new_challenge' : 'unknown' };
   }
   async permit(route) {
@@ -158,7 +161,11 @@ class CaptchaTelegramBrowser {
       || !validAnswerRequest(input, armed.current.form, armed.current.target, armed.text, armed.current.key)) return false;
     armed.permitted++; armed.request = req;
     const dispatched = this.dispatch(route); this.dispatches.add(dispatched);
-    try { armed.acknowledged = (await dispatched)?.acknowledged === true; } finally { this.dispatches.delete(dispatched); }
+    try {
+      const result = await dispatched;
+      armed.acknowledged = result?.acknowledged === true;
+      armed.httpStatus = Number.isInteger(result?.httpStatus) && result.httpStatus >= 100 && result.httpStatus <= 599 ? result.httpStatus : null;
+    } finally { this.dispatches.delete(dispatched); }
     return true;
   }
   async drain() { await Promise.allSettled([...this.dispatches]); }

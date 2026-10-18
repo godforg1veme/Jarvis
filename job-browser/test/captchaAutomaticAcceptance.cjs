@@ -1,7 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
-const { readFile, writeFile, unlink } = require('node:fs/promises');
+const { readFile, writeFile, unlink, mkdtemp, rm } = require('node:fs/promises');
+const os = require('node:os');
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const path = require('node:path');
@@ -14,6 +15,7 @@ const { JobCaptchaClient } = require('../../server/src/jobs/jobCaptchaClient');
 const { JobCaptchaWorker } = require('../../server/src/jobs/jobCaptchaWorker');
 const { AUTOMATIC_CAPTION } = require('../../server/src/jobs/jobCaptchaService');
 const { createCaptchaBroker } = require('../src/captchaBroker');
+const { CaptchaAttemptStore } = require('../src/captchaAttemptStore');
 
 const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lVQAAAAASUVORK5CYII=', 'base64');
 
@@ -38,9 +40,15 @@ async function scenario({ mode, recognize = async () => 'проверка кар
     if (mode === 'unknown') return route.abort();
     if (mode === 'success' || mode === 'second' && posts === 2 || mode === 'third' && posts === 3) solved = true;
     await route.fulfill({ status: 204 });
-    return { acknowledged: mode !== 'redirect' };
+    return { acknowledged: mode !== 'redirect', httpStatus: mode === 'redirect' ? 302 : 200 };
   } });
-  controller.automatic = new CaptchaAutomatic({ coordinator, recognize });
+  const archive = await mkdtemp(path.join(os.tmpdir(), 'hh-captcha-acceptance-'));
+  const memory = new Map();
+  const evidence = process.platform === 'linux'
+    ? new CaptchaAttemptStore({ root: path.join(archive, 'evidence'), ownerId })
+    : { start: async value => { const id = randomUUID(); memory.set(id, value); return { id }; },
+      update: async (id, patch) => memory.set(id, { ...memory.get(id), ...patch }), export: async () => [...memory.values()] };
+  controller.automatic = new CaptchaAutomatic({ coordinator, recognize, evidence });
   // Every request is fulfilled or aborted locally, including GET. Nothing
   // reaches HH, DNS or a real account, and no route.continue/fetch is used.
   await context.route('**/*', async route => {
@@ -79,9 +87,15 @@ async function scenario({ mode, recognize = async () => 'проверка кар
     assert.equal(posts, wanted); assert.equal(photos, solved ? 0 : 1);
     assert.equal(coordinator.status().phase, solved ? 'idle' : 'active');
     if (!solved) assert.equal(saved.automatic.phase, 'human');
+    const records = await evidence.export();
+    assert.equal(records.length, wanted);
+    assert.ok(records.every(v => v.answer === expected && Buffer.from(v.pngBase64, 'base64').length > 33));
+    assert.equal(records.at(-1).phase, solved ? 'solved' : mode === 'reject' ? 'new_challenge' : 'unknown');
+    assert.equal(records.at(-1).receipt.httpStatus, mode === 'unknown' ? null : mode === 'redirect' ? 302 : 200);
   } finally {
     broker.closeAllConnections(); await new Promise(resolve => broker.close(resolve));
     worker.stop(); await controller.close(); await context.close(); await browser.close();
+    await rm(archive, { recursive: true, force: true });
   }
 }
 

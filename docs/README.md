@@ -17,6 +17,9 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
+[Готовится приватный журнал попыток OCR](updates/2026-10-18-hh-captcha-evidence.md):
+картинка, ответ и закрытые результаты для разбора неудач. Установка пока не подтверждена.
+
 [Лимит увеличен до трёх попыток](updates/2026-10-18-hh-captcha-three-attempts-development.md)
 перед отправкой капчи владельцу: код в GitHub и на обоих VPS, browser на DE обновлён.
 
@@ -170,6 +173,9 @@ describes publishing. Plans describe intentions. Code, checks, and actual
 deployment establish what is running.
 
 ### Current status
+
+[Private OCR attempt evidence is being prepared](updates/2026-10-18-hh-captcha-evidence.md):
+image, answer and closed outcomes for failure analysis. Installation is not yet confirmed.
 
 [The limit is now three attempts](updates/2026-10-18-hh-captcha-three-attempts-development.md)
 before handing a challenge to the owner: code is on GitHub and both VPS nodes, and the DE browser is updated.

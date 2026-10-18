@@ -17,6 +17,7 @@ const { randomUUID, createHash } = require('node:crypto');
 const { BrowserHealth, bounded } = require('./browserHealth');
 const { CaptchaAutomatic } = require('./captchaAutomatic');
 const { recognizeFrozenPng } = require('./ocrClient');
+const { CaptchaAttemptStore } = require('./captchaAttemptStore');
 
 async function handoverCaptcha({ journal, manual, ownerId, target, error, now = Date.now }) {
   let state = await journal.read();
@@ -62,7 +63,7 @@ async function startBrowser(env = process.env, { onFatal = () => {} } = {}) {
   if (automaticEnabled && !manualEnabled) throw new Error('JOB_CAPTCHA_CONFIG_INVALID');
   if (manualEnabled && (!/^[\x21-\x7e]{32,256}$/.test(manualToken || '') || manualToken === token || manualToken === applyToken)) throw new Error('JOB_MANUAL_CONFIG_INVALID');
   if (!manualEnabled) await assertInactiveWhenDisabled({ root: `${root}/manual-recovery`, ownerId });
-  let context, server, manual, manualPage, broker, health;
+  let context, server, manual, manualPage, broker, health, evidenceTimer;
   try {
     context = await chromium.launchPersistentContext(root, { headless: true, chromiumSandbox: true,
       acceptDownloads: false, serviceWorkers: 'block', locale: 'ru-RU' });
@@ -85,7 +86,14 @@ async function startBrowser(env = process.env, { onFatal = () => {} } = {}) {
         open: (target) => manualPage.open(target), verify: (target, id) => manualPage.verify(target, id) });
       await manual.load();
       manualPage = new CaptchaTelegramBrowser({ context, coordinator: manual, journal, onUnhealthy: () => health.fail() });
-      if (automaticEnabled) manualPage.automatic = new CaptchaAutomatic({ coordinator: manual, recognize: recognizeFrozenPng });
+      if (automaticEnabled) {
+        const evidence = new CaptchaAttemptStore({ root: `${root}/captcha-evidence`, ownerId });
+        const report = () => process.stderr.write('JOB_CAPTCHA_EVIDENCE_UNAVAILABLE\n');
+        await evidence.prune();
+        evidenceTimer = setInterval(() => { evidence.prune().catch(report); }, 3600000);
+        evidenceTimer.unref();
+        manualPage.automatic = new CaptchaAutomatic({ coordinator: manual, recognize: recognizeFrozenPng, evidence, report });
+      }
     }
     const onManualRequired = manual && ((target, error) => handoverCaptcha({ journal, manual, ownerId, target, error }));
     const browser = new HhBrowser({ context, primaryResumeId, captchaRecovery, manualCoordinator: manual, onManualRequired,
@@ -111,12 +119,13 @@ async function startBrowser(env = process.env, { onFatal = () => {} } = {}) {
     }
     health.start();
     return { async close() {
+      clearInterval(evidenceTimer);
       health.close();
       broker?.closeAllConnections();
       if (broker) await new Promise((resolve) => broker.close(resolve));
       await new Promise((resolve) => server.close(resolve)); await browser.tail; await manualPage?.close(); await context.close();
     } };
-  } catch (error) { health?.close(); server?.close(); broker?.close(); await manualPage?.close(); await context?.close(); throw error; }
+  } catch (error) { clearInterval(evidenceTimer); health?.close(); server?.close(); broker?.close(); await manualPage?.close(); await context?.close(); throw error; }
 }
 
 if (require.main === module) {

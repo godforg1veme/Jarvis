@@ -9,6 +9,12 @@ source changes; verify the deployed revision before a server rollout.
 
 ## Change control
 
+18 октября 2026 владелец согласовал приватный архив картинок и ответов только
+автоматических попыток. [Изменение](updates/2026-10-18-hh-captcha-evidence.md)
+внутреннее: browser → OCR → прежний native POST/verifier → прежнее фото владельцу.
+Архив не входит в Telegram diagnostics или историю; ручные ответы не сохраняются.
+Кнопки, подписи, owner scope и подтверждения прежние; unknown не повторяется.
+
 18 октября 2026 владелец запросил три автоматические попытки вместо двух.
 [Установленный на DE выпуск](updates/2026-10-18-hh-captcha-three-attempts-development.md)
 сохраняет прежний Telegram-путь, подпись, подтверждение и раннюю остановку при

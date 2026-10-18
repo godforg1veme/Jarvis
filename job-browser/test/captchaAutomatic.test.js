@@ -6,7 +6,7 @@ const { ManualCoordinator } = require('../src/manualCoordinator');
 const { CaptchaAutomatic } = require('../src/captchaAutomatic');
 const { CaptchaTelegramBrowser, hashKey } = require('../src/captchaTelegramBrowser');
 
-async function fixture({ results = [], ocr = async () => 'проверка картинки' } = {}) {
+async function fixture({ results = [], ocr = async () => 'проверка картинки', evidence, report } = {}) {
   const ownerId = randomUUID(); let saved = initial(ownerId), pictures = 0, answers = 0;
   const store = { read: async () => structuredClone(saved), write: async value => {
     saved = structuredClone(validate(value, ownerId)); return structuredClone(saved);
@@ -33,7 +33,7 @@ async function fixture({ results = [], ocr = async () => 'проверка ка�
     if (outcome === 'solved') await coordinator.write({ phase: 'idle', target: null, recoveryId: null, claims: [], seedRequired: false });
     return { outcome };
   };
-  const bind = () => { ctrl.coordinator = coordinator; ctrl.automatic = new CaptchaAutomatic({ coordinator, recognize: ocr }); };
+  const bind = () => { ctrl.coordinator = coordinator; ctrl.automatic = new CaptchaAutomatic({ coordinator, recognize: ocr, evidence, report }); };
   bind();
   return { ctrl, get coordinator() { return coordinator; }, counts: () => ({ pictures, answers }),
     restart: async () => { await restart(); ctrl.current = null; bind(); }, saved: () => saved };
@@ -134,4 +134,35 @@ test('automatic state is closed, bounded and owner-scoped', () => {
   }
   assert.throws(() => validate({ ...base, automatic: auto }, randomUUID()));
   assert.throws(() => validate({ ...initial(ownerId), automatic: auto }, ownerId));
+});
+
+test('evidence saves image before OCR and exact answer before submit; outcome survives recovery completion', async () => {
+  const events = [], records = new Map();
+  const evidence = { start: async v => { events.push('image'); records.set('test', v); return { id: 'test' }; },
+    update: async (id, patch) => { events.push(patch.phase); records.set(id, { ...records.get(id), ...patch }); } };
+  const f = await fixture({ results: ['solved'], evidence, ocr: async () => {
+    assert.deepEqual(events, ['image']); return ' Проверка   картинки ';
+  } });
+  const submit = f.ctrl.submitAnswer;
+  f.ctrl.submitAnswer = async input => {
+    assert.equal(records.get('test').answer, input.text); assert.equal(events.at(-1), 'dispatch_started');
+    return submit(input);
+  };
+  assert.equal((await f.ctrl.challenge(false)).outcome, 'idle');
+  assert.deepEqual(events, ['image', 'answer_saved', 'dispatch_started', 'solved']);
+  assert.equal(records.get('test').phase, 'solved');
+});
+
+test('evidence failures never authorize an extra POST or leak errors to reporting', async () => {
+  for (const failure of ['image', 'answer_saved', 'dispatch_started', 'new_challenge']) {
+    const reports = [];
+    const evidence = { start: async () => { if (failure === 'image') throw Error('private'); return { id: 'test' }; },
+      update: async (_, patch) => { if (patch.phase === failure) throw Error('private'); } };
+    const f = await fixture({ evidence, report: v => reports.push(v) });
+    assert.equal((await f.ctrl.challenge(false)).outcome, 'preparing');
+    assert.equal((await f.ctrl.challenge(false)).outcome, 'ready');
+    await f.restart(); await f.ctrl.challenge(false);
+    assert.equal(f.counts().answers, failure === 'new_challenge' ? 1 : 0);
+    assert.deepEqual(reports, ['JOB_CAPTCHA_EVIDENCE_UNAVAILABLE']);
+  }
 });

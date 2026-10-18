@@ -5,7 +5,7 @@ const { hashKey } = require('./captchaTelegramBrowser');
 // Invoked inside the controller's serialization queue. Each RPC performs at
 // most one OCR/answer operation so it retains the existing deadline.
 class CaptchaAutomatic {
-  constructor({ coordinator, recognize }) { Object.assign(this, { coordinator, recognize }); }
+  constructor({ coordinator, recognize, evidence, report = () => {} }) { Object.assign(this, { coordinator, recognize, evidence, report }); }
   async challenge(controller, refresh) {
     const state = this.coordinator.state;
     if (state.phase === 'idle') return { outcome: 'idle' };
@@ -30,21 +30,36 @@ class CaptchaAutomatic {
       }
       return challenge;
     }
-    let human = false, submitting = false;
+    let human = false, submitting = false, stage = 'evidence', record;
+    const update = patch => record ? this.evidence.update(record.id, patch) : Promise.resolve();
     try {
+      record = await this.evidence?.start({ recoveryId: this.coordinator.state.recoveryId,
+        attempt: this.coordinator.state.automatic.attempts, pngBase64: challenge.pngBase64 });
+      stage = 'ocr';
       const text = normalizeAnswer(await this.recognize(Buffer.from(challenge.pngBase64, 'base64')));
+      stage = 'evidence';
       if (text) {
+        await update({ answer: text, phase: 'answer_saved' });
+        await update({ phase: 'dispatch_started' });
         submitting = true;
+        stage = 'submit';
         const result = await controller.submitAnswer({ challengeId: challenge.challengeId,
           revision: challenge.revision, operationId: randomUUID(), text });
+        stage = 'evidence';
+        await update({ phase: result.outcome, receipt: controller.lastAttemptReceipt || null });
         if (result.outcome === 'solved') return { outcome: 'idle' };
         // Only a positively observed rejection authorizes another answer.
         human = result.outcome !== 'new_challenge';
-      }
+      } else await update({ phase: 'ocr_invalid' });
     } catch {
       // OCR failure is a failed attempt. After a durable browser claim, any
       // exception is potentially an unknown POST and blocks a second attempt.
-      human = submitting;
+      human = submitting || stage === 'evidence';
+      if (stage === 'evidence') this.report('JOB_CAPTCHA_EVIDENCE_UNAVAILABLE');
+      else {
+        try { await update({ phase: submitting ? 'submission_failed' : 'ocr_failed', receipt: controller.lastAttemptReceipt || null }); }
+        catch { human = true; this.report('JOB_CAPTCHA_EVIDENCE_UNAVAILABLE'); }
+      }
     }
     await this.coordinator.finishAutomatic(human);
     // A fresh human image is prepared on the next tick. Do not accidentally
