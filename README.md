@@ -26,12 +26,12 @@ Windows-приложение и облачный API для подключённ
   Модель запускается по запросу; отправка отклика требует одобрения точного текста
   письма. Живая отправка отклика ещё требует приёмки.
 - Для капчи HH на DE включён дообученный OCR с выпрямлением изображения:
-  до двух автоматических попыток, затем фото владельцу в Telegram. Неизвестный
+  до трёх автоматических попыток, затем фото владельцу в Telegram. Неизвестный
   результат останавливает автоматику раньше. Ответ на фото разрешает однократную
   отправку; подтверждённый доступ возобновляет поиск с сохранённого места.
   Ручной сценарий проверен 16 октября; первая живая OCR-попытка 18 октября
   не подтвердила доступ и передала фото человеку. Tailscale и отдельная веб-страница
-  не нужны. См. [выпуск и пределы проверки](docs/updates/2026-10-18-hh-trained-ocr-release.md).
+  не нужны. См. [выпуск и пределы проверки](docs/updates/2026-10-18-hh-captcha-three-attempts-development.md).
 - Сервис знаний хранит приватные метаданные и текст документов для поиска
   в пределах владельца. Поддерживает текстовые и офисные форматы, поиск по PDF
   со ссылками на страницы. Загруженное содержимое считается недоверенным.
@@ -144,7 +144,7 @@ Telegram is Jarvis's first cloud client. The project also includes a Windows app
 - The cloud service uses Node.js, Fastify, PostgreSQL, and pgvector. Model providers are configured outside product logic.
 - The Telegram bot supports allowlisted users, private conversations, guided forms, inline confirmations, memory, documents, devices, VPN, and Operations. The Life OS area includes Mission, Timeline, projects, commitments, people, reminders, preferences, and context recovery.
 - Job search collects HH vacancies in a separate background process on DE and sends filtered cards to the owner's Telegram chat. Search controls, saved vacancies, and cover-letter preparation and editing are available in the bot. The model runs on request; submitting an application requires approval of the exact letter. Live application submission still needs acceptance.
-- DE uses the fine-tuned HH OCR with image rectification: up to two automatic attempts, then a photo for the owner in Telegram. An unknown result stops automation earlier. Replying to the photo authorizes one submission; verified access resumes the search from its saved position. The human flow passed on 16 October; the first live OCR attempt on 18 October did not confirm access and handed a photo to the owner. No Tailscale connection or separate web screen is needed. See the [release and verification limits](docs/updates/2026-10-18-hh-trained-ocr-release.md).
+- DE uses the fine-tuned HH OCR with image rectification: up to three automatic attempts, then a photo for the owner in Telegram. An unknown result stops automation earlier. Replying to the photo authorizes one submission; verified access resumes the search from its saved position. The human flow passed on 16 October; the first live OCR attempt on 18 October did not confirm access and handed a photo to the owner. No Tailscale connection or separate web screen is needed. See the [release and verification limits](docs/updates/2026-10-18-hh-captcha-three-attempts-development.md).
 - The knowledge service stores private document metadata and text for owner-scoped search. It supports text and office formats, plus page-linked PDF search. Uploaded content is treated as untrusted data.
 - The Windows Electron client provides cloud chat, local wake-word detection, speech, and bounded tools for apps and files. Device credentials are protected with Windows DPAPI.
 - Remote device actions use a validated plan and Tool Gateway. Actions that change state require confirmation in the client that started the request.

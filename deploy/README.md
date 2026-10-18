@@ -412,13 +412,15 @@ Keep fixture send results separate from that live acceptance.
 `JARVIS_HH_CAPTCHA_AUTOMATIC=1` is set in the private server/browser environment,
 with `JARVIS_FROZEN_BUNDLE_SHA256` and `job-ocr-frozen.yml` selecting the verified
 bundle and networkless image. Keep the same external browser profile and socket
-volumes. Attempts remain durable and bounded to two; unknown stops automation
+volumes. Attempts remain durable and bounded to three; unknown stops automation
 earlier. The existing photo reply flow remains the fallback. Linux build, unit
 tests and isolated socket/resource checks passed. The first live attempt returned
 unknown and handed over a photo; HH acceptance is not claimed. See the
 [release record](../docs/updates/2026-10-18-hh-trained-ocr-release.md) and
 [`job-ocr/README.md`](../job-ocr/README.md). The installed release retains its
 private `.env`; do not replace it with the canonical checkout's older environment.
+The [three-attempt update](../docs/updates/2026-10-18-hh-captcha-three-attempts-development.md)
+replaced only the browser on DE and preserved the existing human handover.
 
 The [approved Telegram CAPTCHA design](../docs/superpowers/specs/2026-10-16-hh-telegram-captcha-design.md)
 replaces the old HH browser gateway. One headless, sandboxed Chromium keeps the

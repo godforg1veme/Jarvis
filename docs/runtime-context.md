@@ -55,7 +55,7 @@ deadline across metadata, fetch and body reads.
 
 Установлено на DE 18 октября 2026: включён отдельный opt-in дообученной
 модели `hh-ru-captcha` с исходным выпрямлением, frozen selection и rescue.
-`JARVIS_HH_CAPTCHA_AUTOMATIC=1` разрешает до двух durable попыток перед прежним
+`JARVIS_HH_CAPTCHA_AUTOMATIC=1` разрешает до трёх durable попыток перед прежним
 Telegram фото. Unknown/перезапуск незавершённой отправки останавливает автоматику;
 успех требует прежнего verifier. `/ocr/frozen` исключает подмену общим OCR.
 Код опубликован, веса и приватные примеры не входят в Git. Linux build, права
@@ -63,6 +63,8 @@ Telegram фото. Unknown/перезапуск незавершённой от�
 попытке доступ не подтвердился: budget остановлен после unknown, фото отправлено
 в Telegram; collector остаётся на attention с сохранённым progress.
 [Результат выпуска и ограничения](updates/2026-10-18-hh-trained-ocr-release.md).
+[Увеличение лимита до трёх](updates/2026-10-18-hh-captcha-three-attempts-development.md)
+установлено отдельно; уже переданные человеку капчи остаются в ручном режиме.
 
 Выпущен на DE 15 октября 2026: домен `server/src/jobs`, существующий Telegram
 и PostgreSQL, отдельные collector и Chromium browser. Browser владеет приватной

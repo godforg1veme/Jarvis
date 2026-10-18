@@ -17,11 +17,11 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
-[Локально подготовлен лимит в три попытки](updates/2026-10-18-hh-captcha-three-attempts-development.md)
-перед отправкой капчи владельцу. Изменение пока не опубликовано и не установлено на VPS.
+[Лимит увеличен до трёх попыток](updates/2026-10-18-hh-captcha-three-attempts-development.md)
+перед отправкой капчи владельцу: код в GitHub и на обоих VPS, browser на DE обновлён.
 
 [Дообученный OCR HH установлен на DE](updates/2026-10-18-hh-trained-ocr-release.md):
-исходное выпрямление и веса, до двух автоматических попыток перед Telegram фото,
+исходное выпрямление и веса, теперь до трёх автоматических попыток перед Telegram фото,
 остановка после unknown и сохранение бюджета при перезапуске. Проверены 1 709
 изображений, CPU parity 73/73 и изолированные Linux browser/worker/socket.
 Первая живая попытка не подтвердила доступ: автоматика остановилась, фото
@@ -171,11 +171,11 @@ deployment establish what is running.
 
 ### Current status
 
-[A three-attempt limit is prepared locally](updates/2026-10-18-hh-captcha-three-attempts-development.md)
-before handing a challenge to the owner. This change is not yet published or installed on the VPS nodes.
+[The limit is now three attempts](updates/2026-10-18-hh-captcha-three-attempts-development.md)
+before handing a challenge to the owner: code is on GitHub and both VPS nodes, and the DE browser is updated.
 
 [Fine-tuned HH OCR is installed on DE](updates/2026-10-18-hh-trained-ocr-release.md):
-original rectification and weights, up to two automatic attempts before a Telegram
+original rectification and weights, now up to three automatic attempts before a Telegram
 photo, unknown-result stop and a restart-safe budget. Checks cover 1,709 images,
 73/73 CPU parity and isolated Linux browser/worker/socket behavior. The first live
 attempt did not confirm access; automation stopped and a photo was sent to the
