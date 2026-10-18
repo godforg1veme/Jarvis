@@ -12,19 +12,19 @@ const server = http.createServer(async (request, response) => {
   try { const content = await fs.readFile(path.join(root, relative)); response.writeHead(200, { 'Content-Type': types[path.extname(relative)], 'Content-Security-Policy': "default-src 'self'; script-src 'self' https://telegram.org; connect-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'" }).end(content); }
   catch { response.writeHead(404).end(); }
 });
-async function fixture(context, { level = 'owner', outside = false } = {}) {
+async function fixture(context, { level = 'owner', outside = false, sdkBlocked = false, rejectLogin = false } = {}) {
   const users = [{ telegramId: '100000001', displayName: 'Владелец', level: 'owner', roleId: null, permissions: Object.keys({ assistant:1,jobs:1,life:1,memory:1,documents:1,devices:1,vpn:1,operations:1 }), overrides: {}, revision: 1 }, { telegramId: '100000003', displayName: '<b>Анна</b>', level: 'member', roleId: 'search', overrides: {}, permissions: ['jobs'], revision: 1, blocked: false }];
   const roles = [{ id: 'search', name: 'Только поиск', permissions: ['jobs'], revision: 1 }];
   const actor = level === 'member' ? users[1] : { ...users[0], level };
   const state = { mutations: [], uncertain: false, conflict: false, session: false, op: null, section: null, blocked: false, chatUncertain: false, chatPosts: [], chatOp: null, messages: [], operationUnknown: false };
   const external = []; const errors = [];
   context.on('page', (page) => page.on('pageerror', (error) => errors.push(error.message)));
-  await context.route('https://telegram.org/**', (route) => route.fulfill({ contentType: 'text/javascript', body: outside ? '' : 'window.Telegram={WebApp:{initData:"synthetic-fixture",ready(){},expand(){}}};' }));
+  await context.route('https://telegram.org/**', (route) => sdkBlocked ? route.abort() : route.fulfill({ contentType: 'text/javascript', body: outside ? '' : 'window.Telegram={WebApp:{initData:"synthetic-fixture",ready(){},expand(){}}};' }));
   await context.route('**/mini/api/**', async (route) => {
     const request = route.request(); const endpoint = new URL(request.url()).pathname.slice('/mini/api'.length);
     const body = request.postDataJSON();
     const send = (data, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(data) });
-    if (endpoint === '/session') { assert.equal(body.initData, 'synthetic-fixture'); state.session = true; return send({ ok: true, csrfToken: 'fixture-csrf', actor, catalog: [] }); }
+    if (endpoint === '/session') { assert.equal(body.initData, 'synthetic-fixture'); if (rejectLogin) return send({ ok: false, code: 'invalid_login' }, 400); state.session = true; return send({ ok: true, csrfToken: 'fixture-csrf', actor, catalog: [] }); }
     if (endpoint === '/me') return send(state.session ? { ok: true, csrfToken: 'fixture-csrf', actor, catalog: [] } : { ok: false }, state.session ? 200 : 401);
     if (endpoint.startsWith('/sections/')) { state.section = endpoint; return send({ ok: true, section: 'jobs', items: [{ title: 'Личный профиль' }], notice: 'Нужно личное подключение HH.' }); }
     if (endpoint === '/assistant/messages' && request.method() === 'GET') return send({ ok: true, messages: state.messages });
@@ -88,6 +88,21 @@ async function fixture(context, { level = 'owner', outside = false } = {}) {
     assert.deepEqual(await page.evaluate(() => Object.keys(localStorage)), []); assert.deepEqual(external, []); assert.deepEqual(errors, []);
     await context.close();
     for (const options of [{ level: 'member' }, { outside: true }]) { const ctx = await browser.newContext(); await fixture(ctx, options); const p = await ctx.newPage(); await p.goto(`${origin}/mini/`); if (options.outside) { await p.getByText(/Открой Jarvis Mini App из Telegram/).waitFor(); assert.equal(await p.locator('#application').isVisible(), false); } else { await p.locator('#application').waitFor({ state: 'visible' }); assert.equal(await p.locator('[data-nav="admin"]').isVisible(), false); await p.goto(`${origin}/mini/#admin`); await p.locator('#application').waitFor({ state: 'visible' }); assert.equal(await p.locator('#admin').isVisible(), false); } await ctx.close(); }
-    console.log('PASS: production Telegram fixture login, CSRF, role creation, Telegram ID add, owner protection, sources, confirmation, conflict draft, original-ID mutation/chat reconciliation, private sections, member guards, anonymous, keyboard, 320/390/1280, no credentials storage or unexpected requests.');
+    for (const rejectLogin of [false, true]) {
+      const ctx = await browser.newContext(); const { state } = await fixture(ctx, { sdkBlocked: true, rejectLogin });
+      const p = await ctx.newPage();
+      await p.goto(`${origin}/mini/#tgWebAppData=${encodeURIComponent('synthetic-fixture')}&tgWebAppPlatform=tdesktop`);
+      if (rejectLogin) {
+        await p.waitForFunction(() => document.querySelector('#session-state').textContent !== 'Проверяем доступ…');
+        assert.equal(await p.locator('#application').isVisible(), false, 'fragment never grants access without server approval');
+        assert.equal(state.session, false);
+      } else {
+        await p.locator('#application').waitFor({ state: 'visible' });
+        assert.equal(state.session, true, 'SDK failure still sends raw launch data for server validation');
+        assert.deepEqual(await p.evaluate(() => Object.keys(sessionStorage)), [], 'launch credentials are never persisted');
+      }
+      await ctx.close();
+    }
+    console.log('PASS: blocked-SDK fragment login and server rejection, production Telegram fixture login, CSRF, role creation, Telegram ID add, owner protection, sources, confirmation, conflict draft, original-ID mutation/chat reconciliation, private sections, member guards, anonymous, keyboard, 320/390/1280, no credentials storage or unexpected requests.');
   } finally { await browser.close(); }
 })().catch((error) => { console.error(error); process.exitCode = 1; }).finally(() => server.close());

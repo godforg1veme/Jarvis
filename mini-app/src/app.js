@@ -61,12 +61,24 @@ function navigate() {
 }
 async function start() {
   let data;
-  const webapp = window.Telegram?.WebApp;
+  // Launch data is untrusted transport; the server verifies its Telegram HMAC.
+  // Reading the fragment also works when the optional remote SDK cannot load.
+  const fragmentData = new URLSearchParams(location.hash.slice(1)).get('tgWebAppData') || '';
+  const sdk = $('#telegram-sdk');
+  if (!fragmentData && !window.Telegram?.WebApp && sdk) {
+    await new Promise((resolve) => {
+      const done = () => { clearTimeout(timer); sdk.removeEventListener('load', done); sdk.removeEventListener('error', done); resolve(); };
+      const timer = setTimeout(done, 2000);
+      sdk.addEventListener('load', done, { once: true }); sdk.addEventListener('error', done, { once: true });
+    });
+  }
+  const initData = window.Telegram?.WebApp?.initData || fragmentData;
+  const ready = () => { window.Telegram?.WebApp?.ready?.(); window.Telegram?.WebApp?.expand?.(); };
   try {
     try { data = await api.request('/me'); }
     catch (error) {
       if (error.code !== 'unauthorized') throw error;
-      if (webapp?.initData) data = await api.request('/session', 'POST', { initData: webapp.initData });
+      if (initData) data = await api.request('/session', 'POST', { initData });
       else { status('Открой Jarvis Mini App из Telegram. Для входа нужен Telegram ID, заранее добавленный администратором.'); return; }
     }
     actor = data.actor;
@@ -108,7 +120,8 @@ async function start() {
     $('[data-nav="assistant"]').hidden = !actor.permissions.includes('assistant');
     admin = createAdmin({ api, actor, labels, onSessionError: fail });
     $('#application').hidden = false;
-    webapp?.ready?.(); webapp?.expand?.();
+    ready();
+    if (!window.Telegram?.WebApp) $('#telegram-sdk').addEventListener('load', ready, { once: true });
     window.addEventListener('hashchange', navigate); navigate();
     try {
       const { createCore } = await import('./core.js');

@@ -89,7 +89,7 @@ test('renders only closed bounded VPN inline buttons on the final reply', async 
 });
 
 test('renders persistent bottom navigation separately from inline buttons', async () => {
-  const keyboard = { keyboard: [[{ text: '🏠 Главное' }, { text: '❓ Помощь' }]], resize_keyboard: true, is_persistent: true };
+  const keyboard = { keyboard: [[{ text: '🏠 Главное' }, { text: '🎯 Life OS' }]], resize_keyboard: true, is_persistent: true };
   assert.deepEqual(validatedReplyKeyboard(keyboard), keyboard);
   const calls = [];
   await replyWithChunks({ async reply(text, options) { calls.push({ text, options }); } }, 'Готово', undefined, keyboard);

@@ -9,10 +9,24 @@ source changes; verify the deployed revision before a server rollout.
 
 ## Change control
 
+18 октября, локальная правка по запросу владельца: раздел «Помощь», нижняя кнопка,
+справочный ответ и `/help` удалены. Старый текст кнопки обрабатывается как обычный
+ввод с текущими правами. После выпуска клавиатура обновится при открытии «Главное».
+Mini App также читает исходный `tgWebAppData` из fragment, если внешний SDK
+недоступен; серверная проверка подписи, TTL и membership обязательна.
+[Результаты локальной проверки](updates/2026-10-18-mini-app-entry-help-removal.md).
+
+October 18, owner-requested local change: Help section, bottom button, descriptive
+answer and `/help` navigation are removed. Old button text uses ordinary input
+with current authorization. After release, opening Home refreshes the keyboard.
+The Mini App also reads raw fragment `tgWebAppData` when the remote SDK is
+unavailable; server signature, TTL and membership validation remain mandatory.
+[Local verification](updates/2026-10-18-mini-app-entry-help-removal.md).
+
 18 октября 2026, согласовано владельцем в текущей задаче, выпущено на DE:
 [Telegram Mini App и роли](updates/2026-10-18-telegram-mini-app-release.md).
 При включении серверных прав нижняя клавиатура фильтруется ролью и личными
-allow/deny. Главная/помощь сохраняются; jobs показывается участнику с этим правом,
+allow/deny. Главная сохраняется; jobs показывается участнику с этим правом,
 но до его собственного HH подключения объясняет необходимость настройки.
 Старые команды/callbacks и активный guided input проверяют текущие права,
 отозванный ввод не потребляется и не меняет данные. Контекст модели и итоговый
@@ -25,7 +39,7 @@ kinds, private scope и подтверждения прежние. Общие VP
 Owner-approved on October 18, 2026 and deployed on DE:
 [Mini App and access roles](updates/2026-10-18-telegram-mini-app-release.md).
 With server access control enabled, the bottom keyboard filters role and personal
-allow/deny. Home/help remain; jobs appears for permitted members but explains
+allow/deny. Home remains; jobs appears for permitted members but explains
 personal HH setup until their own connection exists. Old commands/callbacks and
 active guided input check current rights; revoked input is not consumed or
 applied. Model context and output recheck rights to consumed sources. Callback
@@ -293,8 +307,8 @@ ordinary assistant input unless a valid scoped guided interaction owns it.
 | --- | --- | --- | --- |
 | 1 | `🏠 Главное`, `🎯 Life OS` | `🏠 Главное`, `🎯 Life OS` | Home, Life OS |
 | 2 | `🧠 Память`, `📄 Документы` | `🧠 Память`, `📄 Документы` | Memory, documents |
-| 3 | `🖥 Устройства`, `🔐 VPN` | `🖥 Устройства`, `❓ Помощь` | Devices; owner VPN; help |
-| 4 | `📊 Панель`, `❓ Помощь` | absent | Owner Operations, help |
+| 3 | `🖥 Устройства`, `🔐 VPN` | `🖥 Устройства` | Devices; owner VPN |
+| 4 | `📊 Панель` | absent | Owner Operations |
 | 5 | `💼 Поиск работы` | absent | Owner job search, feature enabled and private chat only |
 
 Row 5 is emitted only when job search is configured and the server role is
@@ -312,7 +326,9 @@ after separate release authorization. The server rendering matches the actual
 enabled search; real owner tap-through of the new buttons remains unverified.
 
 Strings and mappings live in `server/src/telegram/telegramMenu.js`. `/start`
-and `/help` remain Home and Help aliases. Owner-only handlers recheck server
+remains the Home alias. The owner requested complete removal of Help on October 18:
+no Help button, section, descriptive answer or `/help` navigation alias remains
+in the pending local change. Old Help text follows ordinary authorized input. Owner-only handlers recheck server
 authorization even if a user types a label or submits callback data directly.
 
 ## Inline controls

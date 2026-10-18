@@ -139,7 +139,6 @@ function vpnPublicError(error) {
 function commandReply(text) {
   const command = String(text || '').split(/\s+/, 1)[0].split('@', 1)[0].toLowerCase();
   if (command === '/start') return 'Jarvis подключён. Напишите вопрос обычным сообщением.';
-  if (command === '/help') return 'Пиши вопросы обычным текстом, отправляй голосовые и файлы или используй нижнее меню. Действия с последствиями подтверждаются отдельными кнопками под сообщением.';
   if (command === '/memory') return null;
   return null;
 }
@@ -570,8 +569,7 @@ class TelegramMessageService {
     let guidedDesktopInstruction = null;
     if (this.menuService && !input.attachment && !input.voice) {
       const legacyNavigation = /^\/start(?:@\w+)?$/i.test(input.text)
-        ? 'home'
-        : /^\/help(?:@\w+)?$/i.test(input.text) ? 'help' : null;
+        ? 'home' : null;
       const action = menuAction(input.text) || legacyNavigation;
       if (action) {
         const menuResult = await this.menuService.handleMenuAction(action, menuContext);

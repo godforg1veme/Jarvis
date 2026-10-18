@@ -93,12 +93,6 @@ class TelegramMenuService {
       return { answer: `Jarvis готов. Выбери раздел снизу или напиши вопрос обычным текстом.${admin}`, replyKeyboard: this.keyboard(context),
         ...(this.jobSearchService && context.user?.role === 'owner' && context.chatType === 'private' ? { jobSearchEntry: true } : {}) };
     }
-    if (action === 'help') {
-      return {
-        answer: 'Можно писать вопросы, отправлять голосовые и файлы. Разделы снизу открывают Life OS, память, документы и устройства. Действия с последствиями подтверждаются отдельными кнопками под сообщением. Старые команды остаются запасным способом управления.',
-        replyKeyboard: this.keyboard(context),
-      };
-    }
     if (action === 'memory') return this.memoryService ? this._memoryHome(context) : { answer: 'Память сейчас недоступна.' };
     if (action === 'documents') return this._documents(context);
     if (action === 'devices') return { answer: 'Управление компьютерами:', buttons: deviceMenu() };

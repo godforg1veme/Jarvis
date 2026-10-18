@@ -18,7 +18,7 @@ function textPermissions(text) {
   const action = menuAction(text);
   if (action) return ACTION_PERMISSION[action] ? [ACTION_PERMISSION[action]] : [];
   const command = /^\/(\w+)(?:@\w+)?(?:\s|$)/.exec(String(text || '').trim())?.[1]?.toLowerCase();
-  if (['start', 'help'].includes(command)) return [];
+  if (command === 'start') return [];
   if (command && /^(?:vpn|happ)/.test(command)) return ['vpn'];
   if (command && /^(?:life)/.test(command)) return ['life'];
   if (['documents', 'document_delete'].includes(command)) return ['documents'];
@@ -41,7 +41,7 @@ async function messagePermissions(input, context, interactions) {
   if (input.replyMessageId && input.captchaReplyHint) return ['jobs'];
   if (input.attachment) return ['documents'];
   if (input.voice) return ['assistant'];
-  if (!menuAction(input.text) && !/^\/(?:start|help)(?:@\w+)?$/i.test(input.text) && interactions) {
+  if (!menuAction(input.text) && !/^\/start(?:@\w+)?$/i.test(input.text) && interactions) {
     const active = await interactions.getActive({ userId: context.user.id,
       conversationId: context.conversation.id, chatId: context.chatId });
     if (active.interaction) return interactionPermissions(active.interaction.kind);

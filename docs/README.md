@@ -17,6 +17,8 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
+Локально подготовлены [удаление «Помощи» и исправление входа без SDK](updates/2026-10-18-mini-app-entry-help-removal.md). Ещё не выпущены.
+
 [Telegram Mini App выпущен на DE](updates/2026-10-18-telegram-mini-app-release.md):
 3D-ядро, Telegram ID, роли и личные разрешения, админка, аудит, личный диалог
 и чтение своих разделов. Кнопка запуска настроена в боте; оба VPS синхронизированы.
@@ -198,6 +200,8 @@ describes publishing. Plans describe intentions. Code, checks, and actual
 deployment establish what is running.
 
 ### Current status
+
+[Help removal and entry without the remote SDK](updates/2026-10-18-mini-app-entry-help-removal.md) are prepared locally, not deployed.
 
 The [Telegram Mini App is deployed on DE](updates/2026-10-18-telegram-mini-app-release.md):
 3D core, Telegram IDs, roles and personal overrides, administration, audit,

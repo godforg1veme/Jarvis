@@ -397,6 +397,20 @@ test('routes start and exact bottom-menu labels without storing presentation tex
   assert.equal(assistantCalls.length, 0);
 });
 
+test('removed Help label and command no longer route to a help section', async () => {
+  const menuCalls = [];
+  const menuService = {
+    async handleMenuAction(action) { menuCalls.push(action); return { answer: 'menu' }; },
+    async handlePendingText() { return null; },
+  };
+  const { service, assistantCalls } = harness(['101'], null, null, { menuService });
+  for (const [i, text] of ['/help', '/help@Jarvis_rilora_bot', '❓ Помощь'].entries()) {
+    await service.handle(update(970 + i, 101, 101, text));
+  }
+  assert.deepEqual(menuCalls, []);
+  assert.equal(assistantCalls.length, 3, 'removed navigation uses ordinary authorized message handling');
+});
+
 test('routes validated menu callbacks before legacy callback handlers', async () => {
   const menuService = {
     async handleCallback(data) { return data === 'mem:list' ? { answer: 'Память открыта.' } : null; },
