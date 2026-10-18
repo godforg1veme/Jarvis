@@ -1,5 +1,15 @@
 # Проверки перед выпуском
 
+Более новая проверка browser от 18 октября:
+[приватный журнал попыток](updates/2026-10-18-hh-captcha-evidence.md), Linux 62/62,
+все шесть browser/broker/worker сценариев с архивом PNG/ответов. Приведённое ниже
+описание первоначального этапа с двумя попытками сохраняет историю.
+
+Newer browser verification on 18 October:
+[private attempt evidence](updates/2026-10-18-hh-captcha-evidence.md), Linux 62/62
+and all six browser/broker/worker scenarios with persisted PNG/answer evidence.
+The initial two-attempt stage below is retained as history.
+
 ## Дообученный OCR HH: локальные проверки 18 октября 2026
 
 Этот раздел описывает локальный этап. Более новый результат —

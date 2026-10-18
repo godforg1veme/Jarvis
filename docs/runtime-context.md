@@ -53,6 +53,11 @@ deadline across metadata, fetch and body reads.
 
 ### Job search
 
+[Приватный архив автоматических попыток](updates/2026-10-18-hh-captcha-evidence.md)
+установлен на DE: PNG, валидный ответ и закрытый receipt в owner-bound profile,
+TTL 48 часов / максимум 64 записи. Архив доступен только локальному CLI;
+публичные diagnostics и ручной Telegram reply не содержат этих данных.
+
 Установлено на DE 18 октября 2026: включён отдельный opt-in дообученной
 модели `hh-ru-captcha` с исходным выпрямлением, frozen selection и rescue.
 `JARVIS_HH_CAPTCHA_AUTOMATIC=1` разрешает до трёх durable попыток перед прежним

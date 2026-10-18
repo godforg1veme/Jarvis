@@ -23,8 +23,19 @@
 в контейнере; HTTP/RPC и новые кнопки не добавлены. Нужен новый browser image;
 модель, server и Desktop не изменены.
 
-Статус: локальная разработка, установка ещё не подтверждена. Windows browser —
-55 успешных тестов, семь Linux-проверок пропущены; server — 725/725.
+Код `6290f87340213555ce60f6b6302eea8aa74955ca` опубликован в GitHub и получен
+обоими VPS. На DE установлен browser release
+`/home/deploy/releases/jarvis-6290f87-captcha-evidence`. Только browser заменён;
+остальные контейнеры, окружение и mounts сохранены. Browser/server/OCR здоровы,
+все JS-файлы работающего browser совпали с release. Текущая ручная капча,
+claims и счётчик сохранены; revision вырос при открытии страницы после рестарта.
+CLI export проверен: архив пока пуст, старые данные в него не перенесены.
+
+Windows browser — 55 успешных тестов, семь Linux-проверок пропущены; Linux
+browser — 62/62, server — 725/725, Telegram contract — 65/65. Все шесть сценариев
+Chromium → broker → Telegram worker прошли на Windows и Linux; Linux проверяет
+реальное сохранение PNG/ответов и экспорт с диска. CPU-модель в этом запуске
+повторно не проверялась, её код и транспорт не менялись. Desktop не менялся.
 Настоящее прохождение HH и причина прежней ранней остановки пока не установлены.
 
 ## English
@@ -48,6 +59,17 @@ Human answers are not archived. Export is available only through a local contain
 CLI; no HTTP/RPC or buttons are added. A new browser image is required; the model,
 server and Desktop are unchanged.
 
-Status: local development; installation is not yet confirmed. Windows browser
-checks have 55 passes and seven Linux-specific skips; server checks passed 725/725.
+Code `6290f87340213555ce60f6b6302eea8aa74955ca` is published on GitHub and received
+by both VPS nodes. DE runs browser release
+`/home/deploy/releases/jarvis-6290f87-captcha-evidence`. Only the browser was replaced;
+other containers, environment and mounts are preserved. Browser/server/OCR are
+healthy, and all running browser JS files match the release. The current manual
+challenge, claims and counter remain intact; its revision advanced when reopening
+the page after restart. CLI export works: the archive is empty, without old data.
+
+Windows browser checks have 55 passes and seven Linux-specific skips; Linux
+browser checks passed 62/62, server 725/725 and Telegram contract 65/65. All six
+Chromium → broker → Telegram worker scenarios passed on Windows and Linux;
+Linux verifies actual PNG/answer persistence and disk export. The CPU model was
+not retested in this run; its code and transport are unchanged. Desktop is unchanged.
 Actual HH acceptance and the reason for the previous early stop remain unconfirmed.
