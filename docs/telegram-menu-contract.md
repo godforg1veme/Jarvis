@@ -9,6 +9,12 @@ source changes; verify the deployed revision before a server rollout.
 
 ## Change control
 
+18 октября 2026 владелец запросил три автоматические попытки вместо двух.
+[Локальное изменение](updates/2026-10-18-hh-captcha-three-attempts-development.md)
+сохраняет прежний Telegram-путь, подпись, подтверждение и раннюю остановку при
+unknown. Уже переданное человеку состояние не открывается повторно. На VPS
+пока действует описанный ниже лимит в две попытки.
+
 Согласовано владельцем и установлено на DE 18 октября 2026:
 [дообученный OCR перед ответом человека](superpowers/specs/2026-10-18-hh-trained-ocr-design.md).
 При отдельном opt-in `JARVIS_HH_CAPTCHA_AUTOMATIC=1` browser/server выполняют

@@ -3,6 +3,7 @@ const { constants } = require('node:fs');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { UUID } = require('./rpcProtocol');
+const { MAX_AUTOMATIC_ATTEMPTS } = require('./captchaLimits');
 const exact = (value, keys) => value && typeof value === 'object' && !Array.isArray(value)
   && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 const fail = (code = 'JOB_MANUAL_STATE_DENIED') => Object.assign(new Error(code), { code });
@@ -31,7 +32,7 @@ function validate(value, ownerId) {
   const keys = ['version', 'ownerId', 'phase', 'recoveryId', 'target', 'revision', 'claims', 'seedRequired', 'lastAction', 'lastRevision'];
   const automatic = value?.automatic;
   if (automatic !== undefined && (!exact(automatic, ['attempts', 'phase', 'challengeHash'])
-    || !Number.isInteger(automatic.attempts) || automatic.attempts < 1 || automatic.attempts > 2
+    || !Number.isInteger(automatic.attempts) || automatic.attempts < 1 || automatic.attempts > MAX_AUTOMATIC_ATTEMPTS
     || !['running', 'ready', 'human'].includes(automatic.phase) || !/^[a-f0-9]{64}$/.test(automatic.challengeHash || '')
     || value.phase === 'idle')) throw fail();
   if (!exact(value, automatic === undefined ? keys : [...keys, 'automatic'])

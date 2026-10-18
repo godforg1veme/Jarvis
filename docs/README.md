@@ -17,6 +17,9 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
+[Локально подготовлен лимит в три попытки](updates/2026-10-18-hh-captcha-three-attempts-development.md)
+перед отправкой капчи владельцу. Изменение пока не опубликовано и не установлено на VPS.
+
 [Дообученный OCR HH установлен на DE](updates/2026-10-18-hh-trained-ocr-release.md):
 исходное выпрямление и веса, до двух автоматических попыток перед Telegram фото,
 остановка после unknown и сохранение бюджета при перезапуске. Проверены 1 709
@@ -167,6 +170,9 @@ describes publishing. Plans describe intentions. Code, checks, and actual
 deployment establish what is running.
 
 ### Current status
+
+[A three-attempt limit is prepared locally](updates/2026-10-18-hh-captcha-three-attempts-development.md)
+before handing a challenge to the owner. This change is not yet published or installed on the VPS nodes.
 
 [Fine-tuned HH OCR is installed on DE](updates/2026-10-18-hh-trained-ocr-release.md):
 original rectification and weights, up to two automatic attempts before a Telegram

@@ -1,4 +1,5 @@
 const { fail } = require('./manualState');
+const { MAX_AUTOMATIC_ATTEMPTS } = require('./captchaLimits');
 class ManualCoordinator {
   constructor({ store, open, verify }) {
     Object.assign(this, { store, open, verify }); this.state = null; this.tail = Promise.resolve(); this.listeners = new Set();
@@ -81,7 +82,7 @@ class ManualCoordinator {
       const previous = this.state.automatic;
       if (!this.canInput() || this.state.seedRequired || !/^[a-f0-9]{64}$/.test(challengeHash)
         || this.state.claims.includes(challengeHash) || !previous && this.state.claims.length
-        || previous && (previous.phase !== 'ready' || previous.attempts >= 2 || previous.challengeHash === challengeHash)) return false;
+        || previous && (previous.phase !== 'ready' || previous.attempts >= MAX_AUTOMATIC_ATTEMPTS || previous.challengeHash === challengeHash)) return false;
       await this.write({ automatic: { attempts: (previous?.attempts || 0) + 1, phase: 'running', challengeHash } });
       return true;
     });
@@ -90,7 +91,7 @@ class ManualCoordinator {
     return this.run(async () => {
       if (this.state.phase === 'idle') return;
       if (this.state.automatic?.phase !== 'running') throw fail();
-      await this.write({ automatic: { ...this.state.automatic, phase: human || this.state.automatic.attempts >= 2 ? 'human' : 'ready' } });
+      await this.write({ automatic: { ...this.state.automatic, phase: human || this.state.automatic.attempts >= MAX_AUTOMATIC_ATTEMPTS ? 'human' : 'ready' } });
     });
   }
   seedBaseline(challengeHash, revision) {

@@ -43,7 +43,7 @@ back to an older binary during an active recovery needs a reviewed conversion
 that preserves all claims; resolving the recovery to idle removes the extension.
 
 With `JARVIS_HH_CAPTCHA_AUTOMATIC=1` in both browser and server, Telegram mode is
-required. Each recovery has at most two persisted OCR attempts on distinct
+required. Each recovery has at most three persisted OCR attempts on distinct
 pictures, each with at most one native answer. Invalid OCR consumes a slot.
 Unknown/interrupted dispatch stops automatic work early. A single `preparing`
 outcome keeps the worker quiet between steps. Failure hands over a fresh photo

@@ -7,6 +7,9 @@
 [Результат выпуска](../docs/updates/2026-10-15-job-search-release.md).
 Playwright/Chromium согласованы владельцем 15 октября 2026.
 
+В текущей рабочей ветке лимит увеличен до трёх попыток; изменение ещё не установлено
+на VPS. [Проверки и поведение](../docs/updates/2026-10-18-hh-captcha-three-attempts-development.md).
+
 18 октября на DE включён [дообученный OCR перед Telegram](../docs/updates/2026-10-18-hh-trained-ocr-release.md):
 `JARVIS_HH_CAPTCHA_AUTOMATIC=1` вместе с Telegram mode и отдельным frozen worker
 даёт до двух durable попыток на разных картинках. После отказов приходит прежнее

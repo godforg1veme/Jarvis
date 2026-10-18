@@ -36,7 +36,7 @@ async function scenario({ mode, recognize = async () => 'проверка кар
     assert.equal(fields.get('captchaText'), expected);
     assert.notEqual(attemptedKey, controller.current.key); attemptedKey = controller.current.key;
     if (mode === 'unknown') return route.abort();
-    if (mode === 'success' || mode === 'second' && posts === 2) solved = true;
+    if (mode === 'success' || mode === 'second' && posts === 2 || mode === 'third' && posts === 3) solved = true;
     await route.fulfill({ status: 204 });
     return { acknowledged: mode !== 'redirect' };
   } });
@@ -75,7 +75,7 @@ async function scenario({ mode, recognize = async () => 'проверка кар
   } });
   try {
     for (let i = 0; i < 5; i++) await worker.tick();
-    const wanted = mode === 'success' ? 1 : mode === 'unknown' || mode === 'redirect' ? 1 : 2;
+    const wanted = mode === 'success' || mode === 'unknown' || mode === 'redirect' ? 1 : mode === 'second' ? 2 : 3;
     assert.equal(posts, wanted); assert.equal(photos, solved ? 0 : 1);
     assert.equal(coordinator.status().phase, solved ? 'idle' : 'active');
     if (!solved) assert.equal(saved.automatic.phase, 'human');
@@ -85,8 +85,8 @@ async function scenario({ mode, recognize = async () => 'проверка кар
   }
 }
 
-test('real Chromium + broker + Telegram worker: first/second success, two rejections, unknown/redirect stop', { timeout: 90000 }, async () => {
-  for (const mode of ['success', 'second', 'reject', 'unknown', 'redirect']) await scenario({ mode });
+test('real Chromium + broker + Telegram worker: first/second/third success, three rejections, unknown/redirect stop', { timeout: 90000 }, async () => {
+  for (const mode of ['success', 'second', 'third', 'reject', 'unknown', 'redirect']) await scenario({ mode });
 });
 
 test('actual fine-tuned CPU model through PNG, Chromium native form, broker and Telegram worker', {

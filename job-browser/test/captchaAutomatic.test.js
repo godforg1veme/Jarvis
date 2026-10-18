@@ -39,45 +39,60 @@ async function fixture({ results = [], ocr = async () => 'проверка ка�
     restart: async () => { await restart(); ctrl.current = null; bind(); }, saved: () => saved };
 }
 
-test('first or second success returns idle, clears budget, and never returns a human photo', async () => {
-  for (const results of [['solved'], ['new_challenge', 'solved']]) {
+test('first, second or third success returns idle, clears budget, and never returns a human photo', async () => {
+  for (const results of [['solved'], ['new_challenge', 'solved'], ['new_challenge', 'new_challenge', 'solved']]) {
     const count = results.length, f = await fixture({ results });
-    if (count === 2) assert.deepEqual(await f.ctrl.challenge(false), { outcome: 'preparing' });
+    for (let i = 1; i < count; i++) assert.deepEqual(await f.ctrl.challenge(false), { outcome: 'preparing' });
     assert.deepEqual(await f.ctrl.challenge(false), { outcome: 'idle' });
     assert.equal(f.counts().answers, count); assert.equal(f.saved().automatic, undefined);
   }
 });
 
-test('two rejected attempts precede one cached human photo; ticks/refresh/restart cannot refill budget', async () => {
+test('three rejected attempts precede one cached human photo; ticks/refresh/restart cannot refill budget', async () => {
   const f = await fixture();
-  const results = await Promise.all([f.ctrl.challenge(false), f.ctrl.challenge(false), f.ctrl.challenge(false)]);
-  assert.deepEqual(results.map(x => x.outcome), ['preparing', 'preparing', 'ready']);
-  const photo = results[2];
-  assert.equal(f.saved().automatic.attempts, 2); assert.equal(f.counts().answers, 2);
+  const results = await Promise.all([f.ctrl.challenge(false), f.ctrl.challenge(false), f.ctrl.challenge(false), f.ctrl.challenge(false)]);
+  assert.deepEqual(results.map(x => x.outcome), ['preparing', 'preparing', 'preparing', 'ready']);
+  const photo = results[3];
+  assert.equal(f.saved().automatic.attempts, 3); assert.equal(f.counts().answers, 3);
   assert.deepEqual(await f.ctrl.challenge(false), photo);
   await f.ctrl.challenge(true); await f.restart(); await f.ctrl.challenge(false);
-  assert.equal(f.counts().answers, 2);
+  assert.equal(f.counts().answers, 3);
 });
 
-test('invalid OCR and OCR exceptions consume two slots without any answer submission', async () => {
+test('invalid OCR and OCR exceptions consume three slots without any answer submission', async () => {
   for (const ocr of [async () => 'invalid', async () => { throw new Error('private'); }]) {
     const f = await fixture({ ocr });
     assert.equal((await f.ctrl.challenge(false)).outcome, 'preparing');
     assert.equal((await f.ctrl.challenge(false)).outcome, 'preparing');
+    assert.equal((await f.ctrl.challenge(false)).outcome, 'preparing');
     assert.equal((await f.ctrl.challenge(false)).outcome, 'ready');
-    assert.equal(f.counts().answers, 0); assert.equal(f.saved().automatic.attempts, 2);
+    assert.equal(f.counts().answers, 0); assert.equal(f.saved().automatic.attempts, 3);
   }
 });
 
-test('completed first failure survives restart and a new resolved recovery receives its own budget', async () => {
-  const f = await fixture({ results: ['new_challenge', 'solved', 'solved'] });
+test('two completed failures survive restarts, third can succeed, and a new recovery receives its own budget', async () => {
+  const f = await fixture({ results: ['new_challenge', 'new_challenge', 'solved', 'solved'] });
   assert.equal((await f.ctrl.challenge(false)).outcome, 'preparing');
   await f.restart();
   assert.equal(f.saved().automatic.attempts, 1);
+  assert.equal((await f.ctrl.challenge(false)).outcome, 'preparing');
+  await f.restart();
+  assert.equal(f.saved().automatic.attempts, 2);
   assert.equal((await f.ctrl.challenge(false)).outcome, 'idle');
   await f.coordinator.pending({ target: 'https://hh.ru/vacancy/123', recoveryId: randomUUID() });
   assert.equal((await f.ctrl.challenge(false)).outcome, 'idle');
-  assert.equal(f.counts().answers, 3);
+  assert.equal(f.counts().answers, 4);
+});
+
+test('upgrade preserves an existing two-attempt human handover', async () => {
+  const f = await fixture();
+  await f.ctrl.challenge(false); await f.ctrl.challenge(false);
+  await f.coordinator.write({ automatic: { ...f.saved().automatic, phase: 'human' } });
+  await f.restart();
+  assert.equal((await f.ctrl.challenge(false)).outcome, 'ready');
+  assert.equal(f.saved().automatic.attempts, 2);
+  assert.equal(f.saved().automatic.phase, 'human');
+  assert.equal(f.counts().answers, 2);
 });
 
 test('unknown answer and post-claim exception immediately hand over without another automatic POST', async () => {
@@ -113,7 +128,8 @@ test('automatic state is closed, bounded and owner-scoped', () => {
   const ownerId = randomUUID(), base = { ...initial(ownerId), phase: 'active', target: 'https://hh.ru/vacancy/123', recoveryId: randomUUID() };
   const auto = { attempts: 1, phase: 'running', challengeHash: 'a'.repeat(64) };
   assert.ok(validate({ ...base, automatic: auto }, ownerId));
-  for (const patch of [{ attempts: 3 }, { attempts: 0 }, { attempts: 1.1 }, { text: 'private' }, { phase: 'other' }, { challengeHash: 'private' }]) {
+  assert.ok(validate({ ...base, automatic: { ...auto, attempts: 3 } }, ownerId));
+  for (const patch of [{ attempts: 4 }, { attempts: 0 }, { attempts: 1.1 }, { text: 'private' }, { phase: 'other' }, { challengeHash: 'private' }]) {
     assert.throws(() => validate({ ...base, automatic: { ...auto, ...patch } }, ownerId));
   }
   assert.throws(() => validate({ ...base, automatic: auto }, randomUUID()));
