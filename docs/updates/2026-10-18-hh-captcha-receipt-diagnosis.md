@@ -30,7 +30,21 @@ receipt, неподтверждённый POST (включая status не 200) 
 Запись до dispatch обязательна; ошибка не разрешает POST. Старый образ не умеет
 читать новое optional поле: не восстанавливай старый state и claims ради отката.
 
-Статус: локальная разработка. Настоящая причина предыдущего `unknown` не доказана;
+Код `821dc20a0ae22432c9eec46cc0c954fd2fd19263` опубликован в GitHub и получен
+обоими VPS. На DE установлен browser release
+`/home/deploy/releases/jarvis-821dc20-captcha-receipts`. Заменён только browser;
+окружение, mounts, остальные контейнеры, manual revision 1606, четыре claims и
+прежняя передача человеку сохранены. Browser/server/OCR здоровы, JS-файлы
+работающего browser совпали с release. CLI receipt export работает и возвращает
+`null` для старой попытки, подтверждая отсутствие сохранённой квитанции.
+
+Linux browser — 66/66, server — 725/725, Telegram contract — 65/65. Все шесть
+автоматических browser/broker/worker сценариев и отдельный ручной redirect
+сценарий прошли на Windows и Linux. Проверены schema, отсутствие сырых данных,
+restart и запрет POST при ошибке предварительной записи. CPU-модель повторно
+не проверялась; её код и транспорт не менялись. Desktop не менялся.
+
+Настоящая причина предыдущего `unknown` не доказана;
 для её определения нужна новая отдельно разрешённая попытка с квитанцией.
 
 ## English
@@ -62,5 +76,19 @@ buttons, confirmation and retry rules remain unchanged. A write before dispatch
 is mandatory; its failure does not authorize a POST. Older images cannot read
 the new optional field: never restore stale state or claims to roll back.
 
-Status: local development. The actual cause of the previous `unknown` remains
+Code `821dc20a0ae22432c9eec46cc0c954fd2fd19263` is published on GitHub and received
+by both VPS nodes. DE runs browser release
+`/home/deploy/releases/jarvis-821dc20-captcha-receipts`. Only the browser was replaced;
+environment, mounts, other containers, manual revision 1606, four claims and
+the existing human handover are preserved. Browser/server/OCR are healthy, and
+running browser JS files match the release. CLI receipt export works and returns
+`null` for the old attempt, confirming that its receipt was not retained.
+
+Linux browser checks passed 66/66, server 725/725 and Telegram contract 65/65.
+All six automatic browser/broker/worker scenarios plus a human redirect scenario
+passed on Windows and Linux. Checks cover schema, exclusion of raw data, restart
+and preventing POST on a failed initial write. The CPU model was not retested;
+its code and transport are unchanged. Desktop is unchanged.
+
+The actual cause of the previous `unknown` remains
 unproven; establishing it requires a new separately authorized attempt with a receipt.

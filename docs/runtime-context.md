@@ -53,6 +53,11 @@ deadline across metadata, fetch and body reads.
 
 ### Job search
 
+Квитанция всех CAPTCHA-отправок сохраняется в owner-bound manual state,
+экспортируется локально через `exportCaptchaReceipt.js`, без ручного текста.
+[Разбор unknown и выпуск](updates/2026-10-18-hh-captcha-receipt-diagnosis.md)
+разделяет потерянные сведения прошлой отправки и готовую диагностику следующей.
+
 [Приватный архив автоматических попыток](updates/2026-10-18-hh-captcha-evidence.md)
 установлен на DE: PNG, валидный ответ и закрытый receipt в owner-bound profile,
 TTL 48 часов / максимум 64 записи. Архив доступен только локальному CLI;
