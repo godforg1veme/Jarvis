@@ -65,3 +65,6 @@ Files: `providerFactory.js`, `config/loadConfig.js`, `providerProfile.js`,
 
 Implementation completed locally on October 19: 14 routing tests, 33 focused tests,
 756 total server tests passed. Publication remains pending owner authorization.
+
+Later outcome: [released and enabled on DE](../../updates/2026-10-19-free-first-routing-release.md);
+Linux 756/756 and one live router request with a $0 generation receipt passed.

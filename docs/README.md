@@ -17,10 +17,11 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
-Локально подготовлена [очередь бесплатных моделей OpenRouter](updates/2026-10-19-free-first-routing-development.md):
+На DE включена [очередь бесплатных моделей OpenRouter](updates/2026-10-19-free-first-routing-release.md):
 семь согласованных free, затем два DeepSeek по оценке стоимости. Цены и квота
 обновляются при использовании раз в 15 минут; новые ID не добавляются.
-756 server tests прошли. На VPS режим ещё не включён.
+Linux server tests 756/756; живой Nemotron Super ответил за $0, отдельная
+generation-квитанция подтвердила стоимость. Исходники обоих VPS синхронизированы.
 
 [Telegram Mini App выпущен на DE](updates/2026-10-18-telegram-mini-app-release.md):
 3D-ядро, Telegram ID, роли и личные разрешения, админка, аудит, личный диалог
@@ -208,10 +209,11 @@ deployment establish what is running.
 
 ### Current status
 
-[Free-first OpenRouter routing](updates/2026-10-19-free-first-routing-development.md)
-is implemented locally: seven approved free models, then two DeepSeek candidates
+[Free-first OpenRouter routing](updates/2026-10-19-free-first-routing-release.md)
+is enabled on DE: seven approved free models, then two DeepSeek candidates
 ranked by estimated cost. Prices/quota refresh on use every 15 minutes; no new
-IDs are added. All 756 server tests passed. Not yet enabled on the VPS.
+IDs are added. Linux server tests passed 756/756; a live Nemotron Super reply
+cost $0, confirmed by a separate generation receipt. Both VPS sources are synchronized.
 
 The [Telegram Mini App is deployed on DE](updates/2026-10-18-telegram-mini-app-release.md):
 3D core, Telegram IDs, roles and personal overrides, administration, audit,

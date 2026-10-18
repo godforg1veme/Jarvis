@@ -4,6 +4,8 @@
 
 ## Русский
 
+Более новый результат: [выпущено и включено на DE](2026-10-19-free-first-routing-release.md). Ниже сохранён локальный этап.
+
 19 октября 2026. Реализовано локально по согласованному порядку; GitHub и VPS
 этой правкой ещё не обновлялись. Предыдущие локальные изменения MD для агентов
 сохранены. План: [free-first routing](../superpowers/plans/2026-10-18-free-first-routing.md).
@@ -66,6 +68,8 @@ Gemma вернула 429. Это не живая приёмка нового rou
 Linux image tests и обновление исходников обоих VPS. Desktop EXE не меняется.
 
 ## English
+
+Newer result: [released and enabled on DE](2026-10-19-free-first-routing-release.md). The local stage is preserved below.
 
 October 19, 2026. Implemented locally in the approved order; this change has not
 been published to GitHub or the VPS nodes. Earlier local agent-documentation

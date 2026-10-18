@@ -501,8 +501,8 @@ instructions and dated release results record the actual deployment outcome.
 
 ## Free-first OpenRouter text routing (opt-in)
 
-Local development on October 19, not yet installed: set
-`JARVIS_OPENROUTER_FREE_FIRST=true` only as part of an authorized rollout.
+Enabled on DE on October 19: [release and live $0 probe](../docs/updates/2026-10-19-free-first-routing-release.md).
+Set `JARVIS_OPENROUTER_FREE_FIRST=true` only as part of an authorized rollout.
 The primary provider must be `openrouter`. The seven approved free IDs precede
 the paid IDs in `OPENROUTER_MODEL` / `OPENROUTER_FALLBACK_MODEL`, ranked by
 estimated request cost. All use the primary `OPENROUTER_API_KEY`; legacy backup

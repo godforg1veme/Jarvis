@@ -20,6 +20,10 @@ Windows-приложение и облачный API для подключённ
   ввод, подтверждения кнопками, память, документы, устройства, VPN и Operations.
   В Life OS доступны Миссия, Хронология, проекты, обязательства, люди,
   напоминания, предпочтения и восстановление контекста.
+- Основной текстовый ассистент на DE сначала выбирает согласованные бесплатные
+  модели OpenRouter, затем платный резерв по оценке стоимости. Цены и доступность
+  обновляются при использовании; список моделей остаётся фиксированным.
+  [Результат выпуска и проверки](docs/updates/2026-10-19-free-first-routing-release.md).
 - Telegram Mini App содержит настоящее вращающееся 3D-ядро, личный чат и админку:
   пользователи по Telegram ID, роли и личные разрешения. Владелец назначает
   администраторов. [Выпуск и клиентские проверки](docs/updates/2026-10-18-telegram-mini-app-release.md).
@@ -148,6 +152,7 @@ Telegram is Jarvis's first cloud client. The project also includes a Windows app
 
 - The cloud service uses Node.js, Fastify, PostgreSQL, and pgvector. Model providers are configured outside product logic.
 - The Telegram bot supports allowlisted users, private conversations, guided forms, inline confirmations, memory, documents, devices, VPN, and Operations. The Life OS area includes Mission, Timeline, projects, commitments, people, reminders, preferences, and context recovery.
+- The main text assistant on DE prioritizes approved free OpenRouter models, then paid candidates by estimated cost. Prices and availability refresh on use; the model list remains fixed. See the [release and verification](docs/updates/2026-10-19-free-first-routing-release.md).
 - The Telegram Mini App includes an actual rotating 3D core, private chat and administration with Telegram IDs, roles and personal overrides. The owner appoints administrators. See the [release and client checks](docs/updates/2026-10-18-telegram-mini-app-release.md).
 - Job search collects HH vacancies in a separate background process on DE and sends filtered cards to the owner's Telegram chat. Search controls, saved vacancies, and cover-letter preparation and editing are available in the bot. The model runs on request; submitting an application requires approval of the exact letter. Live application submission still needs acceptance.
 - DE uses the fine-tuned HH OCR with image rectification: up to three automatic attempts, then a photo for the owner in Telegram. An unknown result stops automation earlier. Replying to the photo authorizes one submission; verified access resumes the search from its saved position. The human flow passed on 16 October; the first live OCR attempt on 18 October did not confirm access and handed a photo to the owner. A later live OCR answer test, approved by the owner, returned solved and resumed collection; a fully autonomous cycle remains unconfirmed. No Tailscale connection or separate web screen is needed. See the [release and verification limits](docs/updates/2026-10-18-hh-ocr-live-acceptance.md).

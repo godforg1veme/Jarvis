@@ -1,16 +1,20 @@
 # Проверки перед выпуском
 
-OpenRouter free-first, локальный этап 19 октября:
-[результат и ограничения](updates/2026-10-19-free-first-routing-development.md).
+OpenRouter free-first, выпуск 19 октября:
+[результат и ограничения](updates/2026-10-19-free-first-routing-release.md).
 14 routing tests, focused suite 33/33, весь server suite 756/756 прошли.
 Проверены цены/caps, очередь, квота, cache refresh и запрет повтора action-capable
-запроса. Новые проверки используют fixture API; новый router на VPS не выпущен.
+запроса. Тот же полный набор прошёл в Linux image. Новый router включён на DE;
+живой бесплатный запрос и отдельная квитанция подтвердили $0. Платный fallback
+проверен fixtures, живую платную отправку не вызывали.
 
-OpenRouter free-first, October 19 local stage:
-[results and limits](updates/2026-10-19-free-first-routing-development.md).
+OpenRouter free-first, October 19 release:
+[results and limits](updates/2026-10-19-free-first-routing-release.md).
 14 routing tests, focused suite 33/33 and full server suite 756/756 passed.
 Coverage includes prices/caps, order, quota, cache refresh and action-capable
-no-retry. New tests use fixture APIs; the router is not deployed on the VPS.
+no-retry. The same complete suite passed in the Linux image. The router is enabled
+on DE; a live free request and its separate receipt confirmed $0. Paid fallback
+uses fixtures; no live paid dispatch was triggered.
 
 ```powershell
 node --test server/test/openRouterRouting.test.js server/test/providers.test.js server/test/config.test.js
