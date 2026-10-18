@@ -1,12 +1,13 @@
 # Local HH captcha OCR
 
-## Optional fine-tuned backend (local development, 18 October 2026)
+## Optional fine-tuned backend (installed on DE, 18 October 2026)
 
 The owner's `hh-ru-captcha` model is integrated through its original pipeline:
 curve rectification, two crops, greedy/beam CTC selection and insertion rescue.
-The default ONNX image below remains unchanged. The optional image and its new
-Paddle/OpenCV/RapidFuzz dependencies await production approval and a Linux build.
-See [local results](../docs/updates/2026-10-18-hh-trained-ocr-development.md).
+The default ONNX build below remains available. The owner approved the optional
+Paddle/OpenCV/RapidFuzz image, which is built and installed on DE through its
+overlay. See [release and live limits](../docs/updates/2026-10-18-hh-trained-ocr-release.md)
+and [local results](../docs/updates/2026-10-18-hh-trained-ocr-development.md).
 
 `frozen-source.json` pins source revision, code, dictionary, config and both
 checkpoints. Prepare the ignored bundle without copying datasets or environments:
@@ -24,10 +25,13 @@ digest as `FROZEN_BUNDLE_SHA256`; runtime verifies it before importing code or
 loading either checkpoint. Model/source artifacts remain outside Git.
 
 `Dockerfile.frozen` and `deploy/job-ocr-frozen.yml` retain the networkless UNIX
-socket and read-only filesystem. The proposed image uses CPU, one thread and a
-1 GiB memory limit. Its Linux resource limits and build are not locally verified:
-Docker and WSL are unavailable on this PC. Do not enable it on the strength of
-Windows tests alone. Approval must cover the dependency lock and Linux rollout.
+socket and read-only filesystem. The installed image uses CPU, one thread and a
+1 GiB limit. An isolated Linux container matched the fixture through the actual
+socket, rejected an invalid image and peaked at 416,694,272 bytes without OOM.
+Socket/directory permissions are 0600/0700 under UID 1001. Docker/WSL remain absent
+on the Windows PC; these checks ran on DE without a production profile. The first
+live attempt stopped as unknown and sent the human photo, so actual HH acceptance
+has not been established.
 
 The trained backend accepts only the studied 250×90 PNG geometry, using the
 existing byte/decompression limits and exactly `{answer: string}`. It supports

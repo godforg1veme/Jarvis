@@ -17,11 +17,12 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
-Локально подготовлена [адаптация дообученного OCR HH](updates/2026-10-18-hh-trained-ocr-development.md):
-исходное выпрямление и веса, две автоматические попытки перед Telegram фото,
+[Дообученный OCR HH установлен на DE](updates/2026-10-18-hh-trained-ocr-release.md):
+исходное выпрямление и веса, до двух автоматических попыток перед Telegram фото,
 остановка после unknown и сохранение бюджета при перезапуске. Проверены 1 709
-изображений и offline браузерная цепочка. Изменения ещё не опубликованы;
-новые зависимости worker и Linux/VPS проверка требуют согласования.
+изображений, CPU parity 73/73 и изолированные Linux browser/worker/socket.
+Первая живая попытка не подтвердила доступ: автоматика остановилась, фото
+отправлено владельцу. Прохождение настоящей капчи OCR пока не подтверждено.
 
 [13 подтверждённых исправлений аудита выпущены](updates/2026-10-17-audit-remediation-release.md):
 server/Operations UI на DE, Host Agent на DE/NL, Desktop пересобран и установлен.
@@ -71,8 +72,9 @@ Operations tests/build и browser fixtures прошли. Код и устано�
 По поручению владельца прежний HH web-доступ через Tailscale заменён
 [ответом на фото в Telegram](updates/2026-10-16-hh-telegram-captcha.md).
 Срок картинки — 10 минут; сама пауза поиска не имеет таймера. В новой схеме
-распознаёт картинку владелец. Автоматический OCR при включённом Telegram режиме
-не запускается. 16 октября владелец подтвердил успешное прохождение капчи.
+распознаёт картинку владелец. В установленном 16 октября режиме автоматический
+OCR не запускался; с 18 октября действует отдельный opt-in, описанный выше.
+16 октября владелец подтвердил успешное прохождение капчи вручную.
 Серверная проверка подтвердила результат ответа `solved`, снятие ручной паузы
 и продолжение сбора: страница сменилась с 15 на 18, число отправленных карточек
 выросло с 583 до 602. Это снимок приёмки, а не постоянные показатели поиска.
@@ -166,11 +168,12 @@ deployment establish what is running.
 
 ### Current status
 
-The [fine-tuned HH OCR adaptation](updates/2026-10-18-hh-trained-ocr-development.md)
-is prepared locally: original rectification and weights, two automatic attempts
-before a Telegram photo, unknown-result stop and a restart-safe attempt budget.
-Checks cover 1,709 images and the offline browser chain. Changes are not published;
-the new worker dependencies and Linux/VPS verification await approval.
+[Fine-tuned HH OCR is installed on DE](updates/2026-10-18-hh-trained-ocr-release.md):
+original rectification and weights, up to two automatic attempts before a Telegram
+photo, unknown-result stop and a restart-safe budget. Checks cover 1,709 images,
+73/73 CPU parity and isolated Linux browser/worker/socket behavior. The first live
+attempt did not confirm access; automation stopped and a photo was sent to the
+owner. Solving an actual HH challenge with OCR remains unconfirmed.
 
 All [13 confirmed audit fixes are deployed](updates/2026-10-17-audit-remediation-release.md):
 server/Operations UI on DE, Host Agent on DE/NL, Desktop rebuilt and installed.
@@ -222,8 +225,9 @@ and the [native request fix](updates/2026-10-16-hh-native-captcha-request.md).
 At the owner's request, the former HH web access through Tailscale was replaced
 with [replies to Telegram photos](updates/2026-10-16-hh-telegram-captcha.md).
 Images expire after 10 minutes; the search pause has no timer. The owner reads
-the image in this workflow. Automatic OCR does not run while Telegram mode is
-enabled. On 16 October, the owner confirmed that the CAPTCHA was solved.
+the image in this workflow. The mode installed on 16 October did not run automatic
+OCR; a separate opt-in has been active since 18 October, as described above.
+On 16 October, the owner confirmed solving the CAPTCHA manually.
 The server confirmed `solved`, cleared the manual pause, and resumed collection:
 the page advanced from 15 to 18 and sent cards increased from 583 to 602.
 These figures describe the acceptance check, not ongoing search metrics.

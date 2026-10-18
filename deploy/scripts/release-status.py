@@ -21,6 +21,19 @@ class InventoryError(Exception):
     pass
 
 
+def release_config_source(configs):
+    """Resolve one release and every Compose input, including overlays."""
+    if not isinstance(configs, str) or not configs:
+        return None
+    paths = [Path(value) for value in configs.split(',')]
+    if any(not path.is_absolute() for path in paths):
+        return None
+    release = paths[0].parent.parent
+    if any(path.parent != paths[0].parent or not path.is_file() for path in paths):
+        return None
+    return release, [path.relative_to(release).as_posix() for path in paths]
+
+
 def command(args, *, cwd=None, input=None, binary=False):
     try:
         result = subprocess.run(args, cwd=cwd, input=input, capture_output=True,
@@ -225,13 +238,14 @@ walk('src');walk('/app/shared');for(const p of ['package.json','package-lock.jso
         inspect = json.loads(command(["docker", "inspect", "jarvis-family-server-1"]))[0]
         server["health"] = inspect.get("State", {}).get("Health", {}).get("Status", "unknown")
         configs = inspect["Config"].get("Labels", {}).get("com.docker.compose.project.config_files", "")
-        if configs and "," not in configs:
-            release = Path(configs).parent.parent
+        release_source = release_config_source(configs)
+        if release_source:
+            release, compose_inputs = release_source
             revision = git(release, "rev-parse", "HEAD")
             server["releaseRevision"] = revision
             # Include compiled UI and image/unit inputs, even when JS hashes match.
             delta = git(repo, "diff", "--name-only", revision, ref, "server", "ops-ui", "shared",
-                        "deploy/docker-compose.yml", "deploy/server.Dockerfile")
+                        "deploy/server.Dockerfile", *compose_inputs)
             server["releaseInputsMatch"] = not bool(delta)
         else:
             server["releaseInputsMatch"] = None

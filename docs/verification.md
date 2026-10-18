@@ -2,6 +2,17 @@
 
 ## Дообученный OCR HH: локальные проверки 18 октября 2026
 
+Этот раздел описывает локальный этап. Более новый результат —
+[Linux установка и живая попытка](updates/2026-10-18-hh-trained-ocr-release.md):
+browser 56/56 без skips, OCR worker 10/10, изолированный UNIX socket и ресурсы
+проверены; текущая реальная попытка остановилась после unknown с отправкой фото.
+Release-status с Compose overlays проверен 15 тестами.
+
+This section records the local stage. The newer linked release covers Linux
+browser 56/56 without skips, OCR worker 10/10 and isolated socket/resource checks.
+The actual attempt stopped as unknown and sent a human photo. Compose-overlay
+release verification passed 15 tests.
+
 ```powershell
 npm test --prefix job-browser
 npm test --prefix server

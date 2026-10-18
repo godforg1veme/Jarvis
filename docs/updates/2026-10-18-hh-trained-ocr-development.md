@@ -8,6 +8,7 @@
 в GitHub и обновление обоих VPS, включая автоматическую обработку ожидающей
 CAPTCHA. Результаты установки и живой проверки будут записаны отдельно;
 измерения ниже относятся к локальному этапу.
+Более новый результат: [установка и живая попытка](2026-10-18-hh-trained-ocr-release.md).
 
 18 октября 2026. Изменения находятся только в локальной ветке
 `codex/hh-trained-ocr`. GitHub, оба VPS и установленный Desktop не менялись.
@@ -116,6 +117,7 @@ Later decision on 18 October 2026: the owner approved dependencies, GitHub
 publication and both VPS updates, including automatic handling of the waiting
 CAPTCHA. Installation and live results will be recorded separately; measurements
 below describe the local development stage.
+Newer result: [installation and the live attempt](2026-10-18-hh-trained-ocr-release.md).
 
 18 October 2026. Changes exist only on the local `codex/hh-trained-ocr` branch.
 GitHub, both VPS nodes and the installed Desktop are unchanged. The model was

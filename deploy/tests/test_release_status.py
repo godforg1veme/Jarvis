@@ -48,6 +48,24 @@ class ReleaseStatusTests(unittest.TestCase):
         self.assertEqual(self.git("show-ref"), refs_before)
         self.assertEqual(self.git("status", "--porcelain"), "")
 
+    def test_compose_overlay_inputs_are_all_checked_against_the_release(self):
+        folder = self.repo / 'deploy'
+        folder.mkdir()
+        base, overlay = folder / 'docker-compose.yml', folder / 'job-ocr-frozen.yml'
+        base.write_text('services: {}\n')
+        overlay.write_text('services: {}\n')
+        self.git('add', 'deploy'); self.git('commit', '-m', 'release inputs')
+        previous = self.git('rev-parse', 'HEAD')
+        release, inputs = status.release_config_source(f'{base},{overlay}')
+        self.assertEqual(release, self.repo)
+        overlay.write_text('services: {job-ocr: {read_only: true}}\n')
+        self.git('add', 'deploy'); self.git('commit', '-m', 'changed overlay')
+        delta = status.git(self.repo, 'diff', '--name-only', previous, 'HEAD', *inputs)
+        self.assertEqual(delta, 'deploy/job-ocr-frozen.yml')
+        self.assertEqual(status.release_config_source(str(base))[1], ['deploy/docker-compose.yml'])
+        for invalid in ['', 'deploy/docker-compose.yml', f'{base},', f'{base},{self.repo / "other.yml"}']:
+            self.assertIsNone(status.release_config_source(invalid))
+
     def test_unique_foreign_commit_is_reported_and_never_merged_or_deleted(self):
         self.git("checkout", "-b", "codex/another-agent")
         (self.repo / "other.js").write_text("other task\n", encoding="utf-8")

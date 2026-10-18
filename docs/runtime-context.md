@@ -53,14 +53,16 @@ deadline across metadata, fetch and body reads.
 
 ### Job search
 
-Локальная разработка 18 октября 2026: подготовлен отдельный opt-in дообученной
+Установлено на DE 18 октября 2026: включён отдельный opt-in дообученной
 модели `hh-ru-captcha` с исходным выпрямлением, frozen selection и rescue.
 `JARVIS_HH_CAPTCHA_AUTOMATIC=1` разрешает до двух durable попыток перед прежним
 Telegram фото. Unknown/перезапуск незавершённой отправки останавливает автоматику;
 успех требует прежнего verifier. `/ocr/frozen` исключает подмену общим OCR.
-Исходники, веса и приватные примеры не публиковались, установленный режим ниже
-не менялся. Зависимости нового worker и Linux build требуют согласования.
-[Результаты и ограничения](updates/2026-10-18-hh-trained-ocr-development.md).
+Код опубликован, веса и приватные примеры не входят в Git. Linux build, права
+сокета, ресурсные ограничения и изолированные проверки прошли. При первой живой
+попытке доступ не подтвердился: budget остановлен после unknown, фото отправлено
+в Telegram; collector остаётся на attention с сохранённым progress.
+[Результат выпуска и ограничения](updates/2026-10-18-hh-trained-ocr-release.md).
 
 Выпущен на DE 15 октября 2026: домен `server/src/jobs`, существующий Telegram
 и PostgreSQL, отдельные collector и Chromium browser. Browser владеет приватной
@@ -84,7 +86,8 @@ chat, message ID, challenge/revision и сроку картинки. Ответ 
 Unknown/replay и старые картинки не разрешают повторную отправку ответа.
 [Согласованный контракт](superpowers/specs/2026-10-16-hh-telegram-captcha-design.md).
 
-Telegram режим сразу передаёт CAPTCHA человеку. Прежний networkless `job-ocr`
+Без нового automatic opt-in Telegram режим сразу передаёт CAPTCHA человеку.
+Прежний общий networkless `job-ocr`
 с UNIX socket сохранён для отдельного opt-in fallback при выключенном Telegram
 режиме. Journal/profile/resume/exclusions не сбрасываются. История OCR и прежнего
 [ручного web-доступа](updates/2026-10-16-hh-mobile-manual-release.md) сохранена;
