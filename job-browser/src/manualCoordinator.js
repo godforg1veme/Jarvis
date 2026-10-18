@@ -6,12 +6,17 @@ class ManualCoordinator {
   run(fn) { const p = this.tail.then(fn); this.tail = p.catch(() => {}); return p; }
   async load() {
     this.state = await this.store.read();
+    // A crash can occur after a POST but before its receipt/checkpoint. Never
+    // grant another automatic operation from an interrupted attempt.
+    if (this.state.automatic?.phase === 'running') await this.write({ automatic: { ...this.state.automatic, phase: 'human' } });
     if (this.state.phase === 'checking') await this.write({ phase: 'active', revision: this.state.revision + 1 });
     return this.status();
   }
   status() { if (!this.state) throw fail(); return { phase: this.state.phase, revision: this.state.revision }; }
   async write(patch) {
-    this.state = await this.store.write({ ...this.state, ...patch });
+    const value = { ...this.state, ...patch };
+    if (value.phase === 'idle') delete value.automatic;
+    this.state = await this.store.write(value);
     for (const fn of this.listeners) { try { fn(this.status()); } catch {} }
     return this.status();
   }
@@ -71,6 +76,23 @@ class ManualCoordinator {
     });
   }
   canInput() { return this.state?.phase === 'active' && !this.finishing; }
+  beginAutomatic(challengeHash) {
+    return this.run(async () => {
+      const previous = this.state.automatic;
+      if (!this.canInput() || this.state.seedRequired || !/^[a-f0-9]{64}$/.test(challengeHash)
+        || this.state.claims.includes(challengeHash) || !previous && this.state.claims.length
+        || previous && (previous.phase !== 'ready' || previous.attempts >= 2 || previous.challengeHash === challengeHash)) return false;
+      await this.write({ automatic: { attempts: (previous?.attempts || 0) + 1, phase: 'running', challengeHash } });
+      return true;
+    });
+  }
+  finishAutomatic(human) {
+    return this.run(async () => {
+      if (this.state.phase === 'idle') return;
+      if (this.state.automatic?.phase !== 'running') throw fail();
+      await this.write({ automatic: { ...this.state.automatic, phase: human || this.state.automatic.attempts >= 2 ? 'human' : 'ready' } });
+    });
+  }
   seedBaseline(challengeHash, revision) {
     return this.run(async () => {
       if (!this.canInput() || this.state.revision !== revision || !this.state.seedRequired) return false;

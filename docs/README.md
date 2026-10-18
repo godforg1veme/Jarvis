@@ -17,6 +17,12 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
+Локально подготовлена [адаптация дообученного OCR HH](updates/2026-10-18-hh-trained-ocr-development.md):
+исходное выпрямление и веса, две автоматические попытки перед Telegram фото,
+остановка после unknown и сохранение бюджета при перезапуске. Проверены 1 709
+изображений и offline браузерная цепочка. Изменения ещё не опубликованы;
+новые зависимости worker и Linux/VPS проверка требуют согласования.
+
 [13 подтверждённых исправлений аудита выпущены](updates/2026-10-17-audit-remediation-release.md):
 server/Operations UI на DE, Host Agent на DE/NL, Desktop пересобран и установлен.
 Server image 723/723, cloud 73/73, Host Agent по 149/149 на обоих Linux-узлах;
@@ -159,6 +165,12 @@ describes publishing. Plans describe intentions. Code, checks, and actual
 deployment establish what is running.
 
 ### Current status
+
+The [fine-tuned HH OCR adaptation](updates/2026-10-18-hh-trained-ocr-development.md)
+is prepared locally: original rectification and weights, two automatic attempts
+before a Telegram photo, unknown-result stop and a restart-safe attempt budget.
+Checks cover 1,709 images and the offline browser chain. Changes are not published;
+the new worker dependencies and Linux/VPS verification await approval.
 
 All [13 confirmed audit fixes are deployed](updates/2026-10-17-audit-remediation-release.md):
 server/Operations UI on DE, Host Agent on DE/NL, Desktop rebuilt and installed.

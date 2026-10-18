@@ -13,6 +13,10 @@ test('CAPTCHA closed callbacks, distinct config and literal photo caption', () =
   assert.equal(parseJobCallback('job:captcha').action, 'captcha'); assert.equal(parseJobCallback('job:captcha_refresh').action, 'captcha_refresh');
   assert.equal(parseJobCallback('job:captcha_refresh:extra'), null); assert.ok(telegramReplyMarkup(refreshButtons));
   assert.equal(loadJobConfig({}).jobCaptchaTelegram, false);
+  assert.equal(loadJobConfig({}).jobCaptchaAutomatic, false);
+  assert.throws(() => loadJobConfig({ JARVIS_HH_CAPTCHA_AUTOMATIC: '1' }));
+  assert.throws(() => loadJobConfig({ JARVIS_HH_CAPTCHA_AUTOMATIC: 'yes' }));
+  assert.equal(loadJobConfig({ JARVIS_HH_CAPTCHA_AUTOMATIC: '1', JARVIS_HH_CAPTCHA_TELEGRAM: '1' }).jobCaptchaAutomatic, true);
   assert.throws(() => loadJobConfig({ JARVIS_JOB_CAPTCHA_TOKEN: token, JARVIS_JOB_BROWSER_TOKEN: token }));
   assert.ok(!CAPTION.includes('http')); assert.equal(normalizedAnswer('  ПЕРВОЕ   СЛОВО  '), 'первое слово');
   assert.equal(validAnswer('первое слово'), true); for (const s of ['english words', 'одно', 'а б', 'слово слово слово']) assert.equal(validAnswer(s), false);
@@ -25,6 +29,8 @@ test('CAPTCHA client bounded exact shape, private owner credential and PNG limit
     assert.equal(options.headers.authorization, `Bearer ${token}`); return new Response(JSON.stringify({ ok: true, value }));
   } });
   assert.deepEqual(await client.status(), value);
+  value = { outcome: 'preparing' }; assert.deepEqual(await client.challenge(), value);
+  value = { outcome: 'preparing', text: 'untrusted' }; await assert.rejects(client.challenge(), { code: 'JOB_CAPTCHA_UNAVAILABLE' });
   value = { outcome: 'ready', challengeId: randomUUID(), revision: 3, expiresAt: new Date(Date.now()+60000).toISOString(), pngBase64: png.toString('base64') };
   assert.ok(Buffer.isBuffer((await client.challenge()).png));
   value.expiresAt = 'bad'; await assert.rejects(client.challenge(), { code: 'JOB_CAPTCHA_UNAVAILABLE' });

@@ -25,6 +25,18 @@ def fixture(flag='1'):
 
 
 class PolicyTests(unittest.TestCase):
+    def test_automatic_flags_match_and_require_human_fallback(self):
+        config = fixture()
+        browser = config['services']['job-browser']['environment']
+        server = config['services']['server']['environment']
+        browser['JARVIS_HH_CAPTCHA_AUTOMATIC'] = '1'
+        with self.assertRaises(ValueError): module.verify(config)
+        server['JARVIS_HH_CAPTCHA_AUTOMATIC'] = '1'
+        self.assertTrue(module.verify(config))
+        for service in config['services'].values():
+            service['environment']['JARVIS_HH_CAPTCHA_TELEGRAM'] = '0'
+        with self.assertRaises(ValueError): module.verify(config)
+
     def test_retired_runtime_files_and_settings_are_removed(self):
         root = Path(__file__).resolve().parents[2]
         for relative in [

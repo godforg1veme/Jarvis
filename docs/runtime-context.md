@@ -53,6 +53,15 @@ deadline across metadata, fetch and body reads.
 
 ### Job search
 
+Локальная разработка 18 октября 2026: подготовлен отдельный opt-in дообученной
+модели `hh-ru-captcha` с исходным выпрямлением, frozen selection и rescue.
+`JARVIS_HH_CAPTCHA_AUTOMATIC=1` разрешает до двух durable попыток перед прежним
+Telegram фото. Unknown/перезапуск незавершённой отправки останавливает автоматику;
+успех требует прежнего verifier. `/ocr/frozen` исключает подмену общим OCR.
+Исходники, веса и приватные примеры не публиковались, установленный режим ниже
+не менялся. Зависимости нового worker и Linux build требуют согласования.
+[Результаты и ограничения](updates/2026-10-18-hh-trained-ocr-development.md).
+
 Выпущен на DE 15 октября 2026: домен `server/src/jobs`, существующий Telegram
 и PostgreSQL, отдельные collector и Chromium browser. Browser владеет приватной
 HH-сессией, узкий RPC привязан к одному owner UUID; read/apply credentials

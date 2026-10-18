@@ -4,6 +4,7 @@ const { randomUUID } = require('node:crypto');
 const { JobCaptchaWorker } = require('../src/jobs/jobCaptchaWorker');
 const { JobCaptchaClient } = require('../src/jobs/jobCaptchaClient');
 const { captchaNoticeView } = require('../src/jobs/jobCaptchaNotices');
+const { JobDeliveryWorker } = require('../src/jobs/jobDeliveryWorker');
 function fixture(options = {}) {
   let now = 100000, request = { request_id: randomUUID(), refresh_requested: true, explicit_request: true };
   const calls = { challenges: [], sends: 0, notices: [], delivered: [], reports: [], acknowledgements: [] };
@@ -24,6 +25,18 @@ function fixture(options = {}) {
     report: code => calls.reports.push(code), ...options });
   return { worker, repository, client, calls, request: () => request, setRequest: x => { request = x; }, advance: ms => { now += ms; } };
 }
+
+test('automatic mode suppresses the early legacy attention; ordinary human mode retains it', async () => {
+  for (const automatic of [true, false]) {
+    let sends = 0, outcome;
+    const worker = new JobDeliveryWorker({ captchaAutomatic: automatic, captchaEnabled: true,
+      deliveryRepository: { claim: async () => ({ id: randomUUID(), user_id: randomUUID(), kind: 'attention', payload: { reason: 'HH_CAPTCHA' } }),
+        finish: async result => { outcome = result.outcome; } },
+      searchRepository: { getSettings: async () => ({ chat_id: '101' }) },
+      send: async () => { sends++; return { message_id: 1 }; } });
+    await worker.tick(); assert.equal(sends, automatic ? 0 : 1); assert.equal(outcome, automatic ? 'failed' : 'sent');
+  }
+});
 test('refresh survives backend errors, exponential backoff and one safe delay notice per request', async () => {
   const f = fixture(); let attempts = 0;
   f.client.challenge = async refresh => { assert.equal(refresh,true); attempts++; throw Error('SECRET exception'); };
@@ -36,6 +49,15 @@ test('refresh survives backend errors, exponential backoff and one safe delay no
   assert.ok(!JSON.stringify(f.calls).includes('SECRET'));
   f.client.challenge = async refresh => { assert.equal(refresh,true); return { outcome:'ready',challengeId:randomUUID() }; };
   f.advance(40000); await f.worker.tick(); assert.equal(f.request(),null); assert.equal(f.calls.sends,1);
+});
+
+test('automatic preparation keeps the scoped request pending and sends no Telegram photo or delay notice', async () => {
+  const f = fixture();
+  f.client.challenge = async refresh => { assert.equal(refresh, true); return { outcome: 'preparing' }; };
+  f.repository.enqueue = async () => assert.fail('preparing is not an image');
+  await f.worker.tick(); await f.worker.tick();
+  assert.ok(f.request()); assert.equal(f.calls.sends, 0); assert.equal(f.calls.notices.length, 0);
+  assert.equal(f.calls.acknowledgements.length, 0); assert.equal(f.worker.failures, 0);
 });
 test('new explicit request bypasses old backoff and acknowledgement cannot erase a newer click', async () => {
   const f = fixture(); f.client.status = async () => { throw Error(); }; await f.worker.tick();

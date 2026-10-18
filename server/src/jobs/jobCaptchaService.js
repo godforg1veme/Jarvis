@@ -2,6 +2,7 @@ const { normalizedAnswer, validAnswer } = require('./jobCaptchaClient');
 const { assertJobScope } = require('./jobSchemas');
 const { response, button } = require('./jobTelegramViews');
 const CAPTION = 'HH CAPTCHA · Ответь на это фото двумя словами с картинки. Ответ означает однократную отправку в HH. Картинка действует 10 минут.';
+const AUTOMATIC_CAPTION = CAPTION + '\nАвтоматическая проверка не подтвердила доступ. Нужна твоя помощь.';
 const refreshButtons = [[button('Обновить картинку', 'captcha_refresh')]];
 class JobCaptchaService {
   constructor({ repository, client }) { Object.assign(this, { repository, client }); }
@@ -31,4 +32,4 @@ class JobCaptchaService {
       : 'Доступ пока не подтверждён. Запроси новую картинку.', refreshButtons);
   }
 }
-module.exports = { JobCaptchaService, CAPTION, refreshButtons };
+module.exports = { JobCaptchaService, CAPTION, AUTOMATIC_CAPTION, refreshButtons };

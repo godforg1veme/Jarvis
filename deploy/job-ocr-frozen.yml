@@ -1,0 +1,12 @@
+# Optional overlay; dependency approval and Linux build/acceptance required.
+# Base file remains deploy/docker-compose.yml. No network/port changes.
+services:
+  job-ocr:
+    build:
+      dockerfile: Dockerfile.frozen
+      args:
+        FROZEN_BUNDLE_SHA256: ${JARVIS_FROZEN_BUNDLE_SHA256:?prepare and verify the frozen bundle first}
+    deploy:
+      resources:
+        limits:
+          memory: 1G

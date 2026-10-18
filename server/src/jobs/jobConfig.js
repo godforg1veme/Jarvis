@@ -8,7 +8,7 @@ const schema = z.object({
   jobSearchModel: z.string().max(255),
   jobSecretKey: z.string().max(128),
   jobPublicOrigin: z.string().max(2048),
-  jobCaptchaTelegram: z.boolean(), jobCaptchaToken: z.string().max(256),
+  jobCaptchaTelegram: z.boolean(), jobCaptchaAutomatic: z.boolean(), jobCaptchaToken: z.string().max(256),
   hhClientId: z.string().max(255), hhClientSecret: z.string().max(2048),
   hhAppToken: z.string().max(4096),
   hhUserAgent: z.string().max(255),
@@ -17,6 +17,7 @@ const schema = z.object({
 });
 
 function loadJobConfig(env) {
+  if (env.JARVIS_HH_CAPTCHA_AUTOMATIC !== undefined && !['0', '1'].includes(env.JARVIS_HH_CAPTCHA_AUTOMATIC)) throw new Error('JOB_CAPTCHA_CONFIG_INVALID');
   const config = schema.parse({
     jobSearchEnabled: ['true', '1', 'yes', 'on'].includes(String(env.JARVIS_JOB_SEARCH_ENABLED || '').toLowerCase()),
     jobCollectorIntervalMs: Number(env.JARVIS_JOB_COLLECTOR_INTERVAL_MS || 1800000),
@@ -26,6 +27,7 @@ function loadJobConfig(env) {
     jobSecretKey: String(env.JARVIS_JOB_SECRET_KEY || '').trim(),
     jobPublicOrigin: String(env.JARVIS_JOB_PUBLIC_ORIGIN || '').trim(),
     jobCaptchaTelegram: env.JARVIS_HH_CAPTCHA_TELEGRAM === '1',
+    jobCaptchaAutomatic: env.JARVIS_HH_CAPTCHA_AUTOMATIC === '1',
     jobCaptchaToken: String(env.JARVIS_JOB_CAPTCHA_TOKEN || '').trim(),
     hhClientId: String(env.HH_CLIENT_ID || '').trim(),
     hhClientSecret: String(env.HH_CLIENT_SECRET || '').trim(),
@@ -37,6 +39,7 @@ function loadJobConfig(env) {
     jobBrowserApplyEnabled: env.JARVIS_JOB_BROWSER_APPLY_ENABLED === '1',
     jobBrowserApplyToken: String(env.JARVIS_JOB_BROWSER_APPLY_TOKEN || '').trim(),
   });
+  if (config.jobCaptchaAutomatic && !config.jobCaptchaTelegram) throw new Error('JOB_CAPTCHA_CONFIG_INVALID');
   if (config.jobSecretKey && (!/^[a-f\d]{64}$/i.test(config.jobSecretKey)
     && !/^[\w-]{43}$/.test(config.jobSecretKey))) throw new Error('Invalid job secret key');
   if (config.jobPublicOrigin) {

@@ -53,7 +53,8 @@ class CaptchaTelegramBrowser {
     return images.length === 1 && validPictureKey(images[0].key) ? { ...images[0], form, target } : null;
   }
   run(fn) { const pending = this.tail.then(fn); this.tail = pending.catch(() => {}); return pending; }
-  challenge(refresh) { return this.run(() => this.issueChallenge(refresh)); }
+  challenge(refresh) { return this.run(() => this.automatic
+    ? this.automatic.challenge(this, refresh) : this.issueChallenge(refresh)); }
   async issueChallenge(refresh) {
     const status = this.coordinator.status();
     if (status.phase === 'idle') { this.current = null; return { outcome: 'idle' }; }
@@ -137,7 +138,9 @@ class CaptchaTelegramBrowser {
     await this.drain();
     const result = await this.coordinator.finish(this.coordinator.status().revision);
     if (result.phase === 'idle') this.current = null;
-    return { outcome: result.phase === 'idle' ? 'solved' : received && armed.permitted === 1 ? 'new_challenge' : 'unknown' };
+    const rejected = received && armed.permitted === 1 && (!this.automatic
+      || armed.acknowledged === true && this.lastVerification === 'captcha');
+    return { outcome: result.phase === 'idle' ? 'solved' : rejected ? 'new_challenge' : 'unknown' };
   }
   async permit(route) {
     const req = route.request();
@@ -155,11 +158,12 @@ class CaptchaTelegramBrowser {
       || !validAnswerRequest(input, armed.current.form, armed.current.target, armed.text, armed.current.key)) return false;
     armed.permitted++; armed.request = req;
     const dispatched = this.dispatch(route); this.dispatches.add(dispatched);
-    try { await dispatched; } finally { this.dispatches.delete(dispatched); }
+    try { armed.acknowledged = (await dispatched)?.acknowledged === true; } finally { this.dispatches.delete(dispatched); }
     return true;
   }
   async drain() { await Promise.allSettled([...this.dispatches]); }
   async verify(target, recoveryId) {
+    this.lastVerification = null;
     await this.drain(); this.armed = null; this.initAllowed = false;
     if (!validTarget(target)) return false;
     const reader = await this.context.newPage();
@@ -167,7 +171,9 @@ class CaptchaTelegramBrowser {
       const response = await reader.goto(target, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await reader.waitForTimeout(1500);
       const current = new URL(reader.url());
-      if (current.href !== target || response?.status() !== 200) return false;
+      if (response?.status() !== 200) return false;
+      if (await readForm(reader, target)) { this.lastVerification = 'captcha'; return false; }
+      if (current.href !== target) return false;
       const observation = await reader.evaluate(() => ({ text: document.body?.innerText?.slice(0, 64000) || '',
         vacancyLinks: document.querySelectorAll('[data-qa="vacancy-serp__vacancy"]').length,
         vacancyContent: Boolean(document.querySelector('[data-qa="vacancy-description"]')),

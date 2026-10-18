@@ -67,6 +67,8 @@ stt_runtime/.venv/
 **/__pycache__/
 *.tsbuildinfo
 .pytest_cache/
+job-ocr/frozen-bundle/
+data/hh-ocr-evaluation/
 
 
 # OS/editor noise

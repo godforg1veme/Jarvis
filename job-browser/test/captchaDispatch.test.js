@@ -8,7 +8,8 @@ test('captcha dispatch never follows or forwards redirects, including preserved-
       fetch: async (options) => { requests++; assert.equal(options.maxRedirects, 0); assert.equal(options.maxRetries, 0); assert.equal(options.timeout, 10000);
         return { status: () => status, headers: () => ({ location: 'https://evil.example/mutate' }) }; },
       fulfill: async (value) => { fulfilled = value; }, abort: async () => assert.fail('approved answer dispatch should reconcile by GET') };
-    await dispatchCaptcha(route); assert.equal(requests, 1); assert.equal(fulfilled.status, 204); assert.equal(fulfilled.headers.location, undefined);
+    const result = await dispatchCaptcha(route); assert.equal(result.acknowledged, status === 200);
+    assert.equal(requests, 1); assert.equal(fulfilled.status, 204); assert.equal(fulfilled.headers.location, undefined);
   }
 });
 test('initialization accepts bounded JSON only and never returns a redirect to the browser', async () => {

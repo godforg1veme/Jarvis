@@ -3,8 +3,8 @@ const { cardView, attentionView } = require('./jobTelegramViews');
 const { captchaNoticeView } = require('./jobCaptchaNotices');
 const { assertJobScope } = require('./jobSchemas');
 class JobDeliveryWorker {
-  constructor({ pool, searchRepository, deliveryRepository, send, captchaEnabled = false, intervalMs = 2000 }) {
-    Object.assign(this, { pool, searchRepository, deliveryRepository, send, captchaEnabled, intervalMs });
+  constructor({ pool, searchRepository, deliveryRepository, send, captchaEnabled = false, captchaAutomatic = false, intervalMs = 2000 }) {
+    Object.assign(this, { pool, searchRepository, deliveryRepository, send, captchaEnabled, captchaAutomatic, intervalMs });
     this.timer = null; this.running = false;
     trackWorker(this, 'tick');
   }
@@ -40,7 +40,14 @@ class JobDeliveryWorker {
             await this.deliveryRepository.finish({ deliveryId: delivery.id,
               outcome: !rejected && delivery.attempts < 4 ? 'queued' : 'failed' }); return;
           }
-        } else if (delivery.payload?.reason === 'HH_CAPTCHA') view = attentionView(this.captchaEnabled);
+        } else if (delivery.payload?.reason === 'HH_CAPTCHA') {
+          // The photo outbox owns human handover after the automatic budget.
+          // This legacy attention contains no image and would arrive too early.
+          if (this.captchaAutomatic && this.captchaEnabled) {
+            await this.deliveryRepository.finish({ deliveryId: delivery.id, outcome: 'failed' }); return;
+          }
+          view = attentionView(this.captchaEnabled);
+        }
         else { await this.deliveryRepository.finish({ deliveryId: delivery.id, outcome: 'failed' }); return; }
       } else if (delivery.kind === 'budget') view = { answer: `Поиск работы: расходы API за ${delivery.payload.month} достигли $${delivery.payload.thresholdUsd}. Работа продолжается.`, buttons: [] };
       else { await this.deliveryRepository.finish({ deliveryId: delivery.id, outcome: 'failed' }); return; }

@@ -1,5 +1,44 @@
 # Проверки перед выпуском
 
+## Дообученный OCR HH: локальные проверки 18 октября 2026
+
+```powershell
+npm test --prefix job-browser
+npm test --prefix server
+python deploy/scripts/test-job-captcha-config.py
+& 'F:/OCR Learning/PaddleOCR/.venv/Scripts/python.exe' -m unittest discover -s job-ocr -p 'test_*.py' -v
+$env:PLAYWRIGHT_CHANNEL='msedge'
+$env:JARVIS_FROZEN_TEST_PYTHON='F:/OCR Learning/PaddleOCR/.venv/Scripts/python.exe'
+$env:JARVIS_FROZEN_TEST_PNG='F:/test/jarvis/data/hh-ocr-evaluation/transport.png'
+node --test job-browser/test/captchaAutomaticAcceptance.cjs
+```
+
+Последняя команда всегда проверяет browser/broker/photo-worker на фикстурах;
+при указанных двух переменных дополнительно использует настоящий CPU recognizer
+и PNG, извлечённый canvas браузера. До запуска подготовь bundle по
+[`job-ocr/README.md`](../job-ocr/README.md), исходный PNG должен быть локальным
+примером 250×90. Контекст браузера принудительно offline; ответы HH и Bot API
+подменены. Успехи с первой/второй попытки, два отказа, unknown/redirect и одна
+доставка фото проверяются через настоящий broker/client/worker. Unit tests
+покрывают durable restart, повтор картинки, лимит, старые states, scope,
+предварительное отсутствие уведомления и исключение общего OCR backend.
+
+[`Результаты`](updates/2026-10-18-hh-trained-ocr-development.md) отделяют GPU
+оценку 1 709 изображений и CPU PNG parity 73/73 от ещё не выполненных Linux
+сборки, resource-limit/socket/metadata проверок и реальной приёмки Telegram/HH.
+Новые production зависимости не установлены. Desktop не затронут.
+
+The last command always exercises browser/broker/photo-worker fixtures and,
+when both variables are provided, also the real CPU recognizer on browser-canvas
+PNG pixels. Prepare the ignored bundle first and supply a local 250×90 PNG.
+The browser context is forcibly offline; HH responses and Bot API delivery are
+synthetic. Tests cover first/second success, two rejections, unknown/redirect
+stop and one photo, with unit coverage for durable restart, repeated images,
+budgets, legacy state, scopes, early-notification suppression and model identity.
+The linked record distinguishes 1,709-image GPU evaluation and 73/73 CPU PNG
+parity from pending Linux build/resource/socket checks and live Telegram/HH
+acceptance. Production dependencies are not installed; Desktop is unaffected.
+
 Выбирай проверки для изменённых компонентов. Результаты реального клиента записывай отдельно от тестов. Порядок публикации находится в [руководстве по выпуску](release-workflow.md).
 
 ## Commands and Verification

@@ -31,7 +31,7 @@ class JobCaptchaClient {
     const v = result.value;
     if (operation === 'status' && exact(v, ['phase','revision']) && ['idle','pending','active','checking'].includes(v.phase) && Number.isSafeInteger(v.revision) && v.revision >= 0) return v;
     if (operation === 'challenge') {
-      if (exact(v, ['outcome']) && ['idle','refresh_required'].includes(v.outcome)) return v;
+      if (exact(v, ['outcome']) && ['idle','refresh_required','preparing'].includes(v.outcome)) return v;
       if (exact(v, ['outcome','challengeId','revision','pngBase64','expiresAt']) && v.outcome === 'ready' && UUID.test(v.challengeId || '')
         && Number.isSafeInteger(v.revision) && v.revision >= 0 && typeof v.expiresAt === 'string' && Number.isFinite(Date.parse(v.expiresAt)) && new Date(v.expiresAt).toISOString() === v.expiresAt
         && Date.parse(v.expiresAt) > Date.now() && Date.parse(v.expiresAt) <= Date.now() + 610000) return { ...v, png: pngBytes(v.pngBase64), pngBase64: undefined };

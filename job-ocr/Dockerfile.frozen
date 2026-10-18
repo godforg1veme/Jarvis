@@ -1,0 +1,15 @@
+# Optional image: frozen runtime dependencies approved by owner 2026-10-18.
+FROM python:3.13-slim@sha256:70729b46c69b4f1e97c4822c1af3df53a1476cf5ddc6c087c0c10bc3a5678c2f
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 OMP_THREAD_LIMIT=1 JARVIS_OCR_BACKEND=frozen
+ENV HOME=/tmp XDG_CACHE_HOME=/tmp/.cache
+RUN apt-get update && apt-get install -y --no-install-recommends libstdc++6 libgomp1 && rm -rf /var/lib/apt/lists/*
+COPY frozen-requirements.lock /opt/requirements.lock
+RUN python -m pip install --no-cache-dir --only-binary=:all: --no-deps --require-hashes -r /opt/requirements.lock
+COPY frozen-bundle/ /opt/frozen-hh/
+ARG FROZEN_BUNDLE_SHA256
+RUN test -n "$FROZEN_BUNDLE_SHA256" && echo "$FROZEN_BUNDLE_SHA256" > /opt/frozen-bundle.sha256 && mkdir -p /run/job-ocr && chown 1001:1001 /run/job-ocr && chmod 0700 /run/job-ocr
+WORKDIR /opt/worker
+COPY worker.py health.py preprocessing.py frozen_backend.py ./
+RUN python -c "from frozen_backend import FrozenRecognizer; FrozenRecognizer()"
+USER 1001:1001
+CMD ["python", "worker.py"]

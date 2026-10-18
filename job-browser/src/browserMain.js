@@ -15,6 +15,8 @@ const { CaptchaTelegramBrowser } = require('./captchaTelegramBrowser');
 const { createCaptchaBroker } = require('./captchaBroker');
 const { randomUUID, createHash } = require('node:crypto');
 const { BrowserHealth, bounded } = require('./browserHealth');
+const { CaptchaAutomatic } = require('./captchaAutomatic');
+const { recognizeFrozenPng } = require('./ocrClient');
 
 async function handoverCaptcha({ journal, manual, ownerId, target, error, now = Date.now }) {
   let state = await journal.read();
@@ -55,6 +57,9 @@ async function startBrowser(env = process.env, { onFatal = () => {} } = {}) {
   } catch (error) { if (error.code !== 'ENOENT') throw error; }
   if (env.JARVIS_HH_CAPTCHA_TELEGRAM !== undefined && !['0', '1'].includes(env.JARVIS_HH_CAPTCHA_TELEGRAM)) throw new Error('JOB_CAPTCHA_CONFIG_INVALID');
   const manualEnabled = env.JARVIS_HH_CAPTCHA_TELEGRAM === '1', manualToken = env.JARVIS_JOB_CAPTCHA_TOKEN;
+  if (env.JARVIS_HH_CAPTCHA_AUTOMATIC !== undefined && !['0', '1'].includes(env.JARVIS_HH_CAPTCHA_AUTOMATIC)) throw new Error('JOB_CAPTCHA_CONFIG_INVALID');
+  const automaticEnabled = env.JARVIS_HH_CAPTCHA_AUTOMATIC === '1';
+  if (automaticEnabled && !manualEnabled) throw new Error('JOB_CAPTCHA_CONFIG_INVALID');
   if (manualEnabled && (!/^[\x21-\x7e]{32,256}$/.test(manualToken || '') || manualToken === token || manualToken === applyToken)) throw new Error('JOB_MANUAL_CONFIG_INVALID');
   if (!manualEnabled) await assertInactiveWhenDisabled({ root: `${root}/manual-recovery`, ownerId });
   let context, server, manual, manualPage, broker, health;
@@ -72,14 +77,15 @@ async function startBrowser(env = process.env, { onFatal = () => {} } = {}) {
     if (env.JARVIS_HH_CAPTCHA_RECOVERY !== undefined && !['0', '1'].includes(env.JARVIS_HH_CAPTCHA_RECOVERY)) throw new Error('JOB_BROWSER_CONFIG_INVALID');
     const journal = env.JARVIS_HH_CAPTCHA_RECOVERY === '1' || manualEnabled
       ? new CaptchaJournal({ root: `${root}/captcha-recovery`, ownerId }) : null;
-    // Human Telegram mode takes over immediately; the independent legacy OCR
-    // opt-in remains available only when this mode is disabled.
+    // Telegram owns the pause and human handover. Its separate trained-model
+    // opt-in runs inside that controller; legacy OCR remains independent.
     const captchaRecovery = !manualEnabled && env.JARVIS_HH_CAPTCHA_RECOVERY === '1' ? new CaptchaRecovery({ journal }) : null;
     if (manualEnabled) {
       manual = new ManualCoordinator({ store: new ManualState({ root: `${root}/manual-recovery`, ownerId }),
         open: (target) => manualPage.open(target), verify: (target, id) => manualPage.verify(target, id) });
       await manual.load();
       manualPage = new CaptchaTelegramBrowser({ context, coordinator: manual, journal, onUnhealthy: () => health.fail() });
+      if (automaticEnabled) manualPage.automatic = new CaptchaAutomatic({ coordinator: manual, recognize: recognizeFrozenPng });
     }
     const onManualRequired = manual && ((target, error) => handoverCaptcha({ journal, manual, ownerId, target, error }));
     const browser = new HhBrowser({ context, primaryResumeId, captchaRecovery, manualCoordinator: manual, onManualRequired,

@@ -5,7 +5,11 @@ async function dispatchCaptcha(route) {
   try {
     response = await route.fetch({ maxRedirects: 0, maxRetries: 0, timeout: 10000 });
     const u = new URL(route.request().url());
-    if (u.pathname !== '/captcha') return await route.fulfill({ status: 204, headers: { 'cache-control': 'no-store' } });
+    if (u.pathname !== '/captcha') {
+      await route.fulfill({ status: 204, headers: { 'cache-control': 'no-store' } });
+      // The synthetic 204 is not evidence of the upstream result.
+      return { acknowledged: response.status() === 200 };
+    }
     const headers = response.headers();
     if (response.status() !== 200 || !/^application\/json(?:;|$)/i.test(headers['content-type'] || '')
       || Number(headers['content-length'] || 0) > 8192) return await route.abort();

@@ -9,6 +9,38 @@ source changes; verify the deployed revision before a server rollout.
 
 ## Change control
 
+Локальная разработка по поручению владельца 18 октября 2026, ещё не выпущена:
+[дообученный OCR перед ответом человека](superpowers/specs/2026-10-18-hh-trained-ocr-design.md).
+При отдельном opt-in `JARVIS_HH_CAPTCHA_AUTOMATIC=1` browser/server выполняют
+до двух автоматических попыток на разных картинках. `preparing` — закрытый
+внутренний исход без фото и Telegram-уведомления; раннее collector attention
+подавляется только в этом режиме. После двух неудач приходит прежнее фото с
+добавлением «Автоматическая проверка не подтвердила доступ. Нужна твоя помощь.»
+к существующей подписи. Unknown или прерванная отправка передают управление
+человеку раньше, без второй автоматической отправки. Автоуспех проверяется
+чтением точного target; без явного запроса успех не создаёт сообщения.
+
+Кнопки, callback grammar, guided kinds, owner/private scope, reply confirmation,
+expiry и deduplication прежние. Ответ владельца по-прежнему разрешает только
+однократную отправку текущей привязанной картинки; refresh не пополняет бюджет.
+Флаг по умолчанию выключен. Старый общий OCR не используется новым режимом.
+Новые зависимости и production rollout не согласованы. Offline Chromium,
+broker, worker и настоящий CPU recognizer проверяются локально;
+реальная доставка Telegram и принятие HH остаются для согласованного выпуска.
+
+Local development requested by the owner on 18 October 2026; not deployed.
+The separate browser/server opt-in runs at most two persisted attempts on
+distinct images before the existing human photo flow. The internal `preparing`
+outcome sends no image or notification; early collector attention is suppressed
+only in this mode. The photo retains its confirmation caption and adds the fixed
+Russian sentence above asking for help. Unknown or interrupted submission stops
+automation early. Success requires the existing exact-target reader. Buttons,
+callbacks, guided kinds, owner/private binding, reply confirmation, expiry and
+deduplication remain unchanged. Refresh cannot replenish the incident budget;
+defaults stay disabled and the generic OCR cannot serve the new endpoint.
+Dependencies/Linux rollout await approval; actual Telegram/HH acceptance remains
+separate from the offline browser/broker/worker and real CPU-model checks.
+
 Согласовано владельцем и установлено на DE 16 октября 2026:
 [панель настроек поиска](superpowers/specs/2026-10-16-job-settings-panel-design.md).
 `job:settings` показывает компактные кнопки дохода, города, удалённых вакансий,

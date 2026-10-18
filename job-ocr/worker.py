@@ -132,8 +132,10 @@ class Handler(BaseHTTPRequestHandler):
         watchdog = None
         try:
             lengths = self.headers.get_all('Content-Length', [])
-            if self.path != '/ocr' or self.headers.get('Content-Type') != 'image/png' or self.headers.get('Transfer-Encoding') or len(lengths) != 1 or not re.fullmatch('[0-9]{1,6}', lengths[0]):
+            if self.path not in ('/ocr', '/ocr/frozen') or self.headers.get('Content-Type') != 'image/png' or self.headers.get('Transfer-Encoding') or len(lengths) != 1 or not re.fullmatch('[0-9]{1,6}', lengths[0]):
                 return self.respond(400, {'code': 'OCR_INPUT_REJECTED'})
+            if self.path == '/ocr/frozen' and getattr(self.server, 'backend', None) != 'frozen':
+                return self.respond(503, {'code': 'OCR_MODEL_REJECTED'})
             length = int(lengths[0])
             if not 0 < length <= MAX_BYTES:
                 return self.respond(413, {'code': 'OCR_INPUT_REJECTED'})
@@ -156,12 +158,14 @@ class Handler(BaseHTTPRequestHandler):
                 watchdog.cancel()
 
 
-class Server(socketserver.UnixStreamServer):
+class Server(getattr(socketserver, 'UnixStreamServer', socketserver.TCPServer)):
     def handle_error(self, request, client_address):
         print('JOB_OCR_REQUEST_FAILED', flush=True)
 
 
 def main():
+    if not hasattr(socket, 'AF_UNIX') or not hasattr(socketserver, 'UnixStreamServer'):
+        raise ValueError('OCR_SOCKET_REJECTED')
     os.umask(0o077)
     directory = Path(SOCKET).parent
     directory_stat = directory.lstat()
@@ -174,10 +178,18 @@ def main():
         os.unlink(SOCKET)
     except FileNotFoundError:
         pass
-    recognizer = Recognizer()
+    backend = os.environ.get('JARVIS_OCR_BACKEND', 'onnx')
+    if backend == 'frozen':
+        from frozen_backend import FrozenRecognizer
+        recognizer = FrozenRecognizer()
+    elif backend == 'onnx':
+        recognizer = Recognizer()
+    else:
+        raise ValueError('OCR_MODEL_REJECTED')
     with Server(SOCKET, Handler) as server:
         os.chmod(SOCKET, 0o600)
         server.recognizer = recognizer
+        server.backend = backend
         server.serve_forever(poll_interval=0.25)
 
 

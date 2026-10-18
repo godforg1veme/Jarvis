@@ -28,7 +28,13 @@ function initial(ownerId) {
     claims: [], seedRequired: false, lastAction: 'none', lastRevision: 0 };
 }
 function validate(value, ownerId) {
-  if (!exact(value, ['version', 'ownerId', 'phase', 'recoveryId', 'target', 'revision', 'claims', 'seedRequired', 'lastAction', 'lastRevision'])
+  const keys = ['version', 'ownerId', 'phase', 'recoveryId', 'target', 'revision', 'claims', 'seedRequired', 'lastAction', 'lastRevision'];
+  const automatic = value?.automatic;
+  if (automatic !== undefined && (!exact(automatic, ['attempts', 'phase', 'challengeHash'])
+    || !Number.isInteger(automatic.attempts) || automatic.attempts < 1 || automatic.attempts > 2
+    || !['running', 'ready', 'human'].includes(automatic.phase) || !/^[a-f0-9]{64}$/.test(automatic.challengeHash || '')
+    || value.phase === 'idle')) throw fail();
+  if (!exact(value, automatic === undefined ? keys : [...keys, 'automatic'])
     || value.version !== 1 || value.ownerId !== ownerId || !UUID.test(ownerId || '')
     || !['idle', 'pending', 'active', 'checking'].includes(value.phase)
     || !Number.isSafeInteger(value.revision) || value.revision < 0

@@ -1,9 +1,9 @@
 const { trackWorker } = require('../lifecycle');
-const { CAPTION, refreshButtons } = require('./jobCaptchaService');
+const { CAPTION, AUTOMATIC_CAPTION, refreshButtons } = require('./jobCaptchaService');
 class JobCaptchaWorker {
-  constructor({ repository, client, ownerId, sendPhoto, intervalMs = 10000, sendTimeoutMs = 30000,
+  constructor({ repository, client, ownerId, sendPhoto, automatic = false, intervalMs = 10000, sendTimeoutMs = 30000,
     now = Date.now, report = code => process.stderr.write(`${code}\n`) }) {
-    Object.assign(this, { repository, client, ownerId, sendPhoto, intervalMs, sendTimeoutMs, now, report });
+    Object.assign(this, { repository, client, ownerId, sendPhoto, automatic, intervalMs, sendTimeoutMs, now, report });
     this.timer = null; this.running = false; this.failures = 0; this.retryAt = 0; this.requestId = null;
     trackWorker(this, 'tick');
   }
@@ -31,6 +31,7 @@ class JobCaptchaWorker {
         await acknowledge(); this.reset(); return;
       }
       const challenge = await this.client.challenge(refresh);
+      if (challenge.outcome === 'preparing') { this.reset(); return; }
       if (challenge.outcome === 'refresh_required') {
         await this.repository.notify(scope, 'REFRESH_REQUIRED', request?.request_id); await acknowledge(); this.reset(); return;
       }
@@ -50,7 +51,8 @@ class JobCaptchaWorker {
       const controller = new AbortController();
       try {
         const sent = await Promise.race([
-          Promise.resolve().then(() => this.sendPhoto({ chatId: scope.chatId, png: challenge.png, caption: CAPTION, buttons: refreshButtons, signal: controller.signal })),
+          Promise.resolve().then(() => this.sendPhoto({ chatId: scope.chatId, png: challenge.png,
+            caption: this.automatic ? AUTOMATIC_CAPTION : CAPTION, buttons: refreshButtons, signal: controller.signal })),
           new Promise((_, reject) => { timer = setTimeout(() => { controller.abort(); reject(new Error('JOB_CAPTCHA_SEND_TIMEOUT')); }, this.sendTimeoutMs); }),
         ]);
         if (/^[1-9]\d{0,19}$/.test(String(sent?.message_id))) { messageId = sent.message_id; outcome = 'sent'; }

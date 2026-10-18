@@ -42,6 +42,10 @@ def verify(config):
     require(flag in {'0', '1'})
     require(server_env.get('JARVIS_HH_CAPTCHA_TELEGRAM', '0') == flag)
     require(collector['environment'].get('JARVIS_HH_CAPTCHA_TELEGRAM', '0') == flag)
+    automatic = browser_env.get('JARVIS_HH_CAPTCHA_AUTOMATIC', '0')
+    require(automatic in {'0', '1'})
+    require(server_env.get('JARVIS_HH_CAPTCHA_AUTOMATIC', '0') == automatic)
+    require(automatic != '1' or flag == '1')
     token = browser_env['JARVIS_JOB_CAPTCHA_TOKEN']
     if flag == '1' or token:
         require(isinstance(token, str) and 32 <= len(token) <= 256)

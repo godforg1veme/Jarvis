@@ -58,12 +58,14 @@ function createJobRuntime({ config, pool, interactions, send, sendPhoto, fetchIm
     const client = new JobCaptchaClient({ ownerId: config.jobBrowserOwnerId, token: config.jobCaptchaToken, fetchImpl });
     const repository = new JobCaptchaRepository(pool);
     captchaService = new JobCaptchaService({ repository, client });
-    captchaWorker = new JobCaptchaWorker({ repository, client, ownerId: config.jobBrowserOwnerId, sendPhoto });
+    captchaWorker = new JobCaptchaWorker({ repository, client, ownerId: config.jobBrowserOwnerId, sendPhoto,
+      automatic: config.jobCaptchaAutomatic === true });
   }
   const telegramService = new JobTelegramService({ pool, searchRepository, profileRepository, draftRepository,
     usageRepository, interactions, draftService, settingsService, applicationService, connectionService, captchaService, historyService,
     settingsModels: [config.jobSearchModel, config.openrouterModel, config.openrouterFallbackModel], defaultModel: config.jobSearchModel });
-  const deliveryWorker = new JobDeliveryWorker({ pool, searchRepository, deliveryRepository, send, captchaEnabled: Boolean(captchaService) });
+  const deliveryWorker = new JobDeliveryWorker({ pool, searchRepository, deliveryRepository, send,
+    captchaEnabled: Boolean(captchaService), captchaAutomatic: config.jobCaptchaAutomatic === true });
   const recoveryWorker = new JobRecoveryWorker({ pool, applicationRepository });
   const close = createResourceCloser(Object.entries({ deliveryWorker, recoveryWorker, captchaWorker, historyWorker })
     .filter(([, worker]) => worker).map(([name, worker]) => ({ name, close: () => worker.stop() })));
