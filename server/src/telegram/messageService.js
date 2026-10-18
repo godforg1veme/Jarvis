@@ -9,6 +9,7 @@ const { parseRemoteCommand, remoteCommandReply } = require('../commands/commandT
 const { recordMessageEvent } = require('../life/lifeSourceEvents');
 const { menuAction } = require('./telegramMenu');
 const { classifyTelegramFailure, telegramFailureReply } = require('./telegramFailure');
+const { DENIED_ANSWER, callbackPermissions, messagePermissions, textPermissions, permits } = require('./telegramPermissionPolicy');
 
 function telegramMenuContext({ user, conversation, input }) {
   return {
@@ -154,6 +155,7 @@ function commandParts(text) {
 class TelegramMessageService {
   constructor(options) {
     this.accessPolicy = options.accessPolicy;
+    this.accessService = options.accessService || null;
     this.updateRepository = options.updateRepository;
     this.userRepository = options.userRepository;
     this.conversationRepository = options.conversationRepository;
@@ -211,12 +213,13 @@ class TelegramMessageService {
 
   async handleCallback(update) {
     const input = normalizeTelegramCallbackUpdate(update);
-    if (!this.accessPolicy.isAllowed(input.telegramUserId)) return { status: 'forbidden' };
+    if (!await this.accessPolicy.isAllowed(input.telegramUserId)) return { status: 'forbidden' };
     const claimed = await this.updateRepository.claim(input.updateId, input.telegramUserId, 'callback');
     if (!claimed) return { status: 'duplicate' };
     try {
       const result = await this.handleClaimedCallback(input);
       await this.markCompleted(input.updateId);
+      if (this.accessService && !permits(await this.accessService.getAccessForTelegram(input.telegramUserId), callbackPermissions(input.data))) return { status: 'answered', answer: DENIED_ANSWER };
       return result;
     } catch (error) {
       return this.failureResult({ updateId: input.updateId, error, phase: 'callback' });
@@ -227,6 +230,11 @@ class TelegramMessageService {
     const user = await this.userRepository.findOrCreateTelegramUser({ telegramUserId: input.telegramUserId, displayName: input.displayName });
     const conversation = await this.conversationRepository.getOrCreate({ userId: user.id, channel: 'telegram', externalChatId: input.chatId });
     const menuContext = telegramMenuContext({ user, conversation, input });
+
+    if (this.accessService) {
+      menuContext.access = await this.accessService.getAccessForUser(user.id);
+      if (!permits(menuContext.access, callbackPermissions(input.data))) return { status: 'answered', answer: DENIED_ANSWER };
+    }
 
     if (input.data.startsWith('vpsup:')) {
       const supervisorCallbackHandler = this.vpnSupervisorCallbackRouter || this.vpnSupervisorService;
@@ -515,7 +523,7 @@ class TelegramMessageService {
 
   async handle(update, options = {}) {
     const input = normalizeTelegramMessage(update);
-    if (!this.accessPolicy.isAllowed(input.telegramUserId)) {
+    if (!await this.accessPolicy.isAllowed(input.telegramUserId)) {
       return { status: 'forbidden' };
     }
     if (input.ignored) return { status: 'ignored' };
@@ -526,6 +534,7 @@ class TelegramMessageService {
     try {
       const result = await this.handleClaimedMessage(input, options);
       await this.markCompleted(input.updateId);
+      if (this.accessService && !permits(await this.accessService.getAccessForTelegram(input.telegramUserId), input.accessPermissions || [])) return { status: 'answered', answer: DENIED_ANSWER };
       return result;
     } catch (error) {
       return this.failureResult({ updateId: input.updateId, error, phase: 'message' });
@@ -543,6 +552,13 @@ class TelegramMessageService {
       externalChatId: input.chatId,
     });
     const menuContext = telegramMenuContext({ user, conversation, input });
+
+    if (this.accessService) {
+      menuContext.access = await this.accessService.getAccessForUser(user.id);
+      const required = await messagePermissions(input, menuContext, this.menuService?.interactions);
+      input.accessPermissions = required;
+      if (!permits(menuContext.access, required)) return { status: 'answered', answer: DENIED_ANSWER };
+    }
 
     if (input.replyMessageId) {
       if (this.jobCaptchaService) {
@@ -599,6 +615,9 @@ class TelegramMessageService {
       const transcript = String(transcription && transcription.text || '').trim();
       if (!transcript || transcript.length > MAX_TEXT_LENGTH) throw new Error('invalid Telegram voice transcription');
       input.text = transcript;
+      if (this.accessService && !permits(await this.accessService.getAccessForUser(user.id), textPermissions(input.text))) {
+        return { status: 'answered', answer: DENIED_ANSWER };
+      }
       voiceTranscript = true;
       await this.conversationRepository.appendMessage({
         userId: user.id,
@@ -650,7 +669,7 @@ class TelegramMessageService {
       });
     }
 
-    await recordMessageEvent(this.lifeEventGateway, {
+    await recordMessageEvent(!this.accessService || await this.accessService.allows(user.id, 'life') ? this.lifeEventGateway : null, {
       userId: user.id,
       conversationId: conversation.id,
       sourceChannel: 'telegram',
@@ -722,7 +741,8 @@ class TelegramMessageService {
       conversationId: conversation.id,
       limit: 30,
     });
-    const orchestration = this.orchestrator ? await this.orchestrator.handle({
+    const can = async (permission) => !this.accessService || await this.accessService.allows(user.id, permission);
+    const orchestration = this.orchestrator && await can('devices') ? await this.orchestrator.handle({
       userId: user.id,
       conversationId: conversation.id,
       originChannel: 'telegram',
@@ -743,11 +763,11 @@ class TelegramMessageService {
       return { status: 'answered', answer, ...(orchestration.buttons ? { buttons: orchestration.buttons } : {}) };
     }
 
-    const memoryResult = this.memoryService
+    const memoryResult = this.memoryService && await can('memory')
       ? await this.memoryService.handleUserText({ userId: user.id, text: input.text, sourceConversationId: conversation.id })
       : { handled: false };
 
-    const deviceAnswer = await this.deviceCommandReply({ text: input.text, user });
+    const deviceAnswer = await can('devices') ? await this.deviceCommandReply({ text: input.text, user }) : null;
     if (deviceAnswer) {
       const answerText = typeof deviceAnswer === 'string' ? deviceAnswer : deviceAnswer.answer;
       await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: answerText });
@@ -761,10 +781,13 @@ class TelegramMessageService {
       return { status: 'answered', answer: answerText, ...(documentAnswer.buttons ? { buttons: documentAnswer.buttons } : {}) };
     }
 
-    const memories = this.memoryService ? await this.memoryService.memoriesForPrompt({ userId: user.id }) : [];
-    const devices = this.deviceService ? await this.deviceService.list({ userId: user.id }) : [];
-    const documentSources = this.knowledgeService ? await this.knowledgeService.searchForPrompt({ userId: user.id, query: input.text }) : [];
-    const visualMemories = this.visualMemoryService ? await this.visualMemoryService.searchForPrompt({ userId: user.id, query: input.text }) : [];
+    const memories = this.memoryService && await can('memory') ? await this.memoryService.memoriesForPrompt({ userId: user.id }) : [];
+    const devices = this.deviceService && await can('devices') ? await this.deviceService.list({ userId: user.id }) : [];
+    const documentSources = this.knowledgeService && await can('documents') ? await this.knowledgeService.searchForPrompt({ userId: user.id, query: input.text }) : [];
+    const visualMemories = this.visualMemoryService && await can('memory') && await can('devices') ? await this.visualMemoryService.searchForPrompt({ userId: user.id, query: input.text }) : [];
+    if (this.accessService) input.accessPermissions = [...new Set([...(input.accessPermissions || []),
+      ...(memories.length ? ['memory'] : []), ...(devices.length ? ['devices'] : []),
+      ...(documentSources.length ? ['documents'] : []), ...(visualMemories.length ? ['memory', 'devices'] : [])])];
     const answer = commandReply(input.text) || memoryResult.answer || await this.assistant.answer({
       userId: user.id,
       conversationId: conversation.id,
@@ -782,6 +805,9 @@ class TelegramMessageService {
     });
     const safeAnswer = renderDocumentCitations(String(answer || '').trim(), documentSources).slice(0, 10000);
     if (!safeAnswer) throw new Error('provider returned an empty answer');
+    if (this.accessService && !permits(await this.accessService.getAccessForUser(user.id), input.accessPermissions)) {
+      return { status: 'answered', answer: DENIED_ANSWER };
+    }
 
     await this.conversationRepository.appendMessage({
       userId: user.id,

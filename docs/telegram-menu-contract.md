@@ -9,6 +9,31 @@ source changes; verify the deployed revision before a server rollout.
 
 ## Change control
 
+18 октября 2026, согласовано владельцем в текущей задаче, подготовлено локально:
+[Telegram Mini App и роли](updates/2026-10-18-telegram-mini-app-development.md).
+При включении серверных прав нижняя клавиатура фильтруется ролью и личными
+allow/deny. Главная/помощь сохраняются; jobs показывается участнику с этим правом,
+но до его собственного HH подключения объясняет необходимость настройки.
+Старые команды/callbacks и активный guided input проверяют текущие права,
+отозванный ввод не потребляется и не меняет данные. Контекст модели и итоговый
+ответ проверяют права на использованные источники. Callback grammar, guided
+kinds, private scope и подтверждения прежние. Общие VPN/Operations/Supervisor
+остаются за отдельными owner-bound границами. Даже при отключённом UI ранее
+заведённые ограничения продолжают действовать. На VPS это ещё не установлено;
+настоящие нажатия owner/admin/member остаются для приёмки.
+
+Owner-approved on October 18, 2026 and implemented locally:
+[Mini App and access roles](updates/2026-10-18-telegram-mini-app-development.md).
+With server access control enabled, the bottom keyboard filters role and personal
+allow/deny. Home/help remain; jobs appears for permitted members but explains
+personal HH setup until their own connection exists. Old commands/callbacks and
+active guided input check current rights; revoked input is not consumed or
+applied. Model context and output recheck rights to consumed sources. Callback
+grammar, guided kinds, private scope and confirmations remain. Shared
+VPN/Operations/Supervisor keeps separate owner-bound limits. Turning off the UI
+does not remove established restrictions. Not yet deployed; actual
+owner/admin/member taps remain for acceptance.
+
 18 октября: [исследование 403](updates/2026-10-18-hh-captcha-403-investigation.md)
 добавляет закрытую категорию ответа HH, тип запроса, возраст картинки и исход
 сопоставления CSRF/cookie в private receipt. Значения секретов/headers и тело сайта

@@ -44,6 +44,8 @@ test('migration files are ordered and narrowly named', () => {
     '030_job_search_interactions.sql',
     '031_job_captcha_attention.sql', '032_job_telegram_captcha.sql', '033_job_captcha_resilience.sql', '034_job_letter_modes.sql', '035_job_application_tracking.sql',
     '036_job_setting_value.sql',
+    '037_access_mini_app.sql',
+    '038_mini_app_requests.sql',
   ]);
 });
 

@@ -8,8 +8,8 @@ import { createHash } from 'node:crypto';
 const root = path.dirname(fileURLToPath(import.meta.url));
 const importMapHash = createHash('sha256').update('{"imports":{"three":"/vendor/three.module.js"}}').digest('base64');
 const files = new Map([
-  ['/', ['index.html', 'text/html; charset=utf-8']],
-  ['/app.js', ['src/app.js', 'text/javascript; charset=utf-8']],
+  ['/', ['preview.html', 'text/html; charset=utf-8']],
+  ['/app.js', ['src/preview.js', 'text/javascript; charset=utf-8']],
   ['/core.js', ['src/core.js', 'text/javascript; charset=utf-8']],
   ['/style.css', ['src/style.css', 'text/css; charset=utf-8']],
   ['/vendor/three.module.js', ['node_modules/three/build/three.module.js', 'text/javascript; charset=utf-8']],
@@ -34,4 +34,5 @@ const server = createServer(async (request, response) => {
     response.writeHead(503, headers).end('Preview asset unavailable');
   }
 });
-server.listen(5187, '127.0.0.1', () => console.log('Jarvis design preview: http://127.0.0.1:5187'));
+const port = Number(process.env.MINI_PREVIEW_PORT || 5187);
+server.listen(port, '127.0.0.1', () => console.log('Jarvis design preview: http://127.0.0.1:' + port));

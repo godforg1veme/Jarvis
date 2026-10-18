@@ -1,103 +1,154 @@
-# Jarvis Mini App — design preview
+# Jarvis Telegram Mini App
 
 [Русский](#русский) | [English](#english)
 
 ## Русский
 
-Локальный образец дизайна, 18 октября 2026. Это ещё не установленный Telegram
-Mini App: вход Telegram, серверные роли, API и реальные пользовательские разделы
-не подключены. Образец не выдаёт реальных прав и не читает личные данные.
-Все Telegram ID вымышленные. Изменения существуют только в памяти вкладки
-и пропадают при обновлении страницы. Email не используется.
+18 октября 2026 подготовлена первая локальная версия. Вход проверяет подписанные
+Telegram initData; личность определяется числовым Telegram ID. Email не нужен.
+Вне Telegram клиент не выдаёт демонстрационных прав.
 
-Главная содержит процедурное 3D-ядро Three.js: отдельные металлические кольца,
-световые вставки, сфера, оболочка и частицы. Есть вращение по разным осям,
-поворот перетаскиванием с плавным догоняющим движением, пауза, скорость и сброс.
-Сцена останавливается вне viewport и при скрытии вкладки. Reduced motion
-по умолчанию оставляет неподвижную сцену; отсутствие WebGL даёт статичный вид.
-Внешних API, CDN, моделей и генерации на каждом кадре нет.
+Работают роли, персональные allow/deny/inherit, назначение администраторов
+владельцем, блокировка, подтверждение изменений, revision/CAS и аудит.
+Администрирование не открывает чужие диалоги, память и документы. Изменение роли
+обновляет revision её участников, поэтому старые пользовательские редакторы
+не сохранятся поверх новых прав. Перезапуск не снимает блокировки и назначения.
 
-В управлении можно добавить вымышленный Telegram ID, создать роль,
-выбрать роль пользователя, задать персональные allow/deny/inherit и увидеть
-итоговые права. Владелец защищён от изменения в этом образце.
-Это демонстрация интерфейса, а не реализация серверной безопасности.
+Главная содержит настоящее 3D-ядро Three.js: кольца вращаются независимо,
+есть перетаскивание, скорость, пауза, reduced motion и статичный WebGL fallback.
+Скрытая сцена останавливается. Анимация не использует внешний API/CDN;
+вход загружает официальный Telegram Web App SDK.
 
-Запуск из `mini-app/`:
+Доступны личный текстовый диалог и чтение своих памяти, документов, устройств
+и Life OS, если эти серверные сервисы включены. Действия с подтверждением
+остаются в Telegram/Desktop. Для второго поиска HH нужно собственное подключение:
+одна галочка не открывает браузер владельца. Общие VPN/Operations/Supervisor
+сохраняют отдельные owner-bound ограничения.
+
+При неизвестном результате sessionStorage хранит только исходный UUID, тип
+операции и Telegram ID. Тексты и credentials туда не попадают. После reload
+клиент предлагает сверить исходный запрос и не отправляет его повторно.
+
+### Сборка и запуск
 
 ```powershell
-npm ci
-npm run dev
+npm ci --prefix mini-app
+npm run build --prefix mini-app
 ```
 
-Адрес: http://127.0.0.1:5187/. Preview server слушает только loopback,
-отдаёт закрытый список файлов и запрещает сетевые соединения страницы через CSP.
-Не используйте его как production сервер и не публикуйте через туннель.
+Сборка копирует закрытый набор файлов в `dist/`; Fastify отдаёт их по `/mini/`.
+Dockerfile сервера содержит отдельный этап сборки. Windows Desktop исключает
+эти ресурсы; его runtime не менялся.
 
-Проверка при работающем preview server, из корня репозитория:
+Реальный вход требует существующих PostgreSQL и Telegram bot, стабильного
+`JARVIS_OPERATIONS_OWNER_TELEGRAM_ID`, `JARVIS_MINI_APP_ENABLED=true` и
+`JARVIS_MINI_APP_PUBLIC_ORIGIN=https://<домен>` без пути. Migration 037 хранит
+права/аудит/сессии, 038 — квитанции ассистента; обе forward-only. Секреты идут
+через штатное окружение. Выключение UI сохраняет уже заведённые проверки прав.
+
+После отдельного поручения на выпуск HTTPS URL `https://<домен>/mini/`
+настраивается в Main Mini App / menu button бота через BotFather. Только
+Mini App получает ограниченное разрешение Telegram Web framing; другие
+страницы сохраняют DENY. Cookie имеет HttpOnly/Secure/SameSite=None/Partitioned.
+
+Отдельное дизайн-превью: `npm run dev --prefix mini-app`,
+http://127.0.0.1:5187/. Это loopback-сервер, вымышленные ID и изменения в памяти
+вкладки; production сборка исключает preview-файлы. Не публикуйте этот сервер.
+
+### Проверки
 
 ```powershell
 node scripts/testMiniAppPreview.cjs
+node scripts/testMiniAppClient.cjs
+npm test --prefix server
+# JARVIS_MINI_TEST_DATABASE_URL указывает только на отдельную тестовую БД.
+node --test server/test/miniAppPostgresAcceptance.cjs server/test/miniAppIntegrationAcceptance.cjs
 ```
 
-Использует имеющиеся Playwright в `job-browser/node_modules` и Edge.
-Проверяет WebGL frames, pause/offscreen, reduced motion, fallback, allow/deny,
-создание ролей, уникальность Telegram ID, безопасное отображение имени,
-320/390/844 px, отсутствие сохранения и browser/CSP errors. Артефакты остаются
-в игнорируемой `.superpowers/mini-app-preview/`. Тест использует software WebGL;
-производительность на настоящем телефоне ещё не проверена.
+Первый тест требует работающий preview; `MINI_PREVIEW_URL` меняет адрес.
+Browser tests используют имеющиеся Playwright из job-browser и Edge.
+Артефакты: игнорируемая `.superpowers/mini-app-preview/`.
+Прошли 741 server test, 8 настоящих изолированных PostgreSQL acceptance,
+production browser fixtures и 3D preview. PostgreSQL применял целевые SQL
+migrations в отдельных схемах, без несвязанного pgvector. Полный Linux Docker
+build, реальный Telegram/CHIPS cookie, BotFather launch, телефонный FPS и
+второй HH пока не проверены. На VPS ничего не выпущено.
 
-Спецификация: [Telegram Mini App](../docs/superpowers/specs/2026-10-18-telegram-mini-app-design.md).
-Следующий этап после проверки спецификации владельцем: подробный план,
-серверная модель прав, проверенный Telegram вход и подключение настоящей админки.
-Публикация и настройка запуска в Telegram требуют отдельного поручения.
-Образец исключён из упаковки Windows Desktop.
+[Спецификация](../docs/superpowers/specs/2026-10-18-telegram-mini-app-design.md),
+[результат](../docs/updates/2026-10-18-telegram-mini-app-development.md).
 
 ## English
 
-Local design preview, October 18, 2026. This is not a deployed Telegram Mini
-App: Telegram authentication, server roles, APIs and actual user sections are
-not connected. The preview grants no real permissions and reads no personal
-data. All Telegram IDs are fictional. Edits live only in tab memory and are
-discarded on reload. Email is not used.
+The first local version was prepared on October 18, 2026. The server verifies
+signed Telegram initData and identifies users by numeric Telegram ID. Email is
+unnecessary. Clients outside Telegram receive no demo privileges.
 
-The home screen contains a procedural Three.js core: independent metallic rings,
-light inlays, a sphere, a shell and particles. It includes multi-axis rotation,
-drag rotation with smooth trailing movement, pause, speed and reset controls.
-Rendering stops offscreen and when the tab is hidden. Reduced motion defaults
-to a stationary scene; unavailable WebGL produces a static fallback. No external
-APIs, CDNs, models or per-frame generation are used.
+Roles, personal allow/deny/inherit, owner-only administrator appointment,
+blocking, change confirmation, revision/CAS and audit are implemented.
+Administration does not open other people's conversations, memory or documents.
+Role changes increment member revisions so old user editors cannot save over
+new permissions. Restarting preserves blocks and assignments.
 
-Administration allows adding a fictional Telegram ID, creating roles, assigning
-a user's role, selecting personal allow/deny/inherit overrides and inspecting
-effective access. The owner cannot be changed in this preview. This demonstrates
-the interface, not server-side security.
+The home screen contains an actual Three.js core with independently rotating
+rings, dragging, speed, pause, reduced motion and a static WebGL fallback.
+Hidden scenes stop rendering. Animation uses no external API/CDN;
+authentication loads the official Telegram Web App SDK.
 
-Run from `mini-app/`:
+Private text conversation and own memory, document, device and Life OS reads
+are available when their server services are enabled. Confirmed actions remain
+in Telegram/Desktop. A second HH search needs a personal connection: a checkbox
+never opens the owner's browser. Shared VPN/Operations/Supervisor retains
+separate owner-bound limits.
+
+For unknown outcomes sessionStorage holds only the original UUID, operation
+kind and Telegram ID. Text and credentials are never stored there. After reload
+the client offers original-request reconciliation without resubmission.
+
+### Build and launch
 
 ```powershell
-npm ci
-npm run dev
+npm ci --prefix mini-app
+npm run build --prefix mini-app
 ```
 
-URL: http://127.0.0.1:5187/. The preview server binds only to loopback,
-serves an explicit file allowlist and prevents page network connections through
-CSP. Do not use it as a production server or expose it through a tunnel.
+The build copies an explicit allowlist into `dist/`, served by Fastify at
+`/mini/`. The server Dockerfile includes a separate build stage. Windows Desktop
+excludes these resources and its runtime is unchanged.
 
-With the preview running, verify from the repository root:
+Real authentication needs the existing PostgreSQL and Telegram bot, a stable
+`JARVIS_OPERATIONS_OWNER_TELEGRAM_ID`, `JARVIS_MINI_APP_ENABLED=true` and
+`JARVIS_MINI_APP_PUBLIC_ORIGIN=https://<domain>` without a path. Migration 037
+stores access/audit/sessions and 038 assistant receipts; both are forward-only.
+Secrets use the normal environment. Disabling the UI preserves established
+permission enforcement.
+
+After separate release authorization, configure HTTPS URL
+`https://<domain>/mini/` as the bot's Main Mini App / menu button via BotFather.
+Only the Mini App receives restricted Telegram Web framing; other pages keep
+DENY. Cookies use HttpOnly/Secure/SameSite=None/Partitioned.
+
+Separate design preview: `npm run dev --prefix mini-app`,
+http://127.0.0.1:5187/. It is a loopback server with fictional IDs and tab-memory
+edits; production builds exclude preview files. Do not publish that server.
+
+### Verification
 
 ```powershell
 node scripts/testMiniAppPreview.cjs
+node scripts/testMiniAppClient.cjs
+npm test --prefix server
+# JARVIS_MINI_TEST_DATABASE_URL must point only to an isolated test database.
+node --test server/test/miniAppPostgresAcceptance.cjs server/test/miniAppIntegrationAcceptance.cjs
 ```
 
-Uses existing Playwright in `job-browser/node_modules` and Edge. Covers WebGL
-frames, pause/offscreen, reduced motion, fallback, allow/deny, role creation,
-Telegram ID uniqueness, safe display names, 320/390/844 px, ephemeral edits,
-and absence of browser/CSP errors. Artifacts remain under ignored
-`.superpowers/mini-app-preview/`. The test uses software WebGL; performance
-on a physical phone has not been verified.
+The first test requires a running preview; `MINI_PREVIEW_URL` overrides its URL.
+Browser tests use existing job-browser Playwright and Edge. Artifacts remain
+under ignored `.superpowers/mini-app-preview/`. Verification passed 741 server
+tests, 8 actual isolated PostgreSQL acceptance tests, production browser
+fixtures and the 3D preview. PostgreSQL applied target SQL migrations in isolated
+schemas without unrelated pgvector. Full Linux Docker build, actual Telegram/
+CHIPS cookies, BotFather launch, phone FPS and a second HH account remain
+unverified. Nothing has been released to the VPS.
 
-Specification: [Telegram Mini App](../docs/superpowers/specs/2026-10-18-telegram-mini-app-design.md).
-After the owner's specification review, the next stage is a detailed plan,
-server access control, verified Telegram authentication and actual administration.
-Publication and Telegram launch configuration require a separate instruction.
-The preview is excluded from Windows Desktop packaging.
+[Specification](../docs/superpowers/specs/2026-10-18-telegram-mini-app-design.md),
+[results](../docs/updates/2026-10-18-telegram-mini-app-development.md).

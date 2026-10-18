@@ -1,5 +1,39 @@
 # Проверки перед выпуском
 
+Telegram Mini App, локальная разработка 18 октября:
+[результат](updates/2026-10-18-telegram-mini-app-development.md).
+741 server test и 8 acceptance на отдельном PostgreSQL прошли; оба browser
+набора проверяют production client и отдельный 3D preview. Полный Docker/Caddy
+build, реальные Telegram cookies/клиенты и второй HH ещё не проверены.
+
+Telegram Mini App, local development on October 18:
+[results](updates/2026-10-18-telegram-mini-app-development.md).
+741 server tests and 8 isolated PostgreSQL acceptance tests passed; both browser
+suites cover the production client and separate 3D preview. Complete Docker/Caddy
+build, actual Telegram cookies/clients and a second HH account remain unverified.
+
+```powershell
+npm run build --prefix mini-app
+node scripts/testMiniAppClient.cjs
+# Preview server must be running; MINI_PREVIEW_URL may override its address.
+node scripts/testMiniAppPreview.cjs
+npm test --prefix server
+# JARVIS_MINI_TEST_DATABASE_URL must point to an isolated test DB, never production.
+node --test server/test/miniAppPostgresAcceptance.cjs server/test/miniAppIntegrationAcceptance.cjs
+```
+
+PostgreSQL acceptance создаёт и удаляет только свои временные схемы, применяет
+настоящие целевые migrations без несвязанного pgvector и не обращается к HH
+или Bot API. Без явной тестовой БД эти отдельные `.cjs` tests пропускаются;
+это не считается успешной PostgreSQL-проверкой. Последний локальный запуск
+выполнен с БД, 8/8 без пропусков.
+
+PostgreSQL acceptance creates/drops only its own temporary schemas, applies
+actual target migrations without unrelated pgvector and never contacts HH or
+the Bot API. Without an explicit test DB these separate `.cjs` tests skip;
+that does not establish PostgreSQL acceptance. The latest local run had a
+configured isolated DB and passed 8/8 with no skips.
+
 Более новая проверка browser от 18 октября:
 [приватный журнал попыток](updates/2026-10-18-hh-captcha-evidence.md), Linux 62/62,
 все шесть browser/broker/worker сценариев с архивом PNG/ответов. Приведённое ниже

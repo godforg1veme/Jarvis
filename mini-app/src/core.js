@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { RoomEnvironment } from '/vendor/RoomEnvironment.js';
+import { RoomEnvironment } from './vendor/RoomEnvironment.js';
 
 // A procedural model, not a rotating raster. No external assets or API calls.
 export function createCore(host, { onStatus = () => {} } = {}) {
@@ -127,7 +127,7 @@ export function createCore(host, { onStatus = () => {} } = {}) {
   let pointer = null;
   let contextLost = false;
   function draw(time = performance.now()) {
-    if (disposed || contextLost) return;
+    if (disposed || contextLost || !visible || document.hidden || !host.getClientRects().length) return;
     const delta = lastTime ? Math.min((time - lastTime) / 1000, 0.05) : 0;
     lastTime = time;
     if (!paused) elapsed += delta * speed;

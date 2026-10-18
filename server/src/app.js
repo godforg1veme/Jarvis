@@ -2,6 +2,12 @@ const Fastify = require('fastify');
 const { buildRoutingHtmlPage } = require('./vpn/vpnRoutingService');
 const { hashToken } = require('./vpn/vpnSubscriptionService');
 
+function isMiniPath(url) {
+  const prefix = (url || '').slice(0, 64).replace(/%([0-9a-f]{2})/gi,
+    (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+  return /^\/mini(?:\/|\?|$)/.test(prefix);
+}
+
 function subscriptionLogPath(url) {
   // Decode ASCII escapes for classification only; preserve the actual request.
   // This also covers malformed/escaped paths handled by Fastify's default 404.
@@ -16,7 +22,7 @@ function safeRequestLog(request) {
   // clients can repeat the credential there under an arbitrary parameter name.
   return {
     method: request.method,
-    url: subscriptionLogPath(request.url) || request.url,
+    url: isMiniPath(request.url) ? '/mini/:route' : subscriptionLogPath(request.url) || request.url,
     version: request.headers && request.headers['accept-version'],
     host: request.host,
     remoteAddress: request.ip,
@@ -90,15 +96,15 @@ function buildApp(options = {}) {
     // Fastify's default 404/error messages can interpolate the raw URL outside
     // the req serializer. Emit only closed lifecycle messages for this prefix.
     logController: new Fastify.LogController({
-      disableRequestLogging: (request) => Boolean(subscriptionLogPath(request.url)),
+      disableRequestLogging: (request) => isMiniPath(request.url) || Boolean(subscriptionLogPath(request.url)),
     }),
   });
 
   app.addHook('onRequest', async (request) => {
-    if (subscriptionLogPath(request.url)) request.log.info({ req: request }, 'incoming request');
+    if (isMiniPath(request.url) || subscriptionLogPath(request.url)) request.log.info({ req: request }, 'incoming request');
   });
   app.addHook('onResponse', async (request, reply) => {
-    if (subscriptionLogPath(request.url)) {
+    if (isMiniPath(request.url) || subscriptionLogPath(request.url)) {
       request.log.info({ res: reply, responseTime: reply.elapsedTime }, 'request completed');
     }
   });
@@ -108,11 +114,15 @@ function buildApp(options = {}) {
     reply.header('X-Frame-Options', 'DENY');
     reply.header('Referrer-Policy', 'no-referrer');
     const opsAsset = request.raw.url && request.raw.url.startsWith('/ops/');
+    const miniAsset = config.miniAppEnabled && isMiniPath(request.raw.url);
+    if (miniAsset) reply.removeHeader('X-Frame-Options');
     const isHtmlLanding = request.raw.url && (
       request.raw.url.startsWith('/happ-routing') ||
       request.raw.url.startsWith('/happ-sub/')
     );
-    reply.header('Content-Security-Policy', opsAsset
+    reply.header('Content-Security-Policy', miniAsset
+      ? "default-src 'none'; script-src 'self' https://telegram.org/js/telegram-web-app.js; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'self' https://web.telegram.org https://*.web.telegram.org; base-uri 'none'; object-src 'none'; form-action 'self'"
+      : opsAsset
       ? "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'"
       : isHtmlLanding
       ? "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'"
@@ -175,7 +185,7 @@ function buildApp(options = {}) {
 
   app.setErrorHandler((error, request, reply) => {
     request.log.error({
-      err: subscriptionLogPath(request.url) ? safeSubscriptionError(error) : error,
+      err: isMiniPath(request.url) || subscriptionLogPath(request.url) ? safeSubscriptionError(error) : error,
       requestId: request.id,
     }, 'request failed');
     const statusCode = error && error.name === 'ZodError'

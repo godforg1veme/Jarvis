@@ -17,6 +17,7 @@ class AssistantService {
     this.profile = options.profile;
     this.logger = options.logger || null;
     this.lifeContextComposer = options.lifeContextComposer || null;
+    this.accessService = options.accessService || null;
   }
 
   setLifeContextComposer(composer) {
@@ -24,8 +25,20 @@ class AssistantService {
   }
 
   async answer(input) {
+    const access = this.accessService && input.userId ? await this.accessService.getAccessForUser(input.userId) : null;
+    const allowed = (permission) => !this.accessService || Boolean(access && !access.blocked && access.permissions.includes(permission));
+    const required = new Set(['assistant']);
+    const requireAccess = async () => {
+      if (!this.accessService) return;
+      const current = await this.accessService.getAccessForUser(input.userId);
+      if (!current || current.blocked || [...required].some((permission) => !current.permissions.includes(permission))) {
+        throw Object.assign(new Error('Access unavailable'), { statusCode: 403, publicCode: 'PERMISSION_DENIED' });
+      }
+    };
+    await requireAccess();
     let life = null;
-    const usesComposer = Boolean(this.lifeContextComposer && input.userId);
+    const usesComposer = Boolean(this.lifeContextComposer && input.userId && allowed('life'));
+    if (usesComposer || (input.lifeContext && allowed('life'))) required.add('life');
     if (usesComposer) {
       try {
         life = await this.lifeContextComposer.compose({
@@ -42,14 +55,24 @@ class AssistantService {
     }
     const effectiveInput = {
       ...input,
+      memories: allowed('memory') ? input.memories : [],
+      documents: allowed('documents') ? input.documents : [],
+      devices: allowed('devices') ? input.devices : [],
+      visualMemories: allowed('memory') && allowed('devices') ? input.visualMemories : [],
       communicationGuidance: usesComposer ? (life?.communicationGuidance || null) : input.communicationGuidance,
-      lifeContext: usesComposer ? (life?.lifeContext || null) : input.lifeContext,
+      lifeContext: usesComposer ? (life?.lifeContext || null) : allowed('life') ? input.lifeContext : null,
     };
+    if (effectiveInput.memories?.length) required.add('memory');
+    if (effectiveInput.documents?.length) required.add('documents');
+    if (effectiveInput.devices?.length) required.add('devices');
+    if (effectiveInput.visualMemories?.length) { required.add('memory'); required.add('devices'); }
+    await requireAccess();
     const canonical = buildCanonicalPrompt(effectiveInput);
     let correctionViolations = [];
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const messages = adaptPrompt(canonical, this.profile, { correctionViolations });
       const answer = await this.provider.answer({ ...effectiveInput, messages });
+      await requireAccess();
       const validation = validateOutput(answer, canonical.runtime);
       if (validation.ok) return String(answer).trim();
       correctionViolations = validation.violations;

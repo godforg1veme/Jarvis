@@ -109,6 +109,11 @@ const { PeopleRepository } = require('./life/people/peopleRepository');
 const { PeopleService } = require('./life/people/peopleService');
 const { PersonLinker } = require('./life/people/personLinker');
 const { FamilyAccessService } = require('./life/people/familyAccessService');
+const { AccessService } = require('./access/accessService');
+const { registerMiniAppRoutes } = require('./miniApp/routes');
+const { registerMiniAppAssets } = require('./miniAppAssets');
+const { registerMiniAppSelfRoutes } = require('./miniAppSelfRoutes');
+const { protectService, registerDesktopPermissionBoundary } = require('./userPermissionBoundary');
 
 async function createRuntime(config, overrides = {}) {
   let pool = overrides.pool || null;
@@ -119,10 +124,19 @@ async function createRuntime(config, overrides = {}) {
   let bot = overrides.bot || null;
   let pollingTask = null;
   let jobRuntime = null;
+  let accessService = null;
   let pollingHealth = { at: 0, ok: false };
 
   if (pool) {
     await (overrides.runMigrations || runMigrations)(pool);
+    // Turning off the UI must never reactivate blocked Desktop credentials.
+    const persistedAccess = !config.miniAppEnabled && typeof pool.query === 'function'
+      ? (await pool.query('SELECT EXISTS(SELECT 1 FROM access_memberships) AS active'))?.rows?.[0]?.active === true : false;
+    if (config.miniAppEnabled || persistedAccess) {
+      accessService = overrides.accessService || new AccessService({ pool,
+        ownerTelegramId: config.operationsOwnerTelegramId, legacyAllowedIds: config.telegramAllowedIds });
+      await accessService.initialize();
+    }
   }
 
   let assistant = overrides.assistant || null;
@@ -159,11 +173,12 @@ async function createRuntime(config, overrides = {}) {
       provider: answerProvider,
       profile: providerProfileForConfig(config),
       logger: app.log,
+      accessService,
     });
     const deviceRepository = overrides.deviceRepository || new DeviceRepository(pool);
     const conversationRepository = overrides.conversationRepository || new ConversationRepository(pool);
     const authenticateDevice = overrides.authenticateDevice || createDeviceAuthenticator(deviceRepository);
-    deviceService = overrides.deviceService || new DeviceService({ repository: deviceRepository });
+    deviceService = overrides.deviceService || new DeviceService({ repository: deviceRepository, accessService });
     const sessionRegistry = overrides.sessionRegistry || new DeviceSessionRegistry();
     let lifeEventRepository = null;
     let lifeProjectionRepository = null;
@@ -236,12 +251,14 @@ async function createRuntime(config, overrides = {}) {
       deviceRepository,
       sessionRegistry,
       resultBroker,
+      accessService,
     });
     const actionManifest = overrides.actionManifest || createActionManifest();
     const workflowRepository = overrides.workflowRepository || new WorkflowRepository(pool);
     const executorRegistry = overrides.executorRegistry || new ExecutorRegistry()
       .register('device', new DesktopCommandExecutor({ commandService }));
     if (!overrides.executorRegistry && config.lifeOsEnabled) executorRegistry.register('server', new ServerActionExecutor({
+      accessService,
       reminderService: lifeReminderService,
       commitmentRepository: lifeCommitmentRepository,
       projectionRepository: lifeProjectionRepository,
@@ -262,6 +279,7 @@ async function createRuntime(config, overrides = {}) {
       conversationRepository,
       lifeEventGateway,
       deliverUpdate: async ({ workflow, answer, response }) => {
+        if (accessService && !await accessService.allows(workflow.user_id, 'devices')) return;
         if (workflow.origin_channel === 'desktop' && workflow.origin_device_id) {
           sessionRegistry.send(workflow.origin_device_id, createRemoteMessage('workflow.update', {
             workflowId: workflow.id,
@@ -323,6 +341,7 @@ async function createRuntime(config, overrides = {}) {
           };
         },
         deliverProposal: async (proposal) => {
+          if (accessService && !await accessService.allows(proposal.user_id, 'life')) return;
           if (proposal.origin_channel === 'desktop' && proposal.origin_device_id) {
             sessionRegistry.send(proposal.origin_device_id, createRemoteMessage('life.proposal', {
               proposalId: proposal.id, title: proposal.title,
@@ -354,6 +373,7 @@ async function createRuntime(config, overrides = {}) {
       lifeProjectionWorker = overrides.lifeProjectionWorker || new LifeProjectionWorker({
         eventRepository: lifeEventRepository, projectionRepository: lifeProjectionRepository,
         enrich: async (event) => {
+          if (accessService && !await accessService.allows(event.user_id, 'life')) return null;
           const result = overrides.lifeEventEnricher
             ? await overrides.lifeEventEnricher(event, enrichment)
             : await enrichment.enrich(event);
@@ -500,6 +520,7 @@ async function createRuntime(config, overrides = {}) {
           : documentExtractor.extract.bind(documentExtractor),
         embeddingProvider,
         lifeEventGateway,
+        accessService,
       });
       knowledgeWorker = overrides.knowledgeWorker || new KnowledgeWorker({
         repository: knowledgeRepository,
@@ -515,6 +536,11 @@ async function createRuntime(config, overrides = {}) {
       logger: app.log,
     }));
     if (visualMemoryService) visualMemoryWorker = overrides.visualMemoryWorker || new VisualMemoryWorker({ service: visualMemoryService, logger: app.log });
+    memoryService = protectService(memoryService, accessService, 'memory');
+    knowledgeService = protectService(knowledgeService, accessService, 'documents');
+    deviceService = protectService(deviceService, accessService, 'devices');
+    visualMemoryService = protectService(visualMemoryService, accessService, 'memory');
+    if (accessService) registerDesktopPermissionBoundary(app, { accessService, authenticate: authenticateDevice });
     const desktopMessageService = overrides.desktopMessageService || new DesktopMessageService({
       requestRepository: overrides.desktopRequestRepository || new DesktopRequestRepository(pool),
       conversationRepository,
@@ -527,6 +553,7 @@ async function createRuntime(config, overrides = {}) {
       visualMemoryService,
       vpnService,
       lifeEventGateway,
+      accessService,
     });
     asr = overrides.asr || createAsrProvider(config);
     if (typeof app.post === 'function' && typeof app.addContentTypeParser === 'function') {
@@ -570,6 +597,7 @@ async function createRuntime(config, overrides = {}) {
     if (typeof app.register === 'function' && typeof app.get === 'function') {
       await registerDeviceSessionRoute(app, {
         authenticate: authenticateDevice,
+        accessService,
         repository: deviceRepository,
         sessionRegistry,
         commandService,
@@ -578,6 +606,13 @@ async function createRuntime(config, overrides = {}) {
       });
     }
 
+    if (accessService && config.miniAppEnabled) {
+      registerMiniAppAssets(app, { root: overrides.miniAppAssetsRoot || require('node:path').join(__dirname,
+        config.nodeEnv === 'production' ? '../public/mini' : '../../mini-app/dist') });
+      registerMiniAppRoutes(app, { config, accessService, pool,
+        registerUserRoutes: (routes) => registerMiniAppSelfRoutes(routes, { accessService, pool,
+          memoryService, knowledgeService, deviceService, missionControlService, assistant, conversationRepository }) });
+    }
     if (!bot && config.telegramBotToken) {
       const memoryGalleryService = new TelegramMemoryGalleryService({
         repository: overrides.telegramMemoryGalleryRepository || new TelegramMemoryGalleryRepository(pool),
@@ -585,7 +620,7 @@ async function createRuntime(config, overrides = {}) {
         visualMemoryService,
       });
       const telegramInteractions = overrides.telegramInteractionRepository || new TelegramInteractionRepository(pool);
-      jobRuntime = createJobRuntime({ config, pool, interactions: telegramInteractions,
+      jobRuntime = createJobRuntime({ config, pool, interactions: telegramInteractions, accessService,
         fetchImpl: overrides.jobModelFetch,
         applicationAdapter: overrides.jobApplicationAdapter,
         sendPhoto: ({ chatId, png, caption, buttons, signal }) => bot.api.sendPhoto(chatId, new InputFile(png, 'hh-captcha.png'), { caption, reply_markup: telegramReplyMarkup(buttons) }, signal),
@@ -622,13 +657,15 @@ async function createRuntime(config, overrides = {}) {
         lifeOsService: telegramLifeOsService,
         memoryGalleryService,
         jobSearchService: jobRuntime?.telegramService,
+        accessService,
         ownerTelegramId: config.operationsOwnerTelegramId,
         operationsEnabled: config.operationsEnabled,
         operationsPublicOrigin: config.operationsPublicOrigin,
       });
       const messageService = new TelegramMessageService({
         jobCaptchaService: jobRuntime?.captchaService,
-        accessPolicy: createTelegramAccessPolicy(config.telegramAllowedIds),
+        accessPolicy: accessService ? { isAllowed: (id) => accessService.isAllowedTelegram(id) } : createTelegramAccessPolicy(config.telegramAllowedIds),
+        accessService,
         updateRepository: new TelegramUpdateRepository(pool),
         userRepository: new UserRepository(pool),
         conversationRepository,
@@ -663,6 +700,7 @@ async function createRuntime(config, overrides = {}) {
     }
     if (config.lifeOsEnabled && config.lifeOsRemindersEnabled) {
       const reminderRouter = overrides.reminderDeliveryRouter || new ReminderDeliveryRouter({
+        accessService,
         telegram: new TelegramReminderTransport({ bot, conversationRepository }),
         desktop: new DesktopReminderTransport({ sessionRegistry }),
       });
@@ -732,6 +770,7 @@ async function createRuntime(config, overrides = {}) {
     bot,
     pool,
     assistant,
+    accessService,
     deviceService,
     memoryService,
     knowledgeService,

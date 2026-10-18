@@ -5,6 +5,13 @@ RUN npm ci
 COPY ops-ui ./
 RUN npm run build
 
+FROM node:22-bookworm-slim AS mini-build
+WORKDIR /app/mini-app
+COPY mini-app/package.json mini-app/package-lock.json ./
+RUN npm ci
+COPY mini-app ./
+RUN npm run build
+
 FROM node:22-bookworm-slim
 
 ENV NODE_ENV=production
@@ -20,6 +27,7 @@ RUN apt-get update \
 COPY server/src ./src
 COPY shared /app/shared
 COPY --from=ui-build /app/ops-ui/dist ./public/ops
+COPY --from=mini-build /app/mini-app/dist ./public/mini
 
 # Docker copies this ownership into a newly created named volume, letting the
 # unprivileged server process persist private attachments without running as root.

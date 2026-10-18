@@ -41,9 +41,15 @@ class DesktopMessageService {
     this.visualMemoryService = options.visualMemoryService || null;
     this.vpnService = options.vpnService || null;
     this.lifeEventGateway = options.lifeEventGateway || null;
+    this.accessService = options.accessService || null;
   }
 
   async handle({ device, clientMessageId, kind = 'text', resolveContent }) {
+    const can = async (permission) => !this.accessService || await this.accessService.allows(device.user_id, permission);
+    const requireAssistant = async () => {
+      if (!await can('assistant')) throw Object.assign(new Error('Access unavailable'), { statusCode: 403, publicCode: 'PERMISSION_DENIED' });
+    };
+    await requireAssistant();
     const claim = await this.requestRepository.claim({
       userId: device.user_id,
       deviceId: device.id,
@@ -73,7 +79,7 @@ class DesktopMessageService {
         contentType: kind === 'voice' ? 'voice_transcript' : 'text',
         externalMessageId: clientMessageId,
       });
-      await recordMessageEvent(this.lifeEventGateway, {
+      await recordMessageEvent(await can('life') ? this.lifeEventGateway : null, {
         userId: device.user_id,
         conversationId: conversation.id,
         sourceChannel: 'desktop',
@@ -84,7 +90,7 @@ class DesktopMessageService {
         kind,
         text: content,
       });
-      const vpnResult = this.vpnService ? await this.vpnService.handle({
+      const vpnResult = this.vpnService && await can('vpn') ? await this.vpnService.handle({
         text: content, userId: device.user_id, conversationId: conversation.id,
         originChannel: 'desktop', originDeviceId: device.id,
       }) : null;
@@ -110,7 +116,7 @@ class DesktopMessageService {
         return publicResponse;
       }
 
-      const remoteAnswer = await remoteCommandReply({
+      const remoteAnswer = await can('devices') ? await remoteCommandReply({
         text: content,
         userId: device.user_id,
         conversationId: conversation.id,
@@ -119,7 +125,7 @@ class DesktopMessageService {
         defaultDeviceId: device.id,
         commandService: this.commandService,
         orchestrator: this.orchestrator,
-      });
+      }) : null;
       if (remoteAnswer) {
         const answerText = typeof remoteAnswer === 'string' ? remoteAnswer : remoteAnswer.answer;
         const assistantMessage = await this.conversationRepository.appendMessage({
@@ -152,7 +158,7 @@ class DesktopMessageService {
         conversationId: conversation.id,
         limit: 30,
       });
-      const orchestration = this.orchestrator ? await this.orchestrator.handle({
+      const orchestration = this.orchestrator && await can('devices') ? await this.orchestrator.handle({
         userId: device.user_id,
         conversationId: conversation.id,
         originChannel: 'desktop',
@@ -189,15 +195,15 @@ class DesktopMessageService {
         });
         return response;
       }
-      const memoryResult = this.memoryService
+      const memoryResult = this.memoryService && await can('memory')
         ? await this.memoryService.handleUserText({ userId: device.user_id, text: content, sourceConversationId: conversation.id })
         : { handled: false };
-      const memories = this.memoryService ? await this.memoryService.memoriesForPrompt({ userId: device.user_id }) : [];
-      const devices = this.deviceService ? await this.deviceService.list({ userId: device.user_id }) : [];
-      const documentSources = this.knowledgeService
+      const memories = this.memoryService && await can('memory') ? await this.memoryService.memoriesForPrompt({ userId: device.user_id }) : [];
+      const devices = this.deviceService && await can('devices') ? await this.deviceService.list({ userId: device.user_id }) : [];
+      const documentSources = this.knowledgeService && await can('documents')
         ? await this.knowledgeService.searchForPrompt({ userId: device.user_id, query: content })
         : [];
-      const visualMemories = this.visualMemoryService
+      const visualMemories = this.visualMemoryService && await can('memory') && await can('devices')
         ? await this.visualMemoryService.searchForPrompt({ userId: device.user_id, query: content }) : [];
       const deviceAnswer = isDeviceAttachmentQuestion(content) ? attachmentReply(devices) : null;
       const answer = memoryResult.answer || deviceAnswer || await this.assistant.answer({
@@ -218,6 +224,12 @@ class DesktopMessageService {
       });
       const safeAnswer = renderDocumentCitations(String(answer || '').trim(), documentSources).slice(0, MAX_TEXT_LENGTH);
       if (!safeAnswer) throw new Error('provider returned an empty answer');
+      await requireAssistant();
+      const sourcePermissions = [ ...(memories.length ? ['memory'] : []), ...(devices.length ? ['devices'] : []),
+        ...(documentSources.length ? ['documents'] : []), ...(visualMemories.length ? ['memory', 'devices'] : []) ];
+      for (const permission of sourcePermissions) if (!await can(permission)) {
+        throw Object.assign(new Error('Access unavailable'), { statusCode: 403, publicCode: 'PERMISSION_DENIED' });
+      }
       const assistantMessage = await this.conversationRepository.appendMessage({
         userId: device.user_id,
         conversationId: conversation.id,

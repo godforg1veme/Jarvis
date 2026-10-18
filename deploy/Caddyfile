@@ -5,7 +5,12 @@
   header {
     -Server
     X-Content-Type-Options "nosniff"
-    X-Frame-Options "DENY"
     Referrer-Policy "no-referrer"
   }
+  # Only the Mini App may be embedded by Telegram Web. Fastify supplies its
+  # explicit frame-ancestors policy; every other route keeps DENY.
+  @notMini {
+    not path /mini /mini/*
+  }
+  header @notMini X-Frame-Options "DENY"
 }

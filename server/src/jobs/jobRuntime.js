@@ -23,7 +23,7 @@ const {JobHistorySyncRepository}=require('./jobHistorySyncRepository');
 const {JobHistoryWorker}=require('./jobHistoryWorker');
 const {JobHistoryTelegram}=require('./jobHistoryTelegram');
 
-function createJobRuntime({ config, pool, interactions, send, sendPhoto, fetchImpl, applicationAdapter = null }) {
+function createJobRuntime({ config, pool, interactions, send, sendPhoto, fetchImpl, applicationAdapter = null, accessService = null }) {
   if (!config.jobSearchEnabled) return null;
   let connectionService = null, browserClient = null;
   if (config.jobBrowserOwnerId && config.jobBrowserToken) {
@@ -64,7 +64,7 @@ function createJobRuntime({ config, pool, interactions, send, sendPhoto, fetchIm
   const telegramService = new JobTelegramService({ pool, searchRepository, profileRepository, draftRepository,
     usageRepository, interactions, draftService, settingsService, applicationService, connectionService, captchaService, historyService,
     settingsModels: [config.jobSearchModel, config.openrouterModel, config.openrouterFallbackModel], defaultModel: config.jobSearchModel });
-  const deliveryWorker = new JobDeliveryWorker({ pool, searchRepository, deliveryRepository, send,
+  const deliveryWorker = new JobDeliveryWorker({ pool, searchRepository, deliveryRepository, send, accessService,
     captchaEnabled: Boolean(captchaService), captchaAutomatic: config.jobCaptchaAutomatic === true });
   const recoveryWorker = new JobRecoveryWorker({ pool, applicationRepository });
   const close = createResourceCloser(Object.entries({ deliveryWorker, recoveryWorker, captchaWorker, historyWorker })

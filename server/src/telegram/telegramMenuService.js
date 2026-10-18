@@ -3,6 +3,7 @@ const { containsSensitiveMemoryData, normalizeMemoryContent } = require('../memo
 const { normalizeDeviceName } = require('../devices/deviceService');
 const { validateAction: validateVpnAction, normalizeSubscriptionLabel } = require('../vpn/vpnCommandService');
 const { MENU, isOwner, replyKeyboard } = require('./telegramMenu');
+const { ACTION_PERMISSION, DENIED_ANSWER, callbackPermissions, interactionPermissions, permits } = require('./telegramPermissionPolicy');
 
 function memoryMenu() {
   return [
@@ -41,6 +42,7 @@ class TelegramMenuService {
     this.lifeOsService = options.lifeOsService || null;
     this.memoryGalleryService = options.memoryGalleryService || null;
     this.jobSearchService = options.jobSearchService || null;
+    this.accessService = options.accessService || null;
     this.ownerTelegramId = String(options.ownerTelegramId || '0');
     this.operationsEnabled = options.operationsEnabled === true;
     const configuredOperationsUrl = this.operationsEnabled && options.operationsPublicOrigin
@@ -50,12 +52,14 @@ class TelegramMenuService {
   }
 
   owner(context) {
+    if (context.access) return context.access.level === 'owner';
     return isOwner(context.user, context.telegramUserId, this.ownerTelegramId);
   }
 
   keyboard(context) {
     return replyKeyboard(this.owner(context), { jobSearchEnabled: Boolean(this.jobSearchService)
-      && context.user?.role === 'owner' && context.chatType === 'private' });
+      && context.user?.role === 'owner' && context.chatType === 'private',
+      permissions: context.access?.permissions || null });
   }
 
   async _cancel(context, id = null) {
@@ -76,6 +80,11 @@ class TelegramMenuService {
 
   async handleMenuAction(action, context) {
     if (!action) return null;
+    if (this.accessService) {
+      context.access = await this.accessService.getAccessForUser(context.user.id);
+      if (!permits(context.access, ACTION_PERMISSION[action] ? [ACTION_PERMISSION[action]] : [])) return { answer: DENIED_ANSWER };
+      if (action === 'jobs' && context.access.level !== 'owner') return { answer: 'Право на поиск работы выдано. Для запуска нужно отдельное подключение HH: браузер владельца другим пользователям не передаётся.' };
+    }
     await this._cancel(context);
     if (action === 'jobs') return this.jobSearchService
       ? this.jobSearchService.handleCallback('job:menu', context) : { answer: 'Поиск работы сейчас недоступен.' };
@@ -176,6 +185,11 @@ class TelegramMenuService {
 
   async handleCallback(data, context) {
     data = String(data || '');
+    if (this.accessService) {
+      context.access = await this.accessService.getAccessForUser(context.user.id);
+      if (!permits(context.access, callbackPermissions(data))) return { answer: DENIED_ANSWER };
+      if (data.startsWith('job:') && context.access.level !== 'owner') return { answer: 'Для поиска нужно отдельное подключение HH этого пользователя.' };
+    }
     if (data.startsWith('job:')) {
       await this._cancel(context);
       return this.jobSearchService ? this.jobSearchService.handleCallback(data, context) : { answer: 'Поиск работы сейчас недоступен.' };
@@ -299,6 +313,10 @@ class TelegramMenuService {
     });
     if (!active.interaction) return active.expired ? { answer: 'Время ввода закончилось. Открой нужный раздел и начни ещё раз.' } : null;
     const interaction = active.interaction;
+    if (this.accessService) {
+      context.access = await this.accessService.getAccessForUser(context.user.id);
+      if (!permits(context.access, interactionPermissions(interaction.kind))) return { answer: DENIED_ANSWER };
+    }
     const value = String(text || '').trim();
     if (!value) return { answer: 'Напиши значение обычным текстом.', buttons: interactionCancel(interaction.id) };
     if (interaction.kind.startsWith('job_')) return this.jobSearchService

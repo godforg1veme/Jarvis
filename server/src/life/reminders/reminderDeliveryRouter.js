@@ -2,9 +2,15 @@ class ReminderDeliveryRouter {
   constructor(options = {}) {
     this.telegram = options.telegram || null;
     this.desktop = options.desktop || null;
+    this.accessService = options.accessService || null;
   }
 
   async deliver({ reminder, channel, deliveryKey }) {
+    if (this.accessService) {
+      try {
+        if (!await this.accessService.allows(reminder.user_id, 'life')) return { status: 'permanent_failure', errorCode: 'PERMISSION_DENIED' };
+      } catch { return { status: 'transient_failure', errorCode: 'PERMISSION_UNAVAILABLE' }; }
+    }
     const transport = channel === 'telegram' ? this.telegram : channel === 'desktop' ? this.desktop : null;
     if (!transport || typeof transport.deliver !== 'function') return { status: 'permanent_failure', errorCode: 'CHANNEL_UNAVAILABLE' };
     try {

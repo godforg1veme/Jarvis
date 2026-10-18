@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node preview-server.js"
+    "dev": "node preview-server.js",
+    "build": "node build.js"
   },
   "dependencies": {
     "three": "0.186.1"

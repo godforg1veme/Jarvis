@@ -14,7 +14,7 @@ const { chromium } = require('../job-browser/node_modules/playwright');
     const page = await context.newPage();
     page.on('pageerror', (error) => errors.push(error.message));
     page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
-    await page.goto('http://127.0.0.1:5187/');
+    await page.goto((process.env.MINI_PREVIEW_URL || 'http://127.0.0.1:5187/'));
     await page.waitForFunction(() => document.querySelector('#core-loading').hidden);
     assert.equal(await page.locator('#core-stage').getAttribute('data-render'), 'webgl', 'actual WebGL rendering, not a fallback');
     const frame = () => page.locator('#core-stage').getAttribute('data-frames').then(Number);
@@ -64,6 +64,7 @@ const { chromium } = require('../job-browser/node_modules/playwright');
     for (const width of [320, 390, 844]) {
       await page.setViewportSize({ width, height: 844 });
       await page.getByRole('link', { name: 'Главная', exact: true }).click();
+      await page.waitForFunction(() => document.documentElement.scrollWidth <= innerWidth);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `home fits ${width}px`);
       if (width === 390) {
         await page.getByRole('button', { name: 'Пауза', exact: true }).click();
@@ -84,7 +85,7 @@ const { chromium } = require('../job-browser/node_modules/playwright');
 
     const reducedContext = await browser.newContext({ reducedMotion: 'reduce', viewport: { width: 390, height: 844 } });
     const reducedPage = await reducedContext.newPage();
-    await reducedPage.goto('http://127.0.0.1:5187/');
+    await reducedPage.goto((process.env.MINI_PREVIEW_URL || 'http://127.0.0.1:5187/'));
     await reducedPage.waitForFunction(() => document.querySelector('#core-loading').hidden);
     assert.equal(await reducedPage.getByRole('button', { name: 'Продолжить', exact: true }).getAttribute('aria-pressed'), 'true');
     await reducedPage.waitForTimeout(100);
@@ -100,7 +101,7 @@ const { chromium } = require('../job-browser/node_modules/playwright');
         return type.startsWith('webgl') ? null : getContext.call(this, type, ...args);
       };
     });
-    await fallback.goto('http://127.0.0.1:5187/');
+    await fallback.goto((process.env.MINI_PREVIEW_URL || 'http://127.0.0.1:5187/'));
     await fallback.waitForFunction(() => document.querySelector('#core-loading').hidden);
     assert.equal(await fallback.locator('#core-stage').getAttribute('data-render'), 'fallback');
     await fallback.getByRole('link', { name: 'Управление', exact: true }).click();

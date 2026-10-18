@@ -3,8 +3,8 @@ const { cardView, attentionView } = require('./jobTelegramViews');
 const { captchaNoticeView } = require('./jobCaptchaNotices');
 const { assertJobScope } = require('./jobSchemas');
 class JobDeliveryWorker {
-  constructor({ pool, searchRepository, deliveryRepository, send, captchaEnabled = false, captchaAutomatic = false, intervalMs = 2000 }) {
-    Object.assign(this, { pool, searchRepository, deliveryRepository, send, captchaEnabled, captchaAutomatic, intervalMs });
+  constructor({ pool, searchRepository, deliveryRepository, send, captchaEnabled = false, captchaAutomatic = false, intervalMs = 2000, accessService = null }) {
+    Object.assign(this, { pool, searchRepository, deliveryRepository, send, captchaEnabled, captchaAutomatic, intervalMs, accessService });
     this.timer = null; this.running = false;
     trackWorker(this, 'tick');
   }
@@ -13,6 +13,12 @@ class JobDeliveryWorker {
     this.running = true;
     try {
       const delivery = await this.deliveryRepository.claim(); if (!delivery) return;
+      if (this.accessService) {
+        const actor = await this.accessService.getAccessForUser(delivery.user_id);
+        if (!actor || actor.blocked || actor.level !== 'owner' || !actor.permissions.includes('jobs')) {
+          await this.deliveryRepository.finish({ deliveryId: delivery.id, outcome: 'failed' }); return;
+        }
+      }
       const search = await this.searchRepository.getSettings({ userId: delivery.user_id });
       let view;
       if (delivery.kind === 'card') {

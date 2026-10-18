@@ -57,9 +57,17 @@ class ServerActionExecutor {
     this.deviceRepository = options.deviceRepository;
     this.workflowRepository = options.workflowRepository || null;
     this.continueWorkflow = options.continueWorkflow || null;
+    this.accessService = options.accessService || null;
   }
 
   async execute(input) {
+    if (this.accessService) {
+      const permissions = input.action === 'project.show_documents' ? ['life', 'documents']
+        : ['device.status.request', 'workflow.continue'].includes(input.action) ? ['life', 'devices'] : ['life'];
+      for (const permission of permissions) if (!await this.accessService.allows(input.userId, permission)) {
+        throw Object.assign(new Error('Access unavailable'), { statusCode: 403, publicCode: 'PERMISSION_DENIED' });
+      }
+    }
     const args = input.args;
     let result;
     if (input.action === 'reminder.create') result = await this.reminderService.create({

@@ -117,10 +117,12 @@ class CommandService {
     this.deviceRepository = options.deviceRepository;
     this.sessionRegistry = options.sessionRegistry;
     this.resultBroker = options.resultBroker || null;
+    this.accessService = options.accessService || null;
     this.now = options.now || (() => new Date());
   }
 
   async create(input) {
+    if (this.accessService && !await this.accessService.allows(input.userId, 'devices')) throw this.publicError(403, 'PERMISSION_DENIED');
     if (!['telegram', 'pwa', 'desktop'].includes(input.originChannel)) throw this.publicError(400, 'INVALID_COMMAND_ORIGIN');
     const normalized = validateCommandInput({
       deviceId: input.deviceId,
@@ -166,6 +168,7 @@ class CommandService {
   }
 
   async approve({ userId, commandId, originChannel, originDeviceId = null }) {
+    if (this.accessService && !await this.accessService.allows(userId, 'devices')) throw this.publicError(403, 'PERMISSION_DENIED');
     const command = await this.repository.approve({ userId, commandId, originChannel, originDeviceId });
     if (!command) throw this.publicError(409, 'CONFIRMATION_UNAVAILABLE');
     return this.dispatch(command);
@@ -204,6 +207,7 @@ class CommandService {
   }
 
   async dispatch(command) {
+    if (this.accessService && !await this.accessService.allows(command.user_id, 'devices')) throw this.publicError(403, 'PERMISSION_DENIED');
     const running = await this.repository.markRunning({ userId: command.user_id, commandId: command.id });
     if (!running) throw this.publicError(409, 'COMMAND_NOT_QUEUED');
     const message = createRemoteMessage('command.execute', {

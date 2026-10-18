@@ -30,6 +30,8 @@ const baseSchema = z.object({
   databaseUrl: z.string().max(2048),
   telegramBotToken: z.string().max(512),
   telegramAllowedIds: z.array(z.string().regex(/^\d{1,20}$/)).max(100),
+  miniAppEnabled: z.boolean(),
+  miniAppPublicOrigin: z.string().max(2048),
   modelProvider: z.enum(['echo', 'salad', 'openrouter']),
   modelFallbackProvider: z.enum(['', 'salad', 'openrouter']),
   modelTimeoutMs: z.number().int().min(1000).max(120000),
@@ -196,6 +198,8 @@ function loadConfig(env = process.env) {
     databaseUrl: String(env.DATABASE_URL || '').trim(),
     telegramBotToken: String(env.TELEGRAM_BOT_TOKEN || '').trim(),
     telegramAllowedIds: parseAllowedTelegramIds(env.TELEGRAM_ALLOWED_IDS),
+    miniAppEnabled: parseBoolean(env.JARVIS_MINI_APP_ENABLED),
+    miniAppPublicOrigin: String(env.JARVIS_MINI_APP_PUBLIC_ORIGIN || '').trim(),
     modelProvider: String(env.JARVIS_MODEL_PROVIDER || 'echo').trim().toLowerCase(),
     modelFallbackProvider: String(env.JARVIS_MODEL_FALLBACK_PROVIDER || '').trim().toLowerCase(),
     modelTimeoutMs: Number(env.JARVIS_MODEL_TIMEOUT_MS || 60000),
@@ -263,6 +267,17 @@ function loadConfig(env = process.env) {
   };
 
   const config = { ...baseSchema.parse(raw), ...loadJobConfig(env) };
+  if (config.miniAppEnabled) {
+    if (!config.databaseUrl || !config.telegramBotToken || config.operationsOwnerTelegramId === '0') {
+      throw new Error('Mini App requires database, Telegram bot and configured owner');
+    }
+    let origin;
+    try { origin = new URL(config.miniAppPublicOrigin); } catch { throw new Error('Mini App requires a valid public origin'); }
+    if (origin.protocol !== 'https:' || origin.username || origin.password || origin.pathname !== '/' || origin.search || origin.hash) {
+      throw new Error('Mini App public origin must use HTTPS without a path or credentials');
+    }
+    config.miniAppPublicOrigin = origin.origin;
+  }
   if (config.nodeEnv === 'production') {
     if (!config.databaseUrl) throw new Error('DATABASE_URL is required in production');
     if (!config.telegramBotToken) throw new Error('TELEGRAM_BOT_TOKEN is required in production');

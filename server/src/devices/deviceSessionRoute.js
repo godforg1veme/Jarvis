@@ -12,6 +12,10 @@ function createDeviceSessionHandler(options) {
   const commandService = options.commandService || null;
   const logger = options.logger || null;
   const lifeEventGateway = options.lifeEventGateway || null;
+  const accessService = options.accessService || null;
+  const requireAccess = async (current) => {
+    if (accessService && !await accessService.allows(current.user_id, 'devices')) throw new Error('device access unavailable');
+  };
 
   return async function handle(socket) {
     let device = null;
@@ -36,8 +40,10 @@ function createDeviceSessionHandler(options) {
             // already-TLS-protected WebSocket payload and is never placed in a URL.
             const authenticated = await authenticate({ authorization: `Bearer ${message.payload.token}` });
             if (message.payload.deviceId !== authenticated.id) throw new Error('device id mismatch');
+            await requireAccess(authenticated);
             const online = await repository.markOnline({ userId: authenticated.user_id, deviceId: authenticated.id });
             if (!online) throw new Error('device became unavailable');
+            await requireAccess(online);
             device = online;
             const unregister = sessionRegistry ? sessionRegistry.register(device, socket) : () => {};
             socket.once('close', unregister);
@@ -64,6 +70,9 @@ function createDeviceSessionHandler(options) {
           socket.close(1008, 'session revoked');
           return;
         }
+        // Already dispatched commands must reconcile under their original ID
+        // after access is revoked. Other frames require current device rights.
+        if (message.type !== 'command.result') await requireAccess(device);
         if (message.type === 'device.hello' && message.payload.deviceId !== device.id) {
           throw new Error('device id mismatch');
         }
