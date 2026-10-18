@@ -50,9 +50,19 @@ server 725/725, Telegram contract 65/65. Шесть автоматических
 следующий POST не появляется. CPU-модель в этом запуске повторно не тестировалась;
 её код и транспорт не менялись. Desktop не затронут.
 
-Истинная причина прошлого 403 не доказана. Для
-завершения разбора нужен новый серверный отказ с пояснением; новая отправка требует
-свежей картинки и отдельного одобрения владельца, прежняя не повторяется.
+В 18:37 МСК выполнена отдельно одобренная отправка для новой картинки: один POST,
+HTTP 403, target GET 200 с капчей, итог `unknown`. Тип запроса — XHR, CSRF header
+совпал с cookie. Возраст картинки — 135283 мс, страницы — 138278 мс. Видимого
+сообщения о неверном ответе нет. Классификатор вернул `body_unavailable`: пояснение
+не удалось прочитать с установленными ограничениями. Это не означает, что HH
+ответил пустым телом, и не доказывает CSRF-отказ, просрочку или ошибку OCR.
+Ответ больше не отправлялся.
+
+Причина обоих 403 остаётся неизвестной. Диагностика пока не различает, какое
+ограничение чтения исключило тело ответа; это незакрытая часть разбора.
+Три автоматические попытки применяются к подтверждённому отклонению капчи;
+`unknown` передаётся человеку сразу. Поэтому этот случай не подтверждает
+работоспособность полного автономного цикла.
 
 ## English
 
@@ -103,7 +113,16 @@ The 403 fixture retains the category in both the durable receipt and private
 archive and does not issue another POST. The CPU model was not retested; its code
 and transport are unchanged. Desktop is unaffected.
 
-The actual cause of the past 403 remains unproven.
-Completing the investigation requires another server rejection with an explanation;
-submission needs a fresh picture and separate owner approval, without repeating the
-old answer.
+At 18:37 Moscow time, a separately approved submission used a fresh picture:
+one POST, HTTP 403, target GET 200 with a CAPTCHA, and outcome `unknown`. The
+request was XHR and its CSRF header matched the cookie. Image age was 135283 ms;
+page age was 138278 ms. No wrong-answer message was visible. The classifier
+returned `body_unavailable`: it could not inspect an explanation within its
+limits. This does not mean HH returned an empty body or prove CSRF rejection,
+expiry, or an OCR error. The answer was not submitted again.
+
+The cause of both 403 responses remains unknown. Diagnostics do not yet identify
+which inspection restriction excluded the body; that remains an open part of the
+investigation. Three automatic attempts apply to confirmed CAPTCHA rejection;
+`unknown` immediately hands control to the owner. This case therefore does not
+confirm the complete autonomous cycle works.

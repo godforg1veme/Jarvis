@@ -56,7 +56,9 @@ deadline across metadata, fetch and body reads.
 [Исследование 403](updates/2026-10-18-hh-captcha-403-investigation.md): native XHR
 и browser/API cookies проверены с отменой answer POST. На DE включён ограниченный
 классификатор ошибок HH и закрытые timing/request fields; причина прежнего 403
-ещё не доказана, unknown не повторяется. Linux browser 71/71.
+ещё не доказана, unknown не повторяется. Linux browser 71/71. Одобренный тест
+в 18:37 МСК снова дал 403/unknown, CSRF совпал с cookie, `body_unavailable`;
+точная причина отказа и ограничение, исключившее тело, остаются неизвестны.
 
 [Живой тест 18 октября, 16:46 МСК](updates/2026-10-18-hh-ocr-live-acceptance.md):
 ответ установленной OCR-модели после отдельного одобрения владельца отправлен
