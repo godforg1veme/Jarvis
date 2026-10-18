@@ -1,4 +1,5 @@
 const crypto = require('node:crypto');
+const { formatMoscowDateTime, parseMoscowInput } = require('../../../shared/time');
 const { LIFE_SOURCE_TYPES } = require('../life/sources/sourceSchemas');
 const { PREFERENCE_KEYS } = require('../life/preferences/lifePreferenceSchemas');
 const {
@@ -25,7 +26,7 @@ function page(items, index, size = 8) {
 }
 
 function date(value) {
-  return value ? new Date(value).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' }) : 'без срока';
+  return formatMoscowDateTime(value, 'без срока');
 }
 
 function safe(value, maximum = 160) { return String(value || '').replace(/[\r\n]+/g, ' ').trim().slice(0, maximum); }
@@ -128,7 +129,7 @@ class TelegramLifeOsService {
   }
 
   async _startFlow(section, context) {
-    const definitions = { p: ['life_project_create', 'Напиши: название | описание'], r: ['life_reminder_create', 'Напиши: название | дата и время ISO'], h: ['life_person_create', `Напиши: имя | тип отношений\nТипы: ${RELATIONSHIP_TYPES.join(', ')}`], s: ['life_source_create', `Напиши: тип | название\nТипы: ${LIFE_SOURCE_TYPES.join(', ')}`] };
+    const definitions = { p: ['life_project_create', 'Напиши: название | описание'], r: ['life_reminder_create', 'Напиши: название | ГГГГ-ММ-ДД ЧЧ:ММ. Время — МСК (UTC+3). Явные Z/смещение учитываются.'], h: ['life_person_create', `Напиши: имя | тип отношений\nТипы: ${RELATIONSHIP_TYPES.join(', ')}`], s: ['life_source_create', `Напиши: тип | название\nТипы: ${LIFE_SOURCE_TYPES.join(', ')}`] };
     if (section === 'f') return null;
     const definition = definitions[section]; if (!definition || !this.interactions) return { answer: 'Пошаговый ввод недоступен.', buttons: nav(section) };
     const interaction = await this.interactions.begin({ userId: context.user.id, conversationId: context.conversation.id, chatId: context.chatId, kind: definition[0], context: {} });
@@ -168,7 +169,7 @@ class TelegramLifeOsService {
     }
     if (['p', 'h', 'r', 's'].includes(section) && action === 'edit') {
       const kinds = { p: 'life_project_update', h: 'life_person_update', r: 'life_reminder_reschedule', s: 'life_source_update' };
-      const prompts = { p: 'Напиши: название | описание | статус (active/paused/completed/archived)', h: `Напиши: имя | тип отношений | заметка\nТипы: ${RELATIONSHIP_TYPES.join(', ')}`, r: 'Напиши новую дату и время ISO', s: 'Напиши новое название источника' };
+      const prompts = { p: 'Напиши: название | описание | статус (active/paused/completed/archived)', h: `Напиши: имя | тип отношений | заметка\nТипы: ${RELATIONSHIP_TYPES.join(', ')}`, r: 'Напиши новую дату и время: ГГГГ-ММ-ДД ЧЧ:ММ. Время — МСК (UTC+3). Явные Z/смещение учитываются.', s: 'Напиши новое название источника' };
       const interaction = await this.interactions.begin({ userId, conversationId: context.conversation.id, chatId: context.chatId, kind: kinds[section], context: { targetId: id, revision } });
       return { answer: prompts[section], buttons: [[{ text: '✖️ Отмена', data: `flow:cancel:${interaction.id}` }]] };
     }
@@ -209,8 +210,8 @@ class TelegramLifeOsService {
       const confirmation = await this.interactions.begin({ userId, conversationId: context.conversation.id, chatId: context.chatId, kind: 'life_family_grant_confirm', context: grant });
       return { answer: `Предоставить доступ ${safe(grant.memberUserId, 36)} к ${safe(grant.resourceType, 30)} с правом ${safe(grant.permission, 30)}?`, buttons: [[{ text: '✅ Предоставить', data: `life:h:apply:${confirmation.id}` }, { text: '✖️ Отмена', data: `flow:cancel:${confirmation.id}` }]] };
     }
-    if (active.kind === 'life_reminder_create') result = await this.reminderService.create({ userId, origin: { channel: 'telegram', conversationId: context.conversation.id }, input: { requestId: crypto.randomUUID(), title: parts[0], triggerAt: new Date(parts[1]).toISOString(), timezone: 'Europe/Moscow', deliveryChannels: ['telegram'] } });
-    if (active.kind === 'life_reminder_reschedule') result = await this.reminderService.reschedule({ userId, reminderId: active.context.targetId, revision: active.context.revision, triggerAt: new Date(parts[0]).toISOString(), timezone: 'Europe/Moscow', recurrence: null });
+    if (active.kind === 'life_reminder_create') result = await this.reminderService.create({ userId, origin: { channel: 'telegram', conversationId: context.conversation.id }, input: { requestId: crypto.randomUUID(), title: parts[0], triggerAt: parseMoscowInput(parts[1]), timezone: 'Europe/Moscow', deliveryChannels: ['telegram'] } });
+    if (active.kind === 'life_reminder_reschedule') result = await this.reminderService.reschedule({ userId, reminderId: active.context.targetId, revision: active.context.revision, triggerAt: parseMoscowInput(parts[0]), timezone: 'Europe/Moscow', recurrence: null });
     if (active.kind === 'life_source_create') result = LIFE_SOURCE_TYPES.includes(parts[0]) && await this.sourceRepository.create({ userId, adapterType: parts[0], displayName: parts[1], enabled: false, selectedScope: {}, privacyPolicyVersion: 1, configurationMetadata: {} });
     if (active.kind === 'life_source_update') result = await this.sourceRepository.update({ userId, connectionId: active.context.targetId, revision: active.context.revision, displayName: parts[0] });
     if (active.kind === 'life_preference_set') { let value; try { value = JSON.parse(String(text)); } catch (_) { value = String(text).trim(); } result = await this.preferenceService.set({ userId, key: active.context.key, value, revision: active.context.revision }); }

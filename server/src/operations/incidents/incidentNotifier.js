@@ -6,7 +6,7 @@ class IncidentNotifier {
   async notify(incident, service) {
     const bot = this.getBot && this.getBot();
     if (!bot || !bot.api) return false;
-    const text = `**Ошибка: ${incident.summary}**\n${incidentImpact(service.serviceKey)}\nВремя: ${new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })}\nПанель: ${this.panelOrigin}/ops/#/incidents`;
+    const text = `**Ошибка: ${incident.summary}**\n${incidentImpact(service.serviceKey)}\nВремя: ${new Date().toLocaleString('ru-RU', { timeZone: 'Etc/GMT-3' })}\nПанель: ${this.panelOrigin}/ops/#/incidents`;
     try { await sendTelegramText((chunk, options) => bot.api.sendMessage(this.ownerTelegramId, chunk, options), text); return true; }
     catch (_) { if (this.logger) this.logger.warn({ incidentId: incident.id }, 'operations incident notification failed'); return false; }
   }

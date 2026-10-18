@@ -1,3 +1,4 @@
+const { formatMoscowDateTime } = require('../shared/time');
 let electronShell = null;
 try {
   const electron = require('electron');
@@ -30,7 +31,7 @@ function mapAction(action) {
 }
 
 function resultContent(file) {
-  const date = file.modifiedAt ? new Date(file.modifiedAt).toLocaleString('ru-RU') : '';
+  const date = file.modifiedAt ? formatMoscowDateTime(file.modifiedAt) : '';
   return `${file.path}${file.size ? ` (${formatSize(file.size)})` : ''}${date ? ` · ${date}` : ''}`;
 }
 

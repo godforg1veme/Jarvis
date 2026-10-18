@@ -237,10 +237,10 @@ async function openMemoryDetail(memoryId, preserveDetail = false) {
     ? record.corrected_summary : observation.sceneSummary;
   const image = document.createElement('img');
   image.src = `data:${result.image.contentType};base64,${result.image.data}`;
-  image.alt = `Визуальный снимок от ${new Date(record.captured_at).toLocaleString('ru-RU')}`;
+  image.alt = `Визуальный снимок от ${new Date(record.captured_at).toLocaleString('ru-RU', { timeZone: 'Etc/GMT-3', hourCycle: 'h23' }) + ' МСК'}`;
   const title = document.createElement('h3'); title.textContent = displaySummary;
   const meta = document.createElement('p');
-  meta.textContent = `${new Date(record.captured_at).toLocaleString('ru-RU')} · ${record.source_id} · уверенность ${observation.confidence === null ? '—' : Math.round(observation.confidence * 100) + '%'}`;
+  meta.textContent = `${new Date(record.captured_at).toLocaleString('ru-RU', { timeZone: 'Etc/GMT-3', hourCycle: 'h23' }) + ' МСК'} · ${record.source_id} · уверенность ${observation.confidence === null ? '—' : Math.round(observation.confidence * 100) + '%'}`;
   const actions = document.createElement('div'); actions.className = 'memory-detail-actions';
   const feedback = document.createElement('p'); feedback.setAttribute('role', 'status'); feedback.setAttribute('aria-live', 'polite');
   let pending = false;
@@ -315,7 +315,7 @@ async function loadMemoryTimeline() {
   for (const memory of result.memories) {
     const row = document.createElement('button'); row.type = 'button'; row.className = 'memory-row';
     const label = document.createElement('strong'); label.textContent = `${memory.pinned ? 'PIN · ' : ''}${memory.sensitivity === 'sensitive' ? 'PRIVATE · ' : ''}${memory.source_id}`;
-    const date = document.createElement('span'); date.textContent = new Date(memory.captured_at).toLocaleString('ru-RU');
+    const date = document.createElement('span'); date.textContent = new Date(memory.captured_at).toLocaleString('ru-RU', { timeZone: 'Etc/GMT-3', hourCycle: 'h23' }) + ' МСК';
     const status = document.createElement('span'); status.textContent = memory.state === 'pending_sensitive_consent' ? 'Ожидает решения о хранении' : 'Сохранён';
     row.append(label, date, status);
     row.addEventListener('click', () => openMemoryDetail(memory.id));

@@ -4,8 +4,8 @@ export const statusLabels: Record<string, string> = {
 };
 
 export function dateLabel(value: string | null) {
-  if (!value) return 'нет данных';
-  return new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(value));
+  if (!value || !Number.isFinite(new Date(value).getTime())) return 'нет данных';
+  return new Intl.DateTimeFormat('ru-RU', { timeZone: 'Etc/GMT-3', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).format(new Date(value)) + ' МСК';
 }
 
 export function serviceTag(key: string) {

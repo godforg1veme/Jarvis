@@ -25,7 +25,7 @@ function itemIcon(item) {
 
 function safeDate(value) {
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('ru-RU');
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('ru-RU', { timeZone: 'Etc/GMT-3' });
 }
 
 function previewButtons(source, id, page) {

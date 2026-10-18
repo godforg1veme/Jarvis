@@ -9,6 +9,21 @@ source changes; verify the deployed revision before a server rollout.
 
 ## Change control
 
+19 октября 2026, по запросу владельца: пользовательские часы и даты — МСК,
+фиксированный UTC+3. В «Life OS → Напоминания → Добавить/Перенести» ввод без
+пояса означает московское время; явные ISO Z/offset сохраняют момент.
+Подсказка указывает МСК, карточка показывает МСК. Неверный календарный ввод
+не потребляет guided state; исправленный ввод сохраняет прежние user/chat/
+conversation, revision, expiry и single consumption. Callback grammar/kinds
+не меняются. Старые записи не сдвигаются автоматически.
+
+October 19, 2026, owner request: user-facing dates/times use fixed Moscow UTC+3.
+In Life OS reminder create/reschedule, timezone-free input means Moscow time;
+explicit ISO Z/offset retains the instant. Prompts and cards state Moscow time.
+Invalid calendar input does not consume guided state; valid input retains
+user/chat/conversation, revision, expiry and single consumption. Callback grammar
+and kinds are unchanged. Existing records are not automatically shifted.
+
 18 октября, выпущено на DE по запросу владельца: раздел «Помощь», нижняя кнопка,
 справочный ответ и `/help` удалены. Старый текст кнопки обрабатывается как обычный
 ввод с текущими правами. Клавиатура обновится при открытии «Главное».

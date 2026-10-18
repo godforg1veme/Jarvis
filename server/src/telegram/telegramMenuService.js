@@ -1,4 +1,5 @@
 const { publicDocumentStatus } = require('../knowledge/knowledgeService');
+const { parseMoscowInput, formatMoscowDateTime } = require('../../../shared/time');
 const { containsSensitiveMemoryData, normalizeMemoryContent } = require('../memory/memoryService');
 const { normalizeDeviceName } = require('../devices/deviceService');
 const { validateAction: validateVpnAction, normalizeSubscriptionLabel } = require('../vpn/vpnCommandService');
@@ -115,7 +116,7 @@ class TelegramMenuService {
     if (!this.lifeMissionControlService) return { answer: 'Life OS пока не включён.' };
     const data = await this.lifeMissionControlService.get({ userId: context.user.id });
     const mission = data.currentMission ? `Текущая миссия: ${data.currentMission.name}` : 'Текущая миссия не выбрана.';
-    const commitments = data.commitments.slice(0, 5).map((item) => `• ${item.title}${item.dueAt ? ` — ${new Date(item.dueAt).toLocaleString('ru-RU')}` : ''}`).join('\n');
+    const commitments = data.commitments.slice(0, 5).map((item) => `• ${item.title}${item.dueAt ? ` — ${formatMoscowDateTime(item.dueAt)}` : ''}`).join('\n');
     const proposals = data.proposals.slice(0, 5);
     const proposalText = proposals.map((item) => `• ${item.title}`).join('\n');
     return {
@@ -318,6 +319,15 @@ class TelegramMenuService {
       : { answer: 'Поиск работы сейчас недоступен.' };
 
     if (interaction.kind.startsWith('life_') && this.lifeOsService) {
+      if (['life_reminder_create', 'life_reminder_reschedule'].includes(interaction.kind)) {
+        try {
+          const parts = value.split('|').map((part) => part.trim());
+          if (interaction.kind === 'life_reminder_create' && (!parts[0] || parts.length !== 2)) throw new Error('Invalid date');
+          parseMoscowInput(parts[interaction.kind === 'life_reminder_create' ? 1 : 0]);
+        } catch {
+          return { answer: 'Проверь дату: ГГГГ-ММ-ДД ЧЧ:ММ или ДД.ММ.ГГГГ ЧЧ:ММ. Время — МСК (UTC+3). Повтори ввод.', buttons: interactionCancel(interaction.id) };
+        }
+      }
       try {
         const consumed = await this.interactions.consume({ id: interaction.id, userId: context.user.id, conversationId: context.conversation.id, chatId: context.chatId });
         if (!consumed) return { answer: 'Этот запрос уже недоступен.' };

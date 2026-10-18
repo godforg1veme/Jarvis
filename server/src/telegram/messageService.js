@@ -1,3 +1,4 @@
+const { formatMoscowDateTime } = require('../../../shared/time');
 const MAX_TEXT_LENGTH = 10000;
 const MAX_TELEGRAM_VOICE_BYTES = 5 * 1024 * 1024;
 const MAX_TELEGRAM_VOICE_SECONDS = 120;
@@ -495,7 +496,7 @@ class TelegramMessageService {
     if (command === '/life') {
       const data = await this.lifeMissionControlService.get({ userId: user.id });
       const mission = data.currentMission ? `Текущая миссия: ${data.currentMission.name}` : 'Текущая миссия не выбрана.';
-      const commitments = data.commitments.slice(0, 5).map((item) => `• ${item.title}${item.dueAt ? ` — ${new Date(item.dueAt).toLocaleString('ru-RU')}` : ''}`).join('\n');
+      const commitments = data.commitments.slice(0, 5).map((item) => `• ${item.title}${item.dueAt ? ` — ${formatMoscowDateTime(item.dueAt)}` : ''}`).join('\n');
       const proposalsText = data.proposals.slice(0, 5).map((item) => `• ${item.title}`).join('\n');
       const answer = [mission, commitments ? `\nДоговорённости:\n${commitments}` : '', proposalsText ? `\nПредложения:\n${proposalsText}` : ''].join('').slice(0, MAX_TEXT_LENGTH);
       const buttons = data.proposals.slice(0, 5).map((item) => [

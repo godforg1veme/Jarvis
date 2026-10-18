@@ -1,3 +1,4 @@
+const { moscowIso } = require('../../../shared/time');
 const { PERSONA_POLICY_ID, PERSONA_POLICY_TEXT } = require('./personaPolicy');
 const { hasProviderIdentity, hasUnverifiedUserIdentity } = require('../assistant/outputPolicyValidator');
 const { normalizeDevicePromptContext } = require('../devices/devicePromptContext');
@@ -68,6 +69,8 @@ function buildRuntimePolicy(runtimeContext = {}) {
 
   return {
     channel,
+    timeZone: 'Etc/GMT-3',
+    currentTimeMoscow: moscowIso(),
     toolsAvailable: tools,
     hasVerifiedToolResults: verifiedResults.length > 0,
     hasVerifiedDevices: runtimeContext.hasVerifiedDevices === true,

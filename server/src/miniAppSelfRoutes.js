@@ -1,3 +1,4 @@
+const { formatMoscowDateTime } = require('../../shared/time');
 const { z } = require('zod');
 const { createHash } = require('node:crypto');
 const { PERMISSIONS } = require('./access/permissionCatalog');
@@ -32,7 +33,7 @@ function registerMiniAppSelfRoutes({ route, authorize }, services) {
     else if (permission === 'life' && missionControlService) {
       const data = await missionControlService.get({ userId });
       if (data.currentMission) items.push({ id: data.currentMission.id, title: data.currentMission.name, detail: 'Текущая миссия' });
-      items.push(...(data.commitments || []).slice(0, 30).map((item) => ({ id: item.id, title: item.title, detail: 'Договорённость' })));
+      items.push(...(data.commitments || []).slice(0, 30).map((item) => ({ id: item.id, title: item.title, detail: item.dueAt ? `Договорённость · ${formatMoscowDateTime(item.dueAt)}` : 'Договорённость' })));
     } else if (permission === 'jobs') {
       if (actor.level !== 'owner') notice = 'Нужно отдельное подключение HH. Аккаунт владельца другим людям не передаётся.';
       else notice = 'Настройки поиска, вакансии и подтверждения откликов доступны в личном чате с ботом.';

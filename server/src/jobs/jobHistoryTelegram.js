@@ -2,7 +2,7 @@ const {response,button}=require('./jobTelegramViews');
 const employer={not_viewed:'Не просмотрен',viewed:'Просмотрен',invited:'Приглашение',rejected:'Отказ',unknown:'Статус HH не подтверждён'};
 const sending={sending:'Отправка обрабатывается',sent:'Отправлен',unknown:'Результат отправки неизвестен',failed:'Ошибка отправки',manual_required:'Нужны дополнительные действия',already_applied:'Ранее найден отклик'};
 const syncStatus={queued:'В очереди',running:'Обновляется',paused:'Проверка приостановлена; сохранённый прогресс продолжится',complete:'Проверка завершена',incomplete:'История прочитана не полностью',failed:'Проверка не завершена; сохранённые данные показаны ниже'};
-const date=x=>x?new Date(x).toLocaleString('ru-RU',{timeZone:'Europe/Moscow'}):'неизвестно';
+const date=x=>x?new Date(x).toLocaleString('ru-RU',{timeZone:'Etc/GMT-3'}):'неизвестно';
 function summary(s,available){
   if(!available)return'Чтение истории HH не настроено. Показан журнал Jarvis.';
   if(!s)return'Для загрузки истории подключи HH и нажми «Обновить из HH».';

@@ -8,7 +8,7 @@ function homeView({ search, usage, connection, captchaEnabled = false }) {
   return response(`Поиск работы\n${enabled ? 'Поиск включён' : 'Поиск выключен'}
 Проверка: каждые ${Math.round(search.settings.intervalMs / 60000)} мин.
 Первая выдача: ${search.settings.historyDays} дней.
-Последняя успешная проверка: ${search.checkpoint ? new Date(search.checkpoint).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' }) : 'ещё не выполнена'}
+Последняя успешная проверка: ${search.checkpoint ? new Date(search.checkpoint).toLocaleString('ru-RU', { timeZone: 'Etc/GMT-3' }) : 'ещё не выполнена'}
 API за ${usage.month}: $${Number(usage.total).toFixed(4)}${usage.pending ? `, ${usage.pending} запросов с уточняемой стоимостью` : ''}.
 Уведомление: $${search.settings.budgetUsd}; работа после него продолжается.
 HH: ${connection?.status === 'connected' ? connection.resume_id ? 'подключён, основное резюме выбрано' : 'нужно выбрать резюме' : 'не подключён'}.
@@ -36,7 +36,7 @@ function cardView(vacancy) {
 ${v.city || 'Город не указан'} · ${{ remote: 'удалённо', office: 'офис', hybrid: 'гибрид' }[v.workFormat] || 'формат не уточнён'}
 ${v.employment || 'Занятость не уточнена'}
 ${descriptionSalary(v.description).slice(0, 3).map((salary) => `В описании: ${salaryText(salary)}`).join('\n')}
-Опубликовано: ${new Date(v.publishedAt).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' })}
+Опубликовано: ${new Date(v.publishedAt).toLocaleDateString('ru-RU', { timeZone: 'Etc/GMT-3' })}
 ${(vacancy.annotations || []).map((code) => ANNOTATIONS[code]).filter(Boolean).join('\n')}
 ${v.url}`, [
     [{ text: 'Открыть вакансию', url: v.url }], [button('Подготовить отклик', 'prepare', vacancy.id)],

@@ -116,9 +116,26 @@ async function keyboardAcceptance(browser) {
   await page.close();
 }
 
+async function moscowTimeAcceptance(browser) {
+  for (const timezoneId of ['UTC', 'America/Los_Angeles', 'Asia/Tokyo']) {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, timezoneId });
+    const data = fixture('populated');
+    data.missionControl.reminders[0].triggerAt = '2026-10-18T20:46:00Z';
+    data.missionControl.commitments[0].dueAt = '2026-10-18T21:01:00Z';
+    await page.addInitScript(`window.cloudMockSource = ${cloudMock.toString()}; window.jarvisCloud = window.cloudMockSource(${JSON.stringify(data)}, false);`);
+    await page.goto(pathToFileURL(path.join(root, 'renderer', 'cloud-chat', 'index.html')).href);
+    await page.click('#life-os-open');
+    await page.getByText(/23:46.*МСК/).first().waitFor();
+    assert.equal(await page.getByText(/00:01.*МСК/).first().isVisible(), true);
+    assert.match(await page.getByText(/00:01.*МСК/).first().textContent(), /19/);
+    await page.close();
+  }
+}
+
 (async () => {
   const browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || 'msedge' });
   try {
+    await moscowTimeAcceptance(browser);
     await capture(browser, 'mission-control-1440', 1440, 'populated');
     await capture(browser, 'mission-control-390', 390, 'populated');
     await capture(browser, 'mission-control-320', 320, 'populated');
