@@ -10,6 +10,7 @@ test('captcha dispatch never follows or forwards redirects, including preserved-
       fulfill: async (value) => { fulfilled = value; }, abort: async () => assert.fail('approved answer dispatch should reconcile by GET') };
     const result = await dispatchCaptcha(route); assert.equal(result.acknowledged, status === 200);
     assert.equal(result.httpStatus, status);
+    assert.equal(result.redirectKind, status >= 300 && status < 400 ? 'external' : 'none');
     assert.equal(requests, 1); assert.equal(fulfilled.status, 204); assert.equal(fulfilled.headers.location, undefined);
   }
 });

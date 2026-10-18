@@ -17,6 +17,10 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
+[Разбор неподтверждённой ручной отправки HH](updates/2026-10-18-hh-captcha-receipt-diagnosis.md):
+найдена потеря сведений о HTTP/verifier; готовится долговечная закрытая квитанция
+для обоих путей. Причина последней настоящей попытки пока не доказана.
+
 [Приватный журнал попыток OCR установлен на DE](updates/2026-10-18-hh-captcha-evidence.md):
 картинка, ответ и закрытые результаты для разбора новых неудач. Linux browser — 62/62;
 экспорт проверен, архив пока пуст. Прежние картинки и ответы восстановить нельзя.
@@ -174,6 +178,10 @@ describes publishing. Plans describe intentions. Code, checks, and actual
 deployment establish what is running.
 
 ### Current status
+
+[Unconfirmed human HH submission investigation](updates/2026-10-18-hh-captcha-receipt-diagnosis.md):
+HTTP/verifier details were not retained; a durable closed receipt is being prepared
+for both paths. The cause of the last actual attempt remains unproven.
 
 [Private OCR attempt evidence is installed on DE](updates/2026-10-18-hh-captcha-evidence.md):
 image, answer and closed outcomes for new failure analysis. Linux browser checks passed 62/62;

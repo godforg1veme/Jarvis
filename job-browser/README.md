@@ -7,6 +7,10 @@
 [Результат выпуска](../docs/updates/2026-10-15-job-search-release.md).
 Playwright/Chromium согласованы владельцем 15 октября 2026.
 
+Последняя закрытая квитанция любой отправки сохраняется в manual state;
+`node src/exportCaptchaReceipt.js` читает её без POST/refresh.
+[Поля, ограничения и разбор unknown](../docs/updates/2026-10-18-hh-captcha-receipt-diagnosis.md).
+
 Приватный архив автоматических попыток описан в
 [записи о диагностике](../docs/updates/2026-10-18-hh-captcha-evidence.md).
 Он хранится в owner-bound `profile/captcha-evidence`: до 64 PNG/ответов,

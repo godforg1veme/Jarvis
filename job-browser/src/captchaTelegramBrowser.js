@@ -109,6 +109,25 @@ class CaptchaTelegramBrowser {
       pngBase64: value.png.toString('base64'), expiresAt: new Date(value.expires).toISOString() };
   }
   answer(input) { return this.run(() => this.submitAnswer(input)); }
+  async saveReceipt(patch) {
+    this.receipt = { ...this.receipt, ...patch };
+    await this.coordinator.write({ lastReceipt: this.receipt });
+  }
+  async visibleState() {
+    if (!this.page || this.page.isClosed() || this.crashed.has(this.page)) return { view: 'unavailable', visibleError: 'unavailable' };
+    const u = new URL(this.page.url());
+    if (u.origin !== 'https://hh.ru' || u.pathname !== '/account/captcha') return { view: 'other', visibleError: 'none' };
+    try {
+      const visibleError = await this.page.evaluate(() => {
+        const text = document.body?.innerText?.slice(0, 8000) || '';
+        if (/неверн.{0,30}(?:введ|ответ|символ)|incorrect.{0,20}(?:answer|captcha)/iu.test(text)) return 'wrong_answer';
+        if (/срок.{0,20}ист[её]к|captcha.{0,20}expired/iu.test(text)) return 'expired';
+        if (/слишком много|too many requests/iu.test(text)) return 'rate_limit';
+        return 'none';
+      });
+      return { view: 'captcha', visibleError };
+    } catch { return { view: 'captcha', visibleError: 'unavailable' }; }
+  }
   async submitAnswer(input) {
     this.lastAttemptReceipt = null;
     const text = normalizeAnswer(input.text); if (!text) return { outcome: 'invalid' };
@@ -125,6 +144,10 @@ class CaptchaTelegramBrowser {
     await this.page.locator('form input[name="captchaText"]').fill(text, { timeout: 3000 });
     const filled = await this.picture();
     if (!filled || filled.key !== current.key || !sameForm(filled.form, current.form)) return { outcome: 'stale' };
+    this.receipt = { operationHash, startedAt: this.now(), stage: 'prepared', received: false, permitted: 0,
+      httpStatus: null, redirect: 'none', verification: 'not_checked', verificationStatus: null,
+      view: 'unavailable', visibleError: 'unavailable', outcome: 'pending' };
+    await this.saveReceipt({});
     await this.coordinator.claimMany([hashKey(current.key), operationHash]);
     current.used = true;
     const armed = { current, text, permitted: 0, request: null }; this.armed = armed;
@@ -137,13 +160,17 @@ class CaptchaTelegramBrowser {
     } catch { /* A lost receipt never authorizes another answer POST. */ }
     finally { this.armed = null; }
     await this.drain();
+    await this.saveReceipt({ received, ...await this.visibleState() });
     const result = await this.coordinator.finish(this.coordinator.status().revision);
     if (result.phase === 'idle') this.current = null;
     const rejected = received && armed.permitted === 1 && (!this.automatic
       || armed.acknowledged === true && this.lastVerification === 'captcha');
     this.lastAttemptReceipt = { received, permitted: armed.permitted, httpStatus: armed.httpStatus || null,
       verification: result.phase === 'idle' ? 'verified' : this.lastVerification === 'captcha' ? 'captcha' : 'unconfirmed' };
-    return { outcome: result.phase === 'idle' ? 'solved' : rejected ? 'new_challenge' : 'unknown' };
+    const outcome = result.phase === 'idle' ? 'solved' : rejected ? 'new_challenge' : 'unknown';
+    await this.saveReceipt({ stage: 'finished', outcome, verification: this.verificationReason || 'not_checked',
+      verificationStatus: this.verificationStatus ?? null });
+    return { outcome };
   }
   async permit(route) {
     const req = route.request();
@@ -160,17 +187,22 @@ class CaptchaTelegramBrowser {
     if (!armed || armed.permitted || armed.current.revision !== this.coordinator.status().revision
       || !validAnswerRequest(input, armed.current.form, armed.current.target, armed.text, armed.current.key)) return false;
     armed.permitted++; armed.request = req;
-    const dispatched = this.dispatch(route); this.dispatches.add(dispatched);
-    try {
-      const result = await dispatched;
+    const dispatched = (async () => {
+      await this.saveReceipt({ stage: 'dispatching', permitted: 1 });
+      const result = await this.dispatch(route);
       armed.acknowledged = result?.acknowledged === true;
       armed.httpStatus = Number.isInteger(result?.httpStatus) && result.httpStatus >= 100 && result.httpStatus <= 599 ? result.httpStatus : null;
-    } finally { this.dispatches.delete(dispatched); }
+      await this.saveReceipt({ stage: 'response', httpStatus: armed.httpStatus,
+        redirect: ['none', 'captcha', 'same_origin', 'external', 'invalid'].includes(result?.redirectKind) ? result.redirectKind : 'none' });
+    })();
+    this.dispatches.add(dispatched);
+    try { await dispatched; } finally { this.dispatches.delete(dispatched); }
     return true;
   }
   async drain() { await Promise.allSettled([...this.dispatches]); }
   async verify(target, recoveryId) {
     this.lastVerification = null;
+    this.verificationReason = 'navigation_failed'; this.verificationStatus = null;
     await this.drain(); this.armed = null; this.initAllowed = false;
     if (!validTarget(target)) return false;
     const reader = await this.context.newPage();
@@ -178,9 +210,11 @@ class CaptchaTelegramBrowser {
       const response = await reader.goto(target, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await reader.waitForTimeout(1500);
       const current = new URL(reader.url());
-      if (response?.status() !== 200) return false;
-      if (await readForm(reader, target)) { this.lastVerification = 'captcha'; return false; }
-      if (current.href !== target) return false;
+      this.verificationStatus = response?.status() ?? null;
+      if (response?.status() !== 200) { this.verificationReason = 'http_status'; return false; }
+      this.verificationReason = 'reader_failed';
+      if (await readForm(reader, target)) { this.lastVerification = 'captcha'; this.verificationReason = 'captcha'; return false; }
+      if (current.href !== target) { this.verificationReason = 'different_location'; return false; }
       const observation = await reader.evaluate(() => ({ text: document.body?.innerText?.slice(0, 64000) || '',
         vacancyLinks: document.querySelectorAll('[data-qa="vacancy-serp__vacancy"]').length,
         vacancyContent: Boolean(document.querySelector('[data-qa="vacancy-description"]')),
@@ -204,7 +238,7 @@ class CaptchaTelegramBrowser {
         if (!state || state.operationId !== recoveryId) return false;
         await this.journal.write({ ...state, phase: 'resolved' });
       }
-      return true;
+      this.verificationReason = 'verified'; return true;
     } finally { await reader.close().catch(() => {}); }
   }
   async close() { this.current = null; this.armed = null; if (this.page) await bounded(() => this.page.close(), 2000).catch(() => {}); }

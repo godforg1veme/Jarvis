@@ -9,6 +9,11 @@ source changes; verify the deployed revision before a server rollout.
 
 ## Change control
 
+18 октября: [квитанция ручной и автоматической отправки](updates/2026-10-18-hh-captcha-receipt-diagnosis.md)
+содержит только закрытые status/stage/category, без текста ответа и данных HH.
+Она дополняет owner-bound manual state и локальный экспорт; Telegram-путь,
+кнопки, подписи, исходная operation и подтверждение прежние. Unknown не повторяется.
+
 18 октября 2026 владелец согласовал приватный архив картинок и ответов только
 автоматических попыток. [Изменение](updates/2026-10-18-hh-captcha-evidence.md)
 внутреннее: browser → OCR → прежний native POST/verifier → прежнее фото владельцу.

@@ -19,7 +19,7 @@ const { CaptchaAttemptStore } = require('../src/captchaAttemptStore');
 
 const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lVQAAAAASUVORK5CYII=', 'base64');
 
-async function scenario({ mode, recognize = async () => 'проверка картинки', png = pixel, expected = 'проверка картинки' }) {
+async function scenario({ mode, recognize = async () => 'проверка картинки', png = pixel, expected = 'проверка картинки', human = false }) {
   const browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || undefined });
   const context = await browser.newContext({ serviceWorkers: 'block' });
   await context.setOffline(true);
@@ -40,7 +40,8 @@ async function scenario({ mode, recognize = async () => 'проверка кар
     if (mode === 'unknown') return route.abort();
     if (mode === 'success' || mode === 'second' && posts === 2 || mode === 'third' && posts === 3) solved = true;
     await route.fulfill({ status: 204 });
-    return { acknowledged: mode !== 'redirect', httpStatus: mode === 'redirect' ? 302 : 200 };
+    return { acknowledged: mode !== 'redirect', httpStatus: mode === 'redirect' ? 302 : 200,
+      redirectKind: mode === 'redirect' ? 'captcha' : 'none' };
   } });
   const archive = await mkdtemp(path.join(os.tmpdir(), 'hh-captcha-acceptance-'));
   const memory = new Map();
@@ -69,6 +70,9 @@ async function scenario({ mode, recognize = async () => 'проверка кар
       <script>fetch('/captcha?lang=RU',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'}}).then(r=>r.json()).then(v=>picture.src='/captcha/picture?key='+v.key).catch(()=>{});</script>` });
   });
   await coordinator.load(); await coordinator.pending({ target, recoveryId: randomUUID() });
+  if (human) {
+    await coordinator.write({ phase: 'active', automatic: { attempts: 1, phase: 'human', challengeHash: 'f'.repeat(64) } });
+  }
   const broker = createCaptchaBroker({ controller, coordinator, ownerId, token });
   await new Promise(resolve => broker.listen(0, '127.0.0.1', resolve));
   const client = new JobCaptchaClient({ ownerId, token, baseUrl: `http://127.0.0.1:${broker.address().port}/rpc`, allowTestHttp: true });
@@ -82,16 +86,29 @@ async function scenario({ mode, recognize = async () => 'проверка кар
     assert.ok(Buffer.isBuffer(value.png)); return { message_id: 123 };
   } });
   try {
-    for (let i = 0; i < 5; i++) await worker.tick();
-    const wanted = mode === 'success' || mode === 'unknown' || mode === 'redirect' ? 1 : mode === 'second' ? 2 : 3;
+    if (human) {
+      await worker.tick();
+      const photo = await client.challenge(false);
+      assert.equal((await client.answer({ challengeId: photo.challengeId, revision: photo.revision,
+        operationId: randomUUID(), text: expected })).outcome, 'unknown');
+    } else for (let i = 0; i < 5; i++) await worker.tick();
+    const wanted = human || mode === 'success' || mode === 'unknown' || mode === 'redirect' ? 1 : mode === 'second' ? 2 : 3;
     assert.equal(posts, wanted); assert.equal(photos, solved ? 0 : 1);
     assert.equal(coordinator.status().phase, solved ? 'idle' : 'active');
     if (!solved) assert.equal(saved.automatic.phase, 'human');
     const records = await evidence.export();
-    assert.equal(records.length, wanted);
+    assert.equal(records.length, human ? 0 : wanted);
     assert.ok(records.every(v => v.answer === expected && Buffer.from(v.pngBase64, 'base64').length > 33));
-    assert.equal(records.at(-1).phase, solved ? 'solved' : mode === 'reject' ? 'new_challenge' : 'unknown');
-    assert.equal(records.at(-1).receipt.httpStatus, mode === 'unknown' ? null : mode === 'redirect' ? 302 : 200);
+    if (!human) {
+      assert.equal(records.at(-1).phase, solved ? 'solved' : mode === 'reject' ? 'new_challenge' : 'unknown');
+      assert.equal(records.at(-1).receipt.httpStatus, mode === 'unknown' ? null : mode === 'redirect' ? 302 : 200);
+    }
+    assert.equal(saved.lastReceipt.outcome, solved ? 'solved' : mode === 'reject' ? 'new_challenge' : 'unknown');
+    assert.equal(saved.lastReceipt.stage, 'finished');
+    assert.equal(saved.lastReceipt.httpStatus, mode === 'unknown' ? null : mode === 'redirect' ? 302 : 200);
+    assert.equal(saved.lastReceipt.redirect, mode === 'redirect' ? 'captcha' : 'none');
+    assert.equal(saved.lastReceipt.verification, solved ? 'verified' : 'captcha');
+    assert.equal(saved.lastReceipt.view, mode === 'unknown' ? 'other' : 'captcha');
   } finally {
     broker.closeAllConnections(); await new Promise(resolve => broker.close(resolve));
     worker.stop(); await controller.close(); await context.close(); await browser.close();
@@ -101,6 +118,10 @@ async function scenario({ mode, recognize = async () => 'проверка кар
 
 test('real Chromium + broker + Telegram worker: first/second/third success, three rejections, unknown/redirect stop', { timeout: 90000 }, async () => {
   for (const mode of ['success', 'second', 'third', 'reject', 'unknown', 'redirect']) await scenario({ mode });
+});
+
+test('human answer preserves a durable redirect receipt without archiving human text', { timeout: 20000 }, async () => {
+  await scenario({ mode: 'redirect', human: true });
 });
 
 test('actual fine-tuned CPU model through PNG, Chromium native form, broker and Telegram worker', {
