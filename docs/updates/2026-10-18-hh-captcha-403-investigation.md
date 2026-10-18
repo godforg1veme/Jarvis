@@ -64,6 +64,42 @@ HTTP 403, target GET 200 с капчей, итог `unknown`. Тип запро�
 `unknown` передаётся человеку сразу. Поэтому этот случай не подтверждает
 работоспособность полного автономного цикла.
 
+## Проверка публичного источника и сетевого слоя
+
+Поиск по открытым материалам нашёл почти совпадающий пользовательский отчёт:
+ручный ответ на `/account/captcha` также получал 403 от `ddos-guard`, а в
+JSON было `hhcaptcha.isBot=true`. Это запись другого пользователя и другого
+окружения, поэтому она служит гипотезой, а не доказательством нашего отказа.
+Справка HH подтверждает назначение капчи: проверка должна отличить человека от
+программы; среди описанных причин — подозрение на взлом и повторные неверные
+пароли. [Отчёт с аналогичным симптомом](https://stackoverflow.com/questions/79908359/requests-session-captcha-post-returns-403-and-next-request-still-resolves-to),
+[справка HH о капче](https://feedback.hh.ru/knowledge-base/article/6541).
+
+Выполнены безопасные GET к документированному публичному поиску вакансий
+`https://api.hh.ru/vacancies?text=python&per_page=1`: Windows-компьютер использовал
+fallback User-Agent существующего `HhClient`, DE container — настроенный production
+`HH_USER_AGENT` (значение не выводилось). Оба получили HTTP 403, `Server: ddos-guard`,
+JSON `type=forbidden`. Запросы были только на чтение, без owner cookies и
+авторизационных данных.
+Репозиторий уже содержит `HhClient`, но production collector выбирает браузерный
+RPC. [Официальный API поиска вакансий](https://github.com/hhru/api/blob/master/docs/vacancies.md),
+[описание `captcha_required` в API](https://github.com/hhru/api/blob/master/docs/errors.md).
+
+Отправка ответа в Jarvis идёт через Playwright `route.fetch()`. Документация
+описывает этот путь через `APIRequestContext`; перехватчик страницы работает до
+того, как сетевой слой браузера добавит часть заголовков. Следовательно,
+отличие транспорта остаётся возможной причиной. Предыдущие отменённые пробы
+сверяли форму, видимые заголовки и cookies, но не сравнивали реальную отправку
+браузера с `route.fetch` — все answer POST в них отменялись. [Playwright `APIRequestContext`](https://playwright.dev/docs/api/class-apirequestcontext),
+[сетевые заголовки и перехват запросов](https://playwright.dev/docs/network).
+
+Вывод: правильный OCR и совпавший CSRF не доказывают, что сервер принял запрос
+на уровне защиты. Наиболее сильная версия сейчас — отказ сетевого/защитного
+слоя до проверки ответа капчи; конкретный компонент и причина пока неизвестны.
+Публичный API из текущих двух сетевых точек тоже получил отказ, поэтому переход
+на него пока не подтверждён. Следующий полезный шаг — получить от HH объяснение
+403 и проверить, разрешён ли их API для этого VPS.
+
 ## English
 
 18 October 2026. At 17:58 Moscow time the last automatic attempt received HTTP
@@ -126,3 +162,38 @@ which inspection restriction excluded the body; that remains an open part of the
 investigation. Three automatic attempts apply to confirmed CAPTCHA rejection;
 `unknown` immediately hands control to the owner. This case therefore does not
 confirm the complete autonomous cycle works.
+
+## Public API and network-layer check
+
+A close user report describes a manually entered answer to `/account/captcha`
+also receiving 403 from `ddos-guard`, with `hhcaptcha.isBot=true` in JSON. It
+concerns another account and environment, so it is a lead rather than proof of
+our failure. HH's help center says CAPTCHA distinguishes a person from a program;
+it lists suspected account compromise and repeated incorrect passwords among
+possible triggers. [Similar user report](https://stackoverflow.com/questions/79908359/requests-session-captcha-post-returns-403-and-next-request-still-resolves-to),
+[HH CAPTCHA help](https://feedback.hh.ru/knowledge-base/article/6541).
+
+Read-only GETs tested the documented public vacancy search endpoint
+`https://api.hh.ru/vacancies?text=python&per_page=1`: the Windows computer used
+the existing `HhClient` fallback User-Agent, while the DE container used its
+configured production `HH_USER_AGENT` (its value was not printed). Both returned
+HTTP 403, `Server: ddos-guard`, and JSON `type=forbidden`. The probes used no owner
+cookies or authorization credentials. The repository already contains `HhClient`,
+while the production collector selects browser RPC. [Official vacancy-search API](https://github.com/hhru/api/blob/master/docs/vacancies.md),
+[API `captcha_required` flow](https://github.com/hhru/api/blob/master/docs/errors.md).
+
+Jarvis sends the answer through Playwright `route.fetch()`. Its documentation
+describes this path through `APIRequestContext`; page routing occurs before the
+browser network layer adds some headers. A transport difference remains a
+possible cause. Earlier cancelled probes compared the form, visible headers and
+cookies, but did not compare a real browser submission with `route.fetch`; all
+answer POSTs in those probes were cancelled. [Playwright `APIRequestContext`](https://playwright.dev/docs/api/class-apirequestcontext),
+[request interception and network headers](https://playwright.dev/docs/network).
+
+Conclusion: correct OCR and a matching CSRF token do not prove the protection
+layer accepted the request. The strongest current hypothesis is rejection by a
+network or protection layer before CAPTCHA-answer validation; the specific
+component and reason remain unknown. The public API was also rejected from both
+tested network locations, so switching to it is not yet verified. The next useful
+step is to ask HH to explain the 403 and confirm whether this VPS may use their
+API.
