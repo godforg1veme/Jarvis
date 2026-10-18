@@ -6,10 +6,11 @@
 
 19 октября 2026 исправлены отображение времени и ввод напоминаний. Поручены
 публикация в GitHub, обновление обоих VPS и, отдельным ответом, установка Desktop.
-Server release `e166132bc35632b0a08d09528da1db18dc704a6d` установлен на DE из
-`/home/deploy/releases/jarvis-e166132-moscow-time`, image
-`sha256:2d61c01f67dccacfd6de33803fc4d425a35bb3d047eeb02d47393066305e60d3`.
-Последующие изменения этого выпуска касаются проверки и документации.
+Server release `c60da0a194c93e7f421d956134683f67963f54d2` установлен на DE из
+`/home/deploy/releases/jarvis-c60da0a-moscow-time`, image
+`sha256:98b637f12ec6541be936f3d954060cee723d92fb5a79462d80138082f0802e0d`.
+Первый образ e166132 заменён после включения исправленной проверки в образ;
+последующие изменения касаются только документации.
 
 В примере со скриншота дата без пояса разбиралась как UTC на сервере, а карточка
 показывала её в Москве. Поэтому 23:46 превращалось в 02:46 следующего дня.
@@ -28,8 +29,8 @@ UTC в PostgreSQL, wire timestamps, expiry и дедупликация сохр�
 
 - Полный server suite: 760/760 локально и в Linux image с `TZ=UTC`, без пропусков.
   Старая проверка CommitmentDetector зависела от локального `getHours()`;
-  заменена сравнением ISO. Финальный Linux suite использовал эту проверку
-  через отдельный read-only mount, без изменения immutable release.
+  заменена сравнением ISO. Проверка сначала прошла через read-only mount;
+  затем финальный image c60da0a прошёл весь набор без подмены файлов.
 - Настоящий PostgreSQL: 1/1 acceptance, все 40 migrations в отдельной БД.
   Настоящие message/menu handlers проверили создание и перенос через полночь,
   неверную дату, чужие user/chat, повторное потребление и expiry.
@@ -64,10 +65,11 @@ UTC в PostgreSQL, wire timestamps, expiry и дедупликация сохр�
 On October 19, 2026, time displays and reminder input were fixed. The owner
 authorized GitHub publication, both VPS updates and, in a separate reply,
 Desktop installation. DE runs server release
-`e166132bc35632b0a08d09528da1db18dc704a6d` from
-`/home/deploy/releases/jarvis-e166132-moscow-time`, image
-`sha256:2d61c01f67dccacfd6de33803fc4d425a35bb3d047eeb02d47393066305e60d3`.
-Subsequent changes in this release concern verification and documentation.
+`c60da0a194c93e7f421d956134683f67963f54d2` from
+`/home/deploy/releases/jarvis-c60da0a-moscow-time`, image
+`sha256:98b637f12ec6541be936f3d954060cee723d92fb5a79462d80138082f0802e0d`.
+The initial e166132 image was replaced to include the corrected assertion.
+Subsequent changes concern documentation only.
 
 The screenshot exposed timezone-less input parsed as UTC on the server, then
 displayed in Moscow. This turned 23:46 into 02:46 the following day. Input
@@ -85,8 +87,8 @@ Verified:
 
 - Full server suite: 760/760 locally and in the Linux image with `TZ=UTC`,
   no skips. An older CommitmentDetector assertion used local `getHours()`;
-  it now compares ISO instants. The final Linux suite mounted that assertion
-  read-only without modifying the immutable release.
+  it now compares ISO instants. This first passed through a read-only mount;
+  the final c60da0a image then passed the full suite without file overrides.
 - Real PostgreSQL: 1/1 acceptance, all 40 migrations in an isolated database.
   Real message/menu handlers exercised creation, rescheduling across midnight,
   invalid retry, foreign user/chat, single consumption and expiry. The test
