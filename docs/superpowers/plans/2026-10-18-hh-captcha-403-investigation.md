@@ -7,7 +7,7 @@
 - [x] Исследовать native immediate/settled запросы и browser/API cookies с отменой
   всех answer POST; восстановить исходный контейнер и проверить claims/бюджет.
 - [x] Добавить ограниченный классификатор ошибок HH и закрытые поля запроса/времени.
-- [ ] Проверить schema, response limits, browser/broker, Linux и Telegram/server.
-- [ ] Выпустить в рамках поручения, сохранить state и оба source checkout.
+- [x] Проверить schema, response limits, browser/broker, Linux и Telegram/server.
+- [x] Выпустить в рамках поручения, сохранить state и оба source checkout.
 - [ ] Получить новый server response в отдельно одобренном тесте. Не объявлять
   прошлую причину доказанной по одной гипотезе или общему Forbidden.

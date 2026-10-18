@@ -53,6 +53,11 @@ deadline across metadata, fetch and body reads.
 
 ### Job search
 
+[Исследование 403](updates/2026-10-18-hh-captcha-403-investigation.md): native XHR
+и browser/API cookies проверены с отменой answer POST. На DE включён ограниченный
+классификатор ошибок HH и закрытые timing/request fields; причина прежнего 403
+ещё не доказана, unknown не повторяется. Linux browser 71/71.
+
 [Живой тест 18 октября, 16:46 МСК](updates/2026-10-18-hh-ocr-live-acceptance.md):
 ответ установленной OCR-модели после отдельного одобрения владельца отправлен
 один раз; POST 302 / target GET 200 / solved, сбор возобновился с progress.

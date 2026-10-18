@@ -35,7 +35,22 @@ CSRF/origin, просроченную/неверную капчу, rate limit, �
 Старые квитанции принимаются; отсутствующее пояснение не восстанавливается догадкой.
 Способ отправки, HTTP headers и правила трёх попыток/unknown не менялись.
 
-Статус: локальная разработка. Истинная причина прошлого 403 не доказана. Для
+Код `cb39189693a8f416efd77a6bfbd5d4f9080fdc03` опубликован в GitHub и получен
+обоими VPS. На DE установлен browser release
+`/home/deploy/releases/jarvis-cb39189-captcha-403`. Окружение, mounts и остальные
+контейнеры сохранены; browser/server/OCR здоровы. Claims (два), automatic budget
+(одна попытка, human) и прежняя квитанция 403 сохранены. Поля пояснения для неё
+не добавлялись задним числом. Старая запись архива прочитана новым валидатором.
+Все JS-файлы работающего browser совпали с release, локальный export проверен.
+
+Проверки: Linux browser 71/71, Windows browser 64 успешных и семь Linux skips,
+server 725/725, Telegram contract 65/65. Шесть автоматических browser/broker/worker
+сценариев, отдельные ручной redirect и 403/CSRF прошли на Windows и Linux.
+В 403-фикстуре категория остаётся и в долговечном receipt, и в приватном архиве,
+следующий POST не появляется. CPU-модель в этом запуске повторно не тестировалась;
+её код и транспорт не менялись. Desktop не затронут.
+
+Истинная причина прошлого 403 не доказана. Для
 завершения разбора нужен новый серверный отказ с пояснением; новая отправка требует
 свежей картинки и отдельного одобрения владельца, прежняя не повторяется.
 
@@ -73,7 +88,22 @@ retained. Token, cookie and header values are excluded. Legacy receipts are acce
 missing explanations are not reconstructed by guessing. Transport, HTTP headers
 and the three-attempt/unknown rules are unchanged.
 
-Status: local development. The actual cause of the past 403 remains unproven.
+Code `cb39189693a8f416efd77a6bfbd5d4f9080fdc03` is published on GitHub and received
+by both VPS nodes. DE runs browser release
+`/home/deploy/releases/jarvis-cb39189-captcha-403`. Environment, mounts and other
+containers are preserved; browser/server/OCR are healthy. Two claims, automatic
+budget (one attempt, human handover) and the old 403 receipt are preserved. No
+explanation fields were retroactively invented. The new validator read the old
+archive record. Running browser JS files match the release and local export works.
+
+Checks: Linux browser 71/71, Windows browser 64 passes and seven Linux-specific
+skips, server 725/725, Telegram contract 65/65. Six automatic browser/broker/worker
+scenarios plus human redirect and 403/CSRF cases passed on Windows and Linux.
+The 403 fixture retains the category in both the durable receipt and private
+archive and does not issue another POST. The CPU model was not retested; its code
+and transport are unchanged. Desktop is unaffected.
+
+The actual cause of the past 403 remains unproven.
 Completing the investigation requires another server rejection with an explanation;
 submission needs a fresh picture and separate owner approval, without repeating the
 old answer.
