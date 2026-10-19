@@ -29,8 +29,12 @@ Windows-приложение и облачный API для подключённ
 - Telegram Mini App содержит настоящее вращающееся 3D-ядро, личный чат и админку:
   пользователи по Telegram ID, роли и личные разрешения. Владелец назначает
   администраторов. [Выпуск и клиентские проверки](docs/updates/2026-10-18-telegram-mini-app-release.md).
+- Участники с актуальным правом `jobs` могут подключить собственный аккаунт HH
+  через временную HTTPS-ссылку с телефона или ПК, затем подтвердить резюме в
+  исходной Mini App. Профили отделены от профиля владельца; реальный вход ещё
+  ожидает проверки участником. [Выпуск](docs/updates/2026-10-19-member-hh-login-release.md).
 - Поиск работы собирает вакансии HH отдельным фоновым процессом на DE и отправляет
-  отобранные карточки владельцу в Telegram. В боте доступны управление поиском,
+  отобранные карточки в личный Telegram соответствующего пользователя. В боте доступны управление поиском,
   сохранённые вакансии, подготовка и редактирование сопроводительных писем.
   Модель запускается по запросу; отправка отклика требует одобрения точного текста
   письма. Живая отправка отклика ещё требует приёмки.
@@ -41,7 +45,7 @@ Windows-приложение и облачный API для подключённ
   Ручной сценарий проверен 16 октября; первая живая OCR-попытка 18 октября
   не подтвердила доступ и передала фото человеку. Последующий живой тест ответа OCR
   после одобрения владельца дал `solved` и возобновил сбор; полностью автономный цикл
-  пока не подтверждён. Tailscale и отдельная веб-страница
+  пока не подтверждён. Для этого CAPTCHA-сценария Tailscale и отдельная веб-страница
   не нужны. См. [выпуск и пределы проверки](docs/updates/2026-10-18-hh-ocr-live-acceptance.md).
 - Сервис знаний хранит приватные метаданные и текст документов для поиска
   в пределах владельца. Поддерживает текстовые и офисные форматы, поиск по PDF
@@ -157,8 +161,9 @@ Telegram is Jarvis's first cloud client. The project also includes a Windows app
 - The main text assistant on DE prioritizes approved free OpenRouter models, then paid candidates by estimated cost. Prices and availability refresh on use; the model list remains fixed. See the [release and verification](docs/updates/2026-10-19-free-first-routing-release.md).
 - Dates and clocks use Moscow UTC+3; reminder input without a timezone also means Moscow. See the [release and checks](docs/updates/2026-10-19-moscow-time-release.md).
 - The Telegram Mini App includes an actual rotating 3D core, private chat and administration with Telegram IDs, roles and personal overrides. The owner appoints administrators. See the [release and client checks](docs/updates/2026-10-18-telegram-mini-app-release.md).
-- Job search collects HH vacancies in a separate background process on DE and sends filtered cards to the owner's Telegram chat. Search controls, saved vacancies, and cover-letter preparation and editing are available in the bot. The model runs on request; submitting an application requires approval of the exact letter. Live application submission still needs acceptance.
-- DE uses the fine-tuned HH OCR with image rectification: up to three automatic attempts, then a photo for the owner in Telegram. An unknown result stops automation earlier. Replying to the photo authorizes one submission; verified access resumes the search from its saved position. The human flow passed on 16 October; the first live OCR attempt on 18 October did not confirm access and handed a photo to the owner. A later live OCR answer test, approved by the owner, returned solved and resumed collection; a fully autonomous cycle remains unconfirmed. No Tailscale connection or separate web screen is needed. See the [release and verification limits](docs/updates/2026-10-18-hh-ocr-live-acceptance.md).
+- Members with current `jobs` permission can connect their own HH account through a temporary HTTPS link on a phone or PC, then confirm a resume in the originating Mini App. Profiles are separate from the owner's; a real sign-in still needs member acceptance. See the [release record](docs/updates/2026-10-19-member-hh-login-release.md).
+- Job search collects HH vacancies in a separate background process on DE and sends filtered cards to the relevant user's private Telegram chat. Search controls, saved vacancies, and cover-letter preparation and editing are available in the bot. The model runs on request; submitting an application requires approval of the exact letter. Live application submission still needs acceptance.
+- DE uses the fine-tuned HH OCR with image rectification: up to three automatic attempts, then a photo for the owner in Telegram. An unknown result stops automation earlier. Replying to the photo authorizes one submission; verified access resumes the search from its saved position. The human flow passed on 16 October; the first live OCR attempt on 18 October did not confirm access and handed a photo to the owner. A later live OCR answer test, approved by the owner, returned solved and resumed collection; a fully autonomous cycle remains unconfirmed. This CAPTCHA flow needs no Tailscale connection or separate web screen. See the [release and verification limits](docs/updates/2026-10-18-hh-ocr-live-acceptance.md).
 - The knowledge service stores private document metadata and text for owner-scoped search. It supports text and office formats, plus page-linked PDF search. Uploaded content is treated as untrusted data.
 - The Windows Electron client provides cloud chat, local wake-word detection, speech, and bounded tools for apps and files. Device credentials are protected with Windows DPAPI.
 - Remote device actions use a validated plan and Tool Gateway. Actions that change state require confirmation in the client that started the request.

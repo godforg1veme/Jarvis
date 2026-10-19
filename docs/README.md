@@ -40,15 +40,13 @@ generation-квитанция подтвердила стоимость. Исх�
 [Выжимка чата для следующего агента](updates/2026-10-18-mini-app-agent-handoff.md)
 содержит решения, проверенного владельца, версии и следующий шаг.
 
-19 октября подготовлен локальный сценарий личного HH для участников: ссылка
-на обычном HTTPS, вход с телефона или ПК и подтверждение резюме в Mini App.
-Изменения остаются в ветке `codex/jobs-member-hh`; они не выпущены. Серверные
-unit-тесты прошли 765/765; browser-тесты — 69/69, ещё девять проверок прав
-файловой системы Linux пропущены на Windows. Оба PostgreSQL acceptance-теста
-прошли на временной изолированной БД; сборка Mini App и синтетический Chromium
-сценарий прошли на телефоне/ПК ширинах. Реальный вход в HH и проверка на VPS
-ещё не выполнены.
-[Запись о разработке](updates/2026-10-19-job-search-member-access-development.md).
+19 октября выпущен [личный вход в HH для участников](updates/2026-10-19-member-hh-login-release.md):
+подключение доступно из Mini App по временной HTTPS-ссылке с телефона или ПК,
+профиль HH отдельный для каждого пользователя. Код сервера и browser развернут
+на DE; миграция 039 применена, исходники обоих VPS синхронизированы.
+Server/browser health и публичный HTTPS smoke прошли. Реальный вход в HH и
+подтверждение резюме участником пока ждут проверки. Локальная разработка и её
+результаты сохранены в [исходной записи](updates/2026-10-19-job-search-member-access-development.md).
 
 [Исследуется новый 403 после корректного OCR](updates/2026-10-18-hh-captcha-403-investigation.md):
 native-запрос и browser/API cookies проверены без отправки ответов. Точная причина
@@ -114,7 +112,7 @@ Operations tests/build и browser fixtures прошли. Код и устано�
 | VPN Supervisor | Owner-confirmed ограниченный NL Xray restart с postchecks; peer timers включены | Restore отключён; external timer failures ещё не создают Telegram incidents |
 | Эксплуатация | Server, PostgreSQL и ASR healthy; hopping DNAT присутствует и сохранён в UFW на обоих узлах | Реальная проверка сохранения после reboot и автоматического ACME renewal; backups отложены владельцем |
 | Дальнейшая работа | Облако и Windows являются основными частями продукта | PWA, server executors, расписания и реальные account connectors |
-| Поиск работы | После OOM восстановлены браузер и очередь CAPTCHA; личный HH для участников разрабатывается локально | [Результат восстановления](updates/2026-10-16-hh-captcha-resilience-release.md); [новый путь не выпущен, вход и acceptance ещё не подтверждены](updates/2026-10-19-job-search-member-access-development.md) |
+| Поиск работы | Личный вход участников с правом `jobs` установлен на DE; профили HH разделены | [Выпуск](updates/2026-10-19-member-hh-login-release.md); реальный вход участника и подтверждение резюме ещё не проверены |
 
 [Обновление кнопок поиска работы](updates/2026-10-15-job-search-buttons.md)
 установлено на DE: включение/выключение и постоянный пункт в нижнем меню.
@@ -143,15 +141,14 @@ OCR не запускался; с 18 октября действует отде�
 и продолжение прежнего progress. Запросы обновления сохраняются при сбоях;
 health проверяет Chromium, а ошибки получают понятные сообщения.
 
-Последняя сверка компонентов выполнена 16 октября 2026 года после
-[выпуска сопроводительных](updates/2026-10-16-job-letter-modes-release.md):
-Windows, GitHub и оба VPS-исходника совпадают; Desktop 1.0.2 и сервер соответствуют
-принятому коду. Server работает из `2e1da534e80366d6644a225f5b3f5ac0b526ec7e`,
-browser — из `e6fe29a7e3129a34626223df9bd6a1b980da46be`; collector сохранил прежний контейнер,
-его используемые операции не менялись. Документальные коммиты не требуют пересборки.
-Подробности: [выпуск восстановления HH](updates/2026-10-16-hh-captcha-resilience-release.md),
-[порядок выпуска и проверка версий](updates/2026-10-09-release-workflow.md),
-[VPN и подписки](updates/2026-10-08-vpn-probe-resilience.md).
+Последняя сверка выполнена 19 октября 2026 года после
+[выпуска личного HH](updates/2026-10-19-member-hh-login-release.md).
+Windows и GitHub содержат код приложения из `35a340a19a31056e029b780bbde0c8342a5f8cb6`;
+оба VPS source checkout синхронизированы с `main`. На DE server, job-browser и
+job-collector запущены из этого SHA; миграция 039 и healthchecks подтверждены.
+Desktop 1.0.2 не менялся и соответствует своему принятому коду. Профильный
+volume владельца сохранён. Подробности — в [записи выпуска](updates/2026-10-19-member-hh-login-release.md)
+и [порядке сверки](updates/2026-10-09-release-workflow.md).
 
 ### Основные документы
 
@@ -248,14 +245,13 @@ and two accounts still need acceptance; a second HH account needs its own connec
 The [chat handoff for the next agent](updates/2026-10-18-mini-app-agent-handoff.md)
 records decisions, the verified owner, revisions and the next step.
 
-On October 19, a member-owned HH flow was prepared locally: an ordinary HTTPS
-link, phone/PC sign-in and resume confirmation in the Mini App. The changes
-remain on branch `codex/jobs-member-hh` and have not been released. Server unit
-tests passed 765/765; browser tests passed 69/69. Nine tests of Linux filesystem
-permissions were skipped on Windows. Both PostgreSQL acceptance tests passed on a
-temporary isolated database. The Mini App build and synthetic Chromium flow passed
-at phone and desktop widths. Real HH sign-in and VPS acceptance remain pending.
-[Development record](updates/2026-10-19-job-search-member-access-development.md).
+On October 19, [personal HH sign-in for members](updates/2026-10-19-member-hh-login-release.md)
+was released. Members with current `jobs` permission connect through a temporary
+HTTPS link from a phone or PC and use a separate HH profile. The server and
+browser are deployed on DE; migration 039 is applied, and both VPS source
+checkouts match `main`. Server/browser health and public HTTPS smoke passed.
+A real member sign-in and resume confirmation still need acceptance. The local
+implementation and its checks remain in the [development record](updates/2026-10-19-job-search-member-access-development.md).
 
 [A new 403 after correct OCR is under investigation](updates/2026-10-18-hh-captcha-403-investigation.md):
 native requests and browser/API cookies were checked without submitting answers.
@@ -323,7 +319,7 @@ taps and an HH application remain unverified.
 | VPN Supervisor | Limited NL Xray restart with owner confirmation and postchecks; peer timers enabled | Restore disabled; external timer failures do not yet create Telegram incidents |
 | Operations | Server, PostgreSQL, and ASR healthy; hopping DNAT present and persisted in UFW on both nodes | Persistence after reboot and automatic ACME renewal; backups deferred by the owner |
 | Further work | Cloud and Windows are the main product components | PWA, server executors, schedules, and real account connectors |
-| Job search | Browser and CAPTCHA queue recovered after OOM; personal HH access for members is in local development | [Recovery record](updates/2026-10-16-hh-captcha-resilience-release.md); [new path is unreleased; login and acceptance remain unverified](updates/2026-10-19-job-search-member-access-development.md) |
+| Job search | Personal sign-in for members with `jobs` permission is deployed on DE, with separate HH profiles | [Release record](updates/2026-10-19-member-hh-login-release.md); real member sign-in and resume confirmation remain unverified |
 
 The [job-search button update](updates/2026-10-15-job-search-buttons.md) is
 installed on DE, with enable/disable controls and a permanent bottom-menu entry.
@@ -352,15 +348,14 @@ a new image reached Telegram, and the server confirmed `solved`, an idle
 coordinator, and continued progress from the saved position. Refresh requests
 survive failures; health checks test Chromium, and failures receive clear messages.
 
-The last component comparison was performed on 16 October 2026 after the
-[cover-letter release](updates/2026-10-16-job-letter-modes-release.md).
-Windows, GitHub, and both VPS source checkouts matched; Desktop 1.0.2 and the server
-matched the accepted code. Server runs from `2e1da534e80366d6644a225f5b3f5ac0b526ec7e`;
-browser runs from `e6fe29a7e3129a34626223df9bd6a1b980da46be`; the collector retained its existing
-container because the operations it uses did not change. Documentation commits
-do not require rebuilding. See the [HH recovery release](updates/2026-10-16-hh-captcha-resilience-release.md),
-[release process and version checks](updates/2026-10-09-release-workflow.md),
-and [VPN and subscriptions](updates/2026-10-08-vpn-probe-resilience.md).
+The latest component comparison was performed on October 19, 2026 after the
+[member HH release](updates/2026-10-19-member-hh-login-release.md). Windows and
+GitHub contain application code from `35a340a19a31056e029b780bbde0c8342a5f8cb6`;
+both VPS source checkouts match `main`. On DE, server, job-browser and
+job-collector run from that SHA; migration 039 and healthchecks passed. Desktop
+1.0.2 was unchanged and still matches its accepted code. The owner profile
+volume was preserved. See the [release record](updates/2026-10-19-member-hh-login-release.md)
+and [release/version checks](updates/2026-10-09-release-workflow.md).
 
 ### Main documents
 

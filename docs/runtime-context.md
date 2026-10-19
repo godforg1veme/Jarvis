@@ -120,34 +120,29 @@ HH-сессией, узкий RPC привязан к одному owner UUID; r
 [Результат выпуска и ограничения](updates/2026-10-15-job-search-release.md),
 [настройка браузера](../job-browser/README.md).
 
-19 октября 2026, локальная ветка `codex/jobs-member-hh`: разработан отдельный
-путь входа для участников с правом `jobs`. Mini App выдаёт короткоживущую
-HTTPS-ссылку, а Chromium открывает профиль по UUID, отдельно от owner profile.
-Участник входит с телефона или ПК и подтверждает резюме в исходной Mini App.
-Одноразовая ссылка обменивается на HttpOnly guest cookie; повтор возможен только
-из того же браузера с этой cookie. Cookie ограничена login API, connect RPC
-использует отдельный секрет. Ввод кратко проходит через страницу и gateway в
-памяти, не сохраняется в БД, файлы или логи. Код пока не выпущен. Серверные
-unit-тесты прошли 765/765; browser-тесты — 69/69, девять проверок прав файловой
-системы Linux пропущены на Windows. Оба PostgreSQL acceptance-теста прошли на
-временной изолированной БД. Сборка Mini App и синтетический Chromium сценарий
-прошли; реальный вход HH и работа на VPS ещё не проверялись.
-[Запись разработки](updates/2026-10-19-job-search-member-access-development.md).
+19 октября 2026 личный вход HH для участников с правом `jobs` опубликован
+и установлен на DE из `35a340a19a31056e029b780bbde0c8342a5f8cb6`.
+Mini App выдаёт короткоживущую HTTPS-ссылку для телефона или ПК; Chromium
+использует отдельный профиль участника по UUID. После входа пользователь
+возвращается в исходную Mini App и подтверждает резюме. Одноразовая ссылка
+обменивается на HttpOnly guest cookie, а connect RPC использует отдельный
+секрет. Ввод проходит в памяти и не сохраняется в БД, файлы, Telegram или логи.
+Миграция 039 применена, исходники обоих VPS синхронизированы. Реальный вход HH
+и подтверждение резюме участником ещё требуют проверки.
+[Результат выпуска](updates/2026-10-19-member-hh-login-release.md),
+[запись разработки](updates/2026-10-19-job-search-member-access-development.md).
 
-October 19, 2026, local branch `codex/jobs-member-hh`: a separate login path
-is in development for members with `jobs` permission. The Mini App issues a
-short-lived HTTPS link and Chromium opens a UUID-scoped profile separate from
-the owner profile. The member signs in on a phone or PC and confirms a resume
-in the originating Mini App. The one-time link exchanges for an HttpOnly guest
-cookie; a retry works only in the same browser with that cookie. The cookie is
-limited to the login API, and connect RPC uses a separate credential. Input
-passes briefly through the page and gateway in memory; it is not saved to the
-database, files or logs. The code is not released. Server unit tests pass
-765/765; browser tests pass 69/69 with nine tests of Linux filesystem permissions
-skipped on Windows. Both PostgreSQL acceptance tests passed on a temporary
-isolated database. The Mini App build and synthetic Chromium flow passed; real
-HH sign-in and VPS operation remain unverified.
-[Development record](updates/2026-10-19-job-search-member-access-development.md).
+On October 19, 2026, personal HH sign-in for members with `jobs` permission was
+published and deployed on DE from `35a340a19a31056e029b780bbde0c8342a5f8cb6`.
+The Mini App issues a short-lived HTTPS link for a phone or PC; Chromium uses a
+UUID-scoped profile separate from the owner profile. After signing in, the
+member returns to the originating Mini App to confirm a resume. The one-time
+link exchanges for an HttpOnly guest cookie, and connect RPC uses a separate
+credential. Input passes through memory and is not saved to the database,
+files, Telegram or logs. Migration 039 is applied, and both VPS source checkouts
+are synchronized. A real HH sign-in and resume confirmation still need
+acceptance. See the [release record](updates/2026-10-19-member-hh-login-release.md)
+and [development record](updates/2026-10-19-job-search-member-access-development.md).
 
 Для CAPTCHA на DE установлен человеческий ответ через Telegram: headless browser
 держит один прежний HH profile, coordinator и durable claims. Закрытый broker8082
@@ -215,9 +210,11 @@ owner decisions, deployed revisions, checks and unfinished client acceptance.
 - Permissions are checked beyond menu visibility: Telegram handlers, Desktop
   HTTP/WebSocket, model context/dispatch and background Life OS delivery.
   Disabling the Mini App UI preserves established access restrictions.
-- Migrations 037/038 store access/session data and assistant request receipts.
+- Migrations 037/038 store access/session data and assistant request receipts;
+  migration 039 stores member HH connection tickets and temporary sessions.
   Uncertain requests retain their original operation ID for reconciliation.
-  A jobs permission does not share the existing owner's HH browser.
+  A `jobs` permission does not share the owner's HH browser; profiles are
+  isolated by user UUID, and current access is checked for each action.
 
 ### Cloud control plane
 

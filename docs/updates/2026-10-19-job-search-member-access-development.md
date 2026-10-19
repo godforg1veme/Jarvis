@@ -52,6 +52,12 @@ connect credential отделён от read/apply/CAPTCHA credentials. Теку�
 - Серверные unit-тесты прошли 765/765. Browser-тесты прошли 69/69; девять проверок прав файловой системы Linux пропущены на Windows. Оба PostgreSQL acceptance-теста прошли на временной изолированной БД.
 - Сборка Mini App и синтетический Chromium сценарий прошли на ширинах 390 и 1280 пикселей. Реальный вход HH, отзыв права в живой браузерной сессии и проверка на VPS ещё не подтверждены. На момент подготовки этой записи GitHub и VPS не менялись.
 
+### Последующий результат
+
+19 октября личное подключение опубликовано и установлено на DE. Миграция 039
+применена; исходники обоих VPS синхронизированы. Реальный вход HH и подтверждение
+резюме участником остаются для живой приёмки. См. [запись выпуска](2026-10-19-member-hh-login-release.md).
+
 ## English
 
 October 19, 2026: the changes were prepared locally on branch
@@ -104,3 +110,10 @@ to the main owner's numeric Telegram ID.
 - Tested replay of a one-time ticket: the link is rejected without the guest cookie already issued to that browser; the same browser can retry safely after a lost response. Checks also cover per-user profile routing, current permission and revision, resume ownership, revocation cleanup, guest-session scope, input limits and a separate connect credential.
 - Server unit tests passed 765/765. Browser tests passed 69/69; nine tests of Linux filesystem permissions were skipped on Windows. Both PostgreSQL acceptance tests passed on a temporary isolated database.
 - The Mini App build and synthetic Chromium flow passed at 390 and 1280 pixel widths. Real HH sign-in, revocation during a live browser session and VPS acceptance remain unverified. GitHub and VPS were unchanged when this record was prepared.
+
+### Later release status
+
+On October 19, personal HH sign-in was published and deployed on DE. Migration
+039 is applied, and both VPS source checkouts are synchronized. A real HH
+sign-in and resume confirmation by a member still need acceptance. See the
+[release record](2026-10-19-member-hh-login-release.md).

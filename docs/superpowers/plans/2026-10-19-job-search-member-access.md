@@ -1,6 +1,6 @@
 # Поиск работы с личным подключением HH — план реализации
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use executing-plans. Выполняй задачи последовательно в текущей ветке, сверяясь с контрольными точками. Шаги отмечаются checkbox (`- [ ]`).
+> **For agentic workers:** REQUIRED SUB-SKILL: Use executing-plans. Выполняй задачи последовательно в текущей ветке, сверяясь с контрольными точками. Шаги отмечаются checkbox (`- [x]`).
 
 **Goal:** Разрешить пользователю с правом `jobs` подключить личный HH с телефона или ПК через обычный HTTPS и безопасно искать вакансии в своей области.
 
@@ -8,7 +8,7 @@
 
 **Tech Stack:** CommonJS, Fastify HTTPS routes, PostgreSQL migrations, Mini App ES modules, Playwright/Chromium. Новые production-зависимости не добавлять.
 
-**Текущий статус:** реализация личного подключения и role-scoped jobs подготовлена в `codex/jobs-member-hh`; синтаксис 50 JavaScript-файлов и `git diff --check` прошли. Исправлено использование `users.role='owner'` как fallback для Telegram owner-меню; существующая проверка обновлена, но тесты и сборка не запускались. Live HH и развёртывание не выполнялись. Сверяй оставшиеся шаги с dated development record.
+**Текущий статус:** личное подключение и role-scoped jobs опубликованы в GitHub `main` и установлены на DE 19 октября 2026 года; migration 039 применена. Server tests 765/765, browser tests 69/69 с девятью Linux filesystem checks, пропущенными на Windows, два PostgreSQL acceptance-теста и сборка Mini App прошли. Оба VPS source checkout синхронизированы. Реальный вход HH и подтверждение резюме участником остаются для живой приёмки; подробности в [записи выпуска](../../updates/2026-10-19-member-hh-login-release.md).
 
 **Spec:** [Поиск работы для участников и личное подключение HH](../specs/2026-10-19-job-search-member-access-design.md).
 
@@ -76,7 +76,7 @@
 - `AccessRepository.get()` also returns `roleRevision`; guest authorization is `authorizeGuest({ guestToken })` and returns only `{ sessionId, userId }` after checking expiry, state, permission, captured `membership_revision`, `role_id`, and `role_revision`.
 - Export `assertJobLoginAccess(session, access)` alongside `JobConnectionSessionService` for direct closed-state unit coverage.
 
-- [ ] **Step 1: Add the forward-only session table and indexes**
+- [x] **Step 1: Add the forward-only session table and indexes**
 
 Create `job_hh_login_sessions` with UUID `id`, `user_id`, unique `request_id` per user, nullable SHA-256 `ticket_hash`, nullable unique `guest_token_hash`, positive `membership_revision`, captured nullable `role_id` and nonnegative `role_revision`, status restricted to `pending`, `claimed`, `authenticated`, `confirmed`, `cancelled`, `expired`, `revoked`, or `failed`, optional selected resume ID, separate `ticket_expires_at` (five minutes) and `expires_at` (login session, ten minutes), created/updated timestamps, and nullable claimed/completed timestamps. Retain only the ticket hash while a session is pending/claimed so exchange retries can derive the same guest token; clear it on every terminal state. Add indexes for per-user active state and expiry and a partial unique index allowing at most one `pending`, `claimed` or `authenticated` session per user. Do not add password, cookie, DOM, frame, or raw bearer columns.
 
@@ -104,7 +104,7 @@ CREATE INDEX job_hh_login_expiry_idx ON job_hh_login_sessions(expires_at);
 
 Run the migration in the isolated fixture by applying `001_identity_and_conversations.sql`, `037_access_mini_app.sql`, `029_job_search.sql`, then `039_job_member_hh_sessions.sql`; confirm the owner’s existing `job_connections` row shape is unchanged.
 
-- [ ] **Step 2: Write unit tests for ticket and guest-token transitions**
+- [x] **Step 2: Write unit tests for ticket and guest-token transitions**
 
 In `jobConnectionSession.test.js`, add a local `fixture()` that returns `{ service, repository, access, userId, requestId }`; `repository` implements the method names above and stores only passed hashes. Inject a deterministic clock. Cover: random ticket is 32 bytes and returned once; database receives only its SHA-256 hash; same `requestId` has one `sessionId`; ticket can be claimed once; expiry rejects; wrong user, blocked user, missing `jobs`, denied override, and changed membership or role revision reject; status/confirm/cancel reject foreign user; repeated confirm does not increment the connected profile twice.
 
@@ -140,7 +140,7 @@ Run: `node --test server/test/jobConnectionSession.test.js`
 
 Expected: all cases pass, and serialized repository inputs contain no raw ticket, guest bearer, HH password, or cookie.
 
-- [ ] **Step 3: Implement repository transitions with row locks**
+- [x] **Step 3: Implement repository transitions with row locks**
 
 Use one PostgreSQL transaction per state change. Before locking or changing a login row, take the existing `jarvis-access-admin` transaction advisory lock, then evaluate current access through `AccessRepository.get(client, 'user', userId)`. This serializes claim/confirm with role and membership mutations. `claim` updates `ticket_hash` to `NULL` only when hash, state, expiry, membership revision, role ID and role revision match. Store only `hash(guestToken)`; return the raw token only to the HTTP handler creating the secure cookie. Preserve the original `requestId` on retries.
 
@@ -152,7 +152,7 @@ WHERE ticket_hash = $1 AND status = 'pending' AND ticket_expires_at > now() AND 
 RETURNING id, user_id, membership_revision, role_id, role_revision, expires_at;
 ```
 
-- [ ] **Step 4: Implement service-level current-access checks**
+- [x] **Step 4: Implement service-level current-access checks**
 
 Use injected `AccessService.getAccessForUser(userId)` for every Mini App/guest operation. Require `!blocked`, `permissions.includes('jobs')`, the same membership revision, role ID and role revision, and caller ownership. Extend `AccessRepository.get()` to return the current `access_roles.revision` as `roleRevision` so a role permission change invalidates an open ticket even when the member row itself did not change. `confirm` calls the user’s browser adapter to prove HH authentication, fetches current resumes, validates the chosen ID against that exact list, then upserts only that user’s existing `job_connections` row and increments its revision once.
 
@@ -164,7 +164,7 @@ assertJobLoginAccess({ userId: row.user_id, membershipRevision: row.membership_r
 
 For claim/confirm transactions, call the same repository with the transaction client (`accessService.repository.get(client, 'user', row.user_id)`) after `pg_advisory_xact_lock(hashtext('jarvis-access-admin'))`; do not authorize from a session actor snapshot.
 
-- [ ] **Step 5: Prove migration and scope on an isolated PostgreSQL fixture**
+- [x] **Step 5: Prove migration and scope on an isolated PostgreSQL fixture**
 
 In `jobMemberConnectionPostgresAcceptance.cjs`, use the existing `JARVIS_JOB_TEST_DATABASE_URL` fixture convention. Create owner plus two members with a `jobs` role, exchange a ticket for only one member, and assert the other member cannot claim, view, confirm, or cancel it. Verify duplicate request IDs, concurrent claims, expiry, deny override, block, revision change, and owner/member unique `job_connections` rows.
 
@@ -197,7 +197,7 @@ Expected: PASS against a disposable database; without the explicit isolated URL 
 - `HhBrowser.closeLogin({ sessionId })` closes remote control and removes an unconfirmed profile only if it was created by this attempt.
 - Existing methods (`search`, `history`, `getVacancy`, `inspect`, `submit`, `reconcile`) select only `ProfileManager.forUser(userId)`; the RPC credential remains private to server↔browser.
 
-- [ ] **Step 1: Add profile-path and bounds tests before browser changes**
+- [x] **Step 1: Add profile-path and bounds tests before browser changes**
 
 Test that `resolveProfilePath(ownerId, { ownerId, root })` returns `root`; member UUIDs resolve under `root/members/<uuid>`; invalid UUID, symlink, wrong owner/mode, path traversal, foreign user in a state journal, over-capacity and duplicate session ID all fail closed. Verify the member state file is written atomically with mode `0600` and reloaded on restart. Use temporary fixture directories and fake Playwright contexts only.
 
@@ -210,7 +210,7 @@ await assert.rejects(manager.forUser('../../owner'), { code: 'JOB_BROWSER_ACCESS
 
 Run: `node --test job-browser/test/profileManager.test.js`
 
-- [ ] **Step 2: Implement bounded profile manager without moving owner state**
+- [x] **Step 2: Implement bounded profile manager without moving owner state**
 
 Keep `/home/pwuser/profile` and `jarvis-owner.json` validation intact. Create member directories as mode `0700` beneath `/home/pwuser/profile/members/<user UUID>` on the existing persistent volume and validate each with `lstat`, process UID, no group/world permissions, and no symlinks. Get the Playwright `Browser` from the owner persistent context and fail startup with `JOB_BROWSER_CONTEXT_REQUIRED` if it is unavailable. Create member contexts from that browser with downloads disabled and service workers blocked; load/save only cookies, local storage and IndexedDB in each profile’s private `state.json`; save atomically on authenticated login and context close. Keep at most two live member contexts; close the least-recently-used idle member context before admitting another. If both are busy, queue ordinary job RPCs up to the existing request limit and return `JOB_BROWSER_BUSY` for a third simultaneous login; never evict a profile’s durable files. Keep the current 1 GiB container memory bound; do not raise it automatically.
 
@@ -221,13 +221,13 @@ const context = await browser.newContext({ storageState: await readPrivateState(
 await savePrivateStateAtomically(memberRoot, await context.storageState({ indexedDB: true }));
 ```
 
-- [ ] **Step 3: Bind application and CAPTCHA persistence to each profile**
+- [x] **Step 3: Bind application and CAPTCHA persistence to each profile**
 
    Pass the selected profile root and UUID to `ApplicationLedger`, `GuardedSubmission`, `CaptchaJournal`, `ManualState`, and `CaptchaAttemptStore`. Construct a separate `ManualCoordinator`, `CaptchaRecovery`, and `CaptchaTelegramBrowser` per profile. A repository file or CAPTCHA RPC is rejected if its embedded owner/user ID differs from the profile UUID. Keep owner export/receipt commands fixed to the owner root and disabled for member profiles.
 
 The selected resume ID for a member is loaded from that same private UUID directory at profile start; owner continues reading the existing owner manifest. Do not copy one profile’s manifest to another.
 
-- [ ] **Step 4: Extend the RPC with exact login operations and user routing**
+- [x] **Step 4: Extend the RPC with exact login operations and user routing**
 
    Add `login_start`, `login_frame`, `login_input`, `login_status`, `login_close`, and `select_resume` as exact request shapes in `rpcProtocol.js`. `rpcServer.js` routes them through `ProfileManager.forUser(input.userId)`, validates screenshot response size before JSON encoding, accepts no caller-supplied URL, and keeps the current 1 MiB response bound. Authenticate read, connect and apply operations with three distinct credentials; add `JARVIS_JOB_BROWSER_CONNECT_TOKEN` only to job-browser and the main server, never job-collector. Extend CAPTCHA broker requests with the same exact user UUID and per-user coordinator lookup.
 
@@ -240,7 +240,7 @@ assert.equal(validRequest({ ...inputEvent, args: { ...inputEvent.args, url: 'htt
 assert.equal(validRequest({ userId, operation: 'select_resume', args: { resumeId: 'resume-1' } }), true);
 ```
 
-- [ ] **Step 5: Add HH login and input behavior to the user’s browser only**
+- [x] **Step 5: Add HH login and input behavior to the user’s browser only**
 
 Add a dedicated login tab under the selected user’s isolated context; keep the existing GET-only `allowedRequest` policy as default. During this explicit login state only, permit non-GET requests after a recent explicit user input and only when the exact method, resource type, HH auth origin and login path appear in a closed allowlist; deny application-response paths, other hosts/methods and caller-supplied URLs. Accept only event coordinates inside the last frame, supported key names, and text chunks up to 64 characters. No event, frame, input value, or page content is written to a log or file. The login state machine returns only `waiting`, `authenticated`, `captcha`, `expired`, `closed`, or a fixed failure code.
 
@@ -252,7 +252,7 @@ const loginWrite = isLoginActive && loginInputGuard.hasRecentUserGesture(session
 if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method()) && !loginWrite) return route.abort();
 ```
 
-- [ ] **Step 6: Verify protocol and two-profile isolation with fixtures**
+- [x] **Step 6: Verify protocol and two-profile isolation with fixtures**
 
    Use intercepted HH-shaped pages and fake IDs; assert bad internal auth, unsupported operation, extra keys, unsafe URL, oversized input/frame, foreign `sessionId`, duplicate start, duplicate input sequence and owner/member cross-access are rejected. Verify login never triggers application POST, CAPTCHA broker/state/journal and application ledger are different per profile, and owner browser acceptance still resolves the existing path.
 
@@ -277,17 +277,17 @@ Expected: PASS without real HH credentials or production profile access.
 - `createJobConnectionPanel({ api, actor, anchor })` renders connection state and a share/copy one-time HTTPS link. It stores only the request/session UUID for reconciliation in `sessionStorage`; it never stores the ticket or guest token.
 - The connection page reads ticket from `location.hash`, immediately clears the fragment with `history.replaceState`, exchanges it once, and then uses the HttpOnly guest cookie. The initial one-time link is the only share/copy surface; after exchange no ticket is placed in a later URL, local storage, clipboard fallback, log, or analytics.
 
-- [ ] **Step 1: Test gateway authorization and ticket exchange**
+- [x] **Step 1: Test gateway authorization and ticket exchange**
 
 Exercise actual Fastify route handlers over HTTP: wrong origin, missing/invalid guest cookie, malformed payload, ticket in query, claim replay returning the same session/cookie, expired ticket, foreign profile, oversized frame/input, duplicate input sequence, revoked membership, and request without `jobs` all fail closed with a small public error code. Check response and diagnostics do not contain ticket/token/frame/event text.
 
 Run: `node --test server/test/jobLoginGatewayAcceptance.cjs`
 
-- [ ] **Step 2: Add the Mini App job-connection routes**
+- [x] **Step 2: Add the Mini App job-connection routes**
 
 Register the authenticated endpoints through the existing `route`/`authorize` helpers, requiring exact same origin + CSRF on mutations and no query keys. The claim route has no Mini App cookie; it requires exact Origin and a valid one-time ticket. Pass the lazy job service getter through `runtime.js` to `registerMiniAppSelfRoutes`. Every guest request requires the HTTPS Origin, guest HttpOnly cookie, same live session/revision, and a fresh access check. The guest page polls the bounded frame endpoint and sends allowlisted input events by HTTPS POST; no WebSocket or public browser RPC is added. On revocation, expiry, cancel, or browser failure, clear the cookie and close the temporary browser page.
 
-- [ ] **Step 3: Add Mini App status and one-tap connection flow**
+- [x] **Step 3: Add Mini App status and one-tap connection flow**
 
 Render the jobs connection card from current `actor.permissions`. Show connected/disconnected/expired states, one primary «Подключить HH» action, status polling, exact resume list and a confirmation button. Use Web Share API first, then `navigator.clipboard.writeText`, then a visible selectable link. Show a 5-minute expiry and allow retry with the same `requestId` after an uncertain response. Do not generate a QR through a third-party service or add a production dependency.
 
@@ -297,7 +297,7 @@ link.hash = new URLSearchParams({ ticket }).toString();
 await navigator.share({ url: link.href, title: 'Вход в HH через Jarvis' });
 ```
 
-- [ ] **Step 4: Add a phone/desktop login page with truthful privacy copy**
+- [x] **Step 4: Add a phone/desktop login page with truthful privacy copy**
 
 Serve an explicit `job-connect.html` asset via the Mini App allowlist. Show the HH page as a bounded image with pointer/touch controls and a visible masked keyboard input that invokes the device’s native keyboard; let the user temporarily reveal typed text when entering an email or code. Send text/key events by authenticated HTTPS POST in memory and clear the client value after acknowledgement or tab close. Before starting, disclose that screen frames and input pass through Jarvis HTTPS and its private browser service; values are not retained in the app/database/files/logs, and the infrastructure owner technically controls the server.
 
@@ -310,13 +310,13 @@ ticket = null;
 
 Derive the guest token as an HMAC of the ticket and session ID using a domain-separated label. On an idempotent replay, recompute the same value and compare its digest with the stored `guest_token_hash`; never persist or log the bearer itself. The five-minute ticket expiry bounds this recovery path.
 
-- [ ] **Step 5: Keep cross-device confirmation in the original Telegram Mini App session**
+- [x] **Step 5: Keep cross-device confirmation in the original Telegram Mini App session**
 
 The guest browser can only report that HH authentication completed. It cannot choose or save a resume. The authenticated Mini App session polls `/owned/status/:sessionId`, displays the account-safe state and exact resume titles, and confirms the selected resume. If the original Mini App is closed, the profile stays unconfirmed and is cleared after expiry; a new attempt starts only after checking/reconciling the original `sessionId`.
 
 For each remote text event, allocate the next `sequence`, send once, and clear the transient input only after an acknowledgement with that sequence. A reconnect first asks the server for the next expected sequence, so a lost acknowledgement cannot type the same password character twice.
 
-- [ ] **Step 6: Verify built assets and mobile browser contract**
+- [x] **Step 6: Verify built assets and mobile browser contract**
 
 Add deterministic client checks for fragment clearing before any `fetch`, no token persistence, touch coordinate scaling, native keyboard event forwarding, guest cookie-only stream, share/copy fallback, reconnect/expiry text, and no secret-bearing errors. Build Mini App and serve it from Fastify’s allowlist.
 
@@ -353,13 +353,13 @@ async function assertJobScope(pool, input, accessService) {
 }
 ```
 
-- [ ] **Step 1: Add failing tests for member Telegram scope and stale rights**
+- [x] **Step 1: Add failing tests for member Telegram scope and stale rights**
 
 Update `jobTelegram.test.js` and the actual callback handler acceptance so a member with `jobs` can open search, a member without it is denied, a group/foreign chat is denied, and an already-started callback fails after `deny`, block, or membership revision change. Preserve current callback bytes and button label.
 
 Run: `node --test server/test/jobTelegram.test.js server/test/telegramMenuService.test.js`
 
-- [ ] **Step 2: Remove only the owner gates from the jobs path**
+- [x] **Step 2: Remove only the owner gates from the jobs path**
 
 In `telegramMenuService.js`, remove the canned non-owner return and route `jobs` only after `context.access.permissions` contains `jobs`. `jobScope` checks the private Telegram chat binding; `assertJobScope` then re-reads permission through `AccessService`. Do not touch owner checks for `vpn`, `operations`, desktop control, or admin access.
 
@@ -372,7 +372,7 @@ function jobScope(context) {
 }
 ```
 
-- [ ] **Step 3: Inject current access checks into all job repositories/services**
+- [x] **Step 3: Inject current access checks into all job repositories/services**
 
 Pass `accessService` from `createJobRuntime` and collector startup to every repository/service that calls `assertJobScope`, including search, profiles, drafts, settings, history, applications, connection and CAPTCHA. Replace each `users.role='owner'` queue predicate with current jobs access; retain user identity, conversation, connected profile, lease, expiry and private-chat joins. In the browser adapter, route all list/search/history/inspect/apply/reconcile calls to the selected UUID profile.
 
@@ -390,13 +390,13 @@ if (!access || access.blocked || !access.permissions.includes('jobs')) throw job
 const result = await browserClient.forUser(userId).search(searchArgs);
 ```
 
-- [ ] **Step 4: Recheck permissions at every asynchronous boundary**
+- [x] **Step 4: Recheck permissions at every asynchronous boundary**
 
 Before each collector page, guided-input consumption, captcha browser action/reply/photo, history page, delivery send, and application inspect/confirm/submit/reconcile, re-read current `AccessService` state and compare the login/search/connection revisions already frozen by that operation. On revoke/block/deny, stop or pause with a fixed access-revoked code, close active login control, and never send another page or Telegram item.
 
 For Telegram guided input, preserve the existing `messagePermissions` and final `MessageService` permission recheck. For browser/worker work, put the same check immediately before each external HH or Bot API side effect; do not rely on the permission loaded when the job was queued.
 
-- [ ] **Step 5: Add two-user/owner isolation acceptance**
+- [x] **Step 5: Add two-user/owner isolation acceptance**
 
 With the isolated job/PostgreSQL and browser fixtures, create owner plus two members and distinct synthetic profiles. Verify one user’s search, saved matches, draft, selected resume, application ledger, CAPTCHA state, history, and delivery cannot be read or changed by the other; revoke permission during login, collection, CAPTCHA, history and delivery and assert the next boundary stops. Verify a regrant reuses only that same user’s retained profile. Assert the owner path still works on its existing profile root.
 
@@ -409,19 +409,19 @@ Run: `node --test server/test/jobMemberPermissionsAcceptance.cjs server/test/job
 - Create: `docs/updates/2026-10-19-job-search-member-access-development.md`
 - Test: existing server and browser suites listed below.
 
-- [ ] **Step 1: Record the Telegram observable change**
+- [x] **Step 1: Record the Telegram observable change**
 
 Add a dated Russian/English change note to `docs/telegram-menu-contract.md`: same bottom label and callback grammar; a permitted non-owner now opens personal search; an unconnected user gets an HTTPS Mini App HH connection path; every result stays user/private-chat scoped. Keep the already-notified path and approval evidence in that document.
 
-- [ ] **Step 2: Document connection, privacy, operations and recovery**
+- [x] **Step 2: Document connection, privacy, operations and recovery**
 
 Update `mini-app/README.md` with the phone/desktop link, five-minute ticket, one-time guest cookie, native keyboard, resume confirmation, expiry/retry, and what the infrastructure owner can technically access. Update `job-browser/README.md` with owner and member roots, two-member-context limit, per-user journals/ledgers, private RPC operations and retention behavior. Add only focused verification commands to `docs/verification.md`.
 
-- [ ] **Step 3: Write bilingual current status and development result**
+- [x] **Step 3: Write bilingual current status and development result**
 
 In `docs/README.md`, add a concise Russian and English status linking the implementation record. The new `docs/updates/2026-10-19-job-search-member-access-development.md` has full «Русский» and «English» sections, records only executed local checks, and separates fixtures from pending live HH login/release acceptance. Do not describe a deployment or live login as completed.
 
-- [ ] **Step 4: Run focused regression and full relevant suites**
+- [x] **Step 4: Run focused regression and full relevant suites**
 
 Run, in this order:
 
@@ -438,10 +438,10 @@ node --test server/test/miniAppIntegrationAcceptance.cjs
 
 Use `JARVIS_JOB_TEST_DATABASE_URL` only for a disposable test DB. The migration/acceptance steps must not use production. Browser tests use temporary fixture profiles and intercepted HH-shaped pages; never point them at `/home/pwuser/profile` or a real HH account.
 
-- [ ] **Step 5: Review behavior and report remaining acceptance**
+- [x] **Step 5: Review behavior and report remaining acceptance**
 
-Inspect `git diff --check`, `git status`, exact current `main`/branch relationship, all ticket and RPC responses, Mini App asset allowlist, and every owner gate found by `rg -n "role='owner'|role !== 'owner'|role === 'owner'" server/src/jobs server/src/telegram/telegramMenuService.js`. Remaining owner checks must be documented as owner-only infrastructure or configuration checks. Report live login and release as unverified until separately authorized and performed.
+Inspect `git diff --check`, `git status`, exact current `main`/branch relationship, ticket and RPC responses, Mini App asset allowlist, and owner gates in the jobs path and Telegram menu. Remaining owner checks are documented as owner-only infrastructure or configuration checks. The user authorized and completed the release; live HH login and resume confirmation remain unverified until a member completes them.
 
 ## Последовательность исполнения
 
-Задачи 1–2 вводят идентификатор сессии и user-scoped browser API, на которые опираются задачи 3–4. Task 3 делает полный HTTPS-сценарий пригодным для телефона и ПК. Task 4 открывает только разрешённый личный путь и защищает все отложенные действия актуальными ролями. Task 5 закрывает контракт, проверки и документацию. После локальной реализации и проверок изменения остаются в `codex/jobs-member-hh`; push, PR, production migrations, VPS rollout и live HH login требуют отдельного поручения.
+Задачи 1–2 вводят идентификатор сессии и user-scoped browser API, на которые опираются задачи 3–4. Task 3 делает полный HTTPS-сценарий пригодным для телефона и ПК. Task 4 открывает только разрешённый личный путь и защищает все отложенные действия актуальными ролями. Task 5 закрывает контракт, проверки и документацию. Владелец отдельно поручил публикацию и VPS rollout; их результат записан в [отчёте о выпуске](../../updates/2026-10-19-member-hh-login-release.md). Живой вход участника и проверка резюме остаются для клиентской приёмки.
