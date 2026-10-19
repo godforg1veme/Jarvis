@@ -5,7 +5,10 @@ const path = require('node:path');
 // can be reached through this production route.
 const ASSETS = Object.freeze({
   'index.html': 'text/html; charset=utf-8',
+  'job-connect.html': 'text/html; charset=utf-8',
   'app.js': 'text/javascript; charset=utf-8',
+  'jobConnect.js': 'text/javascript; charset=utf-8',
+  'jobConnection.js': 'text/javascript; charset=utf-8',
   'api.js': 'text/javascript; charset=utf-8',
   'admin.js': 'text/javascript; charset=utf-8',
   'core.js': 'text/javascript; charset=utf-8',
@@ -27,6 +30,7 @@ function registerMiniAppAssets(app, { root = path.join(__dirname, '../public/min
   };
   app.get('/mini', async (_request, reply) => reply.redirect('/mini/'));
   app.get('/mini/', serve('index.html'));
+  app.get('/mini/job-connect/', serve('job-connect.html'));
   for (const name of Object.keys(ASSETS)) app.get(`/mini/${name}`, serve(name));
 }
 

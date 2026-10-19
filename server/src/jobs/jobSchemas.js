@@ -23,13 +23,22 @@ const profileSchema = z.object({
 });
 
 function jobError(code) { const error = new Error(code); error.code = code; return error; }
-async function assertJobScope(pool, input) {
+async function assertUserJobAccess(db, accessService, userId) {
+  if (!accessService?.repository?.get) throw jobError('JOB_SCOPE_DENIED');
+  const access = await accessService.repository.get(db, 'user', uuid.parse(userId));
+  if (!access || access.blocked || !access.permissions.includes('jobs')) throw jobError('JOB_SCOPE_DENIED');
+  return access;
+}
+
+async function assertJobScope(pool, input, accessService) {
   const scope = scopeSchema.parse(input);
+  await assertUserJobAccess(pool, accessService, scope.userId);
   const result = await pool.query(`SELECT c.id FROM conversations c JOIN users u ON u.id=c.user_id
-    WHERE c.id=$1 AND c.user_id=$2 AND c.channel='telegram' AND c.external_chat_id=$3 AND u.role='owner'`,
+    JOIN user_identities i ON i.user_id=c.user_id AND i.provider='telegram' AND i.external_id=$3
+    WHERE c.id=$1 AND c.user_id=$2 AND c.channel='telegram' AND c.external_chat_id=$3`,
   [scope.conversationId, scope.userId, scope.chatId]);
   if (!result.rowCount) throw jobError('JOB_SCOPE_DENIED');
   return scope;
 }
 
-module.exports = { uuid, scopeSchema, settingsSchema, profileSchema, defaultJobSettings, jobError, assertJobScope };
+module.exports = { uuid, scopeSchema, settingsSchema, profileSchema, defaultJobSettings, jobError, assertUserJobAccess, assertJobScope };

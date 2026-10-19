@@ -59,7 +59,7 @@ class TelegramMenuService {
 
   keyboard(context) {
     return replyKeyboard(this.owner(context), { jobSearchEnabled: Boolean(this.jobSearchService)
-      && context.user?.role === 'owner' && context.chatType === 'private',
+      && context.chatType === 'private',
       permissions: context.access?.permissions || null });
   }
 
@@ -84,7 +84,6 @@ class TelegramMenuService {
     if (this.accessService) {
       context.access = await this.accessService.getAccessForUser(context.user.id);
       if (!permits(context.access, ACTION_PERMISSION[action] ? [ACTION_PERMISSION[action]] : [])) return { answer: DENIED_ANSWER };
-      if (action === 'jobs' && context.access.level !== 'owner') return { answer: 'Право на поиск работы выдано. Для запуска нужно отдельное подключение HH: браузер владельца другим пользователям не передаётся.' };
     }
     await this._cancel(context);
     if (action === 'jobs') return this.jobSearchService
@@ -92,7 +91,9 @@ class TelegramMenuService {
     if (action === 'home') {
       const admin = this.owner(context) ? ' Доступны также VPN и Operations.' : '';
       return { answer: `Jarvis готов. Выбери раздел снизу или напиши вопрос обычным текстом.${admin}`, replyKeyboard: this.keyboard(context),
-        ...(this.jobSearchService && context.user?.role === 'owner' && context.chatType === 'private' ? { jobSearchEntry: true } : {}) };
+        ...(this.jobSearchService && context.chatType === 'private'
+          && (context.access?.permissions?.includes('jobs') || (!context.access && this.owner(context)))
+          ? { jobSearchEntry: true } : {}) };
     }
     if (action === 'memory') return this.memoryService ? this._memoryHome(context) : { answer: 'Память сейчас недоступна.' };
     if (action === 'documents') return this._documents(context);
@@ -183,7 +184,6 @@ class TelegramMenuService {
     if (this.accessService) {
       context.access = await this.accessService.getAccessForUser(context.user.id);
       if (!permits(context.access, callbackPermissions(data))) return { answer: DENIED_ANSWER };
-      if (data.startsWith('job:') && context.access.level !== 'owner') return { answer: 'Для поиска нужно отдельное подключение HH этого пользователя.' };
     }
     if (data.startsWith('job:')) {
       await this._cancel(context);

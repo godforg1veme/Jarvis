@@ -25,7 +25,7 @@ const merged=`WITH observed AS (
  WHERE a.user_id=$1 AND NOT EXISTS(SELECT 1 FROM observed h WHERE h.operation_id=a.id)
 )`;
 class JobHistoryRepository {
-  constructor(pool){this.pool=pool;}
+  constructor(pool,{accessService=null}={}){this.pool=pool;this.accessService=accessService;}
   async upsertIn(client,userId,input,now=new Date()){
     const x=itemSchema.parse(input);
     const old=(await client.query('SELECT * FROM job_history_observations WHERE user_id=$1 AND topic_id=$2 FOR UPDATE',[userId,x.topicId])).rows[0];
@@ -50,12 +50,12 @@ class JobHistoryRepository {
     return row;
   }
   async observe({scope,item}){
-    return jobTransaction(this.pool,async client=>{await assertJobScope(client,scope);
+    return jobTransaction(this.pool,async client=>{await assertJobScope(client,scope,this.accessService);
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',[`job-history:${scope.userId}`]);
       return this.upsertIn(client,scope.userId,item);});
   }
   async list({scope,page=0}){
-    await assertJobScope(this.pool,scope);if(!Number.isInteger(page)||page<0||page>9999)throw jobError('JOB_INVALID_PAGE');
+    await assertJobScope(this.pool,scope,this.accessService);if(!Number.isInteger(page)||page<0||page>9999)throw jobError('JOB_INVALID_PAGE');
     // Letter bodies are selected only for a scoped detail card, never for list rendering.
     const rows=(await this.pool.query(`${merged} SELECT id,row_kind,title,company,external_vacancy_id,origin,send_status,
       employer_status,applied_at,first_seen_at,checked_at,status_checked_at FROM records
@@ -64,7 +64,7 @@ class JobHistoryRepository {
     return{items:rows,total};
   }
   async get({scope,id}){
-    await assertJobScope(this.pool,scope);const row=(await this.pool.query(`${merged} SELECT * FROM records WHERE id=$2`,[scope.userId,uuid.parse(id)])).rows[0];
+    await assertJobScope(this.pool,scope,this.accessService);const row=(await this.pool.query(`${merged} SELECT * FROM records WHERE id=$2`,[scope.userId,uuid.parse(id)])).rows[0];
     if(!row)throw jobError('JOB_NOT_FOUND');
     const events=row.row_kind==='hh'?(await this.pool.query(`SELECT employer_status,observed_at FROM job_history_events
       WHERE observation_id=$1 ORDER BY observed_at DESC,id DESC LIMIT 8`,[row.id])).rows:[];

@@ -3,12 +3,14 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const http = require('node:http');
+const { randomUUID } = require('node:crypto');
 const { chromium } = require('../job-browser/node_modules/playwright');
 const root = path.resolve(__dirname, '../mini-app/dist');
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
 const server = http.createServer(async (request, response) => {
-  const relative = new URL(request.url, 'http://localhost').pathname.replace(/^\/mini\//, '') || 'index.html';
-  if (relative.includes('..') || !/^(index\.html|(?:app|api|admin|core)\.js|style\.css|vendor\/(?:three\.module|three\.core|RoomEnvironment)\.js)$/.test(relative)) return response.writeHead(404).end();
+  let relative = new URL(request.url, 'http://localhost').pathname.replace(/^\/mini\//, '') || 'index.html';
+  if (relative === 'job-connect/') relative = 'job-connect.html';
+  if (relative.includes('..') || !/^(index\.html|job-connect\.html|(?:app|api|admin|core|jobConnect|jobConnection)\.js|style\.css|vendor\/(?:three\.module|three\.core|RoomEnvironment)\.js)$/.test(relative)) return response.writeHead(404).end();
   try { const content = await fs.readFile(path.join(root, relative)); response.writeHead(200, { 'Content-Type': types[path.extname(relative)], 'Content-Security-Policy': "default-src 'self'; script-src 'self' https://telegram.org; connect-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'" }).end(content); }
   catch { response.writeHead(404).end(); }
 });
@@ -16,7 +18,8 @@ async function fixture(context, { level = 'owner', outside = false, sdkBlocked =
   const users = [{ telegramId: '100000001', displayName: 'Владелец', level: 'owner', roleId: null, permissions: Object.keys({ assistant:1,jobs:1,life:1,memory:1,documents:1,devices:1,vpn:1,operations:1 }), overrides: {}, revision: 1 }, { telegramId: '100000003', displayName: '<b>Анна</b>', level: 'member', roleId: 'search', overrides: {}, permissions: ['jobs'], revision: 1, blocked: false }];
   const roles = [{ id: 'search', name: 'Только поиск', permissions: ['jobs'], revision: 1 }];
   const actor = level === 'member' ? users[1] : { ...users[0], level };
-  const state = { mutations: [], uncertain: false, conflict: false, session: false, op: null, section: null, blocked: false, chatUncertain: false, chatPosts: [], chatOp: null, messages: [], operationUnknown: false };
+  const state = { mutations: [], uncertain: false, conflict: false, session: false, op: null, section: null, blocked: false, chatUncertain: false, chatPosts: [], chatOp: null, messages: [], operationUnknown: false,
+    jobSessionId: randomUUID(), jobTicket: 'a'.repeat(64), jobStatus: 'waiting', jobConnected: false, jobCreateRequests: [], jobClaims: [], jobConfirm: null, guestEvents: [] };
   const external = []; const errors = [];
   context.on('page', (page) => page.on('pageerror', (error) => errors.push(error.message)));
   await context.route('https://telegram.org/**', (route) => sdkBlocked ? route.abort() : route.fulfill({ contentType: 'text/javascript', body: outside ? '' : 'window.Telegram={WebApp:{initData:"synthetic-fixture",ready(){},expand(){}}};' }));
@@ -27,6 +30,27 @@ async function fixture(context, { level = 'owner', outside = false, sdkBlocked =
     if (endpoint === '/session') { assert.equal(body.initData, 'synthetic-fixture'); if (rejectLogin) return send({ ok: false, code: 'invalid_login' }, 400); state.session = true; return send({ ok: true, csrfToken: 'fixture-csrf', actor, catalog: [] }); }
     if (endpoint === '/me') return send(state.session ? { ok: true, csrfToken: 'fixture-csrf', actor, catalog: [] } : { ok: false }, state.session ? 200 : 401);
     if (endpoint.startsWith('/sections/')) { state.section = endpoint; return send({ ok: true, section: 'jobs', items: [{ title: 'Личный профиль' }], notice: 'Нужно личное подключение HH.' }); }
+    if (endpoint === '/jobs/connection') return send({ ok: true, available: true, connected: state.jobConnected, ...(state.jobConnected ? { resumeId: 'resume-1' } : {}) });
+    if (endpoint === '/jobs/login' && request.method() === 'POST') {
+      assert.equal(request.headers()['x-jarvis-csrf'], 'fixture-csrf'); state.jobCreateRequests.push(body);
+      return send({ ok: true, status: 'created', sessionId: state.jobSessionId, ticket: state.jobTicket });
+    }
+    if (endpoint === `/jobs/login/owned/status/${state.jobSessionId}`) return send({ ok: true,
+      status: state.jobStatus === 'authenticated' ? 'authenticated' : state.jobStatus,
+      state: state.jobStatus, resumes: state.jobStatus === 'authenticated' ? [{ id: 'resume-1', title: 'Моё резюме' }] : [], nextSequence: 1 });
+    if (endpoint === '/jobs/login/claim' && request.method() === 'POST') {
+      assert.ok(!request.headers()['x-jarvis-csrf']); state.jobClaims.push(body.ticket);
+      return send({ ok: true, sessionId: state.jobSessionId });
+    }
+    if (endpoint === `/jobs/login/status/${state.jobSessionId}`) return send({ ok: true, status: 'claimed', state: state.jobStatus, nextSequence: 1 });
+    if (endpoint === `/jobs/login/frame/${state.jobSessionId}`) return send({ ok: true, state: state.jobStatus, mimeType: 'image/jpeg', frameBase64: 'ZmFrZQ==', width: 10, height: 10 });
+    if (endpoint === `/jobs/login/input/${state.jobSessionId}` && request.method() === 'POST') {
+      state.guestEvents.push(body.event); return send({ ok: true, nextSequence: body.sequence + 1 });
+    }
+    if (endpoint === '/jobs/login/confirm' && request.method() === 'POST') {
+      assert.equal(request.headers()['x-jarvis-csrf'], 'fixture-csrf'); state.jobConfirm = body; state.jobConnected = true;
+      return send({ ok: true, status: 'confirmed' });
+    }
     if (endpoint === '/assistant/messages' && request.method() === 'GET') return send({ ok: true, messages: state.messages });
     if (endpoint === '/assistant/messages') {
       assert.equal(request.headers()['x-jarvis-csrf'], 'fixture-csrf'); state.chatPosts.push(body); state.messages.push({ id: 'u', role: 'user', content: body.text }, { id: 'a', role: 'assistant', content: 'Ответ Jarvis' });
@@ -78,7 +102,37 @@ async function fixture(context, { level = 'owner', outside = false, sdkBlocked =
     await page.getByRole('tab', { name: 'Роли', exact: true }).click(); await page.getByRole('button', { name: '+ Создать роль' }).click(); await page.getByLabel('Название роли').fill('Документы'); await page.getByRole('checkbox', { name: 'Документы', exact: true }).check(); await page.getByRole('button', { name: 'Проверить изменения', exact: true }).click(); await page.getByRole('button', { name: 'Подтвердить и сохранить', exact: true }).click(); await page.getByRole('dialog').waitFor({ state: 'hidden' });
     await page.getByRole('button', { name: '+ Добавить', exact: true }).click(); await page.getByLabel('Telegram ID', { exact: true }).fill('100000004'); await page.getByLabel('Имя для отображения').fill('Иван'); await page.getByRole('button', { name: 'Проверить изменения', exact: true }).click(); await page.getByRole('button', { name: 'Подтвердить и сохранить', exact: true }).click(); await page.getByRole('dialog').waitFor({ state: 'hidden' });
     for (const width of [320, 390, 1280]) { await page.setViewportSize({ width, height: 900 }); assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true); await page.getByRole('link', { name: 'Главная', exact: true }).click(); await page.waitForFunction(() => document.documentElement.scrollWidth <= innerWidth); if (width === 390) await page.screenshot({ path: path.join(output, 'production-mobile.png'), fullPage: true }); }
-    await page.getByRole('button', { name: /Поиск работы/ }).click(); await page.getByText('Личный профиль', { exact: true }).waitFor(); assert.equal(state.section, '/sections/jobs');
+    await page.getByRole('button', { name: /Поиск работы/ }).click(); await page.getByText('Личный профиль HH', { exact: true }).waitFor(); assert.equal(state.section, '/sections/jobs');
+    await page.getByRole('button', { name: 'Подключить HH', exact: true }).click();
+    const jobLink = page.getByRole('link', { name: 'Открыть окно входа HH', exact: true }); await jobLink.waitFor();
+    const href = await jobLink.getAttribute('href'), linkUrl = new URL(href);
+    assert.equal(linkUrl.pathname, '/mini/job-connect/'); assert.equal(new URLSearchParams(linkUrl.hash.slice(1)).get('ticket'), state.jobTicket);
+    assert.equal(state.jobCreateRequests.length, 1); assert.equal(await page.evaluate((ticket) => Object.values(sessionStorage).join('').includes(ticket), state.jobTicket), false);
+    const connectPage = await context.newPage(); await connectPage.goto(href);
+    await connectPage.locator('#job-connect-stage').waitFor({ state: 'visible' });
+    for (const width of [390, 1280]) {
+      await connectPage.setViewportSize({ width, height: 844 });
+      assert.equal(await connectPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `HH login page fits ${width}px`);
+    }
+    assert.equal(new URL(connectPage.url()).hash, '', 'one-time ticket is removed from the address bar after claim');
+    assert.equal(await connectPage.locator('#job-connect-input').getAttribute('type'), 'password');
+    assert.deepEqual(state.jobClaims, [state.jobTicket]);
+    assert.equal(await connectPage.evaluate((ticket) => Object.values(sessionStorage).join('').includes(ticket), state.jobTicket), false);
+    await connectPage.getByRole('button', { name: 'Показать ввод', exact: true }).click();
+    assert.equal(await connectPage.locator('#job-connect-input').getAttribute('type'), 'text');
+    await connectPage.locator('#job-connect-input').fill('фиктивный текст');
+    await connectPage.getByRole('button', { name: 'Ввести в HH', exact: true }).click();
+    await connectPage.getByRole('button', { name: 'Enter', exact: true }).click();
+    assert.deepEqual(state.guestEvents.map((event) => event.type), ['text', 'key']);
+    assert.equal(await connectPage.locator('#job-connect-input').inputValue(), '');
+    state.jobStatus = 'authenticated';
+    await connectPage.getByText('Вход HH подтверждён. Вернись в Mini App и выбери основное резюме.').waitFor();
+    const resumeSelect = page.getByRole('combobox', { name: 'Основное резюме HH' }); await resumeSelect.waitFor();
+    assert.equal(await resumeSelect.locator('option').count(), 1);
+    await page.getByRole('button', { name: 'Сохранить профиль', exact: true }).click();
+    await page.getByText(/HH подключён\. Основное резюме: resume-1/).waitFor();
+    assert.deepEqual(state.jobConfirm, { sessionId: state.jobSessionId, resumeId: 'resume-1' });
+    await connectPage.close();
     await page.getByRole('link', { name: 'Ассистент', exact: true }).click(); await page.getByLabel('Сообщение Jarvis').fill('Мой вопрос'); state.chatUncertain = true;
     await page.getByRole('button', { name: 'Отправить', exact: true }).click(); await page.getByRole('button', { name: 'Проверить исходный запрос', exact: true }).waitFor();
     assert.equal(await page.getByLabel('Сообщение Jarvis').inputValue(), 'Мой вопрос');

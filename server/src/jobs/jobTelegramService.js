@@ -5,12 +5,20 @@ const { parseSettingsEdit, parseProfileEdit } = require('./jobSettingsService');
 const { JobLetterFlow } = require('./jobLetterFlow');
 const { JobSettingsPanel } = require('./jobSettingsPanel');
 
-function jobScope(context) {
-  if (context.user?.role !== 'owner' || context.chatType !== 'private' || String(context.chatId) !== String(context.telegramUserId)) throw jobError('JOB_SCOPE_DENIED');
+function isConfiguredOwner(context, ownerTelegramId) {
+  return /^[1-9]\d{0,19}$/.test(String(ownerTelegramId || ''))
+    && String(context.telegramUserId) === String(ownerTelegramId);
+}
+
+function jobScope(context, ownerTelegramId = null) {
+  const hasJobs = context.access
+    ? !context.access.blocked && context.access.permissions?.includes('jobs')
+    : isConfiguredOwner(context, ownerTelegramId);
+  if (!hasJobs || context.chatType !== 'private' || String(context.chatId) !== String(context.telegramUserId)) throw jobError('JOB_SCOPE_DENIED');
   return { userId: context.user.id, conversationId: context.conversation.id, chatId: String(context.chatId), channel: 'telegram' };
 }
 function publicJobFailure(error) {
-  const messages = { JOB_SCOPE_DENIED: 'Поиск работы доступен владельцу в личном чате.',
+  const messages = { JOB_SCOPE_DENIED: 'Поиск работы доступен только в личном чате и при действующем разрешении.',
     JOB_PROFILE_UNCONFIRMED: 'Сначала проверь и подтверди профиль фактов в настройках поиска работы.',
     JOB_MODEL_NOT_CONFIGURED: 'Для писем нужно выбрать модель поиска работы и настроить OpenRouter.',
     JOB_MODEL_UNAVAILABLE: 'Модель сейчас недоступна. Предыдущий черновик сохранён.',
@@ -33,7 +41,7 @@ class JobTelegramService {
   constructor(options) { Object.assign(this, options); this.letterFlow = new JobLetterFlow(this); this.settingsPanel = new JobSettingsPanel(this); }
   async handleCallback(data, context) {
     const parsed = parseJobCallback(data); if (!parsed) return data.startsWith('job:') ? response('Кнопка недоступна.') : null;
-    try { const scope = jobScope(context); await assertJobScope(this.pool, scope);
+    try { const scope = jobScope(context, this.ownerTelegramId); await assertJobScope(this.pool, scope, this.accessService);
       if (!['approve', 'confirm', 'cfg_ok'].includes(parsed.action)) await this.pool.query(`UPDATE job_confirmations SET status='cancelled'
         WHERE user_id=$1 AND conversation_id=$2 AND chat_id=$3 AND status='pending' AND kind IN ('settings','profile')`,
       [scope.userId, scope.conversationId, scope.chatId]);
@@ -112,6 +120,13 @@ ${profile.profile.facts.map((x) => x.text).join('\n')}
     }
     if (action === 'approve') { await this.settingsService.approve({ scope, confirmationId: targetId }); return response('Изменения подтверждены и сохранены.', [[button('В поиск работы', 'menu')]]); }
     if (action === 'connect' || action === 'disconnect' || action === 'resume_select') {
+      const isOwner = context.access?.level === 'owner' || isConfiguredOwner(context, this.ownerTelegramId);
+      if (action === 'connect' && !isOwner) {
+        const href = this.jobPublicOrigin ? new URL('/mini/', this.jobPublicOrigin).href : null;
+        return href ? response('Открой личное подключение HH в Mini App. Войди в свой профиль и выбери основное резюме.',
+          [[{ text: 'Открыть подключение HH', webApp: href }]])
+          : response('Открой личное подключение HH через раздел «Поиск работы» в Jarvis Mini App.');
+      }
       return this.connectionService ? this.connectionService.handle({ scope, action, targetId }) : response('Подключение HH ещё не настроено. Поиск и подготовка писем доступны отдельно.');
     }
     throw jobError('JOB_INVALID_ACTION');
@@ -119,7 +134,7 @@ ${profile.profile.facts.map((x) => x.text).join('\n')}
   async handlePendingText(text, context, interaction) {
     if (!interaction.kind.startsWith('job_')) return null;
     try {
-      const scope = jobScope(context); await assertJobScope(this.pool, scope);
+      const scope = jobScope(context, this.ownerTelegramId); await assertJobScope(this.pool, scope, this.accessService);
       const setting = await this.settingsPanel.handlePendingText(text, {scope,interaction});
       if (setting) return setting;
       const letter = await this.letterFlow.handlePendingText(text, { scope, context, interaction });
@@ -162,4 +177,4 @@ ${profile.profile.facts.map((x) => x.text).join('\n')}
     } catch (error) { return publicJobFailure(error); }
   }
 }
-module.exports = { JobTelegramService, jobScope, publicJobFailure };
+module.exports = { JobTelegramService, jobScope, isConfiguredOwner, publicJobFailure };

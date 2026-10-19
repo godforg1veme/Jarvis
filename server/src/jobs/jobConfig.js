@@ -13,6 +13,7 @@ const schema = z.object({
   hhAppToken: z.string().max(4096),
   hhUserAgent: z.string().max(255),
   jobBrowserUrl: z.string().max(255), jobBrowserOwnerId: z.string().max(100), jobBrowserToken: z.string().max(256),
+  jobBrowserConnectToken: z.string().max(256),
   jobBrowserApplyEnabled: z.boolean(), jobBrowserApplyToken: z.string().max(256),
 });
 
@@ -36,6 +37,7 @@ function loadJobConfig(env) {
     jobBrowserUrl: String(env.JARVIS_JOB_BROWSER_URL || 'http://job-browser:8080').trim(),
     jobBrowserOwnerId: String(env.JARVIS_JOB_BROWSER_OWNER_ID || '').trim(),
     jobBrowserToken: String(env.JARVIS_JOB_BROWSER_TOKEN || '').trim(),
+    jobBrowserConnectToken: String(env.JARVIS_JOB_BROWSER_CONNECT_TOKEN || '').trim(),
     jobBrowserApplyEnabled: env.JARVIS_JOB_BROWSER_APPLY_ENABLED === '1',
     jobBrowserApplyToken: String(env.JARVIS_JOB_BROWSER_APPLY_TOKEN || '').trim(),
   });
@@ -49,8 +51,11 @@ function loadJobConfig(env) {
       throw new Error('Job public origin must be an HTTPS origin');
     }
   }
+  if (config.jobBrowserConnectToken && (!/^[\x21-\x7e]{32,256}$/.test(config.jobBrowserConnectToken)
+    || config.jobBrowserConnectToken === config.jobBrowserToken || config.jobBrowserConnectToken === config.jobBrowserApplyToken
+    || config.jobBrowserConnectToken === config.jobCaptchaToken)) throw new Error('Invalid job browser connection credential');
   if (config.jobCaptchaToken && (!/^[\x21-\x7e]{32,256}$/.test(config.jobCaptchaToken) || config.jobCaptchaToken === config.jobBrowserToken
-    || config.jobCaptchaToken === config.jobBrowserApplyToken)) throw new Error('Invalid job CAPTCHA credential');
+    || config.jobCaptchaToken === config.jobBrowserApplyToken || config.jobCaptchaToken === config.jobBrowserConnectToken)) throw new Error('Invalid job CAPTCHA credential');
   return config;
 }
 module.exports = { loadJobConfig };

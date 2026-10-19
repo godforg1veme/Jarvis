@@ -5,18 +5,141 @@ const { PERMISSIONS } = require('./access/permissionCatalog');
 const { renderDocumentCitations, publicDocumentStatus } = require('./knowledge/knowledgeService');
 const { FixedWindowRateLimiter } = require('./http/rateLimiter');
 
+const JOB_LOGIN_COOKIE = '__Secure-jarvis-job-login';
+const JOB_LOGIN_COOKIE_PATH = '/mini/api/jobs/login';
+const JOB_LOGIN_TTL_SECONDS = 600;
+const jobLoginCookie = (token) => `${JOB_LOGIN_COOKIE}=${token}; Path=${JOB_LOGIN_COOKIE_PATH}; HttpOnly; Secure; SameSite=Strict; Max-Age=${token ? JOB_LOGIN_TTL_SECONDS : 0}`;
+function readJobLoginCookie(request) {
+  const matches = String(request.headers.cookie || '').split(';').map((item) => item.trim())
+    .filter((item) => item.startsWith(`${JOB_LOGIN_COOKIE}=`));
+  if (matches.length !== 1) return null;
+  const token = matches[0].slice(JOB_LOGIN_COOKIE.length + 1);
+  return /^[a-f\d]{64}$/i.test(token) ? token : null;
+}
+
 const messageSchema = z.object({ requestId: z.uuid(), text: z.string().trim().min(1).max(10000) }).strict();
 const fail = (code) => { throw Object.assign(new Error(code), { code }); };
 
-function registerMiniAppSelfRoutes({ route, authorize }, services) {
+function registerMiniAppSelfRoutes({ route, authorize, requireOrigin }, services) {
   const { accessService, memoryService, knowledgeService, deviceService, missionControlService,
-    assistant, conversationRepository, pool } = services;
+    assistant, conversationRepository, pool, getJobConnectionSessionService } = services;
   const chatLimiter = new FixedWindowRateLimiter();
   const requirePermission = async (request, permission, mutation = false) => {
     const session = await authorize(request, { mutation });
     if (!session.actor.permissions.includes(permission)) fail('forbidden');
     return session.actor;
   };
+
+  const jobSessions = () => {
+    const service = getJobConnectionSessionService?.();
+    if (!service) fail('JOB_LOGIN_UNAVAILABLE');
+    return service;
+  };
+  const sessionIdFrom = (request) => {
+    const parsed = z.uuid().safeParse(request.params.sessionId);
+    if (!parsed.success) fail('invalid_request');
+    return parsed.data;
+  };
+  const guestActor = async (request, reply) => {
+    const guestToken = readJobLoginCookie(request);
+    if (!guestToken) fail('JOB_LOGIN_SESSION_INVALID');
+    try { return await jobSessions().authorizeGuest({ guestToken }); }
+    catch (error) { reply?.header('Set-Cookie', jobLoginCookie('')); throw error; }
+  };
+  const withGuestSession = async (reply, run) => {
+    try { return await run(); }
+    catch (error) {
+      if (['JOB_ACCESS_REVOKED','JOB_LOGIN_SESSION_INVALID','JOB_LOGIN_SESSION_EXPIRED'].includes(error?.code))
+        reply.header('Set-Cookie', jobLoginCookie(''));
+      throw error;
+    }
+  };
+  const loginEvent = z.discriminatedUnion('type', [
+    z.strictObject({ type: z.literal('pointer'), action: z.enum(['move','down','up','click']), button: z.enum(['left','middle','right']), x: z.number().finite().min(0).max(1024), y: z.number().finite().min(0).max(768) }),
+    z.strictObject({ type: z.literal('wheel'), x: z.number().finite().min(0).max(1024), y: z.number().finite().min(0).max(768), deltaX: z.number().finite().min(-1000).max(1000), deltaY: z.number().finite().min(-1000).max(1000) }),
+    z.strictObject({ type: z.literal('key'), action: z.enum(['press','down','up']), key: z.enum(['Enter','Tab','Escape','Backspace','Delete','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Home','End','Shift','Control','Alt','Meta','0','1','2','3','4','5','6','7','8','9']) }),
+    z.strictObject({ type: z.literal('text'), value: z.string().min(1).max(64).refine((value) => !/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/u.test(value)) }),
+  ]);
+
+  route('GET', '/jobs/connection', async (request) => {
+    const actor = await requirePermission(request, 'jobs');
+    const available = Boolean(getJobConnectionSessionService?.());
+    const connection = (await pool.query('SELECT status,resume_id,revision FROM job_connections WHERE user_id=$1', [actor.userId])).rows[0] || null;
+    await requirePermission(request, 'jobs');
+    return { ok: true, connected: connection?.status === 'connected', resumeId: connection?.status === 'connected' ? connection.resume_id : null,
+      revision: connection?.revision || 0, available };
+  });
+
+  route('POST', '/jobs/login', async (request) => {
+    const actor = await requirePermission(request, 'jobs', true);
+    const parsed = z.strictObject({ requestId: z.uuid() }).safeParse(request.body);
+    if (!parsed.success) fail('invalid_request');
+    const result = await jobSessions().create({ userId: actor.userId, requestId: parsed.data.requestId });
+    await requirePermission(request, 'jobs');
+    return { ok: true, ...result };
+  });
+
+  route('GET', '/jobs/login/owned/status/:sessionId', async (request) => {
+    const actor = await requirePermission(request, 'jobs');
+    const sessionId = sessionIdFrom(request);
+    const result = await jobSessions().status({ sessionId, userId: actor.userId });
+    await requirePermission(request, 'jobs');
+    return { ok: true, ...result };
+  });
+
+  route('POST', '/jobs/login/claim', async (request, reply) => {
+    requireOrigin(request);
+    const parsed = z.strictObject({ ticket: z.string().regex(/^[a-f\d]{64}$/i) }).safeParse(request.body);
+    if (!parsed.success) fail('invalid_request');
+    const claimed = await jobSessions().claim({ ticket: parsed.data.ticket, existingGuestToken: readJobLoginCookie(request) });
+    reply.header('Set-Cookie', jobLoginCookie(claimed.guestToken));
+    return { ok: true, sessionId: claimed.sessionId, expiresAt: claimed.expiresAt };
+  });
+
+  route('GET', '/jobs/login/status/:sessionId', async (request, reply) => {
+    const guest = await guestActor(request, reply), sessionId = sessionIdFrom(request);
+    if (guest.sessionId !== sessionId) fail('JOB_LOGIN_SESSION_INVALID');
+    return withGuestSession(reply, async () => ({ ok: true, ...(await jobSessions().status({ sessionId, userId: guest.userId })) }));
+  });
+  route('GET', '/jobs/login/frame/:sessionId', async (request, reply) => {
+    const guest = await guestActor(request, reply), sessionId = sessionIdFrom(request);
+    if (guest.sessionId !== sessionId) fail('JOB_LOGIN_SESSION_INVALID');
+    return withGuestSession(reply, async () => ({ ok: true, ...(await jobSessions().frame({ sessionId, userId: guest.userId })) }));
+  });
+  route('POST', '/jobs/login/input/:sessionId', async (request, reply) => {
+    requireOrigin(request);
+    const guest = await guestActor(request, reply), sessionId = sessionIdFrom(request);
+    const parsed = z.strictObject({ sequence: z.number().int().min(1).max(1000000000), event: loginEvent }).safeParse(request.body);
+    if (guest.sessionId !== sessionId || !parsed.success) fail('JOB_LOGIN_SESSION_INVALID');
+    return withGuestSession(reply, async () => ({ ok: true, ...(await jobSessions().input({ sessionId, userId: guest.userId, ...parsed.data })) }));
+  });
+
+  route('POST', '/jobs/login/confirm', async (request, reply) => {
+    const actor = await requirePermission(request, 'jobs', true);
+    const parsed = z.strictObject({ sessionId: z.uuid(), resumeId: z.string().regex(/^[a-zA-Z0-9]{1,100}$/) }).safeParse(request.body);
+    if (!parsed.success) fail('invalid_request');
+    const result = await jobSessions().confirm({ ...parsed.data, userId: actor.userId });
+    await requirePermission(request, 'jobs');
+    reply.header('Set-Cookie', jobLoginCookie(''));
+    return { ok: true, ...result };
+  });
+  route('POST', '/jobs/login/cancel', async (request, reply) => {
+    const actor = await requirePermission(request, 'jobs', true);
+    const parsed = z.strictObject({ sessionId: z.uuid() }).safeParse(request.body);
+    if (!parsed.success) fail('invalid_request');
+    const result = await jobSessions().cancel({ ...parsed.data, userId: actor.userId });
+    reply.header('Set-Cookie', jobLoginCookie(''));
+    return { ok: true, ...result };
+  });
+  route('POST', '/jobs/login/guest/cancel', async (request, reply) => {
+    requireOrigin(request);
+    const guest = await guestActor(request, reply);
+    const parsed = z.strictObject({ sessionId: z.uuid() }).safeParse(request.body);
+    if (!parsed.success || parsed.data.sessionId !== guest.sessionId) fail('JOB_LOGIN_SESSION_INVALID');
+    reply.header('Set-Cookie', jobLoginCookie(''));
+    const result = await jobSessions().cancel({ sessionId: guest.sessionId, userId: guest.userId });
+    return { ok: true, ...result };
+  });
 
   route('GET', '/sections/:permission', async (request) => {
     const permission = request.params.permission;
@@ -35,8 +158,7 @@ function registerMiniAppSelfRoutes({ route, authorize }, services) {
       if (data.currentMission) items.push({ id: data.currentMission.id, title: data.currentMission.name, detail: 'Текущая миссия' });
       items.push(...(data.commitments || []).slice(0, 30).map((item) => ({ id: item.id, title: item.title, detail: item.dueAt ? `Договорённость · ${formatMoscowDateTime(item.dueAt)}` : 'Договорённость' })));
     } else if (permission === 'jobs') {
-      if (actor.level !== 'owner') notice = 'Нужно отдельное подключение HH. Аккаунт владельца другим людям не передаётся.';
-      else notice = 'Настройки поиска, вакансии и подтверждения откликов доступны в личном чате с ботом.';
+      notice = 'Поиск использует твой личный профиль HH. Для подключения понадобится войти в HH и выбрать основное резюме.';
     } else if (permission === 'vpn') notice = actor.level === 'owner'
       ? 'Подписки и подтверждения VPN доступны в личном чате с ботом.'
       : 'Управление общей VPN-инфраструктурой требует отдельного подтверждения владельца.';

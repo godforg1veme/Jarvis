@@ -1,12 +1,12 @@
 const { assertJobScope, jobError } = require('./jobSchemas');
 const { response, button } = require('./jobTelegramViews');
 
-// The owner has already logged in and selected the primary resume in the browser.
+// The primary resume is already selected in this user's isolated browser profile.
 // This path only verifies it and synchronizes local metadata; it cannot change HH.
 class JobBrowserConnectionService {
-  constructor({ pool, browserClient }) { Object.assign(this, { pool, browserClient }); }
+  constructor({ pool, browserClient, accessService = null }) { Object.assign(this, { pool, browserClient, accessService }); }
   async handle({ scope, action }) {
-    await assertJobScope(this.pool, scope);
+    await assertJobScope(this.pool, scope, this.accessService);
     if (action !== 'connect') return response('Основное резюме выбрано владельцем в браузере. Для изменения подключения нужна отдельная настройка.',
       [[button('В поиск работы', 'menu')]]);
     const selected = await this.browserClient.connection(scope.userId);

@@ -30,6 +30,14 @@ Telegram initData; личность определяется числовым Te
 одна галочка не открывает браузер владельца. Общие VPN/Operations/Supervisor
 сохраняют отдельные owner-bound ограничения.
 
+Личное подключение HH для участников находится в локальной разработке на
+`codex/jobs-member-hh` и ещё не выпущено. Участник с правом `jobs` должен будет
+открыть временную HTTPS-ссылку на телефоне или ПК, войти в HH и подтвердить
+основное резюме в исходной Mini App. Временное окно передаёт снимки и ввод через
+Jarvis; значения ввода кратко обрабатываются в памяти и не сохраняются в базе,
+файлах или логах. Владелец инфраструктуры технически управляет серверным
+браузером. [Текущий результат разработки](../docs/updates/2026-10-19-job-search-member-access-development.md).
+
 При неизвестном результате sessionStorage хранит только исходный UUID, тип
 операции и Telegram ID. Тексты и credentials туда не попадают. После reload
 клиент предлагает сверить исходный запрос и не отправляет его повторно.
@@ -111,6 +119,15 @@ are available when their server services are enabled. Confirmed actions remain
 in Telegram/Desktop. A second HH search needs a personal connection: a checkbox
 never opens the owner's browser. Shared VPN/Operations/Supervisor retains
 separate owner-bound limits.
+
+Personal HH login for members is under local development on
+`codex/jobs-member-hh`; it has not been released. A user with `jobs` permission
+will open a temporary HTTPS link on a phone or PC, sign in to HH, then confirm
+the primary resume in the originating Mini App. The temporary window relays
+screenshots and input through Jarvis; input values are handled briefly in memory
+and never saved to the database, files or logs. The infrastructure owner
+technically controls the server browser.
+[Development status](../docs/updates/2026-10-19-job-search-member-access-development.md).
 
 For unknown outcomes sessionStorage holds only the original UUID, operation
 kind and Telegram ID. Text and credentials are never stored there. After reload

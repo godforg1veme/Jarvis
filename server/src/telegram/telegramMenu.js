@@ -38,7 +38,9 @@ function replyKeyboard(owner, { jobSearchEnabled = false, permissions = null } =
 }
 
 function isOwner(user, telegramUserId, ownerTelegramId) {
-  return user?.role === 'owner' || (String(ownerTelegramId || '') !== '0' && String(telegramUserId || '') === String(ownerTelegramId));
+  const configuredOwnerId = String(ownerTelegramId || '');
+  return /^[1-9]\d{0,19}$/.test(configuredOwnerId)
+    && String(telegramUserId || '') === configuredOwnerId;
 }
 
 module.exports = { MENU, isOwner, menuAction, replyKeyboard };

@@ -20,7 +20,7 @@ test('builds distinct persistent keyboards for owner and family member', () => {
   assert.equal(replyKeyboard(false, { jobSearchEnabled: true }).keyboard.flat().some((button) => button.text === MENU.JOBS), false);
 });
 
-test('menu labels use exact matching and roles include configured owner identity', () => {
+test('menu labels use exact matching and only the configured Telegram ID is the owner', () => {
   assert.equal(menuAction(MENU.DEVICES), 'devices');
   assert.equal(menuAction(MENU.JOBS), 'jobs');
   assert.equal(menuAction('Поиск работы'), null);
@@ -29,5 +29,5 @@ test('menu labels use exact matching and roles include configured owner identity
   assert.equal(menuAction(MENU.DEVICES.toLowerCase()), null);
   assert.equal(isOwner({ role: 'member' }, '101', '101'), true);
   assert.equal(isOwner({ role: 'member' }, '202', '101'), false);
-  assert.equal(isOwner({ role: 'owner' }, '202', '101'), true);
+  assert.equal(isOwner({ role: 'owner' }, '202', '101'), false);
 });

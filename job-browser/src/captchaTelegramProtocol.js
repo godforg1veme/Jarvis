@@ -8,7 +8,7 @@ function normalizeAnswer(text) {
   return validAnswer(normalized) ? normalized : null;
 }
 function validCaptchaRequest(value) {
-  if (!exact(value, ['operation', 'args'])) return false;
+  if (!exact(value, ['userId', 'operation', 'args']) || !UUID.test(value.userId || '')) return false;
   if (value.operation === 'status') return exact(value.args, []);
   if (value.operation === 'challenge') return exact(value.args, ['refresh']) && typeof value.args.refresh === 'boolean';
   return value.operation === 'answer' && exact(value.args, ['challengeId', 'revision', 'operationId', 'text'])

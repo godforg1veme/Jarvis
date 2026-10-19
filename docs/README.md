@@ -40,6 +40,16 @@ generation-квитанция подтвердила стоимость. Исх�
 [Выжимка чата для следующего агента](updates/2026-10-18-mini-app-agent-handoff.md)
 содержит решения, проверенного владельца, версии и следующий шаг.
 
+19 октября подготовлен локальный сценарий личного HH для участников: ссылка
+на обычном HTTPS, вход с телефона или ПК и подтверждение резюме в Mini App.
+Изменения остаются в ветке `codex/jobs-member-hh`; они не выпущены. Серверные
+unit-тесты прошли 765/765; browser-тесты — 69/69, ещё девять проверок прав
+файловой системы Linux пропущены на Windows. Оба PostgreSQL acceptance-теста
+прошли на временной изолированной БД; сборка Mini App и синтетический Chromium
+сценарий прошли на телефоне/ПК ширинах. Реальный вход в HH и проверка на VPS
+ещё не выполнены.
+[Запись о разработке](updates/2026-10-19-job-search-member-access-development.md).
+
 [Исследуется новый 403 после корректного OCR](updates/2026-10-18-hh-captcha-403-investigation.md):
 native-запрос и browser/API cookies проверены без отправки ответов. Точная причина
 старого 403 пока неизвестна; ограниченный классификатор ответа HH установлен на DE,
@@ -104,7 +114,7 @@ Operations tests/build и browser fixtures прошли. Код и устано�
 | VPN Supervisor | Owner-confirmed ограниченный NL Xray restart с postchecks; peer timers включены | Restore отключён; external timer failures ещё не создают Telegram incidents |
 | Эксплуатация | Server, PostgreSQL и ASR healthy; hopping DNAT присутствует и сохранён в UFW на обоих узлах | Реальная проверка сохранения после reboot и автоматического ACME renewal; backups отложены владельцем |
 | Дальнейшая работа | Облако и Windows являются основными частями продукта | PWA, server executors, расписания и реальные account connectors |
-| Поиск работы | После OOM установлено восстановление браузера и очереди CAPTCHA; новое фото доставлено, ответ принят, прежний сбор продолжился | [Результат выпуска](updates/2026-10-16-hh-captcha-resilience-release.md). Live HH-отклик и длительная работа под нагрузкой ещё не проверены |
+| Поиск работы | После OOM восстановлены браузер и очередь CAPTCHA; личный HH для участников разрабатывается локально | [Результат восстановления](updates/2026-10-16-hh-captcha-resilience-release.md); [новый путь не выпущен, вход и acceptance ещё не подтверждены](updates/2026-10-19-job-search-member-access-development.md) |
 
 [Обновление кнопок поиска работы](updates/2026-10-15-job-search-buttons.md)
 установлено на DE: включение/выключение и постоянный пункт в нижнем меню.
@@ -238,6 +248,15 @@ and two accounts still need acceptance; a second HH account needs its own connec
 The [chat handoff for the next agent](updates/2026-10-18-mini-app-agent-handoff.md)
 records decisions, the verified owner, revisions and the next step.
 
+On October 19, a member-owned HH flow was prepared locally: an ordinary HTTPS
+link, phone/PC sign-in and resume confirmation in the Mini App. The changes
+remain on branch `codex/jobs-member-hh` and have not been released. Server unit
+tests passed 765/765; browser tests passed 69/69. Nine tests of Linux filesystem
+permissions were skipped on Windows. Both PostgreSQL acceptance tests passed on a
+temporary isolated database. The Mini App build and synthetic Chromium flow passed
+at phone and desktop widths. Real HH sign-in and VPS acceptance remain pending.
+[Development record](updates/2026-10-19-job-search-member-access-development.md).
+
 [A new 403 after correct OCR is under investigation](updates/2026-10-18-hh-captcha-403-investigation.md):
 native requests and browser/API cookies were checked without submitting answers.
 The past 403's exact cause is unknown; a bounded HH response classifier is installed on DE,
@@ -304,7 +323,7 @@ taps and an HH application remain unverified.
 | VPN Supervisor | Limited NL Xray restart with owner confirmation and postchecks; peer timers enabled | Restore disabled; external timer failures do not yet create Telegram incidents |
 | Operations | Server, PostgreSQL, and ASR healthy; hopping DNAT present and persisted in UFW on both nodes | Persistence after reboot and automatic ACME renewal; backups deferred by the owner |
 | Further work | Cloud and Windows are the main product components | PWA, server executors, schedules, and real account connectors |
-| Job search | Browser and CAPTCHA queue recovery installed after OOM; new photo delivered, answer accepted, existing collection resumed | [Release record](updates/2026-10-16-hh-captcha-resilience-release.md). Live HH application submission and sustained operation under load remain unchecked |
+| Job search | Browser and CAPTCHA queue recovered after OOM; personal HH access for members is in local development | [Recovery record](updates/2026-10-16-hh-captcha-resilience-release.md); [new path is unreleased; login and acceptance remain unverified](updates/2026-10-19-job-search-member-access-development.md) |
 
 The [job-search button update](updates/2026-10-15-job-search-buttons.md) is
 installed on DE, with enable/disable controls and a permanent bottom-menu entry.

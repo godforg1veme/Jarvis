@@ -16,11 +16,11 @@ function applicationView(operation) {
 }
 
 class JobApplicationService {
-  constructor({ pool, repository, searchRepository, adapter = null, historyRepository = null }) {
-    Object.assign(this, { pool, repository, searchRepository, adapter, historyRepository });
+  constructor({ pool, repository, searchRepository, adapter = null, historyRepository = null, accessService = null }) {
+    Object.assign(this, { pool, repository, searchRepository, adapter, historyRepository, accessService });
   }
   async requireAdapter({ scope }) {
-    await assertJobScope(this.pool, scope);
+    await assertJobScope(this.pool, scope, this.accessService);
     if (!this.adapter || this.adapter.capabilities?.applicantApply !== true) throw jobError('JOB_APPLICANT_API_UNAVAILABLE');
   }
   async inspect({ scope, draftId }) {

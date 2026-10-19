@@ -79,7 +79,7 @@ class JobSettingsPanel {
   }
   async handlePendingText(text,{scope,interaction}) {
     if(interaction.kind!=='job_setting_value') return null;
-    await assertJobScope(this.jobs.pool,scope);
+    await assertJobScope(this.jobs.pool,scope,this.jobs.accessService);
     const {targetId,revision,field,returnPage}=interaction.context;
     const search=await this.current(scope,revision,targetId),def=fields[field];
     let value;

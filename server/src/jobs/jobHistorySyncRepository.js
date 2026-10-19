@@ -1,11 +1,11 @@
-const {assertJobScope,jobError}=require('./jobSchemas');
+const {assertJobScope,assertUserJobAccess,jobError}=require('./jobSchemas');
 const {jobTransaction}=require('./jobTransaction');
 const {historySchema}=require('./jobHistorySchema');
 class JobHistorySyncRepository{
-  constructor(pool,history,{now=()=>new Date()}={}){Object.assign(this,{pool,history,now});}
-  async state(scope){await assertJobScope(this.pool,scope);return(await this.pool.query('SELECT * FROM job_history_syncs WHERE user_id=$1',[scope.userId])).rows[0]||null;}
+  constructor(pool,history,{now=()=>new Date(),accessService=null}={}){Object.assign(this,{pool,history,now,accessService});}
+  async state(scope){await assertJobScope(this.pool,scope,this.accessService);return(await this.pool.query('SELECT * FROM job_history_syncs WHERE user_id=$1',[scope.userId])).rows[0]||null;}
   async request({scope,firstOnly=false}){
-    return jobTransaction(this.pool,async c=>{await assertJobScope(c,scope);
+    return jobTransaction(this.pool,async c=>{await assertJobScope(c,scope,this.accessService);
       await c.query('SELECT pg_advisory_xact_lock(hashtext($1))',[`job-history:${scope.userId}`]);
       const connection=(await c.query("SELECT 1 FROM job_connections WHERE user_id=$1 AND status='connected' AND resume_id IS NOT NULL",[scope.userId])).rowCount;
       if(!connection)throw jobError('JOB_HH_NOT_CONNECTED');
@@ -19,15 +19,25 @@ class JobHistorySyncRepository{
       [scope.userId,scope.conversationId,scope.chatId,this.now()])).rows[0];});
   }
   async claim(){
-    return(await this.pool.query(`WITH candidate AS(SELECT s.user_id FROM job_history_syncs s
-      JOIN users u ON u.id=s.user_id AND u.role='owner'
-      JOIN conversations c ON c.id=s.conversation_id AND c.user_id=s.user_id AND c.channel='telegram' AND c.external_chat_id=s.chat_id
-      JOIN user_identities i ON i.user_id=s.user_id AND i.provider='telegram' AND i.external_id=s.chat_id
-      JOIN job_connections x ON x.user_id=s.user_id AND x.status='connected'
-      WHERE s.status IN('queued','running','paused') AND s.next_attempt_at<=$1 AND (s.lease_until IS NULL OR s.lease_until<$1)
-      ORDER BY s.next_attempt_at LIMIT 1 FOR UPDATE OF s SKIP LOCKED)
-      UPDATE job_history_syncs s SET status='running',lease_id=gen_random_uuid(),lease_until=$1::timestamptz+interval '2 minutes'
-      FROM candidate WHERE s.user_id=candidate.user_id RETURNING s.*`,[this.now()])).rows[0]||null;
+    return jobTransaction(this.pool,async c=>{
+      const candidates=(await c.query(`SELECT s.* FROM job_history_syncs s
+        JOIN conversations x ON x.id=s.conversation_id AND x.user_id=s.user_id AND x.channel='telegram' AND x.external_chat_id=s.chat_id
+        JOIN user_identities i ON i.user_id=s.user_id AND i.provider='telegram' AND i.external_id=s.chat_id
+        JOIN job_connections j ON j.user_id=s.user_id AND j.status='connected'
+        WHERE s.status IN('queued','running','paused') AND s.next_attempt_at<=$1 AND (s.lease_until IS NULL OR s.lease_until<$1)
+        ORDER BY s.next_attempt_at,s.user_id LIMIT 50 FOR UPDATE OF s SKIP LOCKED`,[this.now()])).rows;
+      for(const candidate of candidates){
+        try{await assertUserJobAccess(c,this.accessService,candidate.user_id);}
+        catch{
+          await c.query("UPDATE job_history_syncs SET status='failed',failure_code='JOB_ACCESS_REVOKED',lease_id=NULL,lease_until=NULL,updated_at=$2 WHERE user_id=$1 AND run_id=$3",
+            [candidate.user_id,this.now(),candidate.run_id]);
+          continue;
+        }
+        return(await c.query(`UPDATE job_history_syncs SET status='running',lease_id=gen_random_uuid(),lease_until=$2::timestamptz+interval '2 minutes'
+          WHERE user_id=$1 AND run_id=$3 RETURNING *`,[candidate.user_id,this.now(),candidate.run_id])).rows[0]||null;
+      }
+      return null;
+    });
   }
   async applyPage({run,leaseId,result}){
     result=historySchema.parse(result);
@@ -35,7 +45,7 @@ class JobHistorySyncRepository{
       await c.query('SELECT pg_advisory_xact_lock(hashtext($1))',[`job-history:${run.user_id}`]);
       const s=(await c.query('SELECT * FROM job_history_syncs WHERE user_id=$1 AND run_id=$2 AND lease_id=$3 FOR UPDATE',[run.user_id,run.run_id,leaseId])).rows[0];
       if(!s||s.lease_until<this.now())return false;
-      await assertJobScope(c,{userId:s.user_id,conversationId:s.conversation_id,chatId:s.chat_id,channel:'telegram'});
+      await assertJobScope(c,{userId:s.user_id,conversationId:s.conversation_id,chatId:s.chat_id,channel:'telegram'},this.accessService);
       const identity=await c.query("SELECT 1 FROM user_identities WHERE user_id=$1 AND provider='telegram' AND external_id=$2",[s.user_id,s.chat_id]);
       if(!identity.rowCount)throw jobError('JOB_SCOPE_DENIED');
       if(!(await c.query("SELECT 1 FROM job_connections WHERE user_id=$1 AND status='connected' AND resume_id IS NOT NULL",[s.user_id])).rowCount)throw jobError('JOB_HH_NOT_CONNECTED');

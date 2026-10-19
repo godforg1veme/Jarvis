@@ -1,4 +1,5 @@
 const fs = require('node:fs/promises');
+const path = require('node:path');
 const { chromium } = require('playwright');
 const { UUID } = require('./rpcProtocol');
 const { createRpcServer } = require('./rpcServer');
@@ -18,6 +19,7 @@ const { BrowserHealth, bounded } = require('./browserHealth');
 const { CaptchaAutomatic } = require('./captchaAutomatic');
 const { recognizeFrozenPng } = require('./ocrClient');
 const { CaptchaAttemptStore } = require('./captchaAttemptStore');
+const { ProfileManager } = require('./profileManager');
 
 async function handoverCaptcha({ journal, manual, ownerId, target, error, now = Date.now }) {
   let state = await journal.read();
@@ -33,6 +35,72 @@ async function handoverCaptcha({ journal, manual, ownerId, target, error, now = 
   return state.operationId;
 }
 
+async function readPrimaryResume(root) {
+  try {
+    const file = path.join(root, 'jarvis-primary-resume.json');
+    const stat = await fs.lstat(file);
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.uid !== process.getuid() || (stat.mode & 0o077) || stat.size > 2048) throw new Error();
+    const id = JSON.parse(await fs.readFile(file, 'utf8')).id;
+    if (!/^[a-zA-Z0-9]{1,100}$/.test(id || '')) throw new Error();
+    return id;
+  } catch (error) { if (error.code === 'ENOENT') return null; throw new Error('JOB_BROWSER_PROFILE_OWNER_DENIED'); }
+}
+
+async function createMemberRuntime({ userId, root, context, env, applyEnabled, onFatal, manualEnabled, manualToken, automaticEnabled }) {
+  const primaryResumeId = await readPrimaryResume(root);
+  const health = new BrowserHealth({ context, onFatal });
+  let manual, manualPage, evidenceTimer;
+  try {
+    await context.route('**/*', async (route) => {
+      const request = route.request();
+      if (['GET','HEAD','OPTIONS'].includes(request.method())) return allowedRequest(request.url()) ? route.continue() : route.abort();
+      try { if (manualPage && await manualPage.permit(route)) return; } catch {}
+      return route.abort();
+    });
+    await context.routeWebSocket('**/*', (socket) => socket.close());
+    const journal = env.JARVIS_HH_CAPTCHA_RECOVERY === '1' || manualEnabled
+      ? new CaptchaJournal({ root: path.join(root, 'captcha-recovery'), ownerId: userId }) : null;
+    const captchaRecovery = !manualEnabled && env.JARVIS_HH_CAPTCHA_RECOVERY === '1' ? new CaptchaRecovery({ journal }) : null;
+    if (!manualEnabled) await assertInactiveWhenDisabled({ root: path.join(root, 'manual-recovery'), ownerId: userId });
+    if (manualEnabled) {
+      manual = new ManualCoordinator({ store: new ManualState({ root: path.join(root, 'manual-recovery'), ownerId: userId }),
+        open: (target) => manualPage.open(target), verify: (target, id) => manualPage.verify(target, id) });
+      await manual.load();
+      manualPage = new CaptchaTelegramBrowser({ context, coordinator: manual, journal, onUnhealthy: () => health.fail() });
+      if (automaticEnabled) {
+        const evidence = new CaptchaAttemptStore({ root: path.join(root, 'captcha-evidence'), ownerId: userId });
+        const report = () => process.stderr.write('JOB_CAPTCHA_EVIDENCE_UNAVAILABLE\n');
+        await evidence.prune();
+        evidenceTimer = setInterval(() => { evidence.prune().catch(report); }, 3600000); evidenceTimer.unref();
+        manualPage.automatic = new CaptchaAutomatic({ coordinator: manual, recognize: recognizeFrozenPng, evidence, report });
+      }
+    }
+    const onManualRequired = manual && ((target, error) => handoverCaptcha({ journal, manual, ownerId: userId, target, error }));
+    const browser = new HhBrowser({ context, primaryResumeId, captchaRecovery, manualCoordinator: manual, onManualRequired,
+      onTimeout: () => health.fail() });
+    const ledger = new ApplicationLedger({ root: path.join(root, 'applications'), ownerId: userId });
+    await ledger.directory();
+    const runtime = { userId, root, context, browser, manual, manualPage, health, ledger, submissions: null,
+      setPrimaryResume: async (resumeId) => {
+        browser.primaryResumeId = resumeId;
+        if (applyEnabled) {
+          const guarded = new GuardedSubmission({ ledger, driver: new HhApplicationDriver({ browser }), ownerId: userId, primaryResumeId: resumeId });
+          runtime.submissions = {
+            submit: (input) => browser.run(() => { manual?.assertAutomatic(); return guarded.submit(input); }),
+            reconcile: (input) => browser.run(() => { manual?.assertAutomatic(); return guarded.reconcile(input); }),
+          };
+        }
+      },
+      async close() { clearInterval(evidenceTimer); health.close(); await manualPage?.close(); },
+    };
+    if (primaryResumeId) await runtime.setPrimaryResume(primaryResumeId);
+    health.start();
+    return runtime;
+  } catch (error) {
+    clearInterval(evidenceTimer); health.close(); await manualPage?.close().catch(() => {}); throw error;
+  }
+}
+
 async function startBrowser(env = process.env, { onFatal = () => {} } = {}) {
   const ownerId = env.JARVIS_JOB_BROWSER_OWNER_ID, token = env.JARVIS_JOB_BROWSER_TOKEN;
   if (env.JARVIS_JOB_BROWSER_ENABLED !== '1' || process.platform !== 'linux' || process.getuid() === 0
@@ -40,6 +108,9 @@ async function startBrowser(env = process.env, { onFatal = () => {} } = {}) {
   const applyEnabled = env.JARVIS_JOB_BROWSER_APPLY_ENABLED === '1';
   const applyToken = applyEnabled ? env.JARVIS_JOB_BROWSER_APPLY_TOKEN : null;
   if (applyEnabled && (!/^[\x21-\x7e]{32,256}$/.test(applyToken || '') || applyToken === token)) throw new Error('JOB_BROWSER_CONFIG_INVALID');
+  const connectToken = env.JARVIS_JOB_BROWSER_CONNECT_TOKEN || null;
+  if (connectToken !== null && (!/^[\x21-\x7e]{32,256}$/.test(connectToken) || connectToken === token
+    || connectToken === applyToken || connectToken === env.JARVIS_JOB_CAPTCHA_TOKEN)) throw new Error('JOB_BROWSER_CONFIG_INVALID');
   await fs.access('/.dockerenv');
   const root = '/home/pwuser/profile', owner = await fs.lstat(root);
   if (!owner.isDirectory() || owner.uid !== process.getuid() || (owner.mode & 0o077)) throw new Error('JOB_BROWSER_PROFILE_OWNER_DENIED');
@@ -63,7 +134,7 @@ async function startBrowser(env = process.env, { onFatal = () => {} } = {}) {
   if (automaticEnabled && !manualEnabled) throw new Error('JOB_CAPTCHA_CONFIG_INVALID');
   if (manualEnabled && (!/^[\x21-\x7e]{32,256}$/.test(manualToken || '') || manualToken === token || manualToken === applyToken)) throw new Error('JOB_MANUAL_CONFIG_INVALID');
   if (!manualEnabled) await assertInactiveWhenDisabled({ root: `${root}/manual-recovery`, ownerId });
-  let context, server, manual, manualPage, broker, health, evidenceTimer;
+  let context, server, manual, manualPage, broker, health, evidenceTimer, profiles;
   try {
     context = await chromium.launchPersistentContext(root, { headless: true, chromiumSandbox: true,
       acceptDownloads: false, serviceWorkers: 'block', locale: 'ru-RU' });
@@ -107,11 +178,27 @@ async function startBrowser(env = process.env, { onFatal = () => {} } = {}) {
       submissions = { submit: (input) => browser.run(() => { manual?.assertAutomatic(); return guarded.submit(input); }),
         reconcile: (input) => browser.run(() => { manual?.assertAutomatic(); return guarded.reconcile(input); }) };
     }
-    server = createRpcServer({ browser, ownerId, token, submissions, applyToken, health: () => health.check() });
+    const ownerRuntime = { browser, submissions, manual, manualPage,
+      async setPrimaryResume(resumeId) {
+        browser.primaryResumeId = resumeId;
+        if (applyEnabled) {
+          const ledger = new ApplicationLedger({ root: `${root}/applications`, ownerId });
+          await ledger.directory();
+          const guarded = new GuardedSubmission({ ledger, driver: new HhApplicationDriver({ browser }), ownerId, primaryResumeId: resumeId });
+          this.submissions = submissions = {
+            submit: (input) => browser.run(() => { manual?.assertAutomatic(); return guarded.submit(input); }),
+            reconcile: (input) => browser.run(() => { manual?.assertAutomatic(); return guarded.reconcile(input); }),
+          };
+        }
+      },
+    };
+    profiles = new ProfileManager({ root, ownerId, ownerRuntime, browser: context.browser(),
+      createRuntime: (args) => createMemberRuntime({ ...args, env, applyEnabled, onFatal, manualEnabled, manualToken, automaticEnabled }) });
+    server = createRpcServer({ browser, profiles, ownerId, token, connectToken, submissions, applyToken, health: () => health.check() });
     await new Promise((resolve, reject) => { server.once('error', reject); server.listen(8080, '0.0.0.0', resolve); });
     if (manual) {
-      broker = createCaptchaBroker({ coordinator: manual, controller: manualPage, ownerId, token: manualToken,
-        run: fn => bounded(() => browser.run(fn), 80000).catch(error => {
+      broker = createCaptchaBroker({ profiles, ownerId, token: manualToken,
+        run: (userId, fn) => profiles.forUser(userId).then(runtime => bounded(() => runtime.browser.run(fn), 80000)).catch(error => {
           if (error.code === 'JOB_BROWSER_OPERATION_TIMEOUT') health.fail();
           throw error;
         }) });
@@ -123,9 +210,9 @@ async function startBrowser(env = process.env, { onFatal = () => {} } = {}) {
       health.close();
       broker?.closeAllConnections();
       if (broker) await new Promise((resolve) => broker.close(resolve));
-      await new Promise((resolve) => server.close(resolve)); await browser.tail; await manualPage?.close(); await context.close();
+      await new Promise((resolve) => server.close(resolve)); await profiles?.close(); await browser.tail; await manualPage?.close(); await context.close();
     } };
-  } catch (error) { clearInterval(evidenceTimer); health?.close(); server?.close(); broker?.close(); await manualPage?.close(); await context?.close(); throw error; }
+  } catch (error) { clearInterval(evidenceTimer); health?.close(); server?.close(); broker?.close(); await profiles?.close().catch(() => {}); await manualPage?.close(); await context?.close(); throw error; }
 }
 
 if (require.main === module) {

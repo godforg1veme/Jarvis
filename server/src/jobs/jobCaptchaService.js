@@ -13,9 +13,10 @@ class JobCaptchaService {
   async handleReply(input, context) {
     if (!input.replyMessageId) return null;
     const denied = () => response('Эта картинка недоступна или уже использована. Открой «Поиск работы → Проверить HH».');
-    if (context.user.role !== 'owner' || input.chatType !== 'private' || input.chatId !== input.telegramUserId) return input.captchaReplyHint ? denied() : null;
+    if (input.chatType !== 'private' || input.chatId !== input.telegramUserId) return input.captchaReplyHint ? denied() : null;
+    if (!context?.user?.id || !context?.conversation?.id) return denied();
     const scope = { userId: context.user.id, conversationId: context.conversation.id, chatId: input.chatId, channel: 'telegram' };
-    try { await assertJobScope(this.repository.pool, scope); } catch { return denied(); }
+    try { await assertJobScope(this.repository.pool, scope, this.repository.accessService); } catch { return denied(); }
     const known = await this.repository.known(scope, input.replyMessageId);
     if (!known) return input.captchaReplyHint ? denied() : null;
     if (known.status !== 'sent' || new Date(known.expires_at).getTime() <= Date.now()) return denied();
@@ -24,7 +25,8 @@ class JobCaptchaService {
     const claimed = await this.repository.consume(scope, input.replyMessageId);
     if (!claimed) return denied();
     let outcome = 'unknown';
-    try { outcome = (await this.client.answer({ challengeId: claimed.challenge_id, revision: Number(claimed.revision), operationId: claimed.operation_id, text })).outcome; } catch {}
+    try { outcome = (await this.client.answer({ userId: scope.userId, challengeId: claimed.challenge_id,
+      revision: Number(claimed.revision), operationId: claimed.operation_id, text })).outcome; } catch {}
     await this.repository.finish(scope, claimed.operation_id, outcome);
     if (outcome === 'new_challenge') await this.repository.request(scope, true);
     if (outcome === 'solved') return response('Доступ к HH подтверждён. Включённый поиск продолжит сохранённый прогресс.');

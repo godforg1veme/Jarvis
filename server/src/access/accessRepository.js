@@ -7,10 +7,11 @@ class AccessRepository {
   async get(db, field, value) {
     const row = (
       await db.query(
-        `SELECT m.*,u.display_name,
+        `SELECT m.*,u.display_name,COALESCE(r.revision,0) AS role_revision,
       ARRAY(SELECT permission FROM access_role_permissions WHERE role_id=m.role_id ORDER BY permission) AS role_permissions,
       COALESCE((SELECT jsonb_object_agg(permission,effect) FROM access_user_overrides WHERE user_id=m.user_id),'{}') AS overrides
       FROM access_memberships m JOIN users u ON u.id=m.user_id
+      LEFT JOIN access_roles r ON r.id=m.role_id
       JOIN user_identities i ON i.user_id=m.user_id AND i.provider='telegram' AND i.external_id=m.telegram_id
       WHERE ${field === 'telegram' ? 'm.telegram_id' : 'm.user_id'}=$1`,
         [value],
@@ -27,6 +28,7 @@ class AccessRepository {
       level,
       blocked,
       roleId: row.role_id,
+      roleRevision: row.role_revision,
       overrides: row.overrides,
       revision: row.revision,
     };

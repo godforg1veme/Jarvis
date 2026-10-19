@@ -4,11 +4,11 @@ const { jobTransaction } = require('./jobTransaction');
 const { buildJobPrompt, parseJobLetter } = require('./jobPrompt');
 
 class JobDraftService {
-  constructor({ pool, searchRepository, profileRepository, draftRepository, usageRepository, modelAdapter, defaultModel = '', now = () => new Date() }) {
-    Object.assign(this, { pool, searchRepository, profileRepository, draftRepository, usageRepository, modelAdapter, defaultModel, now });
+  constructor({ pool, searchRepository, profileRepository, draftRepository, usageRepository, modelAdapter, defaultModel = '', now = () => new Date(), accessService = null }) {
+    Object.assign(this, { pool, searchRepository, profileRepository, draftRepository, usageRepository, modelAdapter, defaultModel, now, accessService });
   }
   async createManual({ scope, vacancyId, mode, text, parentDraftId = null, expectedProfileRevision, expectedVacancyRevision }) {
-    await assertJobScope(this.pool, scope);
+    await assertJobScope(this.pool, scope, this.accessService);
     if (!['base', 'custom'].includes(mode) || typeof text !== 'string' || !text.trim() || text.length > 10000) throw jobError('JOB_INVALID_DRAFT');
     const vacancy = await this.searchRepository.getVacancy({ userId: scope.userId, vacancyId });
     if (!vacancy) throw jobError('JOB_NOT_FOUND');
@@ -24,7 +24,7 @@ class JobDraftService {
   }
   async generate({ scope, vacancyId, requestId, parentDraftId = null, instruction = '', language = 'auto', mode, sourceText,
     expectedProfileRevision, expectedVacancyRevision }) {
-    await assertJobScope(this.pool, scope);
+    await assertJobScope(this.pool, scope, this.accessService);
     uuid.parse(vacancyId);
     if (typeof requestId !== 'string' || !requestId || requestId.length > 150) throw jobError('JOB_INVALID_REQUEST');
     const vacancy = await this.searchRepository.getVacancy({ userId: scope.userId, vacancyId });
@@ -46,6 +46,7 @@ class JobDraftService {
       previousText: continuingDraft ? previous?.text || '' : '' });
     const inputHash = createHash('sha256').update(JSON.stringify({ mode, sourceText, instruction, language })).digest('hex');
     const task = await jobTransaction(this.pool, async (client) => {
+      await assertJobScope(client, scope, this.accessService);
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`job-generate:${scope.userId}:${vacancyId}`]);
       const existing = (await client.query('SELECT * FROM job_tasks WHERE user_id=$1 AND request_id=$2', [scope.userId, requestId])).rows[0];
       if (existing) return existing;
@@ -66,6 +67,7 @@ class JobDraftService {
       WHERE id=$1 AND NOT (payload ? 'invoked') RETURNING id`, [task.id]);
     if (!claimed.rowCount) throw jobError(task.status === 'failed' ? 'JOB_GENERATION_FAILED' : 'JOB_GENERATION_BUSY');
     try {
+      await assertJobScope(this.pool, scope, this.accessService);
       await this.usageRepository.record({ userId: scope.userId, requestId, outcome: 'pending', occurredAt: this.now() });
       const result = await this.modelAdapter.generate({ messages, model });
       await this.usageRepository.record({ userId: scope.userId, requestId, providerRequestId: result.requestId,

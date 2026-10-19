@@ -63,6 +63,23 @@ VPN/Operations/Supervisor keeps separate owner-bound limits. Turning off the UI
 does not remove established restrictions. The “Открыть Jarvis” menu button is configured; actual
 owner/admin/member taps remain for acceptance.
 
+19 октября 2026, локальная разработка без выпуска: существующая кнопка «Поиск
+работы» и callback остаются прежними. Участник с актуальным правом `jobs` получает
+личный раздел; действие «Подключить HH» ведёт в Mini App, где HTTPS-ссылка
+открывает его отдельный профиль браузера с телефона или ПК. Выбор основного
+резюме подтверждается исходной сессией Mini App. Профиль владельца и его путь
+подключения не используются участниками; VPN и Operations остаются owner-only.
+[Текущий результат](updates/2026-10-19-job-search-member-access-development.md).
+
+October 19, 2026, local development and not released: the existing “Поиск
+работы” button and callback remain unchanged. A user with current `jobs`
+permission receives a personal section; “Подключить HH” opens the Mini App,
+where an HTTPS link reaches that user's separate browser profile from a phone
+or PC. The originating Mini App session confirms the primary resume. Members
+never use the owner's browser or connection path; VPN and Operations remain
+owner-only.
+[Current development status](updates/2026-10-19-job-search-member-access-development.md).
+
 18 октября: [исследование 403](updates/2026-10-18-hh-captcha-403-investigation.md)
 добавляет закрытую категорию ответа HH, тип запроса, возраст картинки и исход
 сопоставления CSRF/cookie в private receipt. Значения секретов/headers и тело сайта

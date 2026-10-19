@@ -19,11 +19,12 @@ class JobCaptchaClient {
       && !(allowTestHttp && u.origin.startsWith('http://127.0.0.1:') && u.pathname === '/rpc' && !u.search && !u.hash && !u.username && !u.password))) throw jobError('JOB_CAPTCHA_CONFIG_INVALID');
     Object.assign(this, { ownerId, token, fetchImpl, url: u.href });
   }
-  async call(operation, args) {
+  async call(userId, operation, args) {
+    if (!UUID.test(userId || '')) throw jobError('JOB_CAPTCHA_ACCESS_DENIED');
     let result;
     try {
       const response = await this.fetchImpl(this.url, { method: 'POST', headers: { authorization: `Bearer ${this.token}`,
-        'x-jarvis-owner-id': this.ownerId, 'content-type': 'application/json' }, body: JSON.stringify({ operation, args }),
+        'x-jarvis-owner-id': this.ownerId, 'content-type': 'application/json' }, body: JSON.stringify({ userId, operation, args }),
         redirect: 'manual', signal: AbortSignal.timeout(operation === 'status' ? 5000 : 90000) });
       result = await readBoundedJson(response, 360000);
       if (!response.ok || !exact(result, ['ok', 'value']) || result.ok !== true) throw new Error();
@@ -39,8 +40,11 @@ class JobCaptchaClient {
     if (operation === 'answer' && exact(v, ['outcome']) && ['solved','new_challenge','unknown','stale','invalid','already_used'].includes(v.outcome)) return v;
     throw jobError('JOB_CAPTCHA_UNAVAILABLE');
   }
-  status() { return this.call('status', {}); }
-  challenge(refresh = false) { return this.call('challenge', { refresh }); }
-  answer(args) { return this.call('answer', args); }
+  status(userId = this.ownerId) { return this.call(userId, 'status', {}); }
+  challenge(userId = this.ownerId, refresh = false) {
+    if (typeof userId === 'boolean') { refresh = userId; userId = this.ownerId; }
+    return this.call(userId, 'challenge', { refresh });
+  }
+  answer(input) { const { userId = this.ownerId, ...args } = input; return this.call(userId, 'answer', args); }
 }
 module.exports = { JobCaptchaClient, normalizedAnswer, validAnswer, pngBytes };

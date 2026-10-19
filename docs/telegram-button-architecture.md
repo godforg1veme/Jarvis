@@ -27,6 +27,13 @@ separate closed log codes (`TELEGRAM_DELIVERY_FAILED` and
 re-run a changing action after either code. A durable delivery outbox would be
 a separate product design, not an implied property of this contract.
 
+Job search is authorized by the current `jobs` permission and the same private
+Telegram user/chat/conversation binding as the callback. Its browser profile is
+selected by the internal user UUID. The main owner's configured Telegram ID
+retains the owner profile; a member or administrator gets a separate profile.
+VPN and Operations continue to use their owner checks. The visible flow and
+release state are tracked in the [menu contract](telegram-menu-contract.md).
+
 Callback families include `life:*`, `vpn:*`, `vpsup:*`, `mem:*`, `doc:*`,
 `dev:*`, `gallery:*`, `flow:*`, and `cmd:*`. `bot.js` has the outbound grammar
 gate; each family handler owns its own authorization. New callback syntax must

@@ -611,7 +611,8 @@ async function createRuntime(config, overrides = {}) {
         config.nodeEnv === 'production' ? '../public/mini' : '../../mini-app/dist') });
       registerMiniAppRoutes(app, { config, accessService, pool,
         registerUserRoutes: (routes) => registerMiniAppSelfRoutes(routes, { accessService, pool,
-          memoryService, knowledgeService, deviceService, missionControlService, assistant, conversationRepository }) });
+          memoryService, knowledgeService, deviceService, missionControlService, assistant, conversationRepository,
+          getJobConnectionSessionService: () => jobRuntime?.connectionSessionService }) });
     }
     if (!bot && config.telegramBotToken) {
       const memoryGalleryService = new TelegramMemoryGalleryService({
@@ -696,6 +697,7 @@ async function createRuntime(config, overrides = {}) {
         voiceMaxBytes: MAX_TELEGRAM_VOICE_BYTES,
         onPollingHealth: (value) => { pollingHealth = value; },
         operationsPanelUrl: menuService.operationsPanelUrl,
+        miniAppUrl: config.miniAppEnabled ? new URL('/mini/', config.miniAppPublicOrigin).href : null,
       });
     }
     if (config.lifeOsEnabled && config.lifeOsRemindersEnabled) {

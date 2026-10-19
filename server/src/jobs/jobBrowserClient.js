@@ -6,17 +6,21 @@ const CAPABILITIES = Object.freeze({ dateWindows: false, maxPages: 1000 });
 const CODES = new Set(['JOB_HH_MANUAL_ACTIVE', 'JOB_HH_CAPTCHA_WAITING', 'JOB_HH_CAPTCHA_MANUAL_REQUIRED', 'JOB_HH_DOM_CHANGED', 'JOB_COLLECTION_WINDOW_SATURATED', 'JOB_COLLECTION_WINDOW_EXPIRED',
   'JOB_INVALID_SEARCH', 'JOB_INVALID_VACANCY', 'JOB_HH_CAPTCHA_REQUIRED', 'JOB_HH_RATE_LIMIT', 'JOB_HH_ACCESS_DENIED',
   'JOB_HH_LOGIN_REQUIRED', 'JOB_HH_NOT_FOUND', 'JOB_HH_UNAVAILABLE', 'JOB_HH_RESUME_UNAVAILABLE', 'JOB_BROWSER_ACCESS_DENIED',
-  'JOB_BROWSER_INVALID_REQUEST', 'JOB_BROWSER_BUSY', 'JOB_BROWSER_REQUEST_TOO_LARGE', 'JOB_BROWSER_RESPONSE_TOO_LARGE']);
+  'JOB_BROWSER_INVALID_REQUEST', 'JOB_BROWSER_BUSY', 'JOB_BROWSER_REQUEST_TOO_LARGE', 'JOB_BROWSER_RESPONSE_TOO_LARGE',
+  'JOB_LOGIN_SESSION_INVALID', 'JOB_LOGIN_TICKET_INVALID', 'JOB_LOGIN_RESUME_INVALID']);
 
 class JobBrowserClient {
-  constructor({ baseUrl = 'http://job-browser:8080', ownerId, token, applyToken = null, fetchImpl = globalThis.fetch, allowTestHttp = false }) {
+  constructor({ baseUrl = 'http://job-browser:8080', ownerId, token, connectToken = null, applyToken = null, fetchImpl = globalThis.fetch, allowTestHttp = false }) {
     const url = new URL(baseUrl);
     if (url.username || url.password || url.pathname !== '/' || url.search || url.hash
       || (url.origin !== 'http://job-browser:8080' && !(allowTestHttp === true && url.protocol === 'http:' && url.hostname === '127.0.0.1'))
       || !UUID.test(ownerId || '') || typeof token !== 'string' || !/^[\x21-\x7e]{32,256}$/.test(token)) throw jobError('JOB_BROWSER_CONFIG_INVALID');
     if (applyToken !== null && (typeof applyToken !== 'string' || !/^[\x21-\x7e]{32,256}$/.test(applyToken)
       || applyToken === token)) throw jobError('JOB_BROWSER_CONFIG_INVALID');
-    this.url = new URL('/rpc', url).href; this.ownerId = ownerId; this.token = token; this.applyToken = applyToken; this.fetch = fetchImpl;
+    if (connectToken !== null && (typeof connectToken !== 'string' || !/^[\x21-\x7e]{32,256}$/.test(connectToken)
+      || connectToken === token || connectToken === applyToken)) throw jobError('JOB_BROWSER_CONFIG_INVALID');
+    this.url = new URL('/rpc', url).href; this.ownerId = ownerId; this.token = token;
+    this.connectToken = connectToken; this.applyToken = applyToken; this.fetch = fetchImpl;
   }
   asApplicationAdapter() {
     return { capabilities: { applicantApply: Boolean(this.applyToken) },
@@ -26,23 +30,32 @@ class JobBrowserClient {
   }
   connection(userId) { return this.request(userId, 'connection', {}); }
   forUser(userId) {
-    if (userId !== this.ownerId) throw jobError('JOB_BROWSER_ACCESS_DENIED');
+    if (!UUID.test(userId || '')) throw jobError('JOB_BROWSER_ACCESS_DENIED');
     return { capabilities: CAPABILITIES,
       search: ({ query, publishedFrom, publishedTo, page = 0 }) => this.request(userId, 'search', { query, publishedFrom, publishedTo, page }),
       getVacancy: ({ externalId }) => this.request(userId, 'vacancy', { externalId: String(externalId) }),
       listResumes: () => this.request(userId, 'resumes', {}),
       history: ({section,page}) => this.request(userId, 'history', {section,page}),
       inspect: ({ externalId, resumeId }) => this.request(userId, 'inspect', { externalId: String(externalId), resumeId }),
+      startLogin: ({ sessionId }) => this.request(userId, 'login_start', { sessionId }),
+      loginFrame: ({ sessionId }) => this.request(userId, 'login_frame', { sessionId }),
+      loginInput: ({ sessionId, sequence, event }) => this.request(userId, 'login_input', { sessionId, sequence, event }),
+      loginStatus: ({ sessionId }) => this.request(userId, 'login_status', { sessionId }),
+      closeLogin: ({ sessionId, preserveProfile = false, complete = false }) => this.request(userId, 'login_close', { sessionId, preserveProfile, complete }),
+      discardLogin: ({ sessionId }) => this.request(userId, 'login_discard', { sessionId }),
+      selectResume: ({ resumeId }) => this.request(userId, 'select_resume', { resumeId }),
     };
   }
   async request(userId, operation, args) {
-    if (userId !== this.ownerId) throw jobError('JOB_BROWSER_ACCESS_DENIED');
+    if (!UUID.test(userId || '')) throw jobError('JOB_BROWSER_ACCESS_DENIED');
     const writing = ['submit', 'reconcile'].includes(operation);
     if (writing && !this.applyToken) throw jobError('JOB_BROWSER_ACCESS_DENIED');
+    const connecting = ['login_start', 'login_frame', 'login_input', 'login_status', 'login_close', 'login_discard', 'select_resume'].includes(operation);
+    if (connecting && !this.connectToken) throw jobError('JOB_BROWSER_ACCESS_DENIED');
     let response;
     try {
       response = await this.fetch(this.url, { method: 'POST', headers: {
-        authorization: `Bearer ${writing ? this.applyToken : this.token}`, 'content-type': 'application/json' },
+        authorization: `Bearer ${writing ? this.applyToken : connecting ? this.connectToken : this.token}`, 'content-type': 'application/json' },
       body: JSON.stringify({ userId, operation, args }), redirect: 'manual', signal: AbortSignal.timeout(writing ? 120000 : 90000) });
     } catch { throw jobError('JOB_HH_UNAVAILABLE'); }
     const result = await readBoundedJson(response);
@@ -56,6 +69,19 @@ class JobBrowserClient {
       throw error;
     }
     const value = result.value;
+    if (operation === 'login_frame' && (!value || !['waiting','captcha'].includes(value.state)
+      || value.mimeType !== 'image/jpeg' || !Number.isInteger(value.width) || value.width < 1 || value.width > 1024
+      || !Number.isInteger(value.height) || value.height < 1 || value.height > 768
+      || typeof value.frameBase64 !== 'string' || value.frameBase64.length > 700000
+      || !/^[A-Za-z0-9+/]+={0,2}$/.test(value.frameBase64)
+      || Buffer.from(value.frameBase64, 'base64').length > 512 * 1024)) throw jobError('JOB_HH_INVALID_RESPONSE');
+    if (operation === 'login_input' && (!value || !['waiting','authenticated','captcha','expired','closed'].includes(value.state)
+      || !Number.isSafeInteger(value.nextSequence) || value.nextSequence < 1 || value.nextSequence > 1000000000)) throw jobError('JOB_HH_INVALID_RESPONSE');
+    if (operation === 'login_status' && (!value || !['waiting','authenticated','captcha','expired','closed'].includes(value.state)
+      || !Number.isSafeInteger(value.nextSequence) || value.nextSequence < 1 || value.nextSequence > 1000000000
+      || !Array.isArray(value.resumes) || value.resumes.length > 20
+      || !value.resumes.every((item) => /^[a-zA-Z0-9]{1,100}$/.test(item?.id || '') && typeof item.title === 'string' && item.title.length <= 500))) throw jobError('JOB_HH_INVALID_RESPONSE');
+    if (['login_start','login_close','login_discard','select_resume'].includes(operation) && (!value || value.ok !== true)) throw jobError('JOB_HH_INVALID_RESPONSE');
     if (operation === 'history') {
       const parsed = historySchema.safeParse(value);
       if (!parsed.success || value.page !== args.page || value.section !== args.section) throw jobError('JOB_HH_INVALID_RESPONSE');

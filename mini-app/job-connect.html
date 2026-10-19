@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#080e14">
+  <title>Jarvis · Вход в HH</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/mini/style.css">
+  <script type="module" src="/mini/jobConnect.js"></script>
+</head>
+<body class="job-connect-body">
+  <main class="job-connect-shell">
+    <p class="eyebrow">JARVIS · ЛИЧНЫЙ ПРОФИЛЬ</p>
+    <h1>Подключение HH</h1>
+    <p id="job-connect-status" class="job-connect-status" role="status">Проверяем временную ссылку…</p>
+    <section id="job-connect-stage" class="job-connect-stage" hidden>
+      <p class="job-connect-instructions">Нажми поле на странице HH, введи текст ниже и нажми «Ввести в HH». На телефоне можно использовать обычную клавиатуру телефона; на компьютере — клавиатуру компьютера.</p>
+      <img id="job-connect-frame" class="job-connect-frame" alt="Временное окно входа HH" hidden>
+      <label for="job-connect-input">Клавиатура HH</label>
+      <input id="job-connect-input" type="password" maxlength="256" autocomplete="new-password" autocapitalize="off" spellcheck="false" placeholder="Ввод в выбранное поле HH">
+      <div class="job-connect-controls">
+        <button id="job-connect-send" class="primary" type="button">Ввести в HH</button>
+        <button id="job-connect-reveal" class="secondary" type="button" aria-pressed="false">Показать ввод</button>
+        <button id="job-connect-enter" class="secondary" type="button">Enter</button>
+        <button id="job-connect-tab" class="secondary" type="button">Tab</button>
+        <button id="job-connect-cancel" class="secondary" type="button">Отменить</button>
+      </div>
+    </section>
+    <p class="job-connect-privacy">Окно работает во временной отдельной сессии браузера. Ссылка даёт доступ к этому окну: не пересылай её другим и не вводи пароль, если открыл её не сам. Введённый текст кратко находится в памяти этой вкладки и передаётся через HTTPS в активное поле HH; после подтверждённой отправки или закрытия вкладки он очищается и не записывается в базу, файлы или логи. Серверным браузером технически управляет владелец инфраструктуры. После входа вернись в Mini App и подтверди выбранное резюме.</p>
+  </main>
+</body>
+</html>

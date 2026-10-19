@@ -18,6 +18,7 @@ function vpnReplyMarkup(buttons, options = {}) {
         const text = String(button?.text || '');
         const data = String(button?.data || '');
         const url = String(button?.url || '');
+        const webApp = String(button?.webApp || '');
         const validCallback = data && !url && Buffer.byteLength(data, 'utf8') <= 64 && (TELEGRAM_CALLBACK_RE.test(data) || isLifeCallback(data) || isVpnCallback(data) || isJobCallback(data));
         const validOperationsUrl = url && !data && options.operationsPanelUrl && url === options.operationsPanelUrl;
         const validRoutingUrl = url && !data && (url === 'https://jarvis.rilora.ru/happ-routing' || (options.routingUrl && url === options.routingUrl));
@@ -25,11 +26,12 @@ function vpnReplyMarkup(buttons, options = {}) {
           url.startsWith('https://jarvis.rilora.ru/happ-sub/') ||
           (options.publicUrl && url.startsWith(`${options.publicUrl}/happ-sub/`))
         );
+        const validMiniAppUrl = webApp && !data && !url && options.miniAppUrl && webApp === options.miniAppUrl;
         const validUrl = validOperationsUrl || validRoutingUrl || validSubscriptionUrl || isJobVacancyUrl(url);
-        if (text.length < 1 || text.length > 64 || (!validCallback && !validUrl)) {
+        if (text.length < 1 || text.length > 64 || (!validCallback && !validUrl && !validMiniAppUrl)) {
           throw new Error('invalid VPN button');
         }
-        return validUrl ? { text, url } : { text, callback_data: data };
+        return validMiniAppUrl ? { text, web_app: { url: webApp } } : validUrl ? { text, url } : { text, callback_data: data };
       });
     }),
   };
@@ -219,7 +221,7 @@ function createTelegramBot(options) {
     const result = typeof messageService.handleCallback === 'function'
       ? await messageService.handleCallback(ctx.update)
       : (data.startsWith('vpn:') ? await messageService.handleVpnCallback(ctx.update) : null);
-    if (result) await deliverResult(ctx, result, { operationsPanelUrl: options.operationsPanelUrl, mediaMaxBytes: options.documentMaxBytes });
+    if (result) await deliverResult(ctx, result, { operationsPanelUrl: options.operationsPanelUrl, miniAppUrl: options.miniAppUrl, mediaMaxBytes: options.documentMaxBytes });
   });
 
   if (typeof options.approvalHandler === 'function') {
@@ -231,7 +233,7 @@ function createTelegramBot(options) {
       downloadAttachment: () => downloadTelegramAttachment(ctx, options.token, options.documentMaxBytes, options.fetchImpl),
       downloadVoice: () => downloadTelegramAttachment(ctx, options.token, options.voiceMaxBytes, options.fetchImpl),
     });
-    await deliverResult(ctx, result, { operationsPanelUrl: options.operationsPanelUrl, mediaMaxBytes: options.documentMaxBytes });
+    await deliverResult(ctx, result, { operationsPanelUrl: options.operationsPanelUrl, miniAppUrl: options.miniAppUrl, mediaMaxBytes: options.documentMaxBytes });
   });
 
   bot.catch(async (error) => {

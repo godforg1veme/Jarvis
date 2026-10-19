@@ -38,11 +38,11 @@ function parseProfileEdit(text, current) {
 }
 
 class JobSettingsService {
-  constructor({ pool, searchRepository, profileRepository, now = () => new Date() }) {
-    Object.assign(this, { pool, searchRepository, profileRepository, now });
+  constructor({ pool, searchRepository, profileRepository, now = () => new Date(), accessService = null }) {
+    Object.assign(this, { pool, searchRepository, profileRepository, now, accessService });
   }
   async preview({ scope, kind, targetId, revision, value, returnTo }) {
-    await assertJobScope(this.pool, scope);
+    await assertJobScope(this.pool, scope, this.accessService);
     if (!['settings', 'profile'].includes(kind)) throw jobError('JOB_INVALID_ACTION');
     if (returnTo !== undefined && (kind !== 'settings' || !returnTo || Object.keys(returnTo).length !== 2
       || !['panel','queries','exclusions'].includes(returnTo.field) || !Number.isInteger(returnTo.page)
@@ -54,7 +54,7 @@ class JobSettingsService {
   }
   async approve({ scope, confirmationId, panel = false }) {
     return jobTransaction(this.pool, async (client) => {
-      await assertJobScope(client, scope);
+      await assertJobScope(client, scope, this.accessService);
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`job-owner:${scope.userId}`]);
       const row = (await client.query(`UPDATE job_confirmations SET status='consumed' WHERE id=$1 AND user_id=$2
         AND conversation_id=$3 AND chat_id=$4 AND channel='telegram' AND kind IN ('settings','profile')

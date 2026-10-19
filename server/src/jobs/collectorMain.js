@@ -5,6 +5,7 @@ const { JobDeliveryRepository } = require('./jobDeliveryRepository');
 const { JobCollector } = require('./jobCollector');
 const { JobBrowserClient } = require('./jobBrowserClient');
 const { CurrencyRates } = require('./currencyRates');
+const { configuredOwnerJobAccess } = require('./configuredOwnerJobAccess');
 
 function createCollectorRuntime({ env = process.env, pool, hhClient, currencyRates, clock = () => new Date(), wait } = {}) {
   const config = loadJobConfig(env);
@@ -13,9 +14,10 @@ function createCollectorRuntime({ env = process.env, pool, hhClient, currencyRat
   const source = hhClient || new JobBrowserClient({ baseUrl: config.jobBrowserUrl,
     ownerId: config.jobBrowserOwnerId, token: config.jobBrowserToken });
   const database = pool || new Pool({ connectionString: env.DATABASE_URL });
-  const searchRepository = new JobSearchRepository(database);
+  const accessService = configuredOwnerJobAccess(database, env.JARVIS_OPERATIONS_OWNER_TELEGRAM_ID);
+  const searchRepository = new JobSearchRepository(database, { accessService });
   let stopping = false, timer = null, running = null;
-  const collector = new JobCollector({ searchRepository, deliveryRepository: new JobDeliveryRepository(database),
+  const collector = new JobCollector({ searchRepository, deliveryRepository: new JobDeliveryRepository(database, { accessService }),
     hhClient: source,
     currencyRates: currencyRates || new CurrencyRates(), now: clock, wait, shouldStop: () => stopping,
     captchaEnabled: config.jobCaptchaTelegram });

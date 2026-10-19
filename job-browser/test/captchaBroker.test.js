@@ -22,14 +22,14 @@ test('private broker validates owner/auth/duplicate headers/JSON/body/operations
       let raw = ''; res.on('data', chunk => { raw += chunk; }); res.on('end', () => resolve({ status: res.statusCode, raw, value: JSON.parse(raw) }));
     }); req.on('error', reject); req.end(bytes);
   });
-  const status = { operation: 'status', args: {} };
+  const status = { userId: ownerId, operation: 'status', args: {} };
   for (const headers of [{ authorization: 'Bearer foreign' }, { 'x-jarvis-owner-id': randomUUID() }, { authorization: [`Bearer ${token}`, `Bearer ${token}`] }]) assert.equal((await request(status, headers)).status, 403);
-  for (const body of [{ ...status, target: 'https://hh.ru' }, { operation: 'challenge', args: { refresh: 1 } }, { operation: 'answer', args: {} }, '{"operation":"status","operation":"status","args":{}}', 'x'.repeat(8193)]) assert.notEqual((await request(body)).status, 200);
+  for (const body of [{ ...status, target: 'https://hh.ru' }, { userId: ownerId, operation: 'challenge', args: { refresh: 1 } }, { userId: ownerId, operation: 'answer', args: {} }, '{"operation":"status","operation":"status","args":{}}', 'x'.repeat(8193)]) assert.notEqual((await request(body)).status, 200);
   assert.equal((await request(status, {}, '/status', 'GET')).status, 400);
   assert.equal((await request(status, { 'content-encoding': 'gzip' })).status, 400);
   assert.deepEqual(calls, []);
   assert.deepEqual((await request(status)).value, { ok: true, value: { phase: 'pending', revision: 1 } });
-  assert.deepEqual((await request({ operation: 'challenge', args: { refresh: false } })).value, { ok: true, value: { outcome: 'idle' } });
-  const failed = await request({ operation: 'challenge', args: { refresh: true } });
+  assert.deepEqual((await request({ userId: ownerId, operation: 'challenge', args: { refresh: false } })).value, { ok: true, value: { outcome: 'idle' } });
+  const failed = await request({ userId: ownerId, operation: 'challenge', args: { refresh: true } });
   assert.deepEqual(failed.value, { ok: false, code: 'JOB_CAPTCHA_UNAVAILABLE' }); assert.equal(failed.raw.includes('private failure'), false);
 });

@@ -18,7 +18,7 @@ test('collector client uses authenticated owner RPC and propagates closed browse
   server.listen(0, '127.0.0.1'); await once(server, 'listening');
   try {
     const client = new JobBrowserClient({ ownerId, token, baseUrl: `http://127.0.0.1:${server.address().port}`, allowTestHttp: true });
-    assert.throws(() => client.forUser(randomUUID()), { code: 'JOB_BROWSER_ACCESS_DENIED' }); assert.equal(calls, 0);
+    assert.equal(client.forUser(randomUUID()).capabilities.dateWindows, false); assert.equal(calls, 0);
     const bound = client.forUser(ownerId);
     assert.equal(bound.capabilities.dateWindows, false);
     const result = await bound.search({ query: 'AI', publishedFrom: '2026-10-01T12:00:00Z', publishedTo: '2026-10-15T12:00:00Z' });

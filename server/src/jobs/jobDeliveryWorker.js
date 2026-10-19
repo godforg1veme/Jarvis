@@ -15,7 +15,7 @@ class JobDeliveryWorker {
       const delivery = await this.deliveryRepository.claim(); if (!delivery) return;
       if (this.accessService) {
         const actor = await this.accessService.getAccessForUser(delivery.user_id);
-        if (!actor || actor.blocked || actor.level !== 'owner' || !actor.permissions.includes('jobs')) {
+        if (!actor || actor.blocked || !actor.permissions.includes('jobs')) {
           await this.deliveryRepository.finish({ deliveryId: delivery.id, outcome: 'failed' }); return;
         }
       }
@@ -32,7 +32,7 @@ class JobDeliveryWorker {
           const denied = () => Object.assign(new Error('JOB_SCOPE_DENIED'), { code: 'JOB_SCOPE_DENIED' });
           try {
             if (!view || search.conversation_id !== scope.conversationId || search.chat_id !== scope.chatId) throw denied();
-            await assertJobScope(this.pool, scope);
+            await assertJobScope(this.pool, scope, this.accessService);
             const identity = await this.pool.query("SELECT 1 FROM user_identities WHERE user_id=$1 AND provider='telegram' AND external_id=$2", [scope.userId,scope.chatId]);
             if (!identity.rowCount) throw denied();
             if (delivery.payload.code === 'PREPARATION_DELAYED') {

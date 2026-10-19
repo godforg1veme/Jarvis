@@ -1,15 +1,22 @@
 
 import { createApi, readPending, savePending, clearPending } from './api.js';
 import { createAdmin } from './admin.js';
+import { createJobConnectionPanel } from './jobConnection.js';
 const $ = (selector) => document.querySelector(selector);
 const api = createApi();
 let actor; let core; let admin; let chatPending; let chatBusy = false;
+let jobConnectionPanel;
 const labels = { assistant: 'Ассистент', jobs: 'Поиск работы', life: 'Life OS', memory: 'Память', documents: 'Документы', devices: 'Устройства', vpn: 'VPN', operations: 'Панель управления' };
 function status(message) { $('#session-state').textContent = message; }
 function fail(error) {
   status(error.message || 'Не удалось проверить доступ. Открой приложение заново.');
   if (['unauthorized', 'forbidden'].includes(error.code)) { $('#application').hidden = true; $('#editor').close(); api.clear(); core?.dispose(); }
 }
+function makeJobPanel() {
+  jobConnectionPanel?.dispose();
+  jobConnectionPanel = createJobConnectionPanel({ api, actor, anchor: $('#assistant .muted') });
+}
+function disposeJobPanel() { jobConnectionPanel?.dispose(); jobConnectionPanel = null; }
 const chat = document.createElement('div'); chat.id = 'chat';
 const history = document.createElement('div'); history.className = 'chat-history'; history.setAttribute('aria-label', 'Личный диалог');
 const chatForm = document.createElement('form'); chatForm.className = 'chat-form';
@@ -19,6 +26,7 @@ const chatStatus = document.createElement('p'); chatStatus.setAttribute('role', 
 const chatSend = document.createElement('button'); chatSend.type = 'submit'; chatSend.className = 'primary'; chatSend.textContent = 'Отправить';
 chatForm.append(chatLabel, chatInput, chatStatus, chatSend); chat.append(history, chatForm); $('#assistant').append(chat);
 async function loadChat() {
+  disposeJobPanel();
   if (!actor?.permissions.includes('assistant')) return;
   chat.hidden = false; $('#section-items')?.remove(); $('#assistant h1').textContent = 'Пространство диалога';
   $('#assistant .muted').textContent = 'Твой личный диалог. Действия с подтверждением выполняются через Telegram.';
@@ -98,16 +106,18 @@ async function start() {
       if (!labels[permission]) continue;
       const button = document.createElement('button'); button.type = 'button'; button.className = 'module';
       const content = document.createElement('div'); const title = document.createElement('strong'); title.textContent = labels[permission];
-      const note = document.createElement('small'); note.textContent = permission === 'assistant' ? 'Личный диалог и история сообщений.' : permission === 'jobs' ? 'Нужно личное подключение HH. Настройка через Telegram.' : 'Твои данные и состояние раздела.';
+      const note = document.createElement('small'); note.textContent = permission === 'assistant' ? 'Личный диалог и история сообщений.' : permission === 'jobs' ? 'Личный поиск по твоему профилю HH.' : 'Твои данные и состояние раздела.';
       content.append(title, note); button.append(content);
       button.addEventListener('click', async () => {
         if (permission === 'assistant') { location.hash = '#assistant'; loadChat(); return; }
+        disposeJobPanel();
         chat.hidden = true;
         $('#assistant h1').textContent = labels[permission]; $('#assistant .muted').textContent = 'Загружаем твои данные…'; $('#section-items')?.remove();
         document.querySelectorAll('.view').forEach((view) => { view.hidden = view.id !== 'assistant'; });
         try {
           const section = await api.request(`/sections/${encodeURIComponent(permission)}`);
           $('#assistant .muted').textContent = section.notice || note.textContent;
+          if (permission === 'jobs') { makeJobPanel(); return; }
           const items = document.createElement('ul'); items.id = 'section-items'; items.className = 'section-items';
           for (const item of section.items || []) { const row = document.createElement('li'); row.textContent = typeof item === 'string' ? item : [item.title || item.name || item.label, item.detail || item.summary || item.status].filter(Boolean).join(' · '); items.append(row); }
           $('#assistant .muted').after(items);

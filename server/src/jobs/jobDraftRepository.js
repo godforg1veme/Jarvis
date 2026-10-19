@@ -2,7 +2,7 @@ const { uuid, assertJobScope, jobError } = require('./jobSchemas');
 const { jobTransaction } = require('./jobTransaction');
 
 class JobDraftRepository {
-  constructor(pool) { this.pool = pool; }
+  constructor(pool, { accessService = null } = {}) { this.pool = pool; this.accessService = accessService; }
   async get({ userId, draftId }) {
     return (await this.pool.query('SELECT * FROM job_drafts WHERE user_id=$1 AND id=$2',
       [uuid.parse(userId), uuid.parse(draftId)])).rows[0] || null;
@@ -16,7 +16,7 @@ class JobDraftRepository {
     if (!['legacy_ai', 'base', 'improved', 'custom', 'custom_ai'].includes(mode)
       || typeof sourceText !== 'string' || sourceText.length > 10000) throw jobError('JOB_INVALID_DRAFT');
     return jobTransaction(this.pool, async (client) => {
-      await assertJobScope(client, scope);
+      await assertJobScope(client, scope, this.accessService);
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`job-owner:${scope.userId}`]);
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`job-draft:${scope.userId}:${vacancyId}`]);
       const allowed = await client.query(`SELECT v.id FROM job_vacancies v JOIN job_matches m ON m.vacancy_id=v.id

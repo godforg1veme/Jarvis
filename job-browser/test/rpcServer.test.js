@@ -53,3 +53,54 @@ test('write RPC needs a distinct credential, exact owner/operation and bounded a
   } finally { await new Promise((resolve) => server.close(resolve)); }
   assert.throws(() => createRpcServer({ ownerId, token, applyToken: token, browser: {}, submissions: {} }), /JOB_BROWSER_CONFIG_INVALID/);
 });
+
+test('member profiles use isolated user routing and login RPC requires the connect credential', async () => {
+  const ownerId = randomUUID(), memberA = randomUUID(), memberB = randomUUID();
+  const token = randomBytes(32).toString('hex'), connectToken = randomBytes(32).toString('hex');
+  const calls = [], profiles = new Map();
+  const manager = {
+    forUser(userId) {
+      calls.push(['profile', userId]);
+      if (!profiles.has(userId)) profiles.set(userId, { browser: {
+        async search() { return { items: [{ id: userId === memberA ? '101' : '202' }], found: 1, pages: 1 }; },
+        async startLogin({ sessionId }) { calls.push(['login_start', userId, sessionId]); return { ok: true }; },
+        async loginFrame({ sessionId }) { calls.push(['login_frame', userId, sessionId]); return { state: 'waiting', mimeType: 'image/jpeg', frameBase64: 'ZmFrZQ==', width: 1024, height: 768 }; },
+        async loginInput({ sessionId, sequence, event }) { calls.push(['login_input', userId, sessionId, sequence, event.type]); return { state: 'waiting', nextSequence: sequence + 1 }; },
+        async loginStatus({ sessionId }) { return { state: 'waiting', resumes: [], nextSequence: 1, sessionId }; },
+      } });
+      return profiles.get(userId);
+    },
+    async discardUnconfirmedUser(userId, sessionId) { calls.push(['discard', userId, sessionId]); return { ok: true }; },
+  };
+  const server = createRpcServer({ ownerId, token, connectToken, profiles: manager, browser: {} });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  const url = `http://127.0.0.1:${server.address().port}/rpc`;
+  const request = (input, credential) => fetch(url, { method: 'POST', headers: {
+    authorization: `Bearer ${credential}`, 'content-type': 'application/json' }, body: JSON.stringify(input) });
+  const sessionId = randomUUID();
+  try {
+    const start = { userId: memberA, operation: 'login_start', args: { sessionId } };
+    assert.equal((await request(start, token)).status, 403);
+    assert.deepEqual(await (await request(start, connectToken)).json(), { ok: true, value: { ok: true } });
+    const frame = await request({ userId: memberA, operation: 'login_frame', args: { sessionId } }, connectToken);
+    assert.equal(frame.status, 200);
+    assert.equal((await frame.json()).value.width, 1024);
+    const input = { userId: memberA, operation: 'login_input', args: {
+      sessionId, sequence: 2, event: { type: 'text', value: 'fixture only' },
+    } };
+    assert.equal((await request({ ...input, args: { ...input.args, url: 'https://attacker.example' } }, connectToken)).status, 403);
+    assert.equal((await request(input, token)).status, 403);
+    assert.deepEqual(await (await request(input, connectToken)).json(), { ok: true, value: { state: 'waiting', nextSequence: 3 } });
+
+    const search = (userId) => ({ userId, operation: 'search', args: { query: 'Fixture',
+      publishedFrom: '2026-10-01T00:00:00Z', publishedTo: '2026-10-15T00:00:00Z', page: 0 } });
+    assert.equal((await request(search(memberA), connectToken)).status, 403);
+    const a = await (await request(search(memberA), token)).json();
+    const b = await (await request(search(memberB), token)).json();
+    assert.equal(a.value.items[0].id, '101');
+    assert.equal(b.value.items[0].id, '202');
+    assert.equal(calls.some(([, userId]) => userId === memberA), true);
+    assert.equal(calls.some(([, userId]) => userId === memberB), true);
+    assert.equal(calls.some(([, userId]) => userId === ownerId), false);
+  } finally { await new Promise((resolve) => server.close(resolve)); }
+});

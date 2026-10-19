@@ -2,13 +2,13 @@ const { uuid, assertJobScope, profileSchema, jobError } = require('./jobSchemas'
 const { jobTransaction } = require('./jobTransaction');
 
 class JobProfileRepository {
-  constructor(pool) { this.pool = pool; }
+  constructor(pool, { accessService = null } = {}) { this.pool = pool; this.accessService = accessService; }
   async get({ userId }) {
     const row = (await this.pool.query('SELECT * FROM job_profiles WHERE user_id=$1', [uuid.parse(userId)])).rows[0];
     return row ? { ...row, profile: profileSchema.parse(row.profile) } : null;
   }
   async ensure({ scope }) {
-    await assertJobScope(this.pool, scope);
+    await assertJobScope(this.pool, scope, this.accessService);
     await this.pool.query(`INSERT INTO job_profiles(user_id,profile) VALUES($1,$2) ON CONFLICT(user_id) DO NOTHING`,
       [scope.userId, { confirmed: false, facts: [], examples: [] }]);
     return this.get({ userId: scope.userId });
@@ -16,7 +16,7 @@ class JobProfileRepository {
   async replace({ scope, expectedRevision, profile }) {
     profile = profileSchema.parse(profile);
     return jobTransaction(this.pool, async (client) => {
-    await assertJobScope(client, scope);
+      await assertJobScope(client, scope, this.accessService);
     await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`job-owner:${scope.userId}`]);
     let result;
     if (expectedRevision === 0) result = await client.query(`INSERT INTO job_profiles(user_id,profile)

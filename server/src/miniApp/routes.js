@@ -24,26 +24,37 @@ const PUBLIC_CODES = new Set([
   'invalid_origin',
   'rate_limited',
   'limit_reached',
+  'JOB_ACCESS_REVOKED',
+  'JOB_LOGIN_SESSION_INVALID',
+  'JOB_LOGIN_TICKET_INVALID',
+  'JOB_LOGIN_SESSION_EXPIRED',
+  'JOB_LOGIN_ALREADY_ACTIVE',
+  'JOB_LOGIN_RESUME_INVALID',
+  'JOB_LOGIN_UNAVAILABLE',
+  'JOB_BROWSER_BUSY',
 ]);
 function publicError(error, reply) {
   const code = PUBLIC_CODES.has(error?.code) ? error.code : 'unavailable';
   const status =
     code === 'unauthorized'
       ? 401
+      : ['JOB_LOGIN_SESSION_INVALID','JOB_LOGIN_TICKET_INVALID','JOB_LOGIN_SESSION_EXPIRED'].includes(code)
+        ? 401
       : [
             'forbidden',
             'protected_owner',
             'invalid_csrf',
             'invalid_origin',
+            'JOB_ACCESS_REVOKED',
           ].includes(code)
         ? 403
         : code === 'not_found' || code === 'operation_unknown'
           ? 404
-          : code.includes('conflict') || code === 'already_exists'
+          : code.includes('conflict') || code === 'already_exists' || code === 'JOB_LOGIN_ALREADY_ACTIVE'
             ? 409
-            : code === 'rate_limited'
+            : code === 'rate_limited' || code === 'JOB_BROWSER_BUSY'
               ? 429
-              : code === 'unavailable'
+              : code === 'unavailable' || code === 'JOB_LOGIN_UNAVAILABLE'
                 ? 503
                 : 400;
   return reply.code(status).send({ ok: false, code });
@@ -156,7 +167,7 @@ function registerMiniAppRoutes(
       result: await accessService.getOperation(s.actor.userId, req.params.id),
     };
   });
-  if (registerUserRoutes) registerUserRoutes({ route, authorize });
+  if (registerUserRoutes) registerUserRoutes({ route, authorize, requireOrigin, publicOrigin: config.miniAppPublicOrigin });
   return { sessions, authorize, route };
 }
 module.exports = { registerMiniAppRoutes, publicError };

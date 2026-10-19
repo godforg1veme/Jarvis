@@ -2,7 +2,7 @@ const http = require('node:http');
 const { createHash, timingSafeEqual } = require('node:crypto');
 const { UUID } = require('./rpcProtocol');
 const { parseClosedJson, validCaptchaRequest } = require('./captchaTelegramProtocol');
-function createCaptchaBroker({ controller, coordinator, ownerId, token, run = fn => fn() }) {
+function createCaptchaBroker({ profiles = null, controller = null, coordinator = null, ownerId, token, run = (_userId, fn) => fn() }) {
   if (!UUID.test(ownerId || '') || !/^[\x21-\x7e]{32,256}$/.test(token || '')) throw new Error('JOB_CAPTCHA_CONFIG_INVALID');
   const digest = value => createHash('sha256').update(value).digest(), expected = digest(`Bearer ${token}`);
   let active = 0;
@@ -32,8 +32,12 @@ function createCaptchaBroker({ controller, coordinator, ownerId, token, run = fn
       }
       let input; try { input = parseClosedJson(Buffer.concat(chunks).toString('utf8')); } catch { return reply(res, 400, { ok: false, code: 'JOB_CAPTCHA_INVALID_REQUEST' }); }
       if (!validCaptchaRequest(input)) return reply(res, 400, { ok: false, code: 'JOB_CAPTCHA_INVALID_REQUEST' });
-      const value = input.operation === 'status' ? coordinator.status()
-        : await run(() => input.operation === 'challenge' ? controller.challenge(input.args.refresh) : controller.answer(input.args));
+      const runtime = profiles ? await profiles.forUser(input.userId)
+        : input.userId === ownerId && controller && coordinator ? { manualPage: controller, manual: coordinator } : null;
+      if (!runtime.manual || !runtime.manualPage) throw Object.assign(new Error('JOB_CAPTCHA_UNAVAILABLE'), { code: 'JOB_CAPTCHA_UNAVAILABLE' });
+      const value = input.operation === 'status' ? runtime.manual.status()
+        : await run(input.userId, () => input.operation === 'challenge'
+          ? runtime.manualPage.challenge(input.args.refresh) : runtime.manualPage.answer(input.args));
       reply(res, 200, { ok: true, value });
     } catch { if (!res.writableEnded) reply(res, 503, { ok: false, code: 'JOB_CAPTCHA_UNAVAILABLE' }); }
     finally { active--; }

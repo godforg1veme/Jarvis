@@ -3,7 +3,7 @@ const { uuid, assertJobScope, jobError } = require('./jobSchemas');
 const { jobTransaction } = require('./jobTransaction');
 
 class JobApplicationRepository {
-  constructor(pool, { now = () => new Date() } = {}) { this.pool = pool; this.now = now; }
+  constructor(pool, { now = () => new Date(), accessService = null } = {}) { this.pool = pool; this.now = now; this.accessService = accessService; }
   async snapshot(client, { scope, draftId }) {
     const row = (await client.query(`SELECT d.*,v.external_id,v.snapshot,v.revision AS latest_vacancy_revision,
       p.revision AS latest_profile_revision,
@@ -20,7 +20,7 @@ class JobApplicationRepository {
   }
   async prepare({ scope, draftId }) {
     return jobTransaction(this.pool, async (client) => {
-      await assertJobScope(client, scope);
+      await assertJobScope(client, scope, this.accessService);
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`job-owner:${scope.userId}`]);
       const row = await this.snapshot(client, { scope, draftId });
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`job-draft:${scope.userId}:${row.vacancy_id}`]);
@@ -36,14 +36,14 @@ class JobApplicationRepository {
     });
   }
   async getConfirmation({ scope, confirmationId }) {
-    await assertJobScope(this.pool, scope);
+    await assertJobScope(this.pool, scope, this.accessService);
     return (await this.pool.query(`SELECT * FROM job_confirmations WHERE id=$1 AND user_id=$2
       AND conversation_id=$3 AND chat_id=$4 AND channel='telegram' AND kind='apply'`,
     [uuid.parse(confirmationId), scope.userId, scope.conversationId, scope.chatId])).rows[0] || null;
   }
   async claim({ scope, confirmationId }) {
     return jobTransaction(this.pool, async (client) => {
-      await assertJobScope(client, scope);
+      await assertJobScope(client, scope, this.accessService);
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`job-owner:${scope.userId}`]);
       const confirmation = (await client.query(`SELECT * FROM job_confirmations WHERE id=$1 AND user_id=$2
         AND conversation_id=$3 AND chat_id=$4 AND channel='telegram' AND kind='apply' FOR UPDATE`,
@@ -72,7 +72,7 @@ class JobApplicationRepository {
     });
   }
   async get({ scope, operationId }) {
-    await assertJobScope(this.pool, scope);
+    await assertJobScope(this.pool, scope, this.accessService);
     return (await this.pool.query(`SELECT a.*,v.external_id AS vacancy_external_id,v.snapshot FROM job_applications a
       JOIN job_vacancies v ON v.id=a.vacancy_id WHERE a.user_id=$1 AND a.operation_id=$2`,
     [scope.userId, uuid.parse(operationId)])).rows[0] || null;

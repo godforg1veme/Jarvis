@@ -17,7 +17,7 @@ function fixture(options = {}) {
     claim: async () => ({ id: randomUUID(), attempts: 1 }), photoState: async () => 'sent',
     delivered: async (...args) => calls.delivered.push(args),
   };
-  const client = { status: async () => ({ phase: 'active' }), challenge: async refresh => {
+  const client = { status: async () => ({ phase: 'active' }), challenge: async (_userId, refresh) => {
     calls.challenges.push(refresh); return { outcome: 'ready', challengeId: randomUUID() };
   } };
   const worker = new JobCaptchaWorker({ ownerId: randomUUID(), repository, client,
@@ -39,7 +39,7 @@ test('automatic mode suppresses the early legacy attention; ordinary human mode 
 });
 test('refresh survives backend errors, exponential backoff and one safe delay notice per request', async () => {
   const f = fixture(); let attempts = 0;
-  f.client.challenge = async refresh => { assert.equal(refresh,true); attempts++; throw Error('SECRET exception'); };
+  f.client.challenge = async (_userId, refresh) => { assert.equal(refresh,true); attempts++; throw Error('SECRET exception'); };
   await f.worker.tick(); assert.ok(f.request()); assert.equal(attempts,1);
   await f.worker.tick(); assert.equal(attempts,1);
   f.advance(10000); await f.worker.tick(); assert.equal(attempts,2);
@@ -47,17 +47,17 @@ test('refresh survives backend errors, exponential backoff and one safe delay no
   assert.equal(f.calls.notices[0][0],'PREPARATION_DELAYED'); assert.ok(f.request());
   assert.ok(f.calls.reports.every(code => code === 'JOB_CAPTCHA_PREPARATION_FAILED'));
   assert.ok(!JSON.stringify(f.calls).includes('SECRET'));
-  f.client.challenge = async refresh => { assert.equal(refresh,true); return { outcome:'ready',challengeId:randomUUID() }; };
+  f.client.challenge = async (_userId, refresh) => { assert.equal(refresh,true); return { outcome:'ready',challengeId:randomUUID() }; };
   f.advance(40000); await f.worker.tick(); assert.equal(f.request(),null); assert.equal(f.calls.sends,1);
 });
 
 test('automatic preparation keeps the scoped request pending and sends no Telegram photo or delay notice', async () => {
   const f = fixture();
-  f.client.challenge = async refresh => { assert.equal(refresh, true); return { outcome: 'preparing' }; };
+  f.client.challenge = async (_userId, refresh) => { assert.equal(refresh, true); return { outcome: 'preparing' }; };
   f.repository.enqueue = async () => assert.fail('preparing is not an image');
   await f.worker.tick(); await f.worker.tick();
   assert.ok(f.request()); assert.equal(f.calls.sends, 0); assert.equal(f.calls.notices.length, 0);
-  assert.equal(f.calls.acknowledgements.length, 0); assert.equal(f.worker.failures, 0);
+  assert.equal(f.calls.acknowledgements.length, 0); assert.equal(f.worker.stateFor(f.worker.ownerId).failures, 0);
 });
 test('new explicit request bypasses old backoff and acknowledgement cannot erase a newer click', async () => {
   const f = fixture(); f.client.status = async () => { throw Error(); }; await f.worker.tick();

@@ -1,4 +1,5 @@
-const { allowedRequest } = require('./networkPolicy');
+const { allowedRequest, isApprovedHhLoginRequest } = require('./networkPolicy');
+const { validEvent } = require('./rpcProtocol');
 const { classifyPage, classifySession } = require('./pageSignals');
 const { readSearchPage, readVacancyPage, readResumes } = require('./hhPageReader');
 const { readApplicationForm } = require('./hhApplicationForm');
@@ -12,7 +13,8 @@ const CAPABILITIES = Object.freeze({ dateWindows: false, maxPages: 1000 });
 
 class HhBrowser {
   constructor({ context, now = () => new Date(), primaryResumeId = null, captchaRecovery = null, captchaDispatch = dispatchCaptcha,
-    manualCoordinator = null, onManualRequired = null, operationTimeoutMs = 80000, onTimeout = () => {} }) {
+    manualCoordinator = null, onManualRequired = null, onAuthenticated = async () => {},
+    operationTimeoutMs = 80000, onTimeout = () => {} }) {
     if (!context || typeof context.newPage !== 'function') throw failure('JOB_BROWSER_CONTEXT_REQUIRED');
     this.context = context; this.now = now; this.tail = Promise.resolve(); this.capabilities = CAPABILITIES;
     this.primaryResumeId = primaryResumeId;
@@ -20,15 +22,170 @@ class HhBrowser {
     this.captchaDispatch = captchaDispatch;
     this.manualCoordinator = manualCoordinator;
     this.onManualRequired = onManualRequired;
+    this.onAuthenticated = onAuthenticated;
     this.operationTimeoutMs = operationTimeoutMs; this.onTimeout = onTimeout;
+    this.activeOperations = 0;
+    this.loginPage = null; this.loginSessionId = null; this.loginState = 'closed'; this.loginResumes = [];
+    this.loginExpiresAt = 0; this.loginNextSequence = 1; this.loginGestureAt = 0; this.loginMainStatus = 0;
+    this.loginExpiryTimer = null;
   }
   // One persistent profile, one active read. A rejected operation must not poison the queue.
   run(fn) {
-    const pending = this.tail.then(() => bounded(fn, this.operationTimeoutMs)).catch(error => {
-      if (error.code === 'JOB_BROWSER_OPERATION_TIMEOUT') this.onTimeout();
-      throw error;
+    const pending = this.tail.then(async () => {
+      this.activeOperations++;
+      try { return await bounded(fn, this.operationTimeoutMs); }
+      catch (error) { if (error.code === 'JOB_BROWSER_OPERATION_TIMEOUT') this.onTimeout(); throw error; }
+      finally { this.activeOperations--; }
     });
     this.tail = pending.catch(() => {}); return pending;
+  }
+  isBusy() { return this.activeOperations > 0; }
+  hasLoginSession() { return Boolean(this.loginSessionId && ['waiting','captcha','authenticated'].includes(this.loginState)); }
+
+  startLogin({ sessionId }) {
+    if (!/^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(sessionId || '')) return Promise.reject(failure('JOB_BROWSER_INVALID_REQUEST'));
+    return this.run(async () => {
+      if (this.loginSessionId === sessionId && ['waiting','captcha','authenticated'].includes(this.loginState)) return { ok: true };
+      if (this.loginPage && !this.loginPage.isClosed()) throw failure('JOB_BROWSER_BUSY');
+      const page = await this.context.newPage();
+      this.loginPage = page; this.loginSessionId = sessionId; this.loginState = 'waiting';
+      this.loginResumes = []; this.loginExpiresAt = Date.now() + 600000; this.loginNextSequence = 1; this.loginGestureAt = 0;
+      clearTimeout(this.loginExpiryTimer);
+      this.loginExpiryTimer = setTimeout(() => { void this.expireLogin(sessionId); }, 600000);
+      this.loginExpiryTimer.unref?.();
+      this.loginMainStatus = 0;
+      page.setViewportSize({ width: 1024, height: 768 }); page.setDefaultTimeout(10000);
+      page.on('response', (response) => {
+        try { if (response.request().isNavigationRequest() && response.request().frame() === page.mainFrame()) this.loginMainStatus = response.status(); } catch {}
+      });
+      await page.route('**/*', async (route) => {
+        const request = route.request();
+        const method = request.method();
+        if (['GET', 'HEAD', 'OPTIONS'].includes(method)) return allowedRequest(request.url()) ? route.continue() : route.abort();
+        let permitted = false;
+        try {
+          permitted = this.loginPage === page && ['waiting','captcha'].includes(this.loginState)
+            && Date.now() - this.loginGestureAt <= 2000
+            && request.frame() === page.mainFrame()
+            && isApprovedHhLoginRequest(method, request.resourceType(), request.url());
+        } catch {}
+        return permitted ? route.continue() : route.abort();
+      });
+      await page.goto('https://hh.ru/account/login?role=applicant', { waitUntil: 'domcontentloaded', timeout: 30000 });
+      return { ok: true };
+    });
+  }
+
+  expireLogin(sessionId) {
+    return this.run(async () => {
+      if (this.loginSessionId !== sessionId || Date.now() < this.loginExpiresAt || this.loginState === 'expired') return;
+      if (this.loginPage && !this.loginPage.isClosed()) await this.loginPage.close().catch(() => {});
+      this.loginPage = null; this.loginState = 'expired'; this.loginResumes = [];
+    });
+  }
+
+  async observeLogin() {
+    if (this.loginSessionId && Date.now() >= this.loginExpiresAt) {
+      if (this.loginPage && !this.loginPage.isClosed()) await this.loginPage.close().catch(() => {});
+      this.loginPage = null; this.loginState = 'expired'; this.loginResumes = [];
+      return { state: 'expired', resumes: [], nextSequence: this.loginNextSequence };
+    }
+    if (this.loginState === 'authenticated') return { state: 'authenticated', resumes: this.loginResumes, nextSequence: this.loginNextSequence };
+    if (!this.loginPage || this.loginPage.isClosed() || Date.now() >= this.loginExpiresAt) {
+      this.loginState = Date.now() >= this.loginExpiresAt ? 'expired' : 'closed';
+      return { state: this.loginState, resumes: [], nextSequence: this.loginNextSequence };
+    }
+    const current = await this.loginPage.evaluate(() => ({ pathname: location.pathname,
+      text: document.body?.innerText?.slice(0, 64000) || '',
+      iframeSources: [...document.querySelectorAll('iframe')].slice(0, 100).filter(node => node.getClientRects().length).map(node => node.src) }));
+    const result = classifySession({ ...current, status: this.loginMainStatus });
+    if (result.state === 'captcha') this.loginState = 'captcha';
+    else if (result.authenticated) {
+      const resumes = await readResumes(this.loginPage);
+      if (!Array.isArray(resumes) || resumes.length < 1 || resumes.length > 20) throw failure('JOB_HH_DOM_CHANGED');
+      this.loginResumes = resumes.map(({ id, title }) => ({ id, title }));
+      this.loginState = 'authenticated';
+      await this.onAuthenticated();
+      await this.loginPage.close().catch(() => {});
+      this.loginPage = null;
+    } else this.loginState = 'waiting';
+    return { state: this.loginState, resumes: this.loginState === 'authenticated' ? this.loginResumes : [], nextSequence: this.loginNextSequence };
+  }
+
+  loginFrame({ sessionId }) {
+    return this.run(async () => {
+      if (sessionId !== this.loginSessionId || !this.loginPage || this.loginPage.isClosed()) throw failure('JOB_LOGIN_SESSION_INVALID');
+      const state = await this.observeLogin();
+      if (state.state !== 'waiting' && state.state !== 'captcha') throw failure('JOB_LOGIN_SESSION_INVALID');
+      const frame = await this.loginPage.screenshot({ type: 'jpeg', quality: 60, animations: 'disabled', caret: 'hide' });
+      if (frame.length > 512 * 1024) throw failure('JOB_BROWSER_RESPONSE_TOO_LARGE');
+      return { state: state.state, mimeType: 'image/jpeg', frameBase64: frame.toString('base64'), width: 1024, height: 768 };
+    });
+  }
+
+  loginInput({ sessionId, sequence, event }) {
+    return this.run(async () => {
+      if (sessionId !== this.loginSessionId || !this.loginPage || this.loginPage.isClosed()
+        || this.loginState === 'authenticated' || !Number.isSafeInteger(sequence) || sequence < 1) throw failure('JOB_LOGIN_SESSION_INVALID');
+      if (sequence < this.loginNextSequence) {
+        const state = await this.observeLogin();
+        return { state: state.state, nextSequence: this.loginNextSequence };
+      }
+      if (sequence !== this.loginNextSequence) throw failure('JOB_BROWSER_INVALID_REQUEST');
+      if (!validEvent(event)) throw failure('JOB_BROWSER_INVALID_REQUEST');
+      const page = this.loginPage;
+      const coordinate = (value, max) => Number.isFinite(value) && value >= 0 && value <= max;
+      this.loginGestureAt = Date.now();
+      // Consume the sequence before dispatch. If the response is lost, a retry
+      // cannot repeat a text insertion or a submit click.
+      this.loginNextSequence++;
+      if (event?.type === 'pointer' && Object.keys(event).sort().join(',') === 'action,button,type,x,y'
+        && ['move','down','up','click'].includes(event.action) && ['left','middle','right'].includes(event.button)
+        && coordinate(event.x, 1024) && coordinate(event.y, 768)) {
+        await page.mouse.move(event.x, event.y);
+        if (event.action === 'down') await page.mouse.down({ button: event.button });
+        else if (event.action === 'up') await page.mouse.up({ button: event.button });
+        else if (event.action === 'click') await page.mouse.click(event.x, event.y, { button: event.button });
+      } else if (event?.type === 'wheel' && Object.keys(event).sort().join(',') === 'deltaX,deltaY,type,x,y'
+        && coordinate(event.x, 1024) && coordinate(event.y, 768) && Number.isFinite(event.deltaX) && Math.abs(event.deltaX) <= 1000
+        && Number.isFinite(event.deltaY) && Math.abs(event.deltaY) <= 1000) {
+        await page.mouse.move(event.x, event.y); await page.mouse.wheel(event.deltaX, event.deltaY);
+      } else if (event?.type === 'key' && Object.keys(event).sort().join(',') === 'action,key,type'
+        && ['press','down','up'].includes(event.action) && /^[A-Za-z0-9_+\-]{1,24}$/.test(event.key)
+        && ['Enter','Tab','Escape','Backspace','Delete','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Home','End','Shift','Control','Alt','Meta',
+          '0','1','2','3','4','5','6','7','8','9'].includes(event.key)) {
+        if (event.action === 'press') await page.keyboard.press(event.key);
+        else if (event.action === 'down') await page.keyboard.down(event.key);
+        else await page.keyboard.up(event.key);
+      } else if (event?.type === 'text' && Object.keys(event).sort().join(',') === 'type,value'
+        && typeof event.value === 'string' && event.value.length > 0 && event.value.length <= 64
+        && !/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/u.test(event.value)) {
+        await page.keyboard.insertText(event.value);
+      } else throw failure('JOB_BROWSER_INVALID_REQUEST');
+      const state = await this.observeLogin();
+      return { state: state.state, nextSequence: this.loginNextSequence };
+    });
+  }
+
+  loginStatus({ sessionId }) {
+    return this.run(async () => {
+      if (sessionId !== this.loginSessionId) throw failure('JOB_LOGIN_SESSION_INVALID');
+      return this.observeLogin();
+    });
+  }
+
+  closeLogin({ sessionId, preserveProfile = false, complete = false }) {
+    return this.run(async () => {
+      if (sessionId !== this.loginSessionId) throw failure('JOB_LOGIN_SESSION_INVALID');
+      if (this.loginPage && !this.loginPage.isClosed()) await this.loginPage.close().catch(() => {});
+      this.loginPage = null;
+      if (!preserveProfile || complete) {
+        clearTimeout(this.loginExpiryTimer); this.loginExpiryTimer = null;
+        this.loginState = 'closed'; this.loginResumes = [];
+        if (complete) this.loginSessionId = null;
+      }
+      return { ok: true };
+    });
   }
   connection() {
     return this.run(async () => {
