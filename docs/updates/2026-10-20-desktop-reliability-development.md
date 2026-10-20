@@ -1,5 +1,11 @@
 # Надёжность Desktop, локальная разработка / Desktop reliability, local development
 
+Более новый результат: [выпуск 20 октября](2026-10-20-desktop-reliability-release.md).
+Эта запись сохраняет состояние до публикации.
+
+Newer result: [October 20 release](2026-10-20-desktop-reliability-release.md).
+This record preserves the pre-publication development state.
+
 ## Русский
 
 20 октября 2026. Реализованы A03, A06 и A07 из оставшихся предложений аудита.

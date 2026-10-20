@@ -1,5 +1,19 @@
 # Проверки перед выпуском
 
+Выпуск 20 октября: [результат](updates/2026-10-20-desktop-reliability-release.md).
+Новый Linux image прошёл 778/778, отдельный PostgreSQL применил 41 миграцию и
+проверил новый status lookup. Установленный Desktop: 146 файлов, Electron и
+bundled runtime совпадают; изолированный настоящий TCP-обрыв восстановлен с
+одним POST. В Electron проверены загрузка UI и trusted IPC. Прямой Windows
+HTTPS/WSS недоступен, поэтому online-чат, микрофон и реальные команды не приняты.
+
+October 20 release: [result](updates/2026-10-20-desktop-reliability-release.md).
+New Linux image passed 778/778; isolated PostgreSQL applied 41 migrations and
+verified status recovery. All 146 installed files, native Electron and bundled
+runtime match. A real isolated TCP loss recovered with one POST; installed UI
+and trusted IPC passed. Direct Windows HTTPS/WSS is unavailable, so online chat,
+microphone and real user commands remain unverified.
+
 Локальная надёжность Desktop, 20 октября 2026:
 [результат и ограничения](updates/2026-10-20-desktop-reliability-development.md).
 `npm run test:core` запускает только явный список из `scripts/coreTestManifest.json`:

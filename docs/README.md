@@ -17,11 +17,13 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
-Локально подготовлены [надёжность Desktop и единые проверки](updates/2026-10-20-desktop-reliability-development.md):
+Выпущены [надёжность Desktop и единые проверки](updates/2026-10-20-desktop-reliability-release.md):
 ограниченные HTTP-запросы, сохранение ID до отправки, ручная проверка результата
 без повтора действия, актуальные подсказки и `test:core`. Прошли 885 проверок
-и браузерные fixtures на широком/минимальном окне. Изменения ещё не опубликованы;
-VPS и установленный EXE используют предыдущую принятую версию.
+и браузерные fixtures на широком/минимальном окне. Server на DE обновлён,
+Desktop пересобран и установлен, исходники обоих VPS синхронизированы.
+Linux 778/778 и отдельная PostgreSQL-приёмка прошли. Прямой HTTPS/WSS из Windows
+недоступен: установленный Desktop paired/offline, живой чат ещё не подтверждён.
 
 [Выпущено единое время МСК UTC+3](updates/2026-10-19-moscow-time-release.md):
 ввод напоминаний без пояса и все пользовательские часы используют Москву.
@@ -228,11 +230,13 @@ deployment establish what is running.
 
 ### Current status
 
-[Desktop reliability and a local test entry point](updates/2026-10-20-desktop-reliability-development.md)
-are prepared locally: bounded HTTP, IDs saved before sending, read-only result
+[Desktop reliability and a local test entry point](updates/2026-10-20-desktop-reliability-release.md)
+are released: bounded HTTP, IDs saved before sending, read-only result
 recovery, connection hints and `test:core`. All 885 checks and wide/minimum-window
-browser fixtures passed. Changes are not published; VPS and installed Desktop
-still use the previous accepted version.
+browser fixtures passed. DE server and installed Desktop are updated; both VPS
+sources are synchronized. Linux 778/778 and isolated PostgreSQL acceptance passed.
+Direct Windows HTTPS/WSS is unavailable: Desktop is paired/offline and live chat
+is not yet accepted.
 
 [Fixed Moscow UTC+3 time is released](updates/2026-10-19-moscow-time-release.md):
 timezone-less reminder input and user-facing clocks use Moscow. DE server
