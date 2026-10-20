@@ -1015,6 +1015,7 @@ app.whenReady().then(() => {
   cloudTransport = createSecureCloudTransport();
   desktopCloudClient = new DesktopCloudClient({
     userDataPath: app.getPath('userData'),
+    outboundDataPath: getWritableDataPath(path.join(__dirname, 'data')),
     safeStorage,
     fetch: cloudTransport.fetch,
     WebSocket: cloudTransport.WebSocket,
@@ -1206,8 +1207,30 @@ app.whenReady().then(() => {
       return result;
     } catch (error) {
       broadcastCoreMode('alert', { error: error.message, duration: 3000 });
-      return { ok: false, error: 'Сервер недоступен. Попробуйте ещё раз.' };
+      return {
+        ok: false, outcome: error.outcome || 'not_sent', clientMessageId: error.clientMessageId,
+        error: error.clientMessageId
+          ? 'Ответ не получен. Проверьте результат отправки, прежде чем повторять действие.'
+          : 'Не удалось отправить сообщение. Проверьте подключение и состояние отправок.',
+      };
     }
+  });
+  ipcMain.handle('cloud:list-pending-requests', (event) => {
+    if (!isTrustedMainRenderer(event) || !desktopCloudClient) return { ok: false, error: 'Access denied.' };
+    try { return { ok: true, requests: desktopCloudClient.listPendingRequests() }; }
+    catch (_) { return { ok: false, error: 'Не удалось прочитать состояние отправок.' }; }
+  });
+  ipcMain.handle('cloud:request-status', async (event, input = {}) => {
+    if (!isTrustedMainRenderer(event) || !desktopCloudClient) return { ok: false, error: 'Access denied.' };
+    if (typeof input.clientMessageId !== 'string' || !/^[a-zA-Z0-9_.:-]{1,128}$/.test(input.clientMessageId)) return { ok: false };
+    try { return await desktopCloudClient.getRequestStatus(input.clientMessageId); }
+    catch (_) { return { ok: false, error: 'Состояние отправки пока недоступно. Попробуйте проверить позже.' }; }
+  });
+  ipcMain.handle('cloud:acknowledge-request', (event, input = {}) => {
+    if (!isTrustedMainRenderer(event) || !desktopCloudClient) return { ok: false, error: 'Access denied.' };
+    if (typeof input.clientMessageId !== 'string' || !/^[a-zA-Z0-9_.:-]{1,128}$/.test(input.clientMessageId)) return { ok: false };
+    try { desktopCloudClient.acknowledgeRequest(input.clientMessageId); return { ok: true }; }
+    catch (_) { return { ok: false, error: 'Не удалось сохранить состояние отправки.' }; }
   });
   ipcMain.handle('cloud:create-command', async (event, input = {}) => {
     if (!isTrustedMainRenderer(event) || !desktopCloudClient) return { ok: false, error: 'Access denied.' };
@@ -1218,7 +1241,8 @@ app.whenReady().then(() => {
         args: input.args || {},
       });
     } catch (error) {
-      return { ok: false, error: 'Не удалось создать удалённую команду.' };
+      return { ok: false, outcome: error.outcome || 'unknown',
+        error: 'Ответ о создании команды не получен. Проверьте состояние устройства перед повторным действием.' };
     }
   });
   ipcMain.handle('cloud:get-command', async (event, input = {}) => {

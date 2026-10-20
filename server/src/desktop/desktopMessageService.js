@@ -44,12 +44,71 @@ class DesktopMessageService {
     this.accessService = options.accessService || null;
   }
 
+  async getStatus({ device, clientMessageId }) {
+    const requirePermission = async (permission) => {
+      if (this.accessService && !await this.accessService.allows(device.user_id, permission)) {
+        throw Object.assign(new Error('Access unavailable'), { statusCode: 403, publicCode: 'PERMISSION_DENIED' });
+      }
+    };
+    await requirePermission('assistant');
+    const request = await this.requestRepository.getForDevice({
+      userId: device.user_id, deviceId: device.id, clientMessageId,
+    });
+    const result = { clientMessageId, status: 'not_found' };
+    if (!request || request.user_id !== device.user_id || request.device_id !== device.id) return result;
+    if (request.status !== 'completed') {
+      result.status = request.status === 'processing' ? 'processing' : 'failed';
+      return result;
+    }
+    const saved = request.response || {};
+    // Old records have no provenance. Do not reveal their cached data after a grant revocation.
+    await this._requireRecoveryPermissions(device, saved);
+    const response = {};
+    for (const key of ['status', 'conversationId', 'messageId', 'answerMessageId', 'answer', 'transcript']) {
+      if (typeof saved[key] === 'string') response[key] = saved[key];
+    }
+    const commandId = saved.confirmation?.commandId;
+    if (typeof commandId === 'string' && /^[a-f0-9-]{36}$/i.test(commandId)) {
+      response.confirmation = { commandId };
+    }
+    if (Array.isArray(saved.buttons)) {
+      response.buttons = saved.buttons.slice(0, 10).filter(Array.isArray).map((row) => row.slice(0, 10)
+        .filter((button) => typeof button?.text === 'string' && /^cmd:(confirm|reject):[a-f0-9-]{36}$/i.test(button.data))
+        .map((button) => ({ text: button.text.slice(0, 200), data: button.data })));
+    }
+    if (saved.artifactUnavailable === true) response.artifactUnavailable = true;
+    return { clientMessageId, status: 'completed', response };
+  }
+
+  async _requireRecoveryPermissions(device, saved) {
+    const permissions = saved._recoveryPermissions || ['assistant', 'memory', 'documents', 'devices', 'vpn', 'life'];
+    for (const permission of new Set(['assistant', ...permissions])) {
+      if (this.accessService && !await this.accessService.allows(device.user_id, permission)) {
+        throw Object.assign(new Error('Access unavailable'), { statusCode: 403, publicCode: 'PERMISSION_DENIED' });
+      }
+    }
+  }
+
+  async _completeRequest(input, permissions) {
+    return this.requestRepository.complete({
+      ...input, response: { ...input.response, _recoveryPermissions: [...new Set(['assistant', ...permissions])] },
+    });
+  }
+
   async handle({ device, clientMessageId, kind = 'text', resolveContent }) {
     const can = async (permission) => !this.accessService || await this.accessService.allows(device.user_id, permission);
     const requireAssistant = async () => {
       if (!await can('assistant')) throw Object.assign(new Error('Access unavailable'), { statusCode: 403, publicCode: 'PERMISSION_DENIED' });
     };
     await requireAssistant();
+    // History may contain earlier source-derived answers even when this turn's search is empty.
+    // Cache recovery therefore retains all source grants available when this turn began.
+    const recoveryContextPermissions = [];
+    if (this.accessService) {
+      for (const permission of ['memory', 'documents', 'devices', 'vpn', 'life']) {
+        if (await can(permission)) recoveryContextPermissions.push(permission);
+      }
+    }
     const claim = await this.requestRepository.claim({
       userId: device.user_id,
       deviceId: device.id,
@@ -57,7 +116,11 @@ class DesktopMessageService {
       kind,
     });
     if (!claim.created) {
-      if (claim.request?.status === 'completed') return { ...claim.request.response, duplicate: true };
+      if (claim.request?.status === 'completed') {
+        await this._requireRecoveryPermissions(device, claim.request.response || {});
+        const { _recoveryPermissions, ...response } = claim.request.response || {};
+        return { ...response, duplicate: true };
+      }
       if (claim.request?.status === 'processing') throw new DesktopRequestPendingError();
       throw new DesktopRequestFailedError();
     }
@@ -109,10 +172,11 @@ class DesktopMessageService {
         };
         const persistedResponse = { ...publicResponse };
         delete persistedResponse.vpnArtifact;
-        await this.requestRepository.complete({
+        if (publicResponse.vpnArtifact) persistedResponse.artifactUnavailable = true;
+        await this._completeRequest({
           userId: device.user_id, deviceId: device.id, clientMessageId,
           conversationId: conversation.id, response: persistedResponse,
-        });
+        }, [...recoveryContextPermissions, 'vpn']);
         return publicResponse;
       }
 
@@ -144,13 +208,13 @@ class DesktopMessageService {
           ...(remoteAnswer.buttons ? { buttons: remoteAnswer.buttons } : {}),
           ...(kind === 'voice' ? { transcript: content, transcription: resolved.transcription || {} } : {}),
         };
-        await this.requestRepository.complete({
+        await this._completeRequest({
           userId: device.user_id,
           deviceId: device.id,
           clientMessageId,
           conversationId: conversation.id,
           response,
-        });
+        }, [...recoveryContextPermissions, 'devices']);
         return response;
       }
       const history = await this.conversationRepository.recentMessages({
@@ -186,13 +250,13 @@ class DesktopMessageService {
           ...(orchestration.confirmation ? { confirmation: orchestration.confirmation } : {}),
           ...(kind === 'voice' ? { transcript: content, transcription: resolved.transcription || {} } : {}),
         };
-        await this.requestRepository.complete({
+        await this._completeRequest({
           userId: device.user_id,
           deviceId: device.id,
           clientMessageId,
           conversationId: conversation.id,
           response,
-        });
+        }, [...recoveryContextPermissions, 'devices']);
         return response;
       }
       const memoryResult = this.memoryService && await can('memory')
@@ -245,13 +309,13 @@ class DesktopMessageService {
         answer: safeAnswer,
         ...(kind === 'voice' ? { transcript: content, transcription: resolved.transcription || {} } : {}),
       };
-      await this.requestRepository.complete({
+      await this._completeRequest({
         userId: device.user_id,
         deviceId: device.id,
         clientMessageId,
         conversationId: conversation.id,
         response,
-      });
+      }, [...recoveryContextPermissions, ...sourcePermissions, ...(memoryResult.handled ? ['memory'] : [])]);
       return response;
     } catch (error) {
       await this.requestRepository.fail({

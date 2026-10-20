@@ -17,6 +17,12 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
+Локально подготовлены [надёжность Desktop и единые проверки](updates/2026-10-20-desktop-reliability-development.md):
+ограниченные HTTP-запросы, сохранение ID до отправки, ручная проверка результата
+без повтора действия, актуальные подсказки и `test:core`. Прошли 885 проверок
+и браузерные fixtures на широком/минимальном окне. Изменения ещё не опубликованы;
+VPS и установленный EXE используют предыдущую принятую версию.
+
 [Выпущено единое время МСК UTC+3](updates/2026-10-19-moscow-time-release.md):
 ввод напоминаний без пояса и все пользовательские часы используют Москву.
 Server на DE обновлён, Desktop 1.0.2 пересобран и установлен. Проверены
@@ -221,6 +227,12 @@ describes publishing. Plans describe intentions. Code, checks, and actual
 deployment establish what is running.
 
 ### Current status
+
+[Desktop reliability and a local test entry point](updates/2026-10-20-desktop-reliability-development.md)
+are prepared locally: bounded HTTP, IDs saved before sending, read-only result
+recovery, connection hints and `test:core`. All 885 checks and wide/minimum-window
+browser fixtures passed. Changes are not published; VPS and installed Desktop
+still use the previous accepted version.
 
 [Fixed Moscow UTC+3 time is released](updates/2026-10-19-moscow-time-release.md):
 timezone-less reminder input and user-facing clocks use Moscow. DE server

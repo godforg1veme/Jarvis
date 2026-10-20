@@ -285,6 +285,28 @@ owner decisions, deployed revisions, checks and unfinished client acceptance.
 
 ### Windows execution edge
 
+Локальные изменения 20 октября: HTTP helper ограничивает полный запрос Desktop
+120 секундами и обычный JSON 2 МиБ. Чтение Visual Memory имеет отдельный предел,
+который сохраняет допустимый кадр 8 МиБ в base64 плюс 256 КиБ метаданных.
+Идентификатор text/voice сохраняется до POST через `runtimeDataPath.js` в
+`data/cloud-outbound-requests.json`; текст, аудио и ответ туда не записываются.
+Удаление записи происходит после показа ответа renderer. Неизвестный результат
+проверяется GET `/v1/desktop/requests/:clientMessageId` по user/device scope
+существующей таблицы; действие не повторяется. Сохранённые права источников
+повторно проверяются при чтении результата. Одноразовый VPN-файл не сохраняется
+для такого восстановления. [Результат и ограничения](updates/2026-10-20-desktop-reliability-development.md).
+
+Local October 20 changes: the HTTP helper bounds the full Desktop request to
+120 seconds and ordinary JSON to 2 MiB. Visual Memory uses a separate bound
+preserving the existing 8 MiB frame in base64 plus 256 KiB of metadata. Text/voice
+IDs are stored before POST through `runtimeDataPath.js` in
+`data/cloud-outbound-requests.json`, without text, audio or response content.
+The renderer acknowledges after display. Unknown results are read through scoped
+GET `/v1/desktop/requests/:clientMessageId` using the existing table, without
+repeating an action. Current source permissions are checked against stored grants.
+One-time VPN files are excluded from recovery. These changes are local and are
+not yet installed; see the linked development result for limits.
+
 - Target OS: Windows; runtime: Electron + Node.js CommonJS.
 - `main.js` owns Electron lifecycle, tray, shortcuts, windows, and IPC wiring.
 - `preload.js` exposes explicit main-renderer capabilities. The overlay,

@@ -171,7 +171,7 @@ code { color: var(--acid); font-family: var(--mono); }
 .primary-button:disabled { opacity: .6; cursor: wait; }
 .form-error { grid-column: 1 / -1; min-height: 14px; margin: 0; color: var(--danger); font-size: 11px; }
 
-.chat-shell { display: grid; grid-template-rows: minmax(0, 1fr) auto; min-height: 0; overflow: hidden; border-top: 1px solid var(--line); }
+.chat-shell { display: grid; grid-template-rows: minmax(0, 1fr) auto auto; min-height: 0; overflow: hidden; border-top: 1px solid var(--line); }
 .chat-shell.is-disabled { opacity: .48; }
 .messages { display: flex; min-height: 0; flex-direction: column; gap: 15px; overflow-y: auto; padding: 24px 0; scrollbar-color: var(--dim) transparent; }
 .empty-chat { display: grid; max-width: 370px; place-items: start; gap: 7px; margin: auto; color: var(--muted); }
@@ -185,6 +185,14 @@ code { color: var(--acid); font-family: var(--mono); }
 .message-body { padding: 13px 15px; border: 1px solid var(--line); color: var(--ink); background: rgba(255,255,255,.04); font-size: 13px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
 .message.user .message-body { border-color: rgba(216,255,101,.35); background: var(--acid-soft); }
 .message.system .message-body { border-color: rgba(121,228,208,.25); color: var(--cyan); font-size: 11px; }
+.pending-requests[hidden] { display: none; }
+.pending-requests { display: grid; gap: 7px; max-height: 150px; overflow-y: auto; padding: 8px 0; border-top: 1px solid var(--line); }
+.pending-request { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 1px solid var(--line); color: var(--muted); background: rgba(255,255,255,.025); font-size: 11px; }
+.pending-request span { min-width: 0; overflow-wrap: anywhere; }
+.pending-request button { flex: none; min-height: 32px; padding: 5px 10px; border: 1px solid var(--acid); color: var(--acid); background: transparent; cursor: pointer; }
+.pending-request button:hover, .pending-request button:focus-visible { outline: 2px solid var(--acid); outline-offset: 2px; }
+.pending-request button:disabled { opacity: .55; cursor: wait; }
+@media (max-width: 540px) { .pending-request { align-items: stretch; flex-direction: column; } .pending-request button { align-self: flex-start; } }
 .composer { display: grid; grid-template-columns: 1fr auto; gap: 10px; padding-top: 16px; }
 .composer-field { display: flex; align-items: flex-end; min-height: 52px; padding: 9px 13px; }
 .composer-prefix { padding: 6px 9px 5px 0; color: var(--acid); font-size: 20px; }

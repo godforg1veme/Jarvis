@@ -32,6 +32,7 @@ function createRendererHarness(sendMessage, overrides = {}) {
   const ids = [
     'pairing-card', 'pairing-form', 'server-url', 'pairing-code', 'pair-button', 'pairing-error',
     'connection-dot', 'connection-label', 'device-label', 'mode-badge', 'chat-shell', 'messages',
+    'pending-requests', 'empty-chat-title', 'empty-chat-description',
     'message-form', 'message-input', 'send-button', 'voice-toggle', 'voice-button-label',
     'voice-title', 'voice-description', 'voice-state',
     'vision-title', 'vision-indicator', 'vision-preview', 'vision-camera', 'vision-screens',
@@ -255,7 +256,7 @@ test('cloud chat always unlocks the send button when the IPC request rejects', a
   assert.equal(elements['send-button'].disabled, false);
   assert.equal(elements['message-input'].focused, true);
   const rendered = elements.messages.children.flatMap((message) => message.children).map((element) => element.textContent);
-  assert.ok(rendered.includes('Сервер недоступен. Попробуйте ещё раз.'));
+  assert.ok(rendered.includes('Сервер недоступен. Проверьте результат отправки ниже перед новым действием.'));
   assert.equal(rendered.some((text) => String(text).includes('network details')), false);
 });
 
@@ -371,4 +372,224 @@ test('cloud chat layout keeps the scrollable transcript and composer inside the 
   const css = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'cloud-chat', 'style.css'), 'utf8');
   assert.match(css, /\.main-panel\s*\{[^}]*min-height:\s*0;[^}]*overflow:\s*hidden;/s);
   assert.match(css, /\.chat-shell\s*\{[^}]*min-height:\s*0;[^}]*overflow:\s*hidden;/s);
+});
+
+test('empty chat follows connection state and composer has a stable accessible name', async () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'cloud-chat', 'index.html'), 'utf8');
+  assert.match(html, /id="message-input"[^>]*aria-label="Сообщение для Jarvis"/);
+  const { elements, window } = createRendererHarness(async () => ({ ok: true }));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(elements['empty-chat-title'].textContent, 'Я на связи');
+  window.jarvisCloud.stateListener({ paired: true, connection: 'offline' });
+  assert.equal(elements['empty-chat-title'].textContent, 'Нет соединения с облаком');
+  window.jarvisCloud.stateListener({ paired: false, connection: 'unpaired' });
+  assert.equal(elements['empty-chat-title'].textContent, 'Подключите Desktop');
+});
+
+test('unknown send offers status lookup without replaying POST; completed response keeps confirmation', async () => {
+  const id = 'request-one';
+  const sent = [];
+  const checked = [];
+  const acknowledged = [];
+  const { elements } = createRendererHarness(async (text) => {
+    sent.push(text);
+    return { ok: false, outcome: 'unknown', clientMessageId: id, error: 'private transport detail' };
+  }, {
+    async listPendingRequests() { return { ok: true, requests: [{ clientMessageId: id, kind: 'text' }] }; },
+    async getRequestStatus(requestId) {
+      checked.push(requestId);
+      return { ok: true, clientMessageId: requestId, status: 'completed', response: { answer: 'Сохранённый ответ', confirmation: { commandId: COMMAND_A } } };
+    },
+    async acknowledgeRequest(requestId) { acknowledged.push(requestId); return { ok: true }; },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  await submitText(elements, 'проверка');
+  assert.equal(elements['pending-requests'].children.length, 1);
+  assert.equal(renderedText(elements).join(' ').includes('private transport detail'), false);
+  await elements['pending-requests'].children[0].children[1].listeners.get('click')();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(sent, ['проверка']);
+  assert.deepEqual(checked, [id]);
+  assert.deepEqual(acknowledged, [id]);
+  assert.ok(renderedText(elements).includes('Сохранённый ответ'));
+  assert.equal(actionRows(elements).length, 1);
+  assert.equal(elements['pending-requests'].children.length, 0);
+});
+
+test('processing, failed and missing results stay visible; lookup failure preserves the row', async () => {
+  const id = 'request-two';
+  const statuses = ['processing', 'failed', 'not_found'];
+  const { elements } = createRendererHarness(async () => ({ ok: true }), {
+    async listPendingRequests() { return { ok: true, requests: [{ clientMessageId: id, kind: 'voice' }] }; },
+    async getRequestStatus() { return { ok: true, clientMessageId: id, status: statuses.shift() }; },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  for (const phrase of ['обрабатывает', 'ошибке', 'не нашёл']) {
+    await elements['pending-requests'].children[0].children[1].listeners.get('click')();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.match(elements['pending-requests'].children[0].children[0].textContent, new RegExp(phrase));
+  }
+  assert.equal(elements['pending-requests'].children.length, 1);
+});
+
+test('failed status lookup keeps its prior status and request metadata visible', async () => {
+  const id = 'request-four';
+  let fail = false;
+  const { elements } = createRendererHarness(async () => ({ ok: true }), {
+    async listPendingRequests() { return { ok: true, requests: [{ clientMessageId: id, kind: 'text' }] }; },
+    async getRequestStatus() {
+      if (fail) throw new Error('private status detail');
+      return { ok: true, clientMessageId: id, status: 'processing' };
+    },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  await elements['pending-requests'].children[0].children[1].listeners.get('click')();
+  await new Promise((resolve) => setImmediate(resolve));
+  fail = true;
+  await elements['pending-requests'].children[0].children[1].listeners.get('click')();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(elements['pending-requests'].children[0].children[0].textContent, /обрабатывает/);
+  assert.equal(elements['pending-requests'].children.length, 1);
+});
+
+test('concurrent checks are single-flight and failed acknowledgement never duplicates recovered answer', async () => {
+  const id = 'request-three';
+  let release;
+  let lookups = 0;
+  const { elements } = createRendererHarness(async () => ({ ok: true }), {
+    async listPendingRequests() { return { ok: true, requests: [{ clientMessageId: id, kind: 'text' }] }; },
+    async getRequestStatus() {
+      lookups += 1;
+      if (lookups === 1) await new Promise((resolve) => { release = resolve; });
+      return { ok: true, clientMessageId: id, status: 'completed', response: { answer: 'Один ответ' } };
+    },
+    async acknowledgeRequest() { return { ok: false }; },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const first = elements['pending-requests'].children[0].children[1].listeners.get('click')();
+  await elements['pending-requests'].children[0].children[1].listeners.get('click')();
+  assert.equal(lookups, 1);
+  release();
+  await first;
+  await new Promise((resolve) => setImmediate(resolve));
+  await elements['pending-requests'].children[0].children[1].listeners.get('click')();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(lookups, 2);
+  assert.equal(renderedText(elements).filter((value) => value === 'Один ответ').length, 1);
+  assert.equal(elements['pending-requests'].children.length, 1);
+});
+
+test('normal text delivery acknowledges only after its answer and confirmation are rendered', async () => {
+  const id = 'normal-text';
+  let displayedAtAck = false;
+  let confirmationAtAck = false;
+  const { elements } = createRendererHarness(async () => ({ ok: true, clientMessageId: id, answer: 'Нужна проверка', confirmation: { commandId: COMMAND_A } }), {
+    async acknowledgeRequest(requestId) {
+      assert.equal(requestId, id);
+      displayedAtAck = renderedText(elements).includes('Нужна проверка');
+      confirmationAtAck = actionRows(elements).length === 1;
+      return { ok: true };
+    },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  await submitText(elements, 'действие');
+  assert.equal(displayedAtAck, true);
+  assert.equal(confirmationAtAck, true);
+});
+
+test('failed acknowledgement after normal delivery leaves one visible answer for status recovery', async () => {
+  const id = 'normal-unacked';
+  const { elements } = createRendererHarness(async () => ({ ok: true, clientMessageId: id, answer: 'Ответ доставлен' }), {
+    async listPendingRequests() { return { ok: true, requests: [{ clientMessageId: id, kind: 'text' }] }; },
+    async acknowledgeRequest() { return { ok: false }; },
+    async getRequestStatus() { return { ok: true, clientMessageId: id, status: 'completed', response: { answer: 'Ответ доставлен' } }; },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  await submitText(elements, 'запрос');
+  assert.equal(elements['pending-requests'].children.length, 1);
+  await elements['pending-requests'].children[0].children[1].listeners.get('click')();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(renderedText(elements).filter((value) => value === 'Ответ доставлен').length, 1);
+});
+
+test('scope change discards a stale in-flight status response and list', async () => {
+  let releaseStatus;
+  let releaseList;
+  const id = 'old-scope';
+  let delayList = false;
+  let switched = false;
+  const { elements, window } = createRendererHarness(async () => ({ ok: true }), {
+    async listPendingRequests() {
+      if (delayList) { delayList = false; return new Promise((resolve) => { releaseList = resolve; }); }
+      return { ok: true, requests: switched ? [] : [{ clientMessageId: id, kind: 'text' }] };
+    },
+    async getRequestStatus() { return new Promise((resolve) => { releaseStatus = resolve; }); },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  delayList = true;
+  window.jarvisCloud.voiceListener({ type: 'error', enabled: false, phase: 'off' });
+  elements['pending-requests'].children[0].children[1].listeners.get('click')();
+  switched = true;
+  window.jarvisCloud.stateListener({ paired: true, serverUrl: 'other-server', deviceId: 'other-device' });
+  releaseStatus({ ok: true, clientMessageId: id, status: 'completed', response: { answer: 'Старый ответ' } });
+  releaseList({ ok: true, requests: [{ clientMessageId: id, kind: 'text' }] });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(elements['pending-requests'].children.length, 0);
+  assert.equal(renderedText(elements).includes('Старый ответ'), false);
+});
+
+test('voice delivery acknowledges after display; voice error refreshes pending results', async () => {
+  const id = 'voice-message';
+  let listed = 0;
+  let displayedAtAck = false;
+  const { elements, window } = createRendererHarness(async () => ({ ok: true }), {
+    async listPendingRequests() { listed += 1; return { ok: true, requests: [] }; },
+    async acknowledgeRequest() { displayedAtAck = renderedText(elements).includes('Голосовой ответ'); return { ok: true }; },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  await window.jarvisCloud.messageListener({ answer: 'Голосовой ответ', clientMessageId: id });
+  assert.equal(displayedAtAck, true);
+  window.jarvisCloud.voiceListener({ type: 'error', enabled: false, phase: 'off' });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.ok(listed >= 2);
+});
+
+test('ordinary delayed response and scoped voice event are not shown after changing devices', async () => {
+  let resolveSend;
+  const { elements, window } = createRendererHarness(() => new Promise((resolve) => { resolveSend = resolve; }));
+  await new Promise((resolve) => setImmediate(resolve));
+  const sending = submitText(elements, 'Привет');
+  await new Promise((resolve) => setImmediate(resolve));
+  window.jarvisCloud.stateListener({ paired: true, serverUrl: 'https://other.test', deviceId: 'other' });
+  resolveSend({ ok: true, answer: 'Старый текстовый ответ', clientMessageId: 'old' });
+  await sending;
+  await window.jarvisCloud.messageListener({ answer: 'Старый голосовой ответ', requestScope: {
+    serverUrl: 'https://old.test', deviceId: 'old',
+  } });
+  assert.equal(renderedText(elements).includes('Старый текстовый ответ'), false);
+  assert.equal(renderedText(elements).includes('Старый голосовой ответ'), false);
+});
+
+test('a delayed pending list cannot resurrect an acknowledged request in the same scope', async () => {
+  let delayNext = false;
+  let releaseList;
+  const request = { clientMessageId: 'original-id', kind: 'text' };
+  const { elements, window } = createRendererHarness(async () => ({ ok: true }), {
+    async listPendingRequests() {
+      if (delayNext) return new Promise((resolve) => { releaseList = resolve; });
+      return { ok: true, requests: [request] };
+    },
+    async getRequestStatus() { return { ok: true, clientMessageId: request.clientMessageId,
+      status: 'completed', response: { answer: 'Готово' } }; },
+    async acknowledgeRequest() { return { ok: true }; },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  delayNext = true;
+  window.jarvisCloud.voiceListener({ type: 'error', enabled: false, phase: 'off' });
+  await new Promise((resolve) => setImmediate(resolve));
+  await elements['pending-requests'].children[0].children[1].listeners.get('click')();
+  await new Promise((resolve) => setImmediate(resolve));
+  releaseList({ ok: true, requests: [request] });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(elements['pending-requests'].children.length, 0);
 });

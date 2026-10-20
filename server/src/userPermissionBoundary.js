@@ -32,6 +32,7 @@ function desktopPermission(request) {
   if (pathname.startsWith('/v1/vision/')) return ['devices', 'memory'];
   if (!pathname.startsWith('/v1/desktop/') || ['/v1/desktop/pair', '/v1/desktop/session'].includes(pathname)) return null;
   if (pathname.startsWith('/v1/desktop/life')) return 'life';
+  if (pathname.startsWith('/v1/desktop/requests/')) return 'assistant';
   if (['/v1/desktop/messages', '/v1/desktop/voice', '/v1/desktop/voice/transcribe'].includes(pathname)) return 'assistant';
   return 'devices';
 }

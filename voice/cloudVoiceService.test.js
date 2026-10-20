@@ -28,7 +28,9 @@ test('cloud voice transcribes first, routes once, and speaks only the final rout
     },
     ttsService: { async speak(text) { calls.push(`speak:${text}`); } },
     wakeWordHost: { start: async () => {}, stop() {}, sendPcm() {} },
-    onTranscript: async (text) => { calls.push(`route:${text}`); return { answer: 'Вижу стол.' }; },
+    onTranscript: async (text) => { calls.push(`route:${text}`); return {
+      answer: 'Вижу стол.', clientMessageId: 'message-fixture', confirmation: { commandId: 'command-fixture' },
+    }; },
     onResponse: (value) => { response = value; },
     settings: {},
   });
@@ -37,4 +39,22 @@ test('cloud voice transcribes first, routes once, and speaks only the final rout
   await service._finishUtterance();
   assert.deepEqual(calls, ['transcribe', 'route:посмотри в камеру', 'speak:Вижу стол.']);
   assert.equal(response.answer, 'Вижу стол.');
+  assert.equal(response.clientMessageId, 'message-fixture');
+  assert.equal(response.confirmation.commandId, 'command-fixture');
+});
+
+test('unknown routed voice outcome is described as a send uncertainty', async () => {
+  const statuses = [];
+  const service = new CloudVoiceService({
+    electron: { BrowserWindow: class {}, ipcMain: {} },
+    cloudClient: { async transcribeVoice() { return { transcript: 'привет' }; } },
+    wakeWordHost: { start: async () => {}, stop() {}, sendPcm() {} },
+    onTranscript: async () => { throw Object.assign(new Error('private transport detail'), { outcome: 'unknown' }); },
+    onStatus: (status) => statuses.push(status), settings: {},
+  });
+  service.utteranceChunks = [Buffer.alloc(320)];
+  service.utteranceBytes = 320;
+  await service._finishUtterance();
+  assert.match(statuses.find((status) => status.type === 'error').message, /Проверьте результат отправки/);
+  assert.equal(JSON.stringify(statuses).includes('private transport detail'), false);
 });

@@ -101,14 +101,15 @@
         <div id="messages" class="messages" aria-live="polite" aria-relevant="additions text">
           <div class="empty-chat">
             <div class="empty-glyph">⌁</div>
-            <h3>Я на связи</h3>
-            <p>Подключите Desktop — и продолжим разговор здесь или в Telegram.</p>
+            <h3 id="empty-chat-title">Подключите Desktop</h3>
+            <p id="empty-chat-description">Подключите этот компьютер через Telegram, чтобы начать разговор.</p>
           </div>
         </div>
+        <div id="pending-requests" class="pending-requests" aria-live="polite" hidden></div>
         <form id="message-form" class="composer">
           <label class="composer-field" for="message-input">
             <span class="composer-prefix" aria-hidden="true">›</span>
-            <textarea id="message-input" rows="1" maxlength="10000" placeholder="Напишите Jarvis…" disabled></textarea>
+            <textarea id="message-input" rows="1" maxlength="10000" aria-label="Сообщение для Jarvis" placeholder="Напишите Jarvis…" disabled></textarea>
           </label>
           <button id="send-button" class="send-button" type="submit" disabled aria-label="Отправить сообщение">↑</button>
         </form>

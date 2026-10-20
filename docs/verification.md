@@ -1,5 +1,42 @@
 # Проверки перед выпуском
 
+Локальная надёжность Desktop, 20 октября 2026:
+[результат и ограничения](updates/2026-10-20-desktop-reliability-development.md).
+`npm run test:core` запускает только явный список из `scripts/coreTestManifest.json`:
+5 проверок runner, 102 cloud/Desktop и 778 server unit, без пропусков.
+Ошибка, пустой набор, skipped или todo обязательного набора дают ненулевой exit.
+Новый тест включается в manifest осознанно. PostgreSQL, Linux, browser и live
+остаются отдельными проверками; зелёный core не означает готовность выпуска.
+
+Local Desktop reliability, October 20, 2026:
+[results and limits](updates/2026-10-20-desktop-reliability-development.md).
+`npm run test:core` runs the explicit `scripts/coreTestManifest.json` only:
+5 runner, 102 cloud/Desktop and 778 server unit tests, no skips. Failed, empty,
+skipped or todo required suites return a nonzero exit. Add new tests deliberately.
+PostgreSQL, Linux, browser and live checks remain separate; core success is not
+release acceptance.
+
+```powershell
+npm run test:core
+node scripts/testDesktopIpcBoundary.js
+node scripts/checkCloudPackageAssets.js
+# Uses existing Playwright, with PLAYWRIGHT_CHANNEL=msedge by default:
+node scripts/testDesktopRecoveryBrowser.cjs
+```
+
+Browser fixture: 1440×900 и минимальное окно Desktop 760×560, доступное имя
+поля, состояния соединения, восстановление ответа/подтверждения, сбой ack,
+отсутствие повторного POST, overflow и runtime errors. Скриншоты сохраняются
+в игнорируемом `build/desktop-recovery-screenshots/`. Модуль Playwright нужен
+в среде проверки, но не добавлен в production-зависимости.
+
+Browser fixtures cover 1440×900 and Desktop's minimum 760×560 window, composer
+accessible name, connection states, response/confirmation recovery, ack failure,
+no repeated POST, overflow and runtime errors. Screenshots go to ignored
+`build/desktop-recovery-screenshots/`. Playwright is required in the test environment
+and is not added as a production dependency. These fixtures do not prove live
+Electron IPC, PostgreSQL or VPS behavior.
+
 Московское время, выпуск 19 октября:
 [результат и ограничения](updates/2026-10-19-moscow-time-release.md).
 760/760 server tests локально и в Linux `TZ=UTC`; PostgreSQL acceptance 1/1

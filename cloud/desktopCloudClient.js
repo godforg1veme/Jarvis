@@ -2,6 +2,10 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { createRemoteMessage, validateRemoteMessage } = require('../agents/remoteProtocol');
+const { boundedJsonFetch } = require('./boundedHttp');
+const { OutboundRequestStore, validId } = require('./outboundRequestStore');
+const { MAX_FRAME_BYTES } = require('../shared/visionSchemas');
+const MAX_VISION_RESPONSE_BYTES = Math.ceil(MAX_FRAME_BYTES / 3) * 4 + 256 * 1024;
 
 const PUBLIC_STATE_FILE = 'cloud-device.json';
 const SECRET_FILE = 'cloud-device.token';
@@ -73,6 +77,7 @@ class DesktopCloudClient {
     this.userDataPath = options.userDataPath;
     this.safeStorage = options.safeStorage;
     this.fetch = options.fetch || globalThis.fetch;
+    this.httpLimits = { timeoutMs: options.httpTimeoutMs, maxBytes: options.httpMaxBytes };
     this.WebSocket = options.WebSocket || globalThis.WebSocket;
     this.allowHttp = options.allowHttp === true;
     this.defaultServerUrl = normalizeServerUrl(options.defaultServerUrl || DEFAULT_CLOUD_SERVER_URL, {
@@ -91,6 +96,7 @@ class DesktopCloudClient {
     this.commandJournalRevision = null;
     this.commandJournal = this._readCommandJournal();
     this.publicState = this._readPublicState();
+    this.outboundRequests = new OutboundRequestStore(options.outboundDataPath || this.userDataPath);
     this.socket = null;
     this.heartbeat = null;
     this.authenticationTimer = null;
@@ -224,21 +230,27 @@ class DesktopCloudClient {
     };
   }
 
-  async _request(urlPath, options = {}) {
+  async _request(urlPath, options = {}, limits = {}) {
     const token = this._readToken();
     if (!token || !this.publicState.serverUrl) throw new Error('Desktop is not paired.');
-    const response = await this.fetch(`${this.publicState.serverUrl}${urlPath}`, {
+    let result;
+    try { result = await boundedJsonFetch(this.fetch, `${this.publicState.serverUrl}${urlPath}`, {
       ...options,
       headers: {
         Authorization: `Bearer ${token}`,
         ...(options.headers || {}),
       },
-    });
-    const body = safeJsonParse(await response.text(), {});
+    }, { ...this.httpLimits, ...limits }); } catch (error) {
+      if (options.method && options.method !== 'GET') error.outcome = 'unknown';
+      throw error;
+    }
+    const { response, body } = result;
     if (!response.ok || !body.ok) {
       const error = new Error(body && body.code ? body.code : 'Cloud request failed.');
       error.code = body && body.code;
       error.statusCode = response.status;
+      if (options.method && options.method !== 'GET' && (response.status >= 500 || response.status < 400
+        || body.code === 'REQUEST_RETRY_WITH_NEW_ID')) error.outcome = 'unknown';
       throw error;
     }
     return body;
@@ -246,12 +258,11 @@ class DesktopCloudClient {
 
   async pair({ serverUrl, pairingCode, capabilities }) {
     const normalizedUrl = normalizeServerUrl(serverUrl, { allowHttp: this.allowHttp });
-    const response = await this.fetch(`${normalizedUrl}/v1/desktop/pair`, {
+    const { response, body } = await boundedJsonFetch(this.fetch, `${normalizedUrl}/v1/desktop/pair`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pairingCode: String(pairingCode || '').trim(), capabilities: capabilities || this.capabilities }),
-    });
-    const body = safeJsonParse(await response.text(), {});
+    }, this.httpLimits);
     if (!response.ok || !body.ok || !body.token || !body.device) {
       const error = new Error(body && body.code ? body.code : 'Pairing failed.');
       error.code = body && body.code;
@@ -266,16 +277,21 @@ class DesktopCloudClient {
   }
 
   async sendText(text, clientMessageId = createClientMessageId()) {
-    const body = await this._request('/v1/desktop/messages', {
+    const requestScope = { serverUrl: this.publicState.serverUrl, deviceId: this.publicState.deviceId };
+    this._claimOutbound(clientMessageId, 'text');
+    let body;
+    try { body = await this._request('/v1/desktop/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ clientMessageId, text: String(text || '').trim() }),
-    });
-    if (body.vpnArtifact) {
-      body.vpnArtifact = this._saveVpnArtifact(body.vpnArtifact);
-      body.answer = `${String(body.answer || '').trim()}\nФайл Happ: ${body.vpnArtifact.path}`.trim();
-    }
-    return body;
+    }); } catch (error) { throw this._unknownOutbound(error, clientMessageId); }
+    try {
+      if (body.vpnArtifact) {
+        body.vpnArtifact = this._saveVpnArtifact(body.vpnArtifact);
+        body.answer = `${String(body.answer || '').trim()}\nФайл Happ: ${body.vpnArtifact.path}`.trim();
+      }
+    } catch (error) { throw this._unknownOutbound(error, clientMessageId); }
+    return { ...body, clientMessageId, requestScope };
   }
 
   _saveVpnArtifact(artifact) {
@@ -296,10 +312,13 @@ class DesktopCloudClient {
   }
 
   async sendVoice(audio, options = {}) {
+    const requestScope = { serverUrl: this.publicState.serverUrl, deviceId: this.publicState.deviceId };
     const clientMessageId = options.clientMessageId || createClientMessageId();
     const mimeType = options.mimeType || 'audio/wav';
     const payload = Buffer.isBuffer(audio) ? audio : Buffer.from(audio || []);
-    return this._request('/v1/desktop/voice', {
+    this._claimOutbound(clientMessageId, 'voice');
+    let body;
+    try { body = await this._request('/v1/desktop/voice', {
       method: 'POST',
       headers: {
         'Content-Type': mimeType,
@@ -307,7 +326,36 @@ class DesktopCloudClient {
         'X-Jarvis-Client-Message-Id': clientMessageId,
       },
       body: payload,
-    });
+    }); } catch (error) { throw this._unknownOutbound(error, clientMessageId); }
+    return { ...body, clientMessageId, requestScope };
+  }
+
+  _claimOutbound(clientMessageId, kind) {
+    if (!this.isPaired()) throw new Error('Desktop is not paired.');
+    this.outboundRequests.claim({ clientMessageId, kind, createdAt: new Date().toISOString(),
+      serverUrl: this.publicState.serverUrl, deviceId: this.publicState.deviceId });
+  }
+
+  _unknownOutbound(error, clientMessageId) {
+    error.clientMessageId = clientMessageId;
+    error.outcome = 'unknown';
+    return error;
+  }
+
+  listPendingRequests() {
+    return this.outboundRequests.list(this.publicState.serverUrl, this.publicState.deviceId);
+  }
+
+  async getRequestStatus(clientMessageId) {
+    if (!validId(clientMessageId)) throw Object.assign(new Error('INVALID_CLIENT_MESSAGE_ID'), { code: 'INVALID_CLIENT_MESSAGE_ID' });
+    if (!this.listPendingRequests().some((entry) => entry.clientMessageId === clientMessageId)) {
+      throw Object.assign(new Error('REQUEST_NOT_FOUND'), { code: 'REQUEST_NOT_FOUND' });
+    }
+    return this._request(`/v1/desktop/requests/${encodeURIComponent(clientMessageId)}`);
+  }
+
+  acknowledgeRequest(clientMessageId) {
+    this.outboundRequests.acknowledge(clientMessageId, this.publicState.serverUrl, this.publicState.deviceId);
   }
 
   async transcribeVoice(audio, options = {}) {
@@ -510,7 +558,11 @@ class DesktopCloudClient {
   }
 
   async listVisionMemories(limit = 50) { return this._request(`/v1/vision/memories?limit=${Math.min(Math.max(Number(limit) || 50, 1), 100)}`); }
-  async getVisionMemory(memoryId) { return this._request(`/v1/vision/memories/${encodeURIComponent(String(memoryId || ''))}`); }
+  async getVisionMemory(memoryId) {
+    return this._request(`/v1/vision/memories/${encodeURIComponent(String(memoryId || ''))}`, {}, {
+      maxBytes: this.httpLimits.maxBytes ?? MAX_VISION_RESPONSE_BYTES,
+    });
+  }
   async updateVisionMemory(memoryId, patch) {
     return this._request(`/v1/vision/memories/${encodeURIComponent(String(memoryId || ''))}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),

@@ -13,6 +13,9 @@ const elements = {
   modeBadge: document.getElementById('mode-badge'),
   chatShell: document.getElementById('chat-shell'),
   messages: document.getElementById('messages'),
+  pendingRequests: document.getElementById('pending-requests'),
+  emptyChatTitle: document.getElementById('empty-chat-title'),
+  emptyChatDescription: document.getElementById('empty-chat-description'),
   messageForm: document.getElementById('message-form'),
   messageInput: document.getElementById('message-input'),
   sendButton: document.getElementById('send-button'),
@@ -41,6 +44,34 @@ let state = { paired: false, connection: 'unpaired', voiceEnabled: false };
 let visionState = { state: 'off', startedAt: null, preview: null };
 let visionBusy = false;
 const decidedCommandIds = new Set();
+const pendingRequestRows = new Map();
+const displayedRecoveredIds = new Set();
+const checkingRequestIds = new Set();
+let requestScope = 'false||';
+let requestScopeGeneration = 0;
+let pendingListRevision = 0;
+
+function currentRequestScope() {
+  return `${Boolean(state.paired)}|${state.serverUrl || ''}|${state.deviceId || ''}`;
+}
+
+async function acknowledgeDisplayedRequest(id, generation = requestScopeGeneration) {
+  if (typeof id !== 'string' || !id || generation !== requestScopeGeneration) return;
+  displayedRecoveredIds.add(id);
+  if (typeof cloud?.acknowledgeRequest !== 'function') return;
+  try {
+    const result = await cloud.acknowledgeRequest(id);
+    if (generation !== requestScopeGeneration) return;
+    if (result?.ok) {
+      pendingListRevision += 1;
+      pendingRequestRows.delete(id);
+    }
+    else await refreshPendingRequests();
+  } catch (_) {
+    if (generation === requestScopeGeneration) await refreshPendingRequests();
+  }
+  if (generation === requestScopeGeneration) renderPendingRequests();
+}
 
 function confirmationCommandId(result) {
   const idPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
@@ -70,15 +101,21 @@ function confirmationButtons(result) {
       decidedCommandIds.add(commandId);
       const text = `/${decision} ${commandId}`;
       appendMessage('user', text);
+      const generation = requestScopeGeneration;
       try {
         const response = await cloud.sendMessage(text);
+        if (generation !== requestScopeGeneration) return;
         if (response?.ok && typeof response.answer === 'string' && response.answer.trim()) {
           appendMessage('assistant', response.answer);
+          await acknowledgeDisplayedRequest(response.clientMessageId, generation);
         } else {
           appendMessage('system', `Результат подтверждения неизвестен. Проверьте состояние: /command ${commandId}`);
+          await refreshPendingRequests();
         }
       } catch (_) {
+        if (generation !== requestScopeGeneration) return;
         appendMessage('system', `Результат подтверждения неизвестен. Проверьте состояние: /command ${commandId}`);
+        await refreshPendingRequests();
       }
     },
   }));
@@ -136,8 +173,122 @@ function connectionText(connection) {
   return 'Не подключён';
 }
 
+function renderEmptyChat() {
+  if (!elements.emptyChatTitle || !elements.emptyChatDescription) return;
+  const copy = !state.paired
+    ? ['Подключите Desktop', 'Подключите этот компьютер через Telegram, чтобы начать разговор.']
+    : state.connection === 'online'
+      ? ['Я на связи', 'Напишите сообщение или включите голосовой канал.']
+      : state.connection === 'connecting'
+        ? ['Подключаюсь к облаку', 'Соединение устанавливается. Проверьте состояние перед отправкой.']
+        : ['Нет соединения с облаком', 'Проверьте подключение к сети и серверу.'];
+  elements.emptyChatTitle.textContent = copy[0];
+  elements.emptyChatDescription.textContent = copy[1];
+}
+
+function pendingKind(kind) {
+  return kind === 'voice' ? 'Голосовое сообщение' : 'Сообщение';
+}
+
+function pendingCopy(status, kind) {
+  const name = pendingKind(kind);
+  if (status === 'processing') return `${name}: сервер обрабатывает запрос.`;
+  if (status === 'failed') return `${name}: сервер сообщил об ошибке. Проверьте историю перед новым действием.`;
+  if (status === 'not_found') return `${name}: сервер не нашёл результат. Исходная отправка остаётся неопределённой.`;
+  if (status === 'completed') return `${name}: ответ уже показан. Сохранение отметки ожидает завершения.`;
+  return `${name}: результат отправки неизвестен.`;
+}
+
+function renderPendingRequests() {
+  const container = elements.pendingRequests;
+  if (!container) return;
+  container.replaceChildren();
+  container.hidden = pendingRequestRows.size === 0;
+  for (const [id, row] of pendingRequestRows) {
+    const item = document.createElement('div');
+    item.className = 'pending-request';
+    const description = document.createElement('span');
+    description.textContent = pendingCopy(row.status, row.kind);
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = 'Проверить результат';
+    button.setAttribute('aria-label', `Проверить результат: ${pendingKind(row.kind).toLowerCase()}`);
+    button.disabled = checkingRequestIds.has(id);
+    button.addEventListener('click', () => { void checkPendingRequest(id); });
+    item.append(description, button);
+    container.appendChild(item);
+  }
+}
+
+async function refreshPendingRequests() {
+  if (!cloud || typeof cloud.listPendingRequests !== 'function') return;
+  const generation = requestScopeGeneration;
+  const revision = ++pendingListRevision;
+  let result;
+  try { result = await cloud.listPendingRequests(); } catch (_) { return; }
+  if (generation !== requestScopeGeneration || revision !== pendingListRevision) return;
+  if (!result?.ok || !Array.isArray(result.requests)) return;
+  const seen = new Set();
+  for (const request of result.requests) {
+    if (typeof request?.clientMessageId !== 'string' || !request.clientMessageId) continue;
+    seen.add(request.clientMessageId);
+    const previous = pendingRequestRows.get(request.clientMessageId);
+    pendingRequestRows.set(request.clientMessageId, {
+      kind: request.kind === 'voice' ? 'voice' : 'text',
+      status: previous?.status || 'unknown',
+    });
+  }
+  for (const id of pendingRequestRows.keys()) {
+    if (!seen.has(id) && !checkingRequestIds.has(id)) pendingRequestRows.delete(id);
+  }
+  renderPendingRequests();
+}
+
+async function checkPendingRequest(id) {
+  if (!pendingRequestRows.has(id) || checkingRequestIds.has(id) || typeof cloud?.getRequestStatus !== 'function') return;
+  const generation = requestScopeGeneration;
+  checkingRequestIds.add(id);
+  renderPendingRequests();
+  try {
+    const result = await cloud.getRequestStatus(id);
+    if (generation !== requestScopeGeneration || !pendingRequestRows.has(id)) return;
+    if (!result?.ok || result.clientMessageId !== id) return;
+    if (result.status === 'completed') {
+      if (!displayedRecoveredIds.has(id)) {
+        const response = result.response;
+        if (!response || typeof response.answer !== 'string' || !response.answer.trim()) return;
+        appendMessage('assistant', response.answer, null, { buttons: confirmationButtons(response) });
+        if (response.artifactUnavailable === true) appendMessage('system',
+          'Действие завершено, но файл из потерянного ответа восстановить нельзя. Проверьте результат в разделе VPN перед дальнейшими действиями.');
+        displayedRecoveredIds.add(id);
+      }
+      pendingRequestRows.get(id).status = 'completed';
+      await acknowledgeDisplayedRequest(id, generation);
+    } else if (['processing', 'failed', 'not_found'].includes(result.status)) {
+      pendingRequestRows.get(id).status = result.status;
+    }
+  } catch (_) { /* A read failure leaves the request and its last known status visible. */ }
+  finally {
+    if (generation === requestScopeGeneration) {
+      checkingRequestIds.delete(id);
+      renderPendingRequests();
+    }
+  }
+}
+
 function renderState(nextState) {
   state = { ...state, ...nextState };
+  const scope = currentRequestScope();
+  if (scope !== requestScope) {
+    requestScope = scope;
+    requestScopeGeneration += 1;
+    pendingRequestRows.clear();
+    displayedRecoveredIds.clear();
+    checkingRequestIds.clear();
+    renderPendingRequests();
+    if (state.paired) void refreshPendingRequests();
+  }
+  renderEmptyChat();
   const connection = state.connection || 'unpaired';
   const paired = Boolean(state.paired);
   elements.connectionDot.className = `signal-dot ${connection === 'online' ? 'online' : connection === 'connecting' ? 'connecting' : 'offline'}`;
@@ -386,7 +537,10 @@ function renderVoice(status) {
     ? 'Wake word распознаётся локально. Фраза уйдёт на сервер после завершения.'
     : 'После подключения Jarvis будет ждать wake word локально.';
   elements.voiceState.textContent = status.message || (enabled ? 'Голос готов' : 'Микрофон не активен');
-  if (status.type === 'error') appendMessage('system', status.message || 'Ошибка голосового канала.');
+  if (status.type === 'error') {
+    appendMessage('system', status.message || 'Ошибка голосового канала.');
+    void refreshPendingRequests();
+  }
 
   if (quantumCore) {
     if (!enabled) {
@@ -416,10 +570,14 @@ async function initialize() {
   }
   cloud.onState(renderState);
   cloud.onVoiceStatus(renderVoice);
-  cloud.onMessage((message) => {
+  cloud.onMessage(async (message) => {
+    if (message.requestScope && (!state.paired || message.requestScope.serverUrl !== state.serverUrl
+      || message.requestScope.deviceId !== state.deviceId)) return;
+    const generation = requestScopeGeneration;
     if (message.transcript) appendMessage('user', message.transcript, 'ВЫ · ГОЛОС');
     if (message.answer) {
       appendMessage('assistant', message.answer);
+      await acknowledgeDisplayedRequest(message.clientMessageId, generation);
       if (quantumCore) {
         quantumCore.setMode('speech');
         quantumCore.setAudioLevel(0.9);
@@ -443,6 +601,7 @@ async function initialize() {
   }
   const result = await cloud.getState();
   if (result && result.ok) renderState(result);
+  await refreshPendingRequests();
   const voice = await cloud.getVoiceState();
   if (voice && voice.ok) renderVoice(voice);
   if (typeof cloud.getVisionState === 'function') {
@@ -505,18 +664,26 @@ elements.messageForm.addEventListener('submit', async (event) => {
   appendMessage('user', text);
   elements.messageInput.value = '';
   elements.sendButton.disabled = true;
+  const generation = requestScopeGeneration;
   if (quantumCore) {
     quantumCore.setMode('vortex');
   }
   try {
     const intent = typeof cloud.classifyVisualIntent === 'function' ? await cloud.classifyVisualIntent(text) : { visual: false };
+    if (generation !== requestScopeGeneration) return;
     if (intent?.visual) {
       await runVisualQuery(text, intent);
       return;
     }
     const result = await cloud.sendMessage(text);
+    if (generation !== requestScopeGeneration) return;
     if (!result || !result.ok) {
-      appendMessage('system', result && result.error ? result.error : 'Сервер не ответил.');
+      if (result?.outcome === 'unknown') {
+        appendMessage('system', 'Результат отправки неизвестен. Проверьте его ниже перед новым действием.');
+      } else {
+        appendMessage('system', result && result.error ? result.error : 'Сервер не ответил.');
+      }
+      await refreshPendingRequests();
       if (quantumCore) {
         quantumCore.setMode('alert');
         setTimeout(() => { if (quantumCore) quantumCore.setMode('idle'); }, 2500);
@@ -525,6 +692,7 @@ elements.messageForm.addEventListener('submit', async (event) => {
     }
     const msgButtons = confirmationButtons(result);
     appendMessage('assistant', result.answer, null, { buttons: msgButtons });
+    await acknowledgeDisplayedRequest(result.clientMessageId, generation);
     if (quantumCore) {
       quantumCore.setMode('speech');
       quantumCore.setAudioLevel(0.85);
@@ -537,7 +705,9 @@ elements.messageForm.addEventListener('submit', async (event) => {
       }, duration);
     }
   } catch (_) {
-    appendMessage('system', 'Сервер недоступен. Попробуйте ещё раз.');
+    if (generation !== requestScopeGeneration) return;
+    appendMessage('system', 'Сервер недоступен. Проверьте результат отправки ниже перед новым действием.');
+    await refreshPendingRequests();
     if (quantumCore) {
       quantumCore.setMode('alert');
       setTimeout(() => { if (quantumCore) quantumCore.setMode('idle'); }, 2500);

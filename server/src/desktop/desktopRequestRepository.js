@@ -3,6 +3,15 @@ class DesktopRequestRepository {
     this.pool = pool;
   }
 
+  async getForDevice({ userId, deviceId, clientMessageId }) {
+    const result = await this.pool.query(`
+      SELECT user_id, device_id, client_message_id, kind, status, response
+      FROM desktop_requests
+      WHERE user_id = $1 AND device_id = $2 AND client_message_id = $3
+    `, [userId, deviceId, clientMessageId]);
+    return result.rows[0] || null;
+  }
+
   async claim({ userId, deviceId, clientMessageId, kind }) {
     const inserted = await this.pool.query(`
       INSERT INTO desktop_requests (user_id, device_id, client_message_id, kind)

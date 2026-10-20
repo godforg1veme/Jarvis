@@ -136,19 +136,26 @@ class CloudVoiceService {
       if (this.onTranscript && typeof this.cloudClient.transcribeVoice === 'function') {
         const transcription = await this.cloudClient.transcribeVoice(wav, { mimeType: 'audio/wav' });
         const handled = await this.onTranscript(transcription.transcript || '');
-        response = { ...transcription, answer: handled?.answer || '' };
+        response = { ...transcription, ...handled, answer: handled?.answer || '' };
       } else {
         response = await this.cloudClient.sendVoice(wav, { mimeType: 'audio/wav' });
       }
       this._emit('responding', 'Отвечаю…', { transcript: response.transcript || '' });
-      this.onResponse({ source: 'voice', transcript: response.transcript || '', answer: response.answer || '' });
+      this.onResponse({ source: 'voice', transcript: response.transcript || '', answer: response.answer || '',
+        ...(response.clientMessageId ? { clientMessageId: response.clientMessageId } : {}),
+        ...(response.requestScope ? { requestScope: response.requestScope } : {}),
+        ...(response.confirmation ? { confirmation: response.confirmation } : {}),
+        ...(response.buttons ? { buttons: response.buttons } : {}),
+      });
       if (response.answer && this.ttsService && typeof this.ttsService.speak === 'function') {
         this._emit('speaking', 'Говорю…', { answer: response.answer });
         await this.ttsService.speak(response.answer);
       }
       this._emit('ready', 'Скажите: «Джарвис»');
     } catch (error) {
-      this._emit('error', 'Не удалось распознать голосовой запрос.');
+      this._emit('error', error.outcome === 'unknown'
+        ? 'Ответ на голосовой запрос не получен. Проверьте результат отправки в чате.'
+        : 'Не удалось распознать голосовой запрос.');
     } finally {
       pcm.fill(0);
       this.pending = false;

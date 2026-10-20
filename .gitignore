@@ -24,6 +24,7 @@ data/history.json
 data/ai-cache.json
 data/file-index.json
 data/agent-history.json
+data/cloud-outbound-requests.json
 data/tts-cache/
 data/*.log
 data/stt-profiles.json

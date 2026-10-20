@@ -6,8 +6,99 @@ const test = require('node:test');
 const { DEFAULT_CLOUD_SERVER_URL, DesktopCloudClient, VPN_EXPORT_DIR, normalizeServerUrl, toWebSocketUrl } = require('./desktopCloudClient');
 
 function response(body, status = 200) {
-  return { ok: status >= 200 && status < 300, status, async text() { return JSON.stringify(body); } };
+  return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 }
+
+test('HTTP success retains its ID through restart until display acknowledgement', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-delivery-'));
+  try {
+    fs.writeFileSync(path.join(directory, 'cloud-device.json'), JSON.stringify({
+      serverUrl: 'https://example.test', deviceId: 'device-a', deviceName: 'Test',
+    }));
+    fs.writeFileSync(path.join(directory, 'cloud-device.token'), fakeSafeStorage().encryptString('fixture'));
+    const options = { userDataPath: directory, safeStorage: fakeSafeStorage(),
+      fetch: async () => response({ ok: true, answer: 'Done' }), WebSocket: FailingSocket };
+    const result = await new DesktopCloudClient(options).sendText('test', 'legacy-message:1');
+    const restarted = new DesktopCloudClient(options);
+    assert.equal(restarted.listPendingRequests()[0].clientMessageId, result.clientMessageId);
+    restarted.acknowledgeRequest(result.clientMessageId);
+    assert.deepEqual(restarted.listPendingRequests(), []);
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('visual memory keeps its existing image budget while ordinary JSON remains bounded', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-image-budget-'));
+  try {
+    const data = 'a'.repeat(3 * 1024 * 1024);
+    const client = new DesktopCloudClient({ userDataPath: directory, safeStorage: fakeSafeStorage(),
+      fetch: async () => response({ ok: true, image: { contentType: 'image/png', data } }), WebSocket: FailingSocket });
+    client._readToken = () => 'fixture';
+    client.publicState = { serverUrl: 'https://example.test', deviceId: 'fixture' };
+    await assert.rejects(client._request('/v1/desktop/device'), /HTTP_RESPONSE_TOO_LARGE/);
+    assert.equal((await client.getVisionMemory('memory-fixture')).image.data.length, data.length);
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('pairing uses the bounded transport without persisting incomplete credentials', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-pair-budget-'));
+  try {
+    const slow = new DesktopCloudClient({ userDataPath: directory, safeStorage: fakeSafeStorage(),
+      fetch: () => new Promise(() => {}), WebSocket: FailingSocket, httpTimeoutMs: 10 });
+    await assert.rejects(slow.pair({ serverUrl: 'https://example.test', pairingCode: 'fixture-code' }), /HTTP_DEADLINE_EXCEEDED/);
+    const oversized = new DesktopCloudClient({ userDataPath: directory, safeStorage: fakeSafeStorage(),
+      fetch: async () => response({ ok: true, extra: 'x'.repeat(100) }), WebSocket: FailingSocket, httpMaxBytes: 20 });
+    await assert.rejects(oversized.pair({ serverUrl: 'https://example.test', pairingCode: 'fixture-code' }), /HTTP_RESPONSE_TOO_LARGE/);
+    assert.equal(fs.existsSync(path.join(directory, 'cloud-device.token')), false);
+    assert.equal(fs.existsSync(path.join(directory, 'cloud-device.json')), false);
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('unknown send survives restart and status lookup never repeats POST', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-recovery-'));
+  const id = '12345678-1234-4234-8234-123456789abc';
+  let posts = 0;
+  const fetch = async (url, options = {}) => {
+    if (url.endsWith('/v1/desktop/messages')) { posts += 1; throw new Error('network failed'); }
+    assert.equal(options.method, undefined);
+    return response({ ok: true, clientMessageId: id, status: 'completed', response: { ok: true, answer: 'Recovered' } });
+  };
+  try {
+    const state = { serverUrl: 'https://example.test', deviceId: 'device-a', deviceName: 'Test' };
+    fs.writeFileSync(path.join(directory, 'cloud-device.json'), JSON.stringify(state));
+    fs.writeFileSync(path.join(directory, 'cloud-device.token'), fakeSafeStorage().encryptString('token'));
+    const client = new DesktopCloudClient({ userDataPath: directory, safeStorage: fakeSafeStorage(), fetch, WebSocket: FailingSocket });
+    await assert.rejects(client.sendText('private text', id), (error) => error.outcome === 'unknown' && error.clientMessageId === id);
+    assert.equal(posts, 1);
+    const raw = fs.readFileSync(path.join(directory, 'cloud-outbound-requests.json'), 'utf8');
+    assert.equal(raw.includes('private text'), false);
+    const restarted = new DesktopCloudClient({ userDataPath: directory, safeStorage: fakeSafeStorage(), fetch, WebSocket: FailingSocket });
+    assert.equal(restarted.listPendingRequests().length, 1);
+    assert.equal((await restarted.getRequestStatus(id)).status, 'completed');
+    assert.equal(restarted.listPendingRequests().length, 1);
+    assert.equal(posts, 1);
+    restarted.acknowledgeRequest(id);
+    assert.deepEqual(restarted.listPendingRequests(), []);
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('failed outbound journal write blocks POST', async (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-recovery-'));
+  let posts = 0;
+  try {
+    fs.writeFileSync(path.join(directory, 'cloud-device.json'), JSON.stringify({
+      serverUrl: 'https://example.test', deviceId: 'device-a', deviceName: 'Test',
+    }));
+    fs.writeFileSync(path.join(directory, 'cloud-device.token'), fakeSafeStorage().encryptString('token'));
+    const client = new DesktopCloudClient({ userDataPath: directory, safeStorage: fakeSafeStorage(),
+      fetch: async () => { posts += 1; return response({ ok: true }); }, WebSocket: FailingSocket });
+    const rename = t.mock.method(fs, 'renameSync', () => { throw new Error('disk failed'); });
+    await assert.rejects(client.sendText('private text'), /OUTBOUND_STORE_UNAVAILABLE/);
+    rename.mock.restore();
+    assert.equal(posts, 0);
+    await assert.rejects(client.sendText('private text'), /OUTBOUND_STORE_UNAVAILABLE/);
+    assert.equal(posts, 0);
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
 
 function fakeSafeStorage() {
   return {

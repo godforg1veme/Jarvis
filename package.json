@@ -7,6 +7,7 @@
     "start": "electron .",
     "start:legacy": "start.bat",
     "test:cloud": "node --test cloud/*.test.js voice/cloudVoiceService.test.js tts/windowsSapiService.test.js",
+    "test:core": "node scripts/testCore.cjs",
     "dist:win": "node scripts/checkCloudPackageAssets.js && node scripts/prepareWakeWordRuntime.js && node scripts/prepareReleaseIcon.js && electron-builder --win nsis",
     "setup": "node scripts/installDependencies.js"
   },

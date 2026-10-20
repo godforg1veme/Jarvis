@@ -81,6 +81,12 @@ function registerDesktopRoutes(app, options) {
     device: publicDevice(request.device),
   }));
 
+  app.get('/v1/desktop/requests/:clientMessageId', { preHandler: requireDevice }, async (request) => {
+    const clientMessageId = z.string().regex(CLIENT_MESSAGE_ID).parse(request.params.clientMessageId);
+    limiter.check(`request-status:${request.device.id}`, { limit: 60, windowMs: 60000 });
+    return { ok: true, ...await messageService.getStatus({ device: request.device, clientMessageId }) };
+  });
+
   app.post('/v1/desktop/messages', { preHandler: requireDevice, bodyLimit: 32 * 1024 }, async (request) => {
     const input = messageSchema.parse(request.body);
     limiter.check(`message:${request.device.id}`, { limit: 30, windowMs: 60000 });
