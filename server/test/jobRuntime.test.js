@@ -13,10 +13,38 @@ test('feature off constructs no database, model or Telegram worker', async () =>
 test('collector has independent configuration and never requires a Telegram or model key', async () => {
   const queries = [];
   const pool = { async query(sql) { queries.push(sql); return { rows: [], rowCount: 0 }; } };
-  const runtime = createCollectorRuntime({ env: { JARVIS_JOB_SEARCH_ENABLED: 'true' }, pool, hhClient: {} });
+  const runtime = createCollectorRuntime({ env: { JARVIS_JOB_SEARCH_ENABLED: 'true', JARVIS_OPERATIONS_OWNER_TELEGRAM_ID: '101' }, pool, hhClient: {} });
   assert.equal(runtime.enabled, true);
   await runtime.start(); await runtime.close();
   assert.equal(queries.length, 2);
   assert.match(queries[0], /job_searches/);
   assert.ok(!queries.some((sql) => /telegram_updates|job_usage/.test(sql)));
+});
+
+test('enabled collector rejects missing or invalid owner configuration instead of silently skipping searches', () => {
+  const forbidden = new Proxy({}, { get() { throw new Error('Unexpected database access'); } });
+  for (const owner of [undefined, '', '0', '-1', 'username', '1'.repeat(21)]) {
+    assert.throws(() => createCollectorRuntime({
+      env: { JARVIS_JOB_SEARCH_ENABLED: 'true', JARVIS_OPERATIONS_OWNER_TELEGRAM_ID: owner }, pool: forbidden, hhClient: {},
+    }), /JOB_COLLECTOR_OWNER_CONFIG_INVALID/);
+  }
+});
+
+test('collector Compose configuration forwards the same owner setting as the server', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const compose = fs.readFileSync(path.join(__dirname, '../../deploy/docker-compose.yml'), 'utf8');
+  const collector = compose.split(/^  job-collector:\s*$/m)[1].split(/^  postgres:\s*$/m)[0];
+  assert.match(collector, /JARVIS_OPERATIONS_OWNER_TELEGRAM_ID: \$\{JARVIS_OPERATIONS_OWNER_TELEGRAM_ID:-0\}/);
+});
+
+test('due users skips revoked permissions but propagates database errors', async () => {
+  const { JobSearchRepository } = require('../src/jobs/jobSearchRepository');
+  const userId = '11111111-1111-4111-8111-111111111111';
+  const pool = { async query() { return { rows: [{ user_id: userId }] }; } };
+  let failure = Object.assign(new Error('denied'), { code: 'JOB_SCOPE_DENIED' });
+  const repository = new JobSearchRepository(pool, { accessService: { repository: { async get() { throw failure; } } } });
+  assert.deepEqual(await repository.dueUsers(), []);
+  failure = Object.assign(new Error('fixture connection lost'), { code: '08006' });
+  await assert.rejects(repository.dueUsers(), { code: '08006' });
 });

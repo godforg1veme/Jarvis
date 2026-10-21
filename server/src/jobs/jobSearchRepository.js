@@ -140,12 +140,26 @@ class JobSearchRepository {
   }
 
   async dueUsers({ now = new Date() } = {}) {
-    const candidates = (await this.pool.query(`SELECT user_id FROM job_searches WHERE next_check_at<=$1
-      AND settings->>'activated'='true' AND settings->>'paused'='false' ORDER BY next_check_at LIMIT 100`, [now])).rows;
     const allowed = [];
-    for (const row of candidates) {
-      try { await assertUserJobAccess(this.pool, this.accessService, row.user_id); allowed.push(row); }
-      catch { /* Revoked users are skipped before their search is claimed. */ }
+    let cursor = null;
+    // Advance past revoked searches as well: they retain their settings and must
+    // not permanently occupy the first page ahead of users who still have access.
+    while (allowed.length < 100) {
+      // Keep PostgreSQL's full timestamp precision in the pagination cursor.
+      const candidates = (await this.pool.query(`SELECT user_id,next_check_at::text AS next_check_at FROM job_searches WHERE next_check_at<=$1
+        AND settings->>'activated'='true' AND settings->>'paused'='false'
+        AND ($2::timestamptz IS NULL OR (next_check_at,user_id)>($2::timestamptz,$3::uuid))
+        ORDER BY next_check_at,user_id LIMIT 100`, [now, cursor?.next_check_at || null, cursor?.user_id || null])).rows;
+      for (const row of candidates) {
+        try { await assertUserJobAccess(this.pool, this.accessService, row.user_id); allowed.push({ user_id: row.user_id }); }
+        catch (error) {
+          // Permission revocation is expected; database failures must reach the worker log.
+          if (error.code !== 'JOB_SCOPE_DENIED') throw error;
+        }
+        if (allowed.length === 100) break;
+      }
+      if (candidates.length < 100) break;
+      cursor = candidates[candidates.length - 1];
     }
     return allowed;
   }

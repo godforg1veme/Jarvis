@@ -17,6 +17,12 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
+21 октября [восстановлен сборщик поиска работы на DE](updates/2026-10-21-job-collector-access-repair.md):
+добавлена недостающая настройка владельца, поиск продолжил сохранённый прогресс.
+Поддержка отдельных HH-профилей, ролей и персонального `jobs` уже существует.
+Постоянное исправление конфигурации и защита очереди проверены локально:
+781 unit и 8 Linux/PostgreSQL checks. Их код ещё не опубликован.
+
 Выпущены [надёжность Desktop и единые проверки](updates/2026-10-20-desktop-reliability-release.md):
 ограниченные HTTP-запросы, сохранение ID до отправки, ручная проверка результата
 без повтора действия, актуальные подсказки и `test:core`. Прошли 885 проверок
@@ -229,6 +235,12 @@ describes publishing. Plans describe intentions. Code, checks, and actual
 deployment establish what is running.
 
 ### Current status
+
+On October 21, [the DE job collector was restored](updates/2026-10-21-job-collector-access-repair.md):
+the missing owner setting was added, and search resumed from saved progress.
+Separate HH profiles, roles and personal `jobs` permissions already exist.
+The permanent configuration and queue fixes passed 781 unit tests and 8
+Linux/PostgreSQL checks locally. Their code has not been published yet.
 
 [Desktop reliability and a local test entry point](updates/2026-10-20-desktop-reliability-release.md)
 are released: bounded HTTP, IDs saved before sending, read-only result

@@ -1,5 +1,23 @@
 # Проверки перед выпуском
 
+Доступ сборщика поиска работы, 21 октября:
+[результат ремонта DE и локальных проверок](updates/2026-10-21-job-collector-access-repair.md).
+781/781 unit; 8/8 Linux-проверок с отдельной PostgreSQL. Новый сценарий проверяет
+роли, персональный allow/deny, блокировку, отзыв прав и 101 запрещённый поиск
+перед разрешёнными. Код защиты пока локальный; на DE восстановлена конфигурация.
+
+Job collector access, October 21:
+[DE repair and local checks](updates/2026-10-21-job-collector-access-repair.md).
+781/781 unit tests; 8/8 Linux checks with isolated PostgreSQL. The new scenario
+covers roles, personal allow/deny, blocking, revocation and 101 denied searches
+ahead of permitted users. The defensive code remains local; DE configuration is repaired.
+
+```powershell
+# Set JARVIS_JOB_TEST_DATABASE_URL privately to an isolated database, never production.
+npm run test:jobs:access --prefix server
+node --test server/test/jobRuntime.test.js
+```
+
 Выпуск 20 октября: [результат](updates/2026-10-20-desktop-reliability-release.md).
 Новый Linux image прошёл 778/778, отдельный PostgreSQL применил 41 миграцию и
 проверил новый status lookup. Установленный Desktop: 146 файлов, Electron и

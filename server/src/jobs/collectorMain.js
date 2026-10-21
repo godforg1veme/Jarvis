@@ -10,6 +10,9 @@ const { configuredOwnerJobAccess } = require('./configuredOwnerJobAccess');
 function createCollectorRuntime({ env = process.env, pool, hhClient, currencyRates, clock = () => new Date(), wait } = {}) {
   const config = loadJobConfig(env);
   if (!config.jobSearchEnabled) return { async start() {}, async close() {}, enabled: false };
+  if (!/^[1-9]\d{0,19}$/.test(String(env.JARVIS_OPERATIONS_OWNER_TELEGRAM_ID || ''))) {
+    throw new Error('JOB_COLLECTOR_OWNER_CONFIG_INVALID');
+  }
   if (!pool && !env.DATABASE_URL) throw new Error('Job collector requires DATABASE_URL');
   const source = hhClient || new JobBrowserClient({ baseUrl: config.jobBrowserUrl,
     ownerId: config.jobBrowserOwnerId, token: config.jobBrowserToken });

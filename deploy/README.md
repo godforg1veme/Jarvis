@@ -377,6 +377,13 @@ unrecoverable, while changing it without re-encryption breaks existing memory.
 
 ## Job search (DE, opt-in; first release 2026-10-15)
 
+The collector requires the same `JARVIS_OPERATIONS_OWNER_TELEGRAM_ID` as the
+server. It uses current role and personal `jobs` grants for every user, including
+background work; that owner setting does not restrict collection to one person.
+Each person must connect their own HH profile and activate their own search.
+The October 21 DE repair restored this setting through a private Compose overlay
+while retaining the collector image. See the [repair and local regression checks](../docs/updates/2026-10-21-job-collector-access-repair.md).
+
 The `job-search-de` profile adds `job-browser` and `job-collector` on DE only.
 The bot server connects to the browser RPC network. No host ports/CDP are
 published; the browser receives neither PostgreSQL nor model/Telegram secrets.
