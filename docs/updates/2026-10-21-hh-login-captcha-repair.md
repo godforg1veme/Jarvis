@@ -29,7 +29,30 @@ frame HH, точный путь, единственный язык RU/EN и пу
 истёкшая сессия и редирект. Edge fixture проверяет отказ до внешнего запроса.
 В Windows полный набор browser: 76 passed, 9 Linux-only skipped, без ошибок.
 Независимая ревизия безопасности блокирующих замечаний не нашла.
-Результаты установки и Linux-тестов добавляются после выпуска.
+
+Изменения опубликованы в GitHub `main` и установлены на DE по поручению владельца.
+Код и immutable release: `19609044f0dab9986c646f51357180b71482ac58`,
+`/home/deploy/releases/jarvis-1960904-hh-login-captcha`.
+Образ browser: `sha256:62ad6875b3ae2e4b78a076a35a25eb59989fc3bd888cf6f249f2e924d4692666`.
+Сам образ с тестовыми fixtures и без сети прошёл 85/85 Linux-тестов.
+После установки рабочий `HhBrowser.startLogin` в отдельном профиле снова получил
+RU/EN картинки: 200 PNG, 61 131 и 63 873 байта. Сверены все 42 runtime-файла
+browser, расхождений нет; контейнер healthy, перезапусков 0.
+
+Сборщик штатно остановлен на время замены browser и запущен в прежнем контейнере.
+Остальные container IDs, окружение и mounts сохранены. Server не пересобирался:
+его 330 файлов совпадают с `main`, health healthy. HTTPS через curl: live/ready,
+окно входа и JS — 200, анонимный `/mini/api/me` — ожидаемый 401. Проба urllib
+без браузерного User-Agent получала 403 на внешнем маршруте; curl прошёл.
+
+Исходники DE/NL чистые и синхронизированы с GitHub; source guards прошли.
+По 17 модулей Host Agent на узел совпадают, VPN-службы активны и не менялись.
+Desktop 1.0.2: 146 файлов, native Electron и bundled Node совпадают; EXE не менялся.
+Windows-исходники обновлены с сохранением незавершённой Operations UI и исходного
+diff её документов. Общая проверка предупреждает только об этой активной работе.
+Закройте старое временное окно и получите новую ссылку через «Подключить HH».
+Реальное решение капчи и завершение входа участником остаются пользовательской проверкой.
+Проверки сохранены приватно в `/home/deploy/maintenance/hh-login-captcha-20261021`.
 
 ## English
 
@@ -60,4 +83,30 @@ refresh, the sign-in retry gesture, malformed parameters, foreign frames and
 origins, expired sessions and redirects. An Edge fixture checks rejection
 before any external request. The full Windows browser suite passed 76 tests,
 with 9 Linux-only skips and no failures. Independent security review found no
-blockers. Installation and Linux-suite results will be recorded after deployment.
+blockers.
+
+With owner authorization, changes were published to GitHub `main` and installed
+on DE. Code and immutable release: `19609044f0dab9986c646f51357180b71482ac58`,
+`/home/deploy/releases/jarvis-1960904-hh-login-captcha`.
+Browser image: `sha256:62ad6875b3ae2e4b78a076a35a25eb59989fc3bd888cf6f249f2e924d4692666`.
+The image passed 85/85 Linux tests with mounted fixtures and no network.
+After installation, the production `HhBrowser.startLogin` handler in an isolated
+profile again loaded RU/EN pictures: 200 PNG, 61,131 and 63,873 bytes. All 42
+browser runtime files match; the container is healthy with zero restarts.
+
+The collector was stopped gracefully while replacing browser, then started in
+its original container. All other container IDs, environment and mounts were
+preserved. Server was not rebuilt: its 330 files match `main` and health is
+healthy. Public HTTPS via curl returned 200 for live/ready, sign-in and JS;
+anonymous `/mini/api/me` returned the expected 401. An urllib probe without a
+browser User-Agent received 403 on the public route; curl passed.
+
+DE/NL sources are clean and synchronized with GitHub; source guards passed.
+All 17 Host Agent modules on each node match; VPN services remain active and
+unchanged. Desktop 1.0.2 matches all 146 files, native Electron and bundled Node;
+the EXE was not changed. Windows sources were updated while preserving unfinished
+Operations UI work and its original documentation diff. The general inventory
+warns only about that active work. Close the old temporary window and request a
+fresh link using “Connect HH”. A member solving the real challenge and completing
+sign-in remains a user acceptance check. Private verification records are stored
+at `/home/deploy/maintenance/hh-login-captcha-20261021`.

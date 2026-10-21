@@ -2,6 +2,10 @@
 
 ## Русский
 
+Более новый результат: [исправлена загрузка картинки капчи](2026-10-21-hh-login-captcha-repair.md).
+Этот выпуск разрешил вход и получение кода, но автоматический запрос картинки
+в нём ещё блокировался; последующее исправление установлено отдельно.
+
 21 октября 2026 по поручению владельца изменения опубликованы в GitHub `main`
 и установлены на DE. Исходники DE/NL синхронизированы; оба source guard прошли.
 
@@ -52,6 +56,10 @@ suite дал 70 passes и 9 Linux-only skips. Настоящий вход HH и 
 перезапуска нужно заменить новой ссылкой; подтверждённые профили сохранены.
 
 ## English
+
+Newer result: [CAPTCHA picture loading repaired](2026-10-21-hh-login-captcha-repair.md).
+This release allowed sign-in and code requests, but still blocked automatic
+picture creation; the follow-up repair was installed separately.
 
 On October 21, 2026, with owner authorization, the change was published to
 GitHub `main` and installed on DE. DE/NL source checkouts are synchronized;
