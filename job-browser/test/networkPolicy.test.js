@@ -15,12 +15,15 @@ test('HH login writes are limited to direct user POSTs on the closed applicant-a
     ['POST', 'document', 'https://hh.ru/account/login'],
     ['POST', 'fetch', 'https://passport.hh.ru/login'],
     ['POST', 'xhr', 'https://hh.ru/account/login/otp'],
+    ['POST', 'fetch', 'https://hh.ru/account/otp_generate'],
+    ['POST', 'xhr', 'https://hh.ru/account/login/by_code'],
   ]) assert.equal(isApprovedHhLoginRequest(method, type, url), true, url);
   for (const [method, type, url] of [
     ['GET', 'document', 'https://hh.ru/account/login'],
     ['POST', 'image', 'https://hh.ru/account/login'],
     ['POST', 'fetch', 'https://hh.ru/applicant/vacancy_response'],
     ['POST', 'fetch', 'https://hh.ru/account/login/unexpected'],
+    ['POST', 'fetch', 'https://hh.ru/account/otp_generate/unexpected'],
     ['POST', 'fetch', 'https://hh.ru.attacker.example/account/login'],
     ['POST', 'fetch', 'https://owner:secret@hh.ru/account/login'],
     ['POST', 'fetch', 'http://hh.ru/account/login'],

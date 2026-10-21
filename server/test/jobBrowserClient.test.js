@@ -5,6 +5,33 @@ const { once } = require('node:events');
 const { JobBrowserClient } = require('../src/jobs/jobBrowserClient');
 const { createRpcServer } = require('../../job-browser/src/rpcServer');
 
+test('login frames expose only bounded keyboard geometry and reject arbitrary field data', async () => {
+  const ownerId = randomUUID(), token = randomBytes(32).toString('hex'), connectToken = randomBytes(32).toString('hex');
+  const field = { x: 100, y: 200, width: 300, height: 44, type: 'password', inputMode: 'text', multiline: false };
+  let frame = { state: 'waiting', mimeType: 'image/jpeg', frameBase64: Buffer.from('fixture-frame').toString('base64'),
+    width: 1024, height: 768, inputFields: [field] };
+  const client = new JobBrowserClient({ ownerId, token, connectToken,
+    fetchImpl: async () => new Response(JSON.stringify({ ok: true, value: frame }), { status: 200 }) }).forUser(ownerId);
+  const result = await client.loginFrame({ sessionId: randomUUID() });
+  assert.deepEqual(result.inputFields, [field]);
+  for (const badFields of [
+    [{ ...field, value: 'synthetic-must-not-leave-browser' }],
+    [{ ...field, type: 'file' }], [{ ...field, inputMode: 'arbitrary-dom-string' }],
+    [{ ...field, multiline: 'true' }], [{ ...field, width: 0 }],
+    [{ ...field, x: 1000 }], [{ ...field, y: 760 }],
+    [{ ...field, x: -1 }], Array.from({ length: 21 }, () => field), null,
+  ]) {
+    frame = { ...frame, inputFields: badFields };
+    await assert.rejects(client.loginFrame({ sessionId: randomUUID() }), { code: 'JOB_HH_INVALID_RESPONSE' });
+  }
+  frame = { ...frame, inputFields: [], fieldValues: 'synthetic-private', pageText: 'synthetic-private' };
+  const projected = await client.loginFrame({ sessionId: randomUUID() });
+  assert.equal(Object.hasOwn(projected, 'fieldValues'), false);
+  assert.equal(Object.hasOwn(projected, 'pageText'), false);
+  delete frame.inputFields;
+  assert.equal(Object.hasOwn(await client.loginFrame({ sessionId: randomUUID() }), 'inputFields'), false);
+});
+
 test('collector client uses authenticated owner RPC and propagates closed browser failures', async () => {
   const ownerId = randomUUID(), token = randomBytes(32).toString('hex'); let calls = 0, missingResume = false;
   const server = createRpcServer({ ownerId, token, browser: {

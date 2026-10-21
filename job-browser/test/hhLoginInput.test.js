@@ -11,7 +11,7 @@ function fixturePage() {
     keyboard: { async insertText(value) { page.calls.push(['text', value.length]); page.value += value; },
       async press(key) { page.calls.push(['key', key]); }, async down() {}, async up() {} },
     isClosed() { return page.closed; },
-    async evaluate() { return { pathname: '/account/login', text: 'Войти в HH', iframeSources: [] }; },
+    async evaluate(fn) { return fn.toString().includes('querySelectorAll') ? [] : { pathname: '/account/login', text: 'Войти в HH', iframeSources: [] }; },
     async screenshot() { return Buffer.from('fixture-frame'); },
     async close() { page.closed = true; },
   };
@@ -25,7 +25,7 @@ test('HH login relay consumes each input sequence once and never echoes text val
   browser.loginExpiresAt = Date.now() + 60000;
   try {
     const frame = await browser.loginFrame({ sessionId });
-    assert.deepEqual(frame, { state: 'waiting', mimeType: 'image/jpeg', frameBase64: Buffer.from('fixture-frame').toString('base64'), width: 1024, height: 768 });
+    assert.deepEqual(frame, { state: 'waiting', mimeType: 'image/jpeg', frameBase64: Buffer.from('fixture-frame').toString('base64'), width: 1024, height: 768, inputFields: [] });
     await browser.loginInput({ sessionId, sequence: 1, event: { type: 'pointer', action: 'click', button: 'left', x: 120, y: 100 } });
     const inserted = await browser.loginInput({ sessionId, sequence: 2, event: { type: 'text', value: 'fixture-user' } });
     const replay = await browser.loginInput({ sessionId, sequence: 2, event: { type: 'text', value: 'must-not-be-inserted' } });

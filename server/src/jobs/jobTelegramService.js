@@ -4,6 +4,7 @@ const { response, button, homeView, cardView, draftView, listView } = require('.
 const { parseSettingsEdit, parseProfileEdit } = require('./jobSettingsService');
 const { JobLetterFlow } = require('./jobLetterFlow');
 const { JobSettingsPanel } = require('./jobSettingsPanel');
+const { createHash } = require('node:crypto');
 
 function isConfiguredOwner(context, ownerTelegramId) {
   return /^[1-9]\d{0,19}$/.test(String(ownerTelegramId || ''))
@@ -120,6 +121,15 @@ ${profile.profile.facts.map((x) => x.text).join('\n')}
     }
     if (action === 'approve') { await this.settingsService.approve({ scope, confirmationId: targetId }); return response('Изменения подтверждены и сохранены.', [[button('В поиск работы', 'menu')]]); }
     if (action === 'connect' || action === 'disconnect' || action === 'resume_select') {
+      if (action === 'connect' && this.loginLinkDelivery) {
+        const digest = createHash('sha256').update(String(context.requestId)).digest('hex');
+        const requestId = `${digest.slice(0, 8)}-${digest.slice(8, 12)}-4${digest.slice(13, 16)}-a${digest.slice(17, 20)}-${digest.slice(20, 32)}`;
+        const result = await this.loginLinkDelivery.create({ userId: scope.userId, requestId,
+          chatId: scope.chatId, conversationId: scope.conversationId });
+        if (result.status === 'connected') return response('HH уже подключён. Основное резюме сохранено.', [[button('В поиск работы', 'menu')]]);
+        if (result.telegramDelivery === 'sent') return response('Личная ссылка для входа HH отправлена отдельным сообщением. После входа вернись в Mini App и выбери основное резюме.', [[button('В поиск работы', 'menu')]]);
+        return response('Ссылка доступна в личном Mini App. Telegram не подтвердил доставку; открой текущую сессию там.', [[button('В поиск работы', 'menu')]]);
+      }
       const isOwner = context.access?.level === 'owner' || isConfiguredOwner(context, this.ownerTelegramId);
       if (action === 'connect' && !isOwner) {
         const href = this.jobPublicOrigin ? new URL('/mini/', this.jobPublicOrigin).href : null;

@@ -38,49 +38,27 @@ class JobConnectionSessionRepository {
 
     const expired = (await client.query(`UPDATE job_hh_login_sessions SET status='expired',ticket_hash=NULL,guest_token_hash=NULL,
       completed_at=COALESCE(completed_at,now()),updated_at=now()
-      WHERE user_id=$1 AND status IN ('pending','claimed','authenticated') AND expires_at<=$2 RETURNING id`, [row.userId, row.now])).rows;
+      WHERE user_id=$1 AND status IN ('pending','claimed','authenticated')
+        AND (expires_at<=$2 OR (status='pending' AND ticket_expires_at<=$2)) RETURNING id`, [row.userId, row.now])).rows;
 
     const active = (await client.query(`SELECT * FROM job_hh_login_sessions
       WHERE user_id=$1 AND status IN ('pending','claimed','authenticated') FOR UPDATE`, [row.userId])).rows[0];
     if (active) {
-      const resumed = (await client.query(`UPDATE job_hh_login_sessions SET ticket_hash=$2,guest_token_hash=NULL,
-        status='pending',claimed_at=NULL,membership_revision=$3,role_id=$4,role_revision=$5,ticket_expires_at=$6,updated_at=now()
-        WHERE id=$1 RETURNING *`, [active.id, row.ticketHash, row.membershipRevision, row.roleId,
-        row.roleRevision, new Date(Math.min(row.ticketExpiresAt.getTime(), new Date(active.expires_at).getTime()))])).rows[0];
-      return { ...resumed, ticketIssued: true, expiredSessionIds: expired.map((item) => item.id) };
+      return { ...active, expiredSessionIds: expired.map((item) => item.id) };
     }
 
     let existing = (await client.query(`SELECT * FROM job_hh_login_sessions
       WHERE user_id=$1 AND request_id=$2 FOR UPDATE`, [row.userId, row.requestId])).rows[0];
 
-    if (existing && ['confirmed','cancelled','expired','revoked','failed'].includes(existing.status)) {
-      existing = (await client.query(`UPDATE job_hh_login_sessions SET ticket_hash=$3,guest_token_hash=NULL,
-        membership_revision=$4,role_id=$5,role_revision=$6,status='pending',resume_id=NULL,
-        ticket_expires_at=$7,expires_at=$8,claimed_at=NULL,completed_at=NULL,updated_at=now()
-        WHERE user_id=$1 AND request_id=$2 RETURNING *`,
-      [row.userId, row.requestId, row.ticketHash, row.membershipRevision, row.roleId, row.roleRevision,
-        row.ticketExpiresAt, row.expiresAt])).rows[0];
-      return { ...existing, ticketIssued: true, expiredSessionIds: expired.map((item) => item.id) };
-    }
-
-    if (existing?.status === 'pending') {
-      existing = (await client.query(`UPDATE job_hh_login_sessions SET ticket_hash=$3,guest_token_hash=NULL,
-        membership_revision=$4,role_id=$5,role_revision=$6,ticket_expires_at=$7,expires_at=$8,updated_at=now()
-        WHERE user_id=$1 AND request_id=$2 RETURNING *`,
-      [row.userId, row.requestId, row.ticketHash, row.membershipRevision, row.roleId, row.roleRevision,
-        row.ticketExpiresAt, row.expiresAt])).rows[0];
-      return { ...existing, ticketIssued: true, expiredSessionIds: expired.map((item) => item.id) };
-    }
-
-    if (existing) return { ...existing, ticketIssued: false };
+    if (existing) return { ...existing, expiredSessionIds: expired.map((item) => item.id) };
 
     try {
       const inserted = (await client.query(`INSERT INTO job_hh_login_sessions
-        (user_id,request_id,ticket_hash,membership_revision,role_id,role_revision,status,ticket_expires_at,expires_at)
-        VALUES($1,$2,$3,$4,$5,$6,'pending',$7,$8) RETURNING *`,
-      [row.userId, row.requestId, row.ticketHash, row.membershipRevision, row.roleId, row.roleRevision,
+        (id,user_id,request_id,ticket_hash,membership_revision,role_id,role_revision,status,ticket_expires_at,expires_at)
+        VALUES($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9) RETURNING *`,
+      [row.sessionId, row.userId, row.requestId, row.ticketHash, row.membershipRevision, row.roleId, row.roleRevision,
         row.ticketExpiresAt, row.expiresAt])).rows[0];
-      return { ...inserted, ticketIssued: true, expiredSessionIds: expired.map((item) => item.id) };
+      return { ...inserted, expiredSessionIds: expired.map((item) => item.id) };
     } catch (error) {
       if (error.code === '23505') throw jobError('JOB_LOGIN_ALREADY_ACTIVE');
       throw error;
@@ -107,6 +85,40 @@ class JobConnectionSessionRepository {
 
   async byIdForUser(client, { sessionId, userId }) {
     return (await client.query('SELECT * FROM job_hh_login_sessions WHERE id=$1 AND user_id=$2 FOR UPDATE', [sessionId, userId])).rows[0] || null;
+  }
+
+  async claimTelegramDelivery({ sessionId, userId, chatId = null, conversationId = null, authorize }) {
+    return this.transaction(async (client) => {
+      const row = await this.byIdForUser(client, { sessionId, userId });
+      if (row && authorize) await authorize(client, row);
+      if (!row || row.telegram_delivery_status !== 'none' || row.status !== 'pending'
+        || new Date(row.ticket_expires_at).getTime() <= Date.now())
+        return { claimed: false, status: row?.telegram_delivery_status === 'sending' ? 'unknown' : row?.telegram_delivery_status || 'failed' };
+      const recipient = (await client.query(`SELECT m.telegram_id,c.id AS conversation_id FROM access_memberships m
+        JOIN user_identities i ON i.user_id=m.user_id AND i.provider='telegram' AND i.external_id=m.telegram_id
+        JOIN conversations c ON c.user_id=m.user_id AND c.channel='telegram' AND c.external_chat_id=m.telegram_id
+        WHERE m.user_id=$1 AND m.blocked=false AND m.telegram_id ~ '^[1-9][0-9]{0,19}$'`, [userId])).rows[0];
+      const bound = recipient && (!chatId || String(chatId) === recipient.telegram_id)
+        && (!conversationId || String(conversationId) === String(recipient.conversation_id));
+      const status = bound ? 'sending' : 'failed';
+      await client.query(`UPDATE job_hh_login_sessions SET telegram_delivery_status=$3,
+        telegram_delivery_chat_id=$4,telegram_delivery_conversation_id=$5,telegram_delivery_at=now()
+        WHERE id=$1 AND user_id=$2`, [sessionId, userId, status,
+        bound ? recipient.telegram_id : null, bound ? recipient.conversation_id : null]);
+      return { claimed: bound, status, chatId: bound ? recipient.telegram_id : null };
+    });
+  }
+
+  async finishTelegramDelivery({ sessionId, userId, status }) {
+    if (!['sent','failed','unknown'].includes(status)) throw jobError('JOB_LOGIN_SESSION_INVALID');
+    await this.pool.query(`UPDATE job_hh_login_sessions SET telegram_delivery_status=$3,updated_at=now()
+      WHERE id=$1 AND user_id=$2 AND telegram_delivery_status='sending'`, [sessionId, userId, status]);
+  }
+
+  async telegramDeliveryStatus({ sessionId, userId }) {
+    const row = (await this.pool.query(`SELECT telegram_delivery_status FROM job_hh_login_sessions
+      WHERE id=$1 AND user_id=$2`, [sessionId, userId])).rows[0];
+    return row?.telegram_delivery_status === 'sending' ? 'unknown' : (row?.telegram_delivery_status || 'failed');
   }
 
   async setStatus(client, { sessionId, userId, status }) {

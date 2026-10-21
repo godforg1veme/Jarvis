@@ -9,6 +9,30 @@ source changes; verify the deployed revision before a server rollout.
 
 ## Change control
 
+21 октября 2026, согласовано владельцем; локальная разработка:
+«Подключить HH» выдаёт личную временную ссылку текстом и URL-кнопкой
+«Открыть вход HH». Запуск из Mini App также отправляет её этому пользователю
+в личный Telegram. URL ограничен настроенным HTTPS origin и
+`/mini/job-connect/#ticket=<64 hex>`; он не попадает в историю Jarvis и логи.
+Сохраняются private scope, актуальное право jobs, отдельный профиль HH,
+срок ссылки и подтверждение основного резюме в исходной Mini App.
+Неизвестная доставка сверяется по исходной операции и не повторяется
+автоматически. Нижняя клавиатура Telegram и запасные кнопки окна HH остаются.
+Тап по полю HH включает ввод с клавиатуры телефона; значения полей не входят
+в метаданные снимка. Публикация и настоящая клиентская приёмка ещё не подтверждены.
+[Согласованная схема](superpowers/specs/2026-10-21-hh-login-touch-design.md).
+
+October 21, 2026, owner-approved local development: “Подключить HH” provides a
+personal temporary link as text and an “Открыть вход HH” URL button. Mini App
+requests also deliver it to that user's private Telegram chat. The URL is
+restricted to the configured HTTPS origin and `/mini/job-connect/#ticket=<64 hex>`;
+it is excluded from Jarvis history and logs. Private scope, current jobs access,
+isolated HH profiles, expiry and resume confirmation in the originating Mini App
+remain. Unknown delivery is not automatically repeated. Keep the Telegram bottom
+keyboard and fallback HH controls; tapping an HH field enables phone-keyboard
+input without returning field values as metadata. Deployment and live client
+acceptance remain unverified. [Approved design](superpowers/specs/2026-10-21-hh-login-touch-design.md).
+
 19 октября 2026, по запросу владельца: пользовательские часы и даты — МСК,
 фиксированный UTC+3. В «Life OS → Напоминания → Добавить/Перенести» ввод без
 пояса означает московское время; явные ISO Z/offset сохраняют момент.

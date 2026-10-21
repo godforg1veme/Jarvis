@@ -4,6 +4,12 @@
 
 ## Русский
 
+21 октября согласованы исправление запросов входа HH, личная доставка временной
+ссылки текстом и кнопкой в Telegram и прямой ввод с клавиатуры телефона после
+тапа по полю HH. Нижняя панель ввода сохраняется. Изменения готовятся локально;
+это ещё не подтверждение выпуска или настоящего входа участника.
+[Схема](../docs/superpowers/specs/2026-10-21-hh-login-touch-design.md).
+
 18 октября 2026 Mini App выпущен на DE; в боте настроена кнопка «Открыть Jarvis».
 [Проверки и ограничения выпуска](../docs/updates/2026-10-18-telegram-mini-app-release.md).
 Вход проверяет подписанные
@@ -94,6 +100,12 @@ production browser fixtures с недоступным SDK и отказом се
 [результат](../docs/updates/2026-10-18-telegram-mini-app-release.md).
 
 ## English
+
+On October 21 the owner approved the HH authentication request fix, private
+Telegram delivery of temporary links as text and a button, and phone-keyboard
+input after tapping an HH field. The bottom input panel remains. Development
+is local; deployment and real member sign-in are not yet confirmed.
+[Design](../docs/superpowers/specs/2026-10-21-hh-login-touch-design.md).
 
 The Mini App was deployed on DE on October 18, 2026; the bot menu opens it.
 [Release checks and limits](../docs/updates/2026-10-18-telegram-mini-app-release.md).

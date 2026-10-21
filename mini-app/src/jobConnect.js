@@ -4,6 +4,7 @@ const api = createApi();
 const statusNode = document.querySelector('#job-connect-status');
 const stage = document.querySelector('#job-connect-stage');
 const frame = document.querySelector('#job-connect-frame');
+const direct = document.querySelector('#job-connect-direct');
 const input = document.querySelector('#job-connect-input');
 const send = document.querySelector('#job-connect-send');
 const reveal = document.querySelector('#job-connect-reveal');
@@ -11,36 +12,98 @@ const enter = document.querySelector('#job-connect-enter');
 const tab = document.querySelector('#job-connect-tab');
 const cancel = document.querySelector('#job-connect-cancel');
 const SESSION_KEY = 'jarvis-job-guest-session';
+const graphemes = typeof Intl.Segmenter === 'function' ? new Intl.Segmenter('ru', { granularity: 'grapheme' }) : null;
+const characters = (value) => graphemes ? Array.from(graphemes.segment(value), (item) => item.segment) : Array.from(value);
 let sessionId = null;
 let sequence = 1;
 let pollTimer = null;
-let busy = false;
 let pendingText = '';
 let pendingOffset = 0;
+let inputFields = [];
+let directValue = '';
+let remoteCursor = 0;
+let composing = false;
+let blocked = false;
+let queue = Promise.resolve();
+let queueDepth = 0;
+let generation = 0;
 
 function message(text) { statusNode.textContent = text; }
 function clearPoll() { if (pollTimer) clearTimeout(pollTimer); pollTimer = null; }
 function apiPath(kind) { return `/jobs/login/${kind}/${encodeURIComponent(sessionId)}`; }
 function clearStoredSession() { try { sessionStorage.removeItem(SESSION_KEY); } catch {} }
 
-async function sendEvent(event) {
-  if (busy) throw new Error('Дождись завершения предыдущего действия.');
+async function deliver(event) {
+  if (blocked) throw new Error('Не удалось подтвердить ввод. Отмени подключение и начни заново; ввод повторно не отправлен.');
   if (!sessionId) throw new Error('Временная ссылка истекла. Создай новую в Mini App.');
-  busy = true;
+  const current = sequence;
   try {
-    const current = sequence;
+    const result = await api.request(`/jobs/login/input/${encodeURIComponent(sessionId)}`, 'POST', { sequence: current, event });
+    sequence = result.nextSequence; return true;
+  } catch (error) {
     try {
-      const result = await api.request(`/jobs/login/input/${encodeURIComponent(sessionId)}`, 'POST', { sequence: current, event });
-      sequence = result.nextSequence; return true;
-    } catch (error) {
-      try {
-        const state = await api.request(apiPath('status'));
-        sequence = state.nextSequence || sequence;
-        if (sequence > current) return true;
-      } catch {}
-      throw error;
-    }
-  } finally { busy = false; }
+      const state = await api.request(apiPath('status'));
+      if (state.nextSequence > current) { sequence = state.nextSequence; return true; }
+    } catch {}
+    blocked = true;
+    clearDirect();
+    throw error;
+  }
+}
+function sendEvent(event) {
+  const currentGeneration = generation;
+  queueDepth++;
+  const task = queue.then(() => {
+    if (currentGeneration !== generation) throw new Error('Окно входа закрыто.');
+    return deliver(event);
+  });
+  queue = task.catch(() => {}).finally(() => { queueDepth--; });
+  return task;
+}
+function clearDirect() {
+  directValue = ''; remoteCursor = 0; composing = false;
+  direct.value = ''; direct.hidden = true; direct.blur();
+}
+function queueDirectChange() {
+  if (composing || direct.hidden || blocked) return;
+  if (direct.value.length > 256) {
+    direct.value = directValue; message('Ввод ограничен 256 символами.'); return;
+  }
+  const oldValue = characters(directValue), nextValue = characters(direct.value);
+  if (directValue === direct.value) return;
+  let prefix = 0;
+  while (prefix < oldValue.length && prefix < nextValue.length && oldValue[prefix] === nextValue[prefix]) prefix++;
+  let suffix = 0;
+  while (suffix < oldValue.length - prefix && suffix < nextValue.length - prefix
+    && oldValue[oldValue.length - 1 - suffix] === nextValue[nextValue.length - 1 - suffix]) suffix++;
+  const removed = oldValue.length - prefix - suffix;
+  const inserted = nextValue.slice(prefix, nextValue.length - suffix);
+  directValue = direct.value;
+  const actions = [];
+  const move = (key, count) => { for (let i = 0; i < count; i++) actions.push({ type: 'key', action: 'press', key }); };
+  move(remoteCursor > prefix + removed ? 'ArrowLeft' : 'ArrowRight', Math.abs(remoteCursor - prefix - removed));
+  move('Backspace', removed);
+  const units = Array.from(inserted.join(''));
+  for (let offset = 0; offset < units.length;) {
+    let end = offset, length = 0;
+    while (end < units.length && length + units[end].length <= 64) { length += units[end].length; end++; }
+    actions.push({ type: 'text', value: units.slice(offset, end).join('') });
+    offset = end;
+  }
+  remoteCursor = prefix + inserted.length;
+  const tasks = actions.map(sendEvent);
+  void Promise.all(tasks).then(() => message('Ввод передан в выбранное поле HH.'))
+    .catch((error) => { blocked = true; message(error.message); });
+}
+function placeDirect(field, rect) {
+  direct.style.left = `${field.x / 1024 * rect.width}px`;
+  direct.style.top = `${field.y / 768 * rect.height}px`;
+  direct.style.width = `${Math.max(44, field.width / 1024 * rect.width)}px`;
+  direct.style.height = `${Math.max(36, field.height / 768 * rect.height)}px`;
+  direct.type = ['password', 'email', 'tel', 'number', 'search', 'url'].includes(field.type) ? field.type : 'text';
+  direct.inputMode = field.inputMode;
+  direct.hidden = false;
+  direct.focus({ preventScroll: true });
 }
 
 async function sendText() {
@@ -63,31 +126,40 @@ async function sendText() {
 
 function clearSensitiveInput() {
   input.value = ''; pendingText = ''; pendingOffset = 0;
+  clearDirect();
   input.type = 'password'; reveal.textContent = 'Показать ввод'; reveal.setAttribute('aria-pressed', 'false');
 }
 
 function showLoginError(error) {
+  generation++;
   clearPoll(); stage.hidden = true; clearStoredSession(); clearSensitiveInput(); sessionId = null;
   message(error.message || 'Сессия входа завершилась. Создай новую ссылку в Mini App.');
 }
 
 async function poll() {
   clearPoll(); if (!sessionId) return;
+  const pollGeneration = generation;
   try {
     const state = await api.request(apiPath('status'));
-    sequence = state.nextSequence || sequence;
+    if (pollGeneration !== generation || !sessionId) return;
+    if (queueDepth === 0) sequence = Math.max(sequence, state.nextSequence || sequence);
     if (state.state === 'authenticated' || state.status === 'authenticated') {
+      generation++; sessionId = null;
       clearSensitiveInput(); stage.hidden = true; message('Вход HH подтверждён. Вернись в Mini App и выбери основное резюме.'); return;
     }
     if (['expired','closed'].includes(state.state) || ['expired','cancelled','revoked','failed'].includes(state.status)) {
       showLoginError(new Error('Время входа завершилось. Создай новую ссылку в Mini App.')); return;
     }
-    if (state.state === 'captcha') message('HH просит пройти дополнительную проверку на странице ниже.');
+    if (blocked) message('Не удалось подтвердить ввод. Отмени подключение и начни заново; ввод повторно не отправлен.');
+    else if (state.state === 'captcha') message('HH просит пройти дополнительную проверку на странице ниже.');
     else message('Войди в свой профиль соискателя HH в окне ниже.');
     const image = await api.request(apiPath('frame'));
+    if (pollGeneration !== generation || !sessionId) return;
     frame.src = `data:${image.mimeType};base64,${image.frameBase64}`; frame.hidden = false; stage.hidden = false;
+    inputFields = Array.isArray(image.inputFields) ? image.inputFields : [];
     pollTimer = setTimeout(() => { void poll(); }, 3000);
   } catch (error) {
+    if (pollGeneration !== generation || !sessionId) return;
     if (['unauthorized','forbidden','JOB_ACCESS_REVOKED','JOB_LOGIN_SESSION_INVALID','JOB_LOGIN_SESSION_EXPIRED','JOB_LOGIN_TICKET_INVALID'].includes(error.code)) {
       showLoginError(error); return;
     }
@@ -119,14 +191,33 @@ async function claim() {
 }
 
 frame.addEventListener('pointerdown', async (event) => {
-  event.preventDefault(); if (busy || !sessionId) return;
+  event.preventDefault(); if (blocked || !sessionId) return;
   const rect = frame.getBoundingClientRect(); if (!rect.width || !rect.height) return;
   const x = Math.max(0, Math.min(1024, (event.clientX - rect.left) * 1024 / rect.width));
   const y = Math.max(0, Math.min(768, (event.clientY - rect.top) * 768 / rect.height));
-  input.focus({ preventScroll: true });
+  const field = inputFields.find((item) => x >= item.x && y >= item.y
+    && x <= item.x + item.width && y <= item.y + item.height);
+  clearDirect();
+  if (field) placeDirect(field, rect);
   try { await sendEvent({ type: 'pointer', action: 'click', button: 'left', x, y }); }
   catch (error) { message(error.message); }
 });
+direct.addEventListener('pointerdown', (event) => event.stopPropagation());
+direct.addEventListener('input', queueDirectChange);
+direct.addEventListener('compositionstart', () => { composing = true; });
+direct.addEventListener('compositionend', () => { composing = false; queueDirectChange(); });
+direct.addEventListener('keydown', (event) => {
+  if (composing || !['Enter', 'Tab'].includes(event.key)) return;
+  event.preventDefault();
+  void sendEvent({ type: 'key', action: 'press', key: event.key }).catch((error) => message(error.message));
+  clearDirect();
+});
+direct.addEventListener('beforeinput', (event) => {
+  if (event.inputType !== 'deleteContentBackward' || direct.value || composing) return;
+  event.preventDefault();
+  void sendEvent({ type: 'key', action: 'press', key: 'Backspace' }).catch((error) => message(error.message));
+});
+input.addEventListener('focus', clearDirect);
 frame.addEventListener('wheel', async (event) => {
   event.preventDefault(); if (!sessionId) return;
   const rect = frame.getBoundingClientRect(); if (!rect.width || !rect.height) return;
@@ -153,10 +244,10 @@ cancel.addEventListener('click', async () => {
   cancel.disabled = true;
   try {
     const result = await api.request('/jobs/login/guest/cancel', 'POST', { sessionId });
-    clearPoll(); clearStoredSession(); clearSensitiveInput(); sessionId = null; stage.hidden = true;
+    generation++; clearPoll(); clearStoredSession(); clearSensitiveInput(); sessionId = null; stage.hidden = true;
     message(result.status === 'connected' ? 'Профиль HH уже подключён. Вернись в Jarvis.' : 'Подключение отменено.');
   } catch (error) { message(error.message); }
   finally { cancel.disabled = false; }
 });
-window.addEventListener('pagehide', () => { clearPoll(); clearSensitiveInput(); }, { once: true });
+window.addEventListener('pagehide', () => { generation++; sessionId = null; clearPoll(); clearSensitiveInput(); }, { once: true });
 void claim().catch((error) => { message(error.message || 'Не удалось открыть сессию входа. Создай новую ссылку в Mini App.'); });

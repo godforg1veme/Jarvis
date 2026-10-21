@@ -7,6 +7,7 @@ const { Pool } = require('pg');
 const { AccessService } = require('../src/access/accessService');
 const { JobConnectionSessionRepository } = require('../src/jobs/jobConnectionSessionRepository');
 const { JobConnectionSessionService } = require('../src/jobs/jobConnectionSessionService');
+const { JobLoginLinkDelivery } = require('../src/jobs/jobLoginLinkDelivery');
 
 const databaseUrl = process.env.JARVIS_JOB_TEST_DATABASE_URL;
 
@@ -17,8 +18,9 @@ async function fixture() {
   await admin.query(`CREATE SCHEMA ${schema}`);
   const pool = new Pool({ connectionString: databaseUrl, options: `-c search_path=${schema}`, max: 8 });
   try {
-    for (const name of ['001_identity_and_conversations.sql', '029_job_search.sql',
-      '037_access_mini_app.sql', '039_job_member_hh_sessions.sql']) {
+    for (const name of ['001_identity_and_conversations.sql', '015_telegram_interactions.sql',
+      '024_telegram_update_outcomes.sql', '025_telegram_update_kind.sql', '029_job_search.sql',
+      '037_access_mini_app.sql', '039_job_member_hh_sessions.sql', '040_job_hh_login_delivery.sql']) {
       const source = await fs.readFile(path.join(__dirname, '../src/db/migrations', name), 'utf8');
       await pool.query(source.replace(/^CREATE EXTENSION[^;]+;\s*/gm, ''));
     }
@@ -59,7 +61,8 @@ async function fixture() {
       }
       return profiles.get(userId).browser;
     } };
-    const service = new JobConnectionSessionService({ repository: new JobConnectionSessionRepository(pool), accessService, browserClient });
+    const service = new JobConnectionSessionService({ repository: new JobConnectionSessionRepository(pool), accessService, browserClient,
+      ticketSecret: 'test-only-hh-login-ticket-secret-123456' });
     return { pool, admin, schema, accessService, owner, member, adminMember, profiles, browserClient, service };
   } catch (error) {
     await pool.end(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end(); throw error;
@@ -136,5 +139,124 @@ test('PostgreSQL expiry sweep discards only an unconfirmed profile and keeps con
       assert.deepEqual(f.profiles.get(f.adminMember.userId).profile.discarded, []);
       assert.equal((await f.pool.query('SELECT status FROM job_connections WHERE user_id=$1', [f.adminMember.userId])).rows[0].status, 'connected');
       assert.ok(guest.guestToken);
+    } finally { await dispose(f); }
+  });
+
+test('PostgreSQL private link delivery is single-claim across concurrent requests and restarts',
+  { skip: !databaseUrl }, async () => {
+    const f = await fixture(); let finishSend;
+    try {
+      await f.pool.query("INSERT INTO conversations(user_id,channel,external_chat_id) VALUES($1,'telegram','202')", [f.member.userId]);
+      let sends = 0, sent;
+      const pending = new Promise((resolve) => { finishSend = resolve; });
+      const delivery = new JobLoginLinkDelivery({ sessions: f.service, repository: f.service.repository,
+        origin: 'https://jarvis.example', send: async (message) => { sends++; sent = message; await pending; } });
+      const requestId = randomUUID();
+      const first = delivery.create({ userId: f.member.userId, requestId });
+      for (let i = 0; i < 50 && !sends; i++) await new Promise((resolve) => setTimeout(resolve, 5));
+      assert.equal(sends, 1);
+      const concurrent = await delivery.create({ userId: f.member.userId, requestId });
+      assert.equal(concurrent.telegramDelivery, 'unknown'); assert.equal(sends, 1);
+      finishSend(); const completed = await first;
+      assert.equal(completed.telegramDelivery, 'sent'); assert.equal(sent.chatId, '202');
+      assert.equal(sent.buttons[0][0].url, `https://jarvis.example/mini/job-connect/#ticket=${completed.ticket}`);
+      assert.ok(sent.answer.includes(sent.buttons[0][0].url));
+      const replay = new JobLoginLinkDelivery({ sessions: f.service, repository: f.service.repository,
+        origin: 'https://jarvis.example', send: async () => { sends++; } });
+      const afterRestart = await replay.create({ userId: f.member.userId, requestId });
+      assert.equal(afterRestart.ticket, completed.ticket); assert.equal(afterRestart.telegramDelivery, 'sent');
+      assert.equal(afterRestart.expiresAt, completed.expiresAt); assert.equal(sends, 1);
+      const stored = (await f.pool.query('SELECT to_jsonb(s)::text AS value FROM job_hh_login_sessions s WHERE id=$1', [completed.sessionId])).rows[0].value;
+      assert.equal(stored.includes(completed.ticket), false);
+    } finally { finishSend?.(); await dispose(f); }
+  });
+
+test('PostgreSQL unknown link delivery is not repeated and foreign recipients never receive a link',
+  { skip: !databaseUrl }, async () => {
+    const f = await fixture();
+    try {
+      await f.pool.query("INSERT INTO conversations(user_id,channel,external_chat_id) VALUES($1,'telegram','202')", [f.member.userId]);
+      let sends = 0;
+      const delivery = new JobLoginLinkDelivery({ sessions: f.service, repository: f.service.repository,
+        origin: 'https://jarvis.example', send: async () => { sends++; throw new Error('synthetic lost acknowledgement'); } });
+      const requestId = randomUUID();
+      const first = await delivery.create({ userId: f.member.userId, requestId });
+      assert.equal(first.telegramDelivery, 'unknown'); assert.ok(first.ticket);
+      const replay = await delivery.create({ userId: f.member.userId, requestId });
+      assert.equal(replay.telegramDelivery, 'unknown'); assert.equal(replay.ticket, first.ticket); assert.equal(sends, 1);
+      const foreign = await delivery.create({ userId: f.adminMember.userId, requestId: randomUUID(), chatId: '202' });
+      assert.equal(foreign.telegramDelivery, 'failed'); assert.equal(sends, 1);
+      assert.ok(foreign.ticket); // A failed notification does not destroy the Mini App link.
+    } finally { await dispose(f); }
+  });
+
+test('PostgreSQL link delivery rechecks jobs revision before sending and expires pending tickets without extension',
+  { skip: !databaseUrl }, async () => {
+    const f = await fixture();
+    try {
+      await f.pool.query("INSERT INTO conversations(user_id,channel,external_chat_id) VALUES($1,'telegram','202')", [f.member.userId]);
+      let sends = 0;
+      const originalClaim = f.service.repository.claimTelegramDelivery.bind(f.service.repository);
+      f.service.repository.claimTelegramDelivery = async (args) => {
+        const access = await f.accessService.getAccessForTelegram('202');
+        await f.accessService.mutate(f.owner.userId, 'user.update', {
+          operationId: randomUUID(), revision: access.revision, overrides: { jobs: 'deny' },
+        }, '202');
+        return originalClaim(args);
+      };
+      const delivery = new JobLoginLinkDelivery({ sessions: f.service, repository: f.service.repository,
+        origin: 'https://jarvis.example', send: async () => { sends++; } });
+      await assert.rejects(delivery.create({ userId: f.member.userId, requestId: randomUUID() }), { code: 'JOB_ACCESS_REVOKED' });
+      assert.equal(sends, 0);
+      const requestId = randomUUID();
+      const initial = await f.service.create({ userId: f.adminMember.userId, requestId });
+      await f.pool.query("UPDATE job_hh_login_sessions SET ticket_expires_at=now()-interval '1 second' WHERE id=$1", [initial.sessionId]);
+      const expired = await f.service.create({ userId: f.adminMember.userId, requestId });
+      assert.equal(expired.status, 'expired'); assert.equal(expired.ticket, null);
+      const fresh = await f.service.create({ userId: f.adminMember.userId, requestId: randomUUID() });
+      assert.notEqual(fresh.sessionId, initial.sessionId); assert.ok(fresh.ticket);
+    } finally { await dispose(f); }
+  });
+
+test('real Telegram message and menu handlers deliver member HH links privately without history or replay',
+  { skip: !databaseUrl }, async () => {
+    const f = await fixture();
+    try {
+      const { JobSearchRepository } = require('../src/jobs/jobSearchRepository');
+      const { JobTelegramService } = require('../src/jobs/jobTelegramService');
+      const { TelegramMessageService } = require('../src/telegram/messageService');
+      const { TelegramMenuService } = require('../src/telegram/telegramMenuService');
+      const { TelegramUpdateRepository } = require('../src/telegram/telegramUpdateRepository');
+      const { TelegramInteractionRepository } = require('../src/telegram/telegramInteractionRepository');
+      const { UserRepository } = require('../src/users/userRepository');
+      const { ConversationRepository } = require('../src/conversations/conversationRepository');
+      const sends = [];
+      const delivery = new JobLoginLinkDelivery({ sessions: f.service, repository: f.service.repository,
+        origin: 'https://jarvis.example', send: async (message) => { sends.push(message); } });
+      const interactions = new TelegramInteractionRepository(f.pool);
+      const jobs = new JobTelegramService({ pool: f.pool, accessService: f.accessService, ownerTelegramId: '101',
+        searchRepository: new JobSearchRepository(f.pool, { accessService: f.accessService }), loginLinkDelivery: delivery });
+      const menu = new TelegramMenuService({ interactions, jobSearchService: jobs, accessService: f.accessService });
+      const messages = new TelegramMessageService({ accessPolicy: { isAllowed: async () => true }, accessService: f.accessService,
+        updateRepository: new TelegramUpdateRepository(f.pool), userRepository: new UserRepository(f.pool),
+        conversationRepository: new ConversationRepository(f.pool), menuService: menu });
+      const update = (id, chat = 202) => ({ update_id: id, callback_query: { id: String(id), from: { id: 202, first_name: 'Fixture' },
+        data: 'job:connect', message: { message_id: id, chat: { id: chat, type: 'private' } } } });
+      const first = await messages.handleCallback(update(100));
+      assert.equal(first.status, 'answered'); assert.match(first.answer, /отправлена/);
+      assert.equal(sends.length, 1); assert.equal(sends[0].chatId, '202');
+      const url = sends[0].buttons[0][0].url;
+      assert.ok(sends[0].answer.includes(url)); assert.equal(sends[0].disableLinkPreview, true);
+      assert.equal((await messages.handleCallback(update(100))).status, 'duplicate');
+      await messages.handleCallback(update(101)); assert.equal(sends.length, 1);
+      await messages.handleCallback(update(102, 303)); assert.equal(sends.length, 1);
+      const history = (await f.pool.query('SELECT content FROM messages WHERE user_id=$1', [f.member.userId])).rows;
+      assert.ok(history.length); assert.equal(JSON.stringify(history).includes('#ticket='), false);
+      const access = await f.accessService.getAccessForTelegram('202');
+      await f.accessService.mutate(f.owner.userId, 'user.update', {
+        operationId: randomUUID(), revision: access.revision, overrides: { jobs: 'deny' },
+      }, '202');
+      const revoked = await messages.handleCallback(update(103));
+      assert.match(revoked.answer, /недоступен/); assert.equal(sends.length, 1);
     } finally { await dispose(f); }
   });

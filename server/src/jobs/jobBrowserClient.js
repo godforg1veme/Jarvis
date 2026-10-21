@@ -3,6 +3,18 @@ const { readBoundedJson } = require('./boundedHttp');
 const { historySchema, itemSchema } = require('./jobHistorySchema');
 const UUID = /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i;
 const CAPABILITIES = Object.freeze({ dateWindows: false, maxPages: 1000 });
+function validInputFields(fields, width, height) {
+  const keys = ['x', 'y', 'width', 'height', 'type', 'inputMode', 'multiline'];
+  return Array.isArray(fields) && fields.length <= 20 && fields.every((field) =>
+    field && typeof field === 'object' && !Array.isArray(field)
+    && Object.keys(field).length === keys.length && keys.every((key) => Object.hasOwn(field, key))
+    && ['x', 'y', 'width', 'height'].every((key) => Number.isFinite(field[key]))
+    && field.x >= 0 && field.y >= 0 && field.width >= 4 && field.height >= 4
+    && field.x + field.width <= width && field.y + field.height <= height
+    && ['text', 'password', 'email', 'tel', 'number', 'search', 'url'].includes(field.type)
+    && ['text', 'numeric', 'decimal', 'tel', 'email', 'url', 'search'].includes(field.inputMode)
+    && typeof field.multiline === 'boolean');
+}
 const CODES = new Set(['JOB_HH_MANUAL_ACTIVE', 'JOB_HH_CAPTCHA_WAITING', 'JOB_HH_CAPTCHA_MANUAL_REQUIRED', 'JOB_HH_DOM_CHANGED', 'JOB_COLLECTION_WINDOW_SATURATED', 'JOB_COLLECTION_WINDOW_EXPIRED',
   'JOB_INVALID_SEARCH', 'JOB_INVALID_VACANCY', 'JOB_HH_CAPTCHA_REQUIRED', 'JOB_HH_RATE_LIMIT', 'JOB_HH_ACCESS_DENIED',
   'JOB_HH_LOGIN_REQUIRED', 'JOB_HH_NOT_FOUND', 'JOB_HH_UNAVAILABLE', 'JOB_HH_RESUME_UNAVAILABLE', 'JOB_BROWSER_ACCESS_DENIED',
@@ -75,6 +87,15 @@ class JobBrowserClient {
       || typeof value.frameBase64 !== 'string' || value.frameBase64.length > 700000
       || !/^[A-Za-z0-9+/]+={0,2}$/.test(value.frameBase64)
       || Buffer.from(value.frameBase64, 'base64').length > 512 * 1024)) throw jobError('JOB_HH_INVALID_RESPONSE');
+    if (operation === 'login_frame') {
+      if (Object.hasOwn(value, 'inputFields') && !validInputFields(value.inputFields, value.width, value.height))
+        throw jobError('JOB_HH_INVALID_RESPONSE');
+      // The remote page is untrusted. Only frame bytes and closed keyboard hints
+      // cross into the guest client; never echo arbitrary DOM or field values.
+      return { state: value.state, mimeType: value.mimeType, frameBase64: value.frameBase64,
+        width: value.width, height: value.height,
+        ...(Object.hasOwn(value, 'inputFields') ? { inputFields: value.inputFields } : {}) };
+    }
     if (operation === 'login_input' && (!value || !['waiting','authenticated','captcha','expired','closed'].includes(value.state)
       || !Number.isSafeInteger(value.nextSequence) || value.nextSequence < 1 || value.nextSequence > 1000000000)) throw jobError('JOB_HH_INVALID_RESPONSE');
     if (operation === 'login_status' && (!value || !['waiting','authenticated','captcha','expired','closed'].includes(value.state)

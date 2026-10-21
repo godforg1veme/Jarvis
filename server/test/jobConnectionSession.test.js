@@ -13,17 +13,14 @@ class MemoryRepository {
       && ['pending', 'claimed', 'authenticated'].includes(item.status));
     const expiredSessionIds = [];
     if (row) {
-      row.ticket_hash = input.ticketHash; row.guest_token_hash = null;
-      row.membership_revision = input.membershipRevision; row.role_id = input.roleId;
-      row.role_revision = input.roleRevision; row.ticket_expires_at = input.ticketExpiresAt;
-      return { ...row, ticketIssued: true, expiredSessionIds };
+      return { ...row, expiredSessionIds };
     }
-    row = { id: randomUUID(), user_id: input.userId, request_id: input.requestId,
+    row = { id: input.sessionId, user_id: input.userId, request_id: input.requestId,
       ticket_hash: input.ticketHash, guest_token_hash: null, membership_revision: input.membershipRevision,
       role_id: input.roleId, role_revision: input.roleRevision, status: 'pending', resume_id: null,
       ticket_expires_at: input.ticketExpiresAt, expires_at: input.expiresAt };
     this.rows.set(row.id, row);
-    return { ...row, ticketIssued: true, expiredSessionIds };
+    return { ...row, expiredSessionIds };
   }
   async byTicketForUpdate(_client, ticketHash) { return [...this.rows.values()].find((row) => row.ticket_hash === ticketHash) || null; }
   async claimLocked(_client, { id, guestTokenHash }) {
@@ -99,7 +96,8 @@ function fixture() {
     return browsers.get(userId).browser;
   } };
   const service = new JobConnectionSessionService({ repository,
-    accessService: { repository: { async get(_client, _field, userId) { return access.get(userId) || null; } } }, browserClient });
+    accessService: { repository: { async get(_client, _field, userId) { return access.get(userId) || null; } } }, browserClient,
+    ticketSecret: 'test-only-hh-login-ticket-secret-123456' });
   return { ownerId, memberId, otherId, access, repository, browsers, calls, service };
 }
 

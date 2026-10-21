@@ -27,7 +27,17 @@ function vpnReplyMarkup(buttons, options = {}) {
           (options.publicUrl && url.startsWith(`${options.publicUrl}/happ-sub/`))
         );
         const validMiniAppUrl = webApp && !data && !url && options.miniAppUrl && webApp === options.miniAppUrl;
-        const validUrl = validOperationsUrl || validRoutingUrl || validSubscriptionUrl || isJobVacancyUrl(url);
+        let validJobLoginUrl = false;
+        if (url && !data && !webApp && options.jobLoginOrigin) {
+          try {
+            const origin = new URL(options.jobLoginOrigin);
+            const prefix = `${origin.origin}/mini/job-connect/#ticket=`;
+            validJobLoginUrl = origin.protocol === 'https:' && !origin.port && origin.pathname === '/' && !origin.search && !origin.hash
+              && !origin.username && !origin.password && url.startsWith(prefix)
+              && /^[a-f0-9]{64}$/.test(url.slice(prefix.length));
+          } catch { /* Reject invalid configured origin. */ }
+        }
+        const validUrl = validOperationsUrl || validRoutingUrl || validSubscriptionUrl || validJobLoginUrl || isJobVacancyUrl(url);
         if (text.length < 1 || text.length > 64 || (!validCallback && !validUrl && !validMiniAppUrl)) {
           throw new Error('invalid VPN button');
         }

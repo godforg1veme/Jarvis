@@ -612,7 +612,8 @@ async function createRuntime(config, overrides = {}) {
       registerMiniAppRoutes(app, { config, accessService, pool,
         registerUserRoutes: (routes) => registerMiniAppSelfRoutes(routes, { accessService, pool,
           memoryService, knowledgeService, deviceService, missionControlService, assistant, conversationRepository,
-          getJobConnectionSessionService: () => jobRuntime?.connectionSessionService }) });
+          getJobConnectionSessionService: () => jobRuntime?.connectionSessionService,
+          getJobLoginLinkDelivery: () => jobRuntime?.loginLinkDelivery }) });
     }
     if (!bot && config.telegramBotToken) {
       const memoryGalleryService = new TelegramMemoryGalleryService({
@@ -625,10 +626,10 @@ async function createRuntime(config, overrides = {}) {
         fetchImpl: overrides.jobModelFetch,
         applicationAdapter: overrides.jobApplicationAdapter,
         sendPhoto: ({ chatId, png, caption, buttons, signal }) => bot.api.sendPhoto(chatId, new InputFile(png, 'hh-captcha.png'), { caption, reply_markup: telegramReplyMarkup(buttons) }, signal),
-        send: ({ chatId, answer, buttons, disableLinkPreview }) => bot.api.sendMessage(chatId, answer, {
-          ...(buttons?.length ? { reply_markup: telegramReplyMarkup(buttons) } : {}),
+        send: ({ chatId, answer, buttons, disableLinkPreview, signal }) => bot.api.sendMessage(chatId, answer, {
+          ...(buttons?.length ? { reply_markup: telegramReplyMarkup(buttons, { jobLoginOrigin: config.miniAppPublicOrigin }) } : {}),
           ...(disableLinkPreview === true ? { link_preview_options: { is_disabled: true } } : {}),
-        }),
+        }, signal),
       });
       const telegramLifeOsService = config.lifeOsEnabled ? new TelegramLifeOsService({
         interactions: telegramInteractions,

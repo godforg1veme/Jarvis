@@ -58,14 +58,18 @@ export function createJobConnectionPanel({ api, actor, anchor }) {
   function clear(key) { try { sessionStorage.removeItem(sessionKey(actor, key)); } catch {} }
   function setSession(id) { sessionId = id; if (id) store('session', id); else clear('session'); }
   function clearTimer() { if (timer) clearTimeout(timer); timer = null; }
-  function showLink(ticket) {
+  function showLink(ticket, delivery) {
     const target = new URL('/mini/job-connect/', location.origin);
     target.hash = new URLSearchParams({ ticket }).toString();
     link.href = target.href;
     linkValue.value = target.href;
     linkBox.hidden = false; refreshLink.hidden = false; copyLink.hidden = false; shareLink.hidden = false; cancel.hidden = false;
-    connectButton.textContent = 'Создать ссылку для другого устройства';
-    message('Открой окно HH или передай ссылку себе на другое устройство. Ссылка даёт временный доступ к окну входа, не пересылай её другим. Срок — 5 минут.');
+    connectButton.textContent = 'Показать текущую ссылку';
+    refreshLink.textContent = 'Показать текущую ссылку';
+    const notification = delivery === 'sent' ? 'Ссылка также отправлена тебе в личный Telegram.'
+      : delivery === 'failed' ? 'Ссылку не удалось отправить в Telegram. Открой её здесь.'
+        : delivery === 'unknown' ? 'Telegram не подтвердил доставку. Повторно сообщение не отправляем; открой ссылку здесь.' : '';
+    message(`Открой окно HH на своём телефоне или ПК. ${notification} Ссылка действует 5 минут с создания; повторное нажатие не продлевает срок. Не пересылай её другим.`);
   }
   async function start() {
     if (busy || disposed) return;
@@ -80,8 +84,15 @@ export function createJobConnectionPanel({ api, actor, anchor }) {
         setSession(null); clear('request');
         await load(); return;
       }
-      if (!created.sessionId || !created.ticket) throw new Error('Не удалось подготовить ссылку. Нажми ещё раз.');
-      setSession(created.sessionId); showLink(created.ticket); void poll();
+      if (['expired','cancelled','revoked','failed'].includes(created.status)) {
+        clear('request'); setSession(null); linkBox.hidden = true;
+        throw new Error('Предыдущая ссылка завершена. Нажми «Подключить HH», чтобы создать новую.');
+      }
+      if (!created.sessionId) throw new Error('Не удалось подготовить ссылку. Нажми ещё раз.');
+      setSession(created.sessionId);
+      if (created.ticket) showLink(created.ticket, created.telegramDelivery);
+      else { linkBox.hidden = true; cancel.hidden = false; message('Вход уже открыт. Продолжи в этом окне или отмени подключение, чтобы создать новую ссылку.'); }
+      void poll();
     } finally { busy = false; refreshLink.disabled = false; }
   }
   async function load() {
@@ -116,7 +127,7 @@ export function createJobConnectionPanel({ api, actor, anchor }) {
         message('Вход HH подтверждён. Выбери основное резюме, чтобы завершить подключение.'); return;
       }
       if (['cancelled','expired','revoked','failed'].includes(state.status) || ['expired','closed'].includes(state.state)) {
-        setSession(null); linkBox.hidden = true; resumes.hidden = true; cancel.hidden = true;
+        setSession(null); clear('request'); linkBox.hidden = true; resumes.hidden = true; cancel.hidden = true;
         connectButton.hidden = false; connectButton.textContent = 'Подключить HH';
         message('Сессия входа завершилась. Нажми «Подключить HH», чтобы начать заново.'); return;
       }
@@ -127,7 +138,7 @@ export function createJobConnectionPanel({ api, actor, anchor }) {
       timer = setTimeout(() => { void poll(); }, 2000);
     } catch (error) {
       if (['unauthorized','forbidden','JOB_ACCESS_REVOKED','JOB_LOGIN_SESSION_INVALID','JOB_LOGIN_SESSION_EXPIRED'].includes(error.code)) {
-        setSession(null); linkBox.hidden = true; resumes.hidden = true; cancel.hidden = true;
+        setSession(null); clear('request'); linkBox.hidden = true; resumes.hidden = true; cancel.hidden = true;
         connectButton.hidden = false; connectButton.textContent = 'Подключить HH';
         message(error.message || 'Сессия входа недоступна. Запусти подключение снова.'); return;
       }
@@ -149,7 +160,7 @@ export function createJobConnectionPanel({ api, actor, anchor }) {
     cancel.disabled = true;
     try {
       const result = await api.request('/jobs/login/cancel', 'POST', { sessionId });
-      setSession(null); clearTimer(); linkBox.hidden = true; resumes.hidden = true; cancel.hidden = true;
+      setSession(null); clear('request'); clearTimer(); linkBox.hidden = true; resumes.hidden = true; cancel.hidden = true;
       connectButton.hidden = false; connectButton.textContent = 'Подключить HH';
       if (result.status === 'connected') { clear('request'); message('Профиль HH уже подключён.'); await load(); }
       else message('Подключение отменено.');

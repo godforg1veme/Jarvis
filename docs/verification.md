@@ -1,5 +1,27 @@
 # Проверки перед выпуском
 
+Личный вход HH, локально 21 октября:
+[результат и ограничения](updates/2026-10-21-hh-login-touch-development.md).
+Server 783/783, Telegram 66/66, browser 70 passed и 9 Windows skips;
+14 отдельных PostgreSQL acceptance и fixtures 390/1280 px прошли.
+Реальный вход HH и клавиатура iPhone остаются для клиентской приёмки.
+
+Personal HH sign-in, local development on October 21:
+[results and limits](updates/2026-10-21-hh-login-touch-development.md).
+Server 783/783, Telegram 66/66, browser 70 passed with 9 Windows skips;
+14 isolated PostgreSQL acceptance checks and 390/1280 px fixtures passed.
+Real HH sign-in and the iPhone keyboard still require client acceptance.
+
+```powershell
+npm run build --prefix mini-app
+npm test --prefix server
+npm test --prefix job-browser
+node scripts/testMiniAppClient.cjs
+node scripts/testHhLoginTouch.cjs
+# Configure JARVIS_JOB_TEST_DATABASE_URL only for an isolated test database.
+node --test server/test/jobMemberConnectionPostgresAcceptance.cjs server/test/miniAppPostgresAcceptance.cjs server/test/miniAppIntegrationAcceptance.cjs
+```
+
 Доступ сборщика поиска работы, 21 октября:
 [результат ремонта DE и локальных проверок](updates/2026-10-21-job-collector-access-repair.md).
 781/781 unit; 8/8 Linux-проверок с отдельной PostgreSQL. Новый сценарий проверяет

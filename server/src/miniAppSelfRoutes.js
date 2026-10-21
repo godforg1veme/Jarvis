@@ -22,7 +22,7 @@ const fail = (code) => { throw Object.assign(new Error(code), { code }); };
 
 function registerMiniAppSelfRoutes({ route, authorize, requireOrigin }, services) {
   const { accessService, memoryService, knowledgeService, deviceService, missionControlService,
-    assistant, conversationRepository, pool, getJobConnectionSessionService } = services;
+    assistant, conversationRepository, pool, getJobConnectionSessionService, getJobLoginLinkDelivery } = services;
   const chatLimiter = new FixedWindowRateLimiter();
   const requirePermission = async (request, permission, mutation = false) => {
     const session = await authorize(request, { mutation });
@@ -74,7 +74,9 @@ function registerMiniAppSelfRoutes({ route, authorize, requireOrigin }, services
     const actor = await requirePermission(request, 'jobs', true);
     const parsed = z.strictObject({ requestId: z.uuid() }).safeParse(request.body);
     if (!parsed.success) fail('invalid_request');
-    const result = await jobSessions().create({ userId: actor.userId, requestId: parsed.data.requestId });
+    const delivery = getJobLoginLinkDelivery?.();
+    if (!delivery) fail('JOB_LOGIN_UNAVAILABLE');
+    const result = await delivery.create({ userId: actor.userId, requestId: parsed.data.requestId });
     await requirePermission(request, 'jobs');
     return { ok: true, ...result };
   });

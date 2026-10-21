@@ -3,7 +3,7 @@ const ALLOWED = ['hh.ru', 'hhcdn.ru', 'yandex.ru', 'yastatic.net', 'yandexcloud.
 const HH_LOGIN_ORIGINS = new Set(['https://hh.ru', 'https://passport.hh.ru']);
 const HH_LOGIN_PATHS = new Set(['/account/login', '/account/login/otp', '/account/login/password',
   '/account/login/phone', '/account/login/email', '/account/login/phone/confirm',
-  '/account/login/email/confirm', '/auth/login', '/login']);
+  '/account/login/email/confirm', '/account/otp_generate', '/account/login/by_code', '/auth/login', '/login']);
 function allowedRequest(value) {
   try {
     const url = new URL(value);

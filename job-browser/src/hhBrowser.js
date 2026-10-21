@@ -7,6 +7,7 @@ const { readResumePrivacy, readEmployerId, evaluatePrivacy } = require('./hhPriv
 const { dispatchCaptcha } = require('./captchaDispatch');
 const { bounded } = require('./browserHealth');
 const { readHistoryPage } = require('./hhHistoryReader');
+const { readLoginInputFields } = require('./loginInputFields');
 const {readExistingApplication,visibleAppliedAction}=require('./existingApplication');
 const failure = (code) => Object.assign(new Error(code), { code });
 const CAPABILITIES = Object.freeze({ dateWindows: false, maxPages: 1000 });
@@ -119,7 +120,8 @@ class HhBrowser {
       if (state.state !== 'waiting' && state.state !== 'captcha') throw failure('JOB_LOGIN_SESSION_INVALID');
       const frame = await this.loginPage.screenshot({ type: 'jpeg', quality: 60, animations: 'disabled', caret: 'hide' });
       if (frame.length > 512 * 1024) throw failure('JOB_BROWSER_RESPONSE_TOO_LARGE');
-      return { state: state.state, mimeType: 'image/jpeg', frameBase64: frame.toString('base64'), width: 1024, height: 768 };
+      const inputFields = await readLoginInputFields(this.loginPage);
+      return { state: state.state, mimeType: 'image/jpeg', frameBase64: frame.toString('base64'), width: 1024, height: 768, inputFields };
     });
   }
 

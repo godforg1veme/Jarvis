@@ -1,4 +1,4 @@
-const { createHash, createHmac, randomBytes, timingSafeEqual } = require('node:crypto');
+const { createHash, createHmac, randomUUID, timingSafeEqual } = require('node:crypto');
 const { z } = require('zod');
 const { jobError } = require('./jobSchemas');
 
@@ -28,10 +28,12 @@ function assertJobLoginAccess(session, access) {
 }
 
 class JobConnectionSessionService {
-  constructor({ repository, accessService, browserClient, now = Date.now }) {
+  constructor({ repository, accessService, browserClient, ticketSecret, now = Date.now }) {
     this.repository = repository;
     this.accessService = accessService;
     this.browserClient = browserClient;
+    this.ticketSecret = ticketSecret || browserClient.connectToken;
+    if (typeof this.ticketSecret !== 'string' || this.ticketSecret.length < 32) throw jobError('JOB_LOGIN_UNAVAILABLE');
     this.now = now;
     this.sweepTimer = null;
     this.sweepPromise = null;
@@ -99,14 +101,17 @@ class JobConnectionSessionService {
   async create({ userId, requestId }) {
     userId = z.uuid().parse(userId);
     requestId = z.uuid().parse(requestId);
-    const rawTicket = randomBytes(32).toString('hex');
+    const sessionId = randomUUID();
+    const ticketFor = (id) => createHmac('sha256', this.ticketSecret)
+      .update(`jarvis-job-login-ticket-v1\0${userId}\0${id}`).digest('hex');
+    const rawTicket = ticketFor(sessionId);
     const ticketExpiresAt = new Date(this.now() + TICKET_TTL_MS);
     const expiresAt = new Date(this.now() + SESSION_TTL_MS);
     const result = await this.repository.transaction(async (client) => {
       const access = await this.accessFor(client, userId);
       if (!access || access.blocked || !access.permissions.includes('jobs')) throw jobError('JOB_ACCESS_REVOKED');
       return this.repository.createOrRefresh(client, {
-        userId, requestId, ticketHash: digest(rawTicket), membershipRevision: access.revision,
+        sessionId, userId, requestId, ticketHash: digest(rawTicket), membershipRevision: access.revision,
         roleId: access.roleId ?? null, roleRevision: access.roleRevision,
         ticketExpiresAt, expiresAt, now: new Date(this.now()),
       });
@@ -114,7 +119,17 @@ class JobConnectionSessionService {
     for (const expiredSessionId of result.expiredSessionIds || [])
       await this.closeBrowserSession(userId, expiredSessionId, { discardUnconfirmed: true });
     if (result.connected) return { sessionId: null, ticket: null, expiresAt: null, status: 'connected' };
-    return { sessionId: result.id, ticket: result.ticketIssued ? rawTicket : null,
+    let sameAccess = false;
+    try {
+      const currentAccess = await this.repository.transaction((client) => this.accessFor(client, userId));
+      assertJobLoginAccess({ userId, membershipRevision: result.membership_revision,
+        roleId: result.role_id, roleRevision: result.role_revision }, currentAccess);
+      sameAccess = true;
+    } catch { /* A stale session never yields a bearer ticket. */ }
+    const issuedTicket = result.status === 'pending' && sameAccess
+      && new Date(result.ticket_expires_at).getTime() > this.now() && new Date(result.expires_at).getTime() > this.now()
+      && sameDigest(result.ticket_hash, digest(ticketFor(result.id))) ? ticketFor(result.id) : null;
+    return { sessionId: result.id, ticket: issuedTicket,
       expiresAt: new Date(result.expires_at).toISOString(), status: result.status };
   }
 

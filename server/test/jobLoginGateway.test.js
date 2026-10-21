@@ -71,7 +71,8 @@ function fixture() {
   };
   const app = Fastify({ logger: false });
   registerMiniAppRoutes(app, { config: { miniAppPublicOrigin: origin, telegramBotToken: botToken }, accessService, pool,
-    registerUserRoutes: (routes) => registerMiniAppSelfRoutes(routes, { accessService, pool, getJobConnectionSessionService: () => service }) });
+    registerUserRoutes: (routes) => registerMiniAppSelfRoutes(routes, { accessService, pool,
+      getJobConnectionSessionService: () => service, getJobLoginLinkDelivery: () => service }) });
   const miniLogin = async (telegramId) => {
     const response = await app.inject({ method: 'POST', url: '/mini/api/session', headers: { origin }, payload: { initData: signed(telegramId) } });
     return { statusCode: response.statusCode, cookie: response.headers['set-cookie'].split(';')[0], csrf: response.json().csrfToken };

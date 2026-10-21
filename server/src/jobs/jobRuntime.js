@@ -20,6 +20,7 @@ const { JobBrowserClient } = require('./jobBrowserClient');
 const { JobBrowserConnectionService } = require('./jobBrowserConnectionService');
 const { JobConnectionSessionRepository } = require('./jobConnectionSessionRepository');
 const { JobConnectionSessionService } = require('./jobConnectionSessionService');
+const { JobLoginLinkDelivery } = require('./jobLoginLinkDelivery');
 const {JobHistoryRepository}=require('./jobHistoryRepository');
 const {JobHistorySyncRepository}=require('./jobHistorySyncRepository');
 const {JobHistoryWorker}=require('./jobHistoryWorker');
@@ -29,7 +30,7 @@ const { configuredOwnerJobAccess } = require('./configuredOwnerJobAccess');
 function createJobRuntime({ config, pool, interactions, send, sendPhoto, fetchImpl, applicationAdapter = null, accessService = null }) {
   if (!config.jobSearchEnabled) return null;
   const jobsAccessService = accessService || configuredOwnerJobAccess(pool, config.operationsOwnerTelegramId);
-  let connectionService = null, connectionSessionService = null, browserClient = null;
+  let connectionService = null, connectionSessionService = null, loginLinkDelivery = null, browserClient = null;
   if (config.jobBrowserOwnerId && config.jobBrowserToken) {
     browserClient = new JobBrowserClient({ baseUrl: config.jobBrowserUrl, ownerId: config.jobBrowserOwnerId,
       token: config.jobBrowserToken, connectToken: config.jobBrowserConnectToken || null, fetchImpl });
@@ -38,6 +39,9 @@ function createJobRuntime({ config, pool, interactions, send, sendPhoto, fetchIm
       connectionSessionService = new JobConnectionSessionService({
         repository: new JobConnectionSessionRepository(pool), accessService, browserClient,
       });
+      if (config.miniAppEnabled && config.miniAppPublicOrigin && send)
+        loginLinkDelivery = new JobLoginLinkDelivery({ sessions: connectionSessionService,
+          repository: connectionSessionService.repository, origin: config.miniAppPublicOrigin, send });
     }
   }
   if (!applicationAdapter && config.jobBrowserApplyEnabled === true) {
@@ -73,7 +77,7 @@ function createJobRuntime({ config, pool, interactions, send, sendPhoto, fetchIm
   const telegramService = new JobTelegramService({ pool, searchRepository, profileRepository, draftRepository,
     usageRepository, interactions, draftService, settingsService, applicationService, connectionService, captchaService, historyService,
     settingsModels: [config.jobSearchModel, config.openrouterModel, config.openrouterFallbackModel], defaultModel: config.jobSearchModel,
-    accessService: jobsAccessService, ownerTelegramId: config.operationsOwnerTelegramId,
+    accessService: jobsAccessService, ownerTelegramId: config.operationsOwnerTelegramId, loginLinkDelivery,
     jobPublicOrigin: config.miniAppEnabled ? config.miniAppPublicOrigin : '' });
   const deliveryWorker = new JobDeliveryWorker({ pool, searchRepository, deliveryRepository, send, accessService: jobsAccessService,
     captchaEnabled: Boolean(captchaService), captchaAutomatic: config.jobCaptchaAutomatic === true });
@@ -81,7 +85,7 @@ function createJobRuntime({ config, pool, interactions, send, sendPhoto, fetchIm
   const close = createResourceCloser(Object.entries({ deliveryWorker, recoveryWorker, captchaWorker, historyWorker, connectionSessionService })
     .filter(([, worker]) => worker).map(([name, worker]) => ({ name, close: () => worker.stop() })));
   return { captchaService, telegramService, deliveryWorker, applicationService, applicationRepository, historyWorker, historyRepository, historySync,
-    connectionSessionService,
+    connectionSessionService, loginLinkDelivery,
     async start() { await recoveryWorker.start(); connectionSessionService?.start(); deliveryWorker.start(); captchaWorker?.start(); historyWorker?.start(); },
     close };
 }

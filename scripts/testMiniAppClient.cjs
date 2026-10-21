@@ -122,7 +122,11 @@ async function fixture(context, { level = 'owner', outside = false, sdkBlocked =
     assert.equal(await connectPage.locator('#job-connect-input').getAttribute('type'), 'text');
     await connectPage.locator('#job-connect-input').fill('фиктивный текст');
     await connectPage.getByRole('button', { name: 'Ввести в HH', exact: true }).click();
-    await connectPage.getByRole('button', { name: 'Enter', exact: true }).click();
+    await Promise.all([
+      connectPage.waitForResponse((response) => response.url().includes('/jobs/login/input/')
+        && response.request().postDataJSON()?.event?.type === 'key'),
+      connectPage.getByRole('button', { name: 'Enter', exact: true }).click(),
+    ]);
     assert.deepEqual(state.guestEvents.map((event) => event.type), ['text', 'key']);
     assert.equal(await connectPage.locator('#job-connect-input').inputValue(), '');
     state.jobStatus = 'authenticated';
