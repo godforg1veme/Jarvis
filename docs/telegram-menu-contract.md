@@ -9,6 +9,25 @@ source changes; verify the deployed revision before a server rollout.
 
 ## Change control
 
+21 октября 2026, согласовано владельцем: новые фильтры поиска пустые.
+В «Настройки → Поисковые запросы / Исключения → Добавить» одно сообщение
+принимает несколько фраз, по одной на строку, с общим предпросмотром и
+подтверждением. «Очистить список» использует существующий `cfg_pick` с индексом,
+не содержит пользовательского текста. Зарплата, город и формат имеют варианты
+без ограничения. Последний запрос можно удалить; поиск тогда выключается.
+Без запросов включение не допускается. Прежние jobs/private scope, revision,
+expiry, retry и single consumption сохраняются; callback grammar и kinds прежние.
+[Проверки и результат выпуска](updates/2026-10-21-empty-job-filters.md).
+
+October 21, 2026, owner-approved: new search filters are empty. Under
+“Settings → Queries / Exclusions → Add”, one message accepts multiple phrases,
+one per line, followed by a combined preview and confirmation. “Clear list” uses
+an existing indexed `cfg_pick`, without user text. Salary, city and format offer
+unrestricted choices. Removing the last query disables search; activation
+requires a query. Existing jobs/private scope, revision, expiry, retry and
+single consumption remain; callback grammar and guided kinds are unchanged.
+[Verification and deployment](updates/2026-10-21-empty-job-filters.md).
+
 21 октября 2026, согласовано владельцем и установлено на DE:
 «Подключить HH» выдаёт личную временную ссылку текстом и URL-кнопкой
 «Открыть вход HH». Запуск из Mini App также отправляет её этому пользователю

@@ -7,24 +7,29 @@ const settings = defaultJobSettings();
 const vacancy = (overrides = {}) => ({ title: 'Senior AI Engineer', description: 'LLM integration',
   city: 'Москва', workFormat: 'office', salary: null, ...overrides });
 
-test('broad AI, ML, research, junior and QA search never filters by seniority or education', () => {
-  for (const title of ['Senior AI Engineer', 'Junior AI', 'Prompt Engineer', 'Промт-инженер',
-    'AI QA Engineer', 'Тестировщик чат-ботов', 'Research Scientist', 'ML Engineer',
-    'AI Enablement Engineer', 'NLP Engineer', 'RAG Developer', 'Стажёр AI']) {
-    assert.equal(evaluateVacancy({ vacancy: vacancy({ title, experience: '6+ years', education: 'PhD' }), settings }).include, true, title);
+test('new filters are empty and do not impose an AI, sales, salary or location preference', () => {
+  assert.deepEqual(settings.queries, []);
+  assert.deepEqual(settings.exclusions, []);
+  assert.equal(settings.targetRub, null);
+  assert.equal(settings.officeCity, '');
+  assert.equal(settings.remote, null);
+  for (const item of [vacancy({ title: 'Бухгалтер', city: 'Казань', salary: { to: 10000, currency: 'RUR', gross: false } }),
+    vacancy({ title: 'Менеджер по продажам', description: 'Холодные звонки', workFormat: 'remote', remoteRestriction: 'foreign_only' })]) {
+    assert.equal(evaluateVacancy({ vacancy: item, settings }).include, true);
   }
 });
 
-test('ordinary AI user, sales duties and definite foreign-only remote are excluded', () => {
-  const cases = [vacancy({ title: 'Бухгалтер', description: 'Можно использовать ChatGPT для работы' }),
-    vacancy({ title: 'Менеджер по продажам AI', description: 'Холодные звонки клиентам' }),
+test('explicit saved location and exclusions still apply', () => {
+  const saved = { ...settings, remote: true, officeCity: 'Москва', exclusions: ['холодные звонки'] };
+  for (const item of [vacancy({ description: 'Холодные звонки клиентам' }),
     vacancy({ workFormat: 'remote', remoteRestriction: 'foreign_only' }),
-    vacancy({ city: 'Казань', workFormat: 'hybrid' })];
-  for (const item of cases) assert.equal(evaluateVacancy({ vacancy: item, settings }).include, false);
-  assert.equal(evaluateVacancy({ vacancy: vacancy({ description: 'Автоматизация отдела продаж с AI' }), settings }).include, true);
-  const unknownRemote = evaluateVacancy({ vacancy: vacancy({ city: 'Other', workFormat: 'remote' }), settings });
+    vacancy({ city: 'Казань', workFormat: 'hybrid' })]) {
+    assert.equal(evaluateVacancy({ vacancy: item, settings: saved }).include, false);
+  }
+  const unknownRemote = evaluateVacancy({ vacancy: vacancy({ city: 'Other', workFormat: 'remote' }), settings: saved });
   assert.equal(unknownRemote.include, true);
   assert.ok(unknownRemote.annotations.includes('REMOTE_ELIGIBILITY_UNKNOWN'));
+  assert.equal(evaluateVacancy({ vacancy: vacancy({ workFormat: 'remote' }), settings: { ...saved, remote: false } }).include, false);
 });
 
 test('salary gates only proven monthly net amounts and preserves uncertainty', () => {

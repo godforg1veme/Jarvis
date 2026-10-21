@@ -10,9 +10,43 @@ const { JobCollector } = require('../src/jobs/jobCollector');
 const { randomBytes } = require('node:crypto');
 const { JobBrowserClient } = require('../src/jobs/jobBrowserClient');
 const { createRpcServer } = require('../../job-browser/src/rpcServer');
+const { configuredOwnerJobAccess } = require('../src/jobs/configuredOwnerJobAccess');
+
+async function collectorFixture() {
+  const fixture = await createJobPostgresFixture();
+  try {
+    await fixture.pool.query("INSERT INTO user_identities(user_id,provider,external_id) VALUES($1,'telegram','101')", [fixture.owner]);
+    return fixture;
+  } catch (error) { await fixture.close(); throw error; }
+}
+
+function repositories(f) {
+  const accessService = configuredOwnerJobAccess(f.pool, '101');
+  return { search: new JobSearchRepository(f.pool, { accessService }),
+    delivery: new JobDeliveryRepository(f.pool, { accessService }) };
+}
+
+test('empty search cannot activate or be claimed, including an already-active legacy row', async () => {
+  const f = await collectorFixture();
+  try {
+    const { search } = repositories(f);
+    const initial = await search.ensure({ scope: f.scope });
+    assert.deepEqual(initial.settings.queries, []);
+    await assert.rejects(search.setEnabled({ scope: f.scope, expectedRevision: initial.revision, enabled: true }),
+      { code: 'JOB_SEARCH_QUERIES_REQUIRED' });
+    const saved = await search.saveSettings({ scope: f.scope, expectedRevision: initial.revision,
+      settings: { ...initial.settings, activated: true, paused: false } });
+    assert.equal(saved.settings.activated, false);
+    assert.equal(saved.settings.paused, true);
+    await f.pool.query("UPDATE job_searches SET settings=jsonb_set(jsonb_set(settings,'{activated}','true'::jsonb),'{paused}','false'::jsonb),next_check_at=now()-interval '1 minute' WHERE user_id=$1", [f.owner]);
+    assert.deepEqual(await search.dueUsers(), []);
+    assert.equal(await search.claimSearch({ userId: f.owner, now: new Date(), force: true }), null);
+    assert.equal((await f.pool.query('SELECT lease_id FROM job_searches WHERE user_id=$1', [f.owner])).rows[0].lease_id, null);
+  } finally { await f.close(); }
+});
 
 test('real HTTP + PostgreSQL: 14 days, pagination, duplicate queries, restart, failure checkpoint and pause', async () => {
-  const f = await createJobPostgresFixture();
+  const f = await collectorFixture();
   const requests = []; let failSecondPage = false;
   const now = new Date('2026-10-15T12:00:00Z');
   const server = http.createServer((req, res) => {
@@ -30,10 +64,10 @@ test('real HTTP + PostgreSQL: 14 days, pagination, duplicate queries, restart, f
   });
   server.listen(0, '127.0.0.1'); await once(server, 'listening');
   try {
-    const search = new JobSearchRepository(f.pool), delivery = new JobDeliveryRepository(f.pool);
+    const { search, delivery } = repositories(f);
     let state = await search.ensure({ scope: f.scope });
     state = await search.saveSettings({ scope: f.scope, expectedRevision: state.revision,
-      settings: { ...state.settings, queries: ['Junior AI', 'AI Engineer'], activated: true } });
+      settings: { ...state.settings, queries: ['Junior AI', 'AI Engineer'], exclusions: ['Холодные звонки'], activated: true } });
     // Scheduling uses the database clock; bind it to this fixture's fixed clock.
     await f.pool.query('UPDATE job_searches SET next_check_at=$1 WHERE user_id=$2', [now, f.owner]);
     const hh = new HhClient({ baseUrl: `http://127.0.0.1:${server.address().port}/`, allowTestHttp: true });
@@ -64,9 +98,9 @@ test('real HTTP + PostgreSQL: 14 days, pagination, duplicate queries, restart, f
 });
 
 test('bounded passes resume at the unfinished card rather than restarting an oversized window', async () => {
-  const f = await createJobPostgresFixture();
+  const f = await collectorFixture();
   try {
-    const search = new JobSearchRepository(f.pool), delivery = new JobDeliveryRepository(f.pool);
+    const { search, delivery } = repositories(f);
     const settings = await search.ensure({ scope: f.scope });
     await search.saveSettings({ scope: f.scope, expectedRevision: 1,
       settings: { ...settings.settings, queries: ['AI Engineer'], activated: true } });
@@ -85,7 +119,7 @@ test('bounded passes resume at the unfinished card rather than restarting an ove
 });
 
 test('browser RPC + PostgreSQL: broad pagination is not split into ignored date windows; failure preserves progress', async () => {
-  const f = await createJobPostgresFixture();
+  const f = await collectorFixture();
   const token = randomBytes(32).toString('hex'), now = new Date('2026-10-15T12:00:00Z');
   const requests = []; let captcha = true;
   const rpc = createRpcServer({ ownerId: f.owner, token, browser: {
@@ -99,7 +133,7 @@ test('browser RPC + PostgreSQL: broad pagination is not split into ignored date 
   } });
   rpc.listen(0, '127.0.0.1'); await once(rpc, 'listening');
   try {
-    const search = new JobSearchRepository(f.pool), delivery = new JobDeliveryRepository(f.pool);
+    const { search, delivery } = repositories(f);
     const initial = await search.ensure({ scope: f.scope });
     await search.saveSettings({ scope: f.scope, expectedRevision: initial.revision,
       settings: { ...initial.settings, queries: ['AI Engineer'], activated: true } });

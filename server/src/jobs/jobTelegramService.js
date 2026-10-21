@@ -20,6 +20,7 @@ function jobScope(context, ownerTelegramId = null) {
 }
 function publicJobFailure(error) {
   const messages = { JOB_SCOPE_DENIED: 'Поиск работы доступен только в личном чате и при действующем разрешении.',
+    JOB_SEARCH_QUERIES_REQUIRED: 'Сначала добавь поисковые запросы: «Настройки → Поисковые запросы → Добавить». Пришли фразы одним сообщением, каждую с новой строки. Затем включи поиск.',
     JOB_PROFILE_UNCONFIRMED: 'Сначала проверь и подтверди профиль фактов в настройках поиска работы.',
     JOB_MODEL_NOT_CONFIGURED: 'Для писем нужно выбрать модель поиска работы и настроить OpenRouter.',
     JOB_MODEL_UNAVAILABLE: 'Модель сейчас недоступна. Предыдущий черновик сохранён.',

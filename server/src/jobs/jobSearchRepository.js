@@ -1,6 +1,7 @@
 const crypto = require('node:crypto');
-const { uuid, settingsSchema, defaultJobSettings, assertUserJobAccess, assertJobScope, jobError } = require('./jobSchemas');
+const { uuid, settingsSchema, parseJobSettings, defaultJobSettings, assertUserJobAccess, assertJobScope, jobError } = require('./jobSchemas');
 const { jobTransaction } = require('./jobTransaction');
+const HAS_QUERIES_SQL = "jsonb_array_length(CASE WHEN jsonb_typeof(settings->'queries')='array' THEN settings->'queries' ELSE '[]'::jsonb END)>0";
 
 class JobSearchRepository {
   constructor(pool, { defaults = {}, accessService = null } = {}) { this.pool = pool; this.defaults = defaults; this.accessService = accessService; }
@@ -21,10 +22,11 @@ class JobSearchRepository {
   }
 
   async saveSettings({ scope, expectedRevision, settings }) {
-    settings = settingsSchema.parse(settings);
+    settings = parseJobSettings(settings);
     return jobTransaction(this.pool, async (client) => {
       await assertJobScope(client, scope, this.accessService);
       const row = (await client.query(`UPDATE job_searches SET settings=$1,revision=revision+1,
+        checkpoint=CASE WHEN settings->'queries' IS DISTINCT FROM $1::jsonb->'queries' THEN NULL ELSE checkpoint END,
         conversation_id=$2,chat_id=$3,next_check_at=now(),progress=NULL,lease_id=NULL,lease_until=NULL,updated_at=now()
         WHERE user_id=$4 AND revision=$5 RETURNING *`,
       [settings, scope.conversationId, scope.chatId, scope.userId, expectedRevision])).rows[0];
@@ -43,10 +45,12 @@ class JobSearchRepository {
         next_check_at=CASE WHEN $1::boolean THEN now() ELSE next_check_at END,
         lease_id=NULL,lease_until=NULL,status='idle',failure_code=NULL,updated_at=now()
         WHERE user_id=$4 AND revision=$5
+        AND (NOT $1::boolean OR ${HAS_QUERIES_SQL})
         AND (settings->>'activated' IS DISTINCT FROM ($1::boolean)::text OR settings->>'paused' IS DISTINCT FROM (NOT $1::boolean)::text)
         RETURNING *`, [enabled, scope.conversationId, scope.chatId, scope.userId, expectedRevision])).rows[0];
       if (row) return row;
       const current = (await client.query('SELECT * FROM job_searches WHERE user_id=$1', [scope.userId])).rows[0];
+      if (enabled && !current?.settings?.queries?.length) throw jobError('JOB_SEARCH_QUERIES_REQUIRED');
       if (current?.settings.activated === enabled && current.settings.paused === !enabled) return current;
       throw jobError('JOB_REVISION_CONFLICT');
     });
@@ -106,6 +110,7 @@ class JobSearchRepository {
       return (await client.query(`UPDATE job_searches SET lease_id=$1,lease_until=$2::timestamptz+interval '5 minutes',
         status='collecting' WHERE user_id=$3 AND (lease_until IS NULL OR lease_until<$2)
         AND settings->>'activated'='true' AND settings->>'paused'='false'
+        AND ${HAS_QUERIES_SQL}
         AND ($4::boolean OR next_check_at<=$2) RETURNING *`, [leaseId, now, uuid.parse(userId), force])).rows[0] || null;
     });
   }
@@ -148,6 +153,7 @@ class JobSearchRepository {
       // Keep PostgreSQL's full timestamp precision in the pagination cursor.
       const candidates = (await this.pool.query(`SELECT user_id,next_check_at::text AS next_check_at FROM job_searches WHERE next_check_at<=$1
         AND settings->>'activated'='true' AND settings->>'paused'='false'
+        AND ${HAS_QUERIES_SQL}
         AND ($2::timestamptz IS NULL OR (next_check_at,user_id)>($2::timestamptz,$3::uuid))
         ORDER BY next_check_at,user_id LIMIT 100`, [now, cursor?.next_check_at || null, cursor?.user_id || null])).rows;
       for (const row of candidates) {

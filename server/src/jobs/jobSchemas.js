@@ -5,13 +5,18 @@ const uuid = z.uuid();
 const scopeSchema = z.object({ userId: uuid, conversationId: uuid,
   chatId: z.string().regex(/^\d{1,20}$/), channel: z.literal('telegram') }).strict();
 const settingsSchema = z.object({
-  queries: z.array(z.string().trim().min(2).max(200)).min(1).max(100),
+  queries: z.array(z.string().trim().min(2).max(200)).max(100),
   exclusions: z.array(z.string().trim().min(1).max(100)).max(50),
-  targetRub: z.number().int().min(1).max(100000000), officeCity: z.string().min(1).max(120),
-  remote: z.boolean(), historyDays: z.number().int().min(1).max(30),
+  targetRub: z.number().int().min(1).max(100000000).nullable(), officeCity: z.string().max(120),
+  remote: z.boolean().nullable(), historyDays: z.number().int().min(1).max(30),
   intervalMs: z.number().int().min(60000).max(86400000), budgetUsd: z.number().positive().max(10000),
   model: z.string().max(255), paused: z.boolean(), activated: z.boolean(),
 }).strict();
+function parseJobSettings(value) {
+  const settings = settingsSchema.parse(value);
+  return settings.queries.length === 0 && settings.activated
+    ? { ...settings, activated: false, paused: true } : settings;
+}
 const profileSchema = z.object({
   confirmed: z.boolean(),
   baseLetter: z.string().max(10000).default(''),
@@ -41,4 +46,4 @@ async function assertJobScope(pool, input, accessService) {
   return scope;
 }
 
-module.exports = { uuid, scopeSchema, settingsSchema, profileSchema, defaultJobSettings, jobError, assertUserJobAccess, assertJobScope };
+module.exports = { uuid, scopeSchema, settingsSchema, parseJobSettings, profileSchema, defaultJobSettings, jobError, assertUserJobAccess, assertJobScope };

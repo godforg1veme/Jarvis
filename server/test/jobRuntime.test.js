@@ -2,6 +2,26 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createJobRuntime } = require('../src/jobs/jobRuntime');
 const { createCollectorRuntime } = require('../src/jobs/collectorMain');
+const { settingsSchema, parseJobSettings, defaultJobSettings } = require('../src/jobs/jobSchemas');
+const { JobCollector } = require('../src/jobs/jobCollector');
+
+test('empty settings validate and a claimed empty search makes no HH request', async () => {
+  assert.deepEqual(settingsSchema.parse(defaultJobSettings()).queries, []);
+  assert.equal(settingsSchema.parse({ ...defaultJobSettings(), queries: ['инженер'], targetRub: 100000,
+    officeCity: 'Москва', remote: true }).remote, true);
+  assert.deepEqual({ activated: parseJobSettings({ ...defaultJobSettings(), activated: true }).activated,
+    paused: parseJobSettings({ ...defaultJobSettings(), activated: true }).paused },
+  { activated: false, paused: true });
+  let called = false;
+  const collector = new JobCollector({
+    searchRepository: { async claimSearch() { return { settings: defaultJobSettings(), lease_id: 'lease' }; },
+      async finishSearch({ failureCode }) { assert.equal(failureCode, 'JOB_SEARCH_QUERIES_REQUIRED'); called = true; } },
+    deliveryRepository: {}, hhClient: { async search() { throw new Error('HH must not be called'); } },
+  });
+  assert.deepEqual(await collector.runOnce({ userId: '11111111-1111-4111-8111-111111111111' }),
+    { outcome: 'JOB_SEARCH_QUERIES_REQUIRED', matched: 0, requests: 0 });
+  assert.equal(called, true);
+});
 
 test('feature off constructs no database, model or Telegram worker', async () => {
   const forbidden = new Proxy({}, { get() { throw new Error('Unexpected feature access'); } });

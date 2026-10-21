@@ -13,6 +13,11 @@ class JobCollector {
     const job = await this.search.claimSearch({ userId, now, force });
     if (!job) return { outcome: 'not_due', matched: 0 };
     const settings = job.settings;
+    if (!Array.isArray(settings?.queries) || settings.queries.length === 0) {
+      await this.search.finishSearch({ userId, leaseId: job.lease_id, checkpoint: null,
+        nextCheckAt: new Date(now.getTime() + (settings?.intervalMs || 1800000)), failureCode: 'JOB_SEARCH_QUERIES_REQUIRED' });
+      return { outcome: 'JOB_SEARCH_QUERIES_REQUIRED', matched: 0, requests: 0 };
+    }
     let requests = 0, matched = 0;
     const seen = new Set();
     const rateSnapshot = this.currencyRates ? await this.currencyRates.get({ date: now }).catch(() => null) : null;

@@ -23,7 +23,7 @@ async function historyFixture(){
  const rpc=createRpcServer({ownerId:f.owner,token,browser:{async history({section,page}){reads++;if(failCode)throw Object.assign(Error('Fixture private failure'),{code:failCode});return structuredClone(pages.get(`${section}:${page}`));}}});
  rpc.listen(0,'127.0.0.1');await once(rpc,'listening');
  const interactions=new TelegramInteractionRepository(f.pool),clock={now:new Date('2026-10-16T12:00:00Z')};
- const runtime=createJobRuntime({config:{jobSearchEnabled:true,jobBrowserOwnerId:f.owner,jobBrowserToken:token,jobBrowserUrl:'http://job-browser:8080'},pool:f.pool,interactions,
+ const runtime=createJobRuntime({config:{jobSearchEnabled:true,operationsOwnerTelegramId:'101',jobBrowserOwnerId:f.owner,jobBrowserToken:token,jobBrowserUrl:'http://job-browser:8080'},pool:f.pool,interactions,
  fetchImpl:(url,init)=>{if(url!=='http://job-browser:8080/rpc'){modelCalls++;throw Error('No model expected');}return fetch(`http://127.0.0.1:${rpc.address().port}/rpc`,init);},
  send:async()=>{throw Error('No outbound notification expected');},applicationAdapter:{capabilities:{applicantApply:true},async submit(){submits++;return{outcome:'unknown'};},async reconcile(){return{outcome:'unknown'};}}});
  runtime.historySync.now=()=>clock.now;

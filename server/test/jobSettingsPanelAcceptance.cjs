@@ -24,7 +24,9 @@ test('real panel emits clickable settings and bounded pages without starting inp
       if(['queries','exclusions'].includes(field))assert.match(view.answer,/Страница/);
       else assert.match(view.answer,/Сейчас:/);
     }
-    const s=await f.search(),next=await f.cb(`job:cfg:queries:${s.revision}:1`);assert.match(next.answer,/Страница 2/);
+    const s=await f.search();assert.deepEqual(s.settings.queries,[]);assert.equal(s.settings.targetRub,null);assert.equal(s.settings.officeCity,'');assert.equal(s.settings.remote,null);
+    s.settings.queries=Array.from({length:9},(_,i)=>`Fixture query ${i}`);await f.pool.query('UPDATE job_searches SET settings=$1 WHERE user_id=$2',[s.settings,f.owner]);
+    const next=await f.cb(`job:cfg:queries:${s.revision}:1`);assert.match(next.answer,/Страница 2/);
     assert.equal(f.reads,0);assert.equal(f.modelCalls,0);assert.equal(f.submits,0);
     const constraint=(await f.pool.query("SELECT pg_get_constraintdef(oid) AS d FROM pg_constraint WHERE conname='telegram_interactions_kind_check' AND conrelid='telegram_interactions'::regclass")).rows[0].d;
     assert.ok(KINDS.has('job_setting_value'));assert.match(constraint,/job_setting_value/);
@@ -69,12 +71,32 @@ test('real query/exclusion lists add, deduplicate, show full text and confirm ex
       assert.match((await f.cb(`job:cfg_remove:${field}:${s.revision}:${index}`)).answer,/Данные изменились/);
     }
     const state=await f.search();state.settings.queries=['Only fixture query'];await f.pool.query('UPDATE job_searches SET settings=$1,revision=revision+1 WHERE user_id=$2',[state.settings,f.owner]);
-    const current=await f.search();assert.match((await f.cb(`job:cfg_remove:queries:${current.revision}:0`)).answer,/последний запрос/);
+    const current=await f.search();await f.cb(saveButton(await f.cb(`job:cfg_remove:queries:${current.revision}:0`)));assert.deepEqual((await f.search()).settings.queries,[]);
     current.settings.exclusions=Array.from({length:50},(_,i)=>`Fixture exclusion ${i}`);
     await f.pool.query('UPDATE job_searches SET settings=$1,revision=revision+1 WHERE user_id=$2',[current.settings,f.owner]);
     const full=await f.search(),fullView=await f.cb(`job:cfg:exclusions:${full.revision}:0`);assert.ok(!fullView.buttons.flat().some(b=>b.text.includes('Добавить')));
     await f.cb(`job:cfg_input:exclusions:${full.revision}:0`);assert.match((await f.msg('One more fixture phrase')).answer,/Список заполнен/);assert.equal((await f.search()).settings.exclusions.length,50);
     const history=(await f.pool.query('SELECT content FROM messages')).rows.map(x=>x.content).join('\n');assert.ok(!history.includes('Private fixture phrase'));
+  }finally{await f.close();}
+});
+
+test('multiline lists validate before consumption, confirm as one change and clear with a single confirmation',async()=>{
+  const f=await fixture();try{
+    let s=await f.search();assert.match((await f.cb('job:resume')).answer,/Сначала добавь поисковые запросы/);
+    await f.cb(`job:cfg_input:queries:${s.revision}:0`);const pending=await f.active();
+    await f.msg('Закупки\nX');assert.equal((await f.active()).id,pending.id);assert.deepEqual((await f.search()).settings.queries,[]);
+    await f.pool.query("UPDATE job_searches SET checkpoint=now()-interval '1 hour' WHERE user_id=$1",[f.owner]);
+    const preview=await f.msg('Закупки\r\nСнабжение\n\nЗакупки');assert.equal(await f.active(),null);assert.match(preview.answer,/1\. Закупки\n2\. Снабжение/);assert.deepEqual((await f.search()).settings.queries,[]);
+    await f.cb(saveButton(preview));assert.deepEqual((await f.search()).settings.queries,['Закупки','Снабжение']);
+    assert.equal((await f.search()).checkpoint,null);
+    assert.match((await f.cb(saveButton(preview))).answer,/недоступно/);
+    await f.cb('job:resume');assert.equal((await f.search()).settings.activated,true);
+    s=await f.search();const clear=await f.cb(`job:cfg_pick:queries:${s.revision}:0`);assert.match(clear.answer,/Поиск будет выключен/);assert.equal((await f.search()).settings.queries.length,2);
+    await f.cb(saveButton(clear));s=await f.search();assert.deepEqual(s.settings.queries,[]);assert.equal(s.settings.activated,false);assert.equal(s.settings.paused,true);
+    for(const [field,index,key] of [['salary',4,'targetRub'],['city',0,'officeCity'],['remote',2,'remote']]) {
+      s=await f.search();const value=await f.cb(`job:cfg_pick:${field}:${s.revision}:${index}`);assert.match(value.answer,/уже установлено/);
+    }
+    assert.equal(f.reads,0);assert.equal(f.modelCalls,0);assert.equal(f.submits,0);
   }finally{await f.close();}
 });
 
@@ -89,7 +111,7 @@ test('real input cancels on navigation and rejects foreign scopes, stale revisio
     assert.match((await f.msg('Expired city')).answer,/Время ввода закончилось/);
     await f.cb(input);await f.pool.query('UPDATE job_searches SET revision=revision+1 WHERE user_id=$1',[f.owner]);assert.match((await f.msg('Stale city')).answer,/Данные изменились/);
     s=await f.search();const preview=await f.cb(`job:cfg_pick:interval:${s.revision}:2`),data=saveButton(preview);
-    assert.match((await f.cb(data,202)).answer,/владельцу/);assert.match((await f.cb(data,101,-100,'group')).answer,/личном/);
+    assert.match((await f.cb(data,202)).answer,/разрешении/);assert.match((await f.cb(data,101,-100,'group')).answer,/личном/);
     assert.match((await f.cb(data,101,999)).answer,/личном/);
     const other=(await f.pool.query("SELECT id FROM conversations WHERE user_id=$1 AND channel='telegram' AND external_chat_id='202'",[f.stranger])).rows[0];
     await assert.rejects(f.runtime.telegramService.settingsService.approve({scope:{...f.scope,conversationId:other.id},confirmationId:data.split(':')[2],panel:true}),{code:'JOB_SCOPE_DENIED'});

@@ -17,6 +17,10 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
+21 октября подготовлены [пустые фильтры поиска и ввод фраз списком](updates/2026-10-21-empty-job-filters.md).
+Проверены ПК Edge, 785 server tests, 66 Telegram и 10 PostgreSQL-сценариев.
+Фактический статус установки и адресной очистки Сени — в записи выпуска.
+
 Исправлена [незагружающаяся картинка капчи при входе HH](updates/2026-10-21-hh-login-captcha-repair.md).
 В отдельном браузере DE получение картинки на русском и английском прошло;
 настоящий вход участника по SMS ещё не подтверждён. Статус выпуска — в записи.
@@ -246,6 +250,10 @@ describes publishing. Plans describe intentions. Code, checks, and actual
 deployment establish what is running.
 
 ### Current status
+
+October 21: [empty job filters and multiline phrase input](updates/2026-10-21-empty-job-filters.md)
+passed PC Edge, 785 server tests, 66 Telegram checks and 10 PostgreSQL scenarios.
+Installation and the targeted Senya reset status are recorded in the release note.
 
 Fixed the [missing CAPTCHA picture during HH sign-in](updates/2026-10-21-hh-login-captcha-repair.md).
 Picture loading in Russian and English passed in isolated Chromium on DE;

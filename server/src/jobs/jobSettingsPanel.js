@@ -20,7 +20,7 @@ class JobSettingsPanel {
       return [control(short(`${def.label}${value!==''?`: ${value}`:''}`),'cfg',field,search.revision)];
     });
     rows.push([button('← В поиск работы','menu')]);
-    return response(`${notice?notice+'\n\n':''}⚙️ Настройки поиска\nНажми на параметр, чтобы изменить его.\nДоход — ориентир на руки. Уведомление о расходах не останавливает AI.`,rows);
+    return response(`${notice?notice+'\n\n':''}⚙️ Настройки поиска\nНажми на параметр, чтобы изменить его.\nФильтры заполняешь сам. Сначала добавь поисковые запросы — по одной фразе на строку.\nДоход — ориентир на руки. Уведомление о расходах не останавливает AI.`,rows);
   }
   fieldView(search,field,page=0,notice='') {
     const def=fields[field],s=search.settings,rev=search.revision;
@@ -28,6 +28,7 @@ class JobSettingsPanel {
       const list=s[def.key],last=Math.max(0,Math.ceil(list.length/8)-1),p=Math.min(page,last);
       const rows=list.slice(p*8,p*8+8).map((text,i)=>[control(short(`${p*8+i+1}. ${text}`),'cfg_item',field,rev,p*8+i)]);
       if(list.length<(field==='queries'?100:50)) rows.push([control('＋ Добавить','cfg_input',field,rev,p)]);
+      if(list.length) rows.push([control('Очистить список','cfg_pick',field,rev,0)]);
       const nav=[];if(p>0)nav.push(control('← Назад','cfg',field,rev,p-1));if(p<last)nav.push(control('Дальше →','cfg',field,rev,p+1));if(nav.length)rows.push(nav);
       rows.push([button('← В настройки','settings')]);
       return response(`${notice?notice+'\n\n':''}${def.label}: ${list.length}\nСтраница ${p+1} из ${last+1}\n${list.length?'Нажми на фразу, чтобы увидеть её полностью или удалить.':'Пока нет фраз.'}`,rows);
@@ -44,6 +45,10 @@ class JobSettingsPanel {
     return returnTo.field==='panel'?this.panel(search,notice):this.fieldView(search,returnTo.field,returnTo.page,notice);
   }
   async preview(scope,search,field,next,change,page=0) {
+    if(!next.queries.length&&next.activated) {
+      next={...next,activated:false,paused:true};
+      change+='\nПоиск будет выключен до добавления запросов.';
+    }
     next=settingsSchema.parse(next);
     const returnTo={field:listFields.includes(field)?field:'panel',page};
     if(isDeepStrictEqual(next,search.settings)) return this.destination(scope,returnTo,'Это значение уже установлено.');
@@ -69,12 +74,11 @@ class JobSettingsPanel {
     if(action==='cfg_pick') {
       const choice=choices(field,s,this.jobs.settingsModels)[index];
       if(!choice) throw jobError('JOB_INVALID_ACTION');
-      return this.preview(scope,search,field,{...s,[def.key]:choice.value},`${def.label}: ${formatValue(field,s[def.key])} → ${formatValue(field,choice.value)}`);
+      return this.preview(scope,search,field,{...s,[def.key]:choice.value},listFields.includes(field)?`${def.label}: очистить весь список (${s[def.key].length} фраз).`:`${def.label}: ${formatValue(field,s[def.key])} → ${formatValue(field,choice.value)}`,page);
     }
     if(!listFields.includes(field)||index>=s[def.key].length) throw jobError('JOB_NOT_FOUND');
     const text=s[def.key][index],returnPage=Math.floor(index/8);
     if(action==='cfg_item') return response(`${def.label}\n\n${text}`,[[control('Удалить','cfg_remove',field,revision,index)],[control('← К списку','cfg',field,revision,returnPage)]]);
-    if(field==='queries'&&s.queries.length===1) return this.fieldView(search,field,returnPage,'Нельзя удалить последний запрос. Сначала добавь другой.');
     return this.preview(scope,search,field,{...s,[def.key]:s[def.key].filter((_,i)=>i!==index)},`Удалить фразу:\n${text}`,returnPage);
   }
   async handlePendingText(text,{scope,interaction}) {
@@ -91,9 +95,10 @@ class JobSettingsPanel {
     let next={...search.settings,[def.key]:value},change=`${def.label}: ${formatValue(field,search.settings[def.key])} → ${formatValue(field,value)}`;
     if(listFields.includes(field)) {
       const old=search.settings[def.key];
-      if(old.length>=(field==='queries'?100:50)&&!old.includes(value)) return response('Список заполнен. Удали одну фразу перед добавлением.',[[control('← К списку','cfg',field,revision,returnPage)]]);
-      next={...search.settings,[def.key]:old.includes(value)?old:[...old,value]};change=`Добавить фразу:\n${value}`;
-      if(!old.includes(value)) destinationPage=Math.floor(old.length/8);
+      const added=value.filter(line=>!old.includes(line));
+      if(old.length+added.length>(field==='queries'?100:50)) return response(`Список заполнен: можно сохранить до ${field==='queries'?100:50} фраз. Удали лишние строки и повтори ввод.`,[[control('← К списку','cfg',field,revision,returnPage)]]);
+      next={...search.settings,[def.key]:[...old,...added]};change=`Добавить фразы (${added.length}):\n${added.map((line,i)=>`${i+1}. ${line}`).join('\n')}`;
+      if(added.length) destinationPage=Math.floor(old.length/8);
     }
     const consumed=await this.jobs.interactions.consume({id:interaction.id,...scope});
     if(!consumed) throw jobError('JOB_CONFIRMATION_UNAVAILABLE');

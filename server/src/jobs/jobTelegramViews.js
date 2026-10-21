@@ -5,7 +5,7 @@ function response(answer, buttons = []) {
 function button(text, action, id) { return { text, data: `job:${action}${id == null ? '' : `:${id}`}` }; }
 function homeView({ search, usage, connection, captchaEnabled = false }) {
   const enabled = search.settings.activated && !search.settings.paused;
-  return response(`Поиск работы\n${enabled ? 'Поиск включён' : 'Поиск выключен'}
+  return response(`Поиск работы\n${enabled ? 'Поиск включён' : 'Поиск выключен'}${!search.settings.queries.length?'\nДобавь запросы в настройках: каждую фразу с новой строки.':''}
 Проверка: каждые ${Math.round(search.settings.intervalMs / 60000)} мин.
 Первая выдача: ${search.settings.historyDays} дней.
 Последняя успешная проверка: ${search.checkpoint ? new Date(search.checkpoint).toLocaleString('ru-RU', { timeZone: 'Etc/GMT-3' }) : 'ещё не выполнена'}
@@ -23,8 +23,8 @@ ${search.status === 'attention' ? 'Последняя проверка не за
   ]);
 }
 const ANNOTATIONS = { SALARY_UNKNOWN: 'Доход нужно уточнить', SALARY_NEEDS_CLARIFICATION: 'Налоги, период оплаты или премии нужно уточнить',
-  SALARY_MINIMUM_NOT_GUARANTEED: '100 000 ₽ на руки не гарантированы', SALARY_CONFLICT: 'Суммы в описании и полях расходятся',
-  REMOTE_ELIGIBILITY_UNKNOWN: 'Возможность работы из Москвы нужно уточнить', LOCATION_UNKNOWN: 'Место и формат нужно уточнить' };
+  SALARY_MINIMUM_NOT_GUARANTEED: 'Выбранный доход на руки не гарантирован', SALARY_CONFLICT: 'Суммы в описании и полях расходятся',
+  REMOTE_ELIGIBILITY_UNKNOWN: 'Доступность удалённой работы нужно уточнить', LOCATION_UNKNOWN: 'Место и формат нужно уточнить' };
 function salaryText(salary) {
   if (!salary || (salary.from == null && salary.to == null)) return 'не указана';
   const format = (n) => Number(n).toLocaleString('ru-RU');

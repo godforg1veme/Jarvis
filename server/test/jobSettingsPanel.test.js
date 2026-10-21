@@ -10,12 +10,23 @@ test('one-field settings values respect existing ranges and ordinary Russian inp
   assert.equal(parseValue('budget', '3,5'), 3.5);
   assert.equal(parseValue('interval', '60'), 3600000);
   assert.equal(parseValue('city', ' Казань '), 'Казань');
-  assert.equal(parseValue('exclusions', 'X'), 'X');
+  assert.deepEqual(parseValue('exclusions', 'X'), ['X']);
   for (const [field, value] of [['salary','0'],['interval','1.5'],['history','31'],['budget','0'],['budget','1e3'],['model','Bearer private-fixture'],['queries','X'],['remote','да']]) {
     assert.throws(() => parseValue(field,value));
   }
   assert.equal(choices('model', {model:'fixture/current'}, ['fixture/default','fixture/current']).filter(x=>x.value==='fixture/current').length, 1);
   assert.equal(choices('model', {model:''}, [])[0].value, '');
+});
+
+test('filter lists accept one message with one phrase per line without partial or hidden parsing', () => {
+  assert.deepEqual(parseValue('queries', ' Менеджер по закупкам\r\n\nСнабжение\nМенеджер по закупкам '), ['Менеджер по закупкам','Снабжение']);
+  assert.deepEqual(parseValue('exclusions', 'Продажи\nЗвонки'), ['Продажи','Звонки']);
+  for(const value of ['\n  \n','Valid query\nX','Valid query\nBad\u0000value',Array.from({length:101},(_,i)=>`Query ${i}`).join('\n')]) {
+    assert.throws(()=>parseValue('queries',value));
+  }
+  assert.equal(choices('salary',{}).at(-1).value,null);
+  assert.equal(choices('remote',{}).at(-1).value,null);
+  assert.equal(choices('city',{})[0].value,'');
 });
 
 test('settings callbacks are closed, bounded, revisioned and carry no user values', () => {

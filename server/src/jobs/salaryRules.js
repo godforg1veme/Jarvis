@@ -17,7 +17,8 @@ function descriptionSalary(text) {
   });
 }
 
-function evaluateSalary({ salary, description = '', targetRub = 100000, rateSnapshot }) {
+function evaluateSalary({ salary, description = '', targetRub = null, rateSnapshot }) {
+  if (targetRub == null) return { include: true, reasonCodes: [], annotations: [] };
   const annotations = [];
   const sources = [];
   if (salary && (salary.from != null || salary.to != null)) sources.push({ ...salary,

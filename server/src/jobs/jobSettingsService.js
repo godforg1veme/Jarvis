@@ -1,4 +1,4 @@
-const { settingsSchema, profileSchema, assertJobScope, jobError } = require('./jobSchemas');
+const { parseJobSettings, profileSchema, assertJobScope, jobError } = require('./jobSchemas');
 const { jobTransaction } = require('./jobTransaction');
 
 function parseSettingsEdit(text, current) {
@@ -17,7 +17,7 @@ function parseSettingsEdit(text, current) {
     const key = keys[match[1].toLowerCase()];
     next[key] = ['model', 'officeCity'].includes(key) ? match[2].trim() : Number(match[2].replace(/\s/g, '').replace(',', '.')) * (key === 'intervalMs' ? 60000 : 1);
   }
-  return settingsSchema.parse(next);
+  return parseJobSettings(next);
 }
 
 function parseProfileEdit(text, current) {
@@ -44,6 +44,7 @@ class JobSettingsService {
   async preview({ scope, kind, targetId, revision, value, returnTo }) {
     await assertJobScope(this.pool, scope, this.accessService);
     if (!['settings', 'profile'].includes(kind)) throw jobError('JOB_INVALID_ACTION');
+    if (kind === 'settings') value = parseJobSettings(value);
     if (returnTo !== undefined && (kind !== 'settings' || !returnTo || Object.keys(returnTo).length !== 2
       || !['panel','queries','exclusions'].includes(returnTo.field) || !Number.isInteger(returnTo.page)
       || returnTo.page < 0 || returnTo.page > 12)) throw jobError('JOB_INVALID_ACTION');
@@ -63,8 +64,9 @@ class JobSettingsService {
       if (!row) throw jobError('JOB_CONFIRMATION_UNAVAILABLE');
       let updated;
       if (row.kind === 'settings') updated = await client.query(`UPDATE job_searches SET settings=$1,revision=revision+1,
+        checkpoint=CASE WHEN settings->'queries' IS DISTINCT FROM $1::jsonb->'queries' THEN NULL ELSE checkpoint END,
         next_check_at=now(),progress=NULL,lease_id=NULL,lease_until=NULL WHERE id=$2 AND user_id=$3 AND revision=$4 RETURNING id`,
-      [settingsSchema.parse(row.frozen.value), row.target_id, scope.userId, row.frozen.revision]);
+      [parseJobSettings(row.frozen.value), row.target_id, scope.userId, row.frozen.revision]);
       else {
         updated = await client.query(`UPDATE job_profiles SET profile=$1,revision=revision+1,updated_at=now()
           WHERE id=$2 AND user_id=$3 AND revision=$4 RETURNING id`,

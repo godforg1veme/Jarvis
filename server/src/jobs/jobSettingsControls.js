@@ -1,19 +1,22 @@
 const { settingsSchema, jobError } = require('./jobSchemas');
 
 const fields = Object.freeze({
-  salary: { key:'targetRub', label:'💰 Доход', hint:'Ориентир дохода на руки в рублях: целое от 1 до 100 000 000.', presets:[80000,100000,150000,200000] },
-  city: { key:'officeCity', label:'📍 Город', hint:'Пришли название города для офисных вакансий, до 120 символов.' },
-  remote: { key:'remote', label:'🏠 Удалённые вакансии', hint:'Допускать удалённые вакансии наряду с офисными в выбранном городе?', presets:[true,false] },
+  salary: { key:'targetRub', label:'💰 Доход', hint:'Ориентир дохода на руки в рублях: целое от 1 до 100 000 000. Можно снять ограничение кнопкой.', presets:[80000,100000,150000,200000,null] },
+  city: { key:'officeCity', label:'📍 Город', hint:'Пришли название города для офисных вакансий, до 120 символов. Можно выбрать любой город.' },
+  remote: { key:'remote', label:'🏠 Удалённые вакансии', hint:'Любой формат — без ограничения. «Да» допускает удалённые вакансии наряду с офисными; «нет» исключает удалённые.', presets:[true,false,null] },
   interval: { key:'intervalMs', label:'🕒 Проверять', hint:'Интервал проверки в минутах: целое от 1 до 1440.', presets:[900000,1800000,3600000,7200000] },
   history: { key:'historyDays', label:'📅 История', hint:'Глубина первоначальной выдачи: от 1 до 30 дней. Это не срок хранения откликов.', presets:[1,7,14,30] },
   budget: { key:'budgetUsd', label:'🔔 Уведомление о расходах', hint:'Порог уведомления в USD: больше 0, до 10 000. Он не останавливает расходы AI.', presets:[1,3,5,10] },
   model: { key:'model', label:'🤖 Модель AI', hint:'Выбери настроенную модель или укажи другой ID OpenRouter. Изменение не вызывает AI.' },
-  queries: { key:'queries', label:'🔎 Поисковые запросы', hint:'Пришли одну поисковую фразу, от 2 до 200 символов.' },
-  exclusions: { key:'exclusions', label:'🚫 Исключения', hint:'Пришли одну нежелательную фразу, от 1 до 100 символов.' },
+  queries: { key:'queries', label:'🔎 Поисковые запросы', hint:'Пришли ключевые слова или фразы одним сообщением: каждая фраза с новой строки, от 2 до 200 символов. Например:\nМенеджер по закупкам\nСнабжение\nЛогистика\nВсего до 100 фраз. Повторы не добавляются.' },
+  exclusions: { key:'exclusions', label:'🚫 Исключения', hint:'Пришли нежелательные слова или фразы одним сообщением: каждая с новой строки, от 1 до 100 символов. Всего до 50 фраз. Повторы не добавляются.' },
 });
 const inputFields = Object.keys(fields).filter(x => x !== 'remote');
 const listFields = ['queries','exclusions'];
 function formatValue(field,value) {
+  if(field==='salary'&&value===null) return 'Не задан';
+  if(field==='city'&&!value) return 'Любой город';
+  if(field==='remote'&&value===null) return 'Любой формат';
   if(field==='salary') return `${Number(value).toLocaleString('ru-RU')} ₽`;
   if(field==='interval') return `${value/60000} мин`;
   if(field==='history') return `${value} дн`;
@@ -24,8 +27,17 @@ function formatValue(field,value) {
 function parseValue(field,input) {
   if(!inputFields.includes(field) || typeof input!=='string') throw jobError('JOB_INVALID_SETTING_VALUE');
   const text=input.trim();
-  if(/[\r\n\u0000-\u001f]/.test(text)) throw jobError('JOB_INVALID_SETTING_VALUE');
+  if(text.length>10000) throw jobError('JOB_INVALID_SETTING_VALUE');
   if(/\b(?:sk-[\w-]{16,}|Bearer\s+\S+)|(?:пароль|password|api[_ -]?key|токен)\s*[:=]\s*\S+/iu.test(text)) throw jobError('JOB_SENSITIVE_INPUT');
+  if(listFields.includes(field)) {
+    const lines=text.split(/\r?\n/).map(line=>line.trim()).filter(Boolean);
+    if(!lines.length||lines.some(line=>/[\u0000-\u001f\u007f]/.test(line))) throw jobError('JOB_INVALID_SETTING_VALUE');
+    const values=[...new Set(lines)];
+    const parsed=settingsSchema.shape[fields[field].key].safeParse(values);
+    if(!parsed.success) throw jobError('JOB_INVALID_SETTING_VALUE');
+    return parsed.data;
+  }
+  if(/[\r\n\u0000-\u001f]/.test(text)) throw jobError('JOB_INVALID_SETTING_VALUE');
   let value=text;
   if(['salary','interval','history','budget'].includes(field)) {
     const compact=text.replace(/[ \u00a0\u202f]/g,'');
@@ -33,15 +45,13 @@ function parseValue(field,input) {
     value=Number(compact.replace(',','.'))*(field==='interval'?60000:1);
   }
   if(field==='model'&&!/^[a-zA-Z0-9][a-zA-Z0-9_./:+-]{0,254}$/.test(text)) throw jobError('JOB_INVALID_SETTING_VALUE');
-  if(listFields.includes(field)) {
-    if(!text||text.length>(field==='queries'?200:100)||text.length<(field==='queries'?2:1)) throw jobError('JOB_INVALID_SETTING_VALUE');
-    return text;
-  }
   const parsed=settingsSchema.shape[fields[field].key].safeParse(value);
   if(!parsed.success) throw jobError('JOB_INVALID_SETTING_VALUE');
   return parsed.data;
 }
 function choices(field,settings,models=[]) {
+  if(listFields.includes(field)) return [{value:[],label:'Очистить список'}];
+  if(field==='city') return [{value:'',label:'Любой город'}];
   if(field==='model') return [{value:'',label:'По умолчанию'}, ...[...new Set([settings.model,...models].filter(x=>typeof x==='string'&&x.trim()&&x.length<=255))].slice(0,8).map(value=>({value,label:value}))];
   return (fields[field]?.presets||[]).map(value=>({value,label:formatValue(field,value)}));
 }
