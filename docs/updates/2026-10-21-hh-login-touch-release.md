@@ -34,6 +34,14 @@ inode смонтированного секрета сохранены. При �
 Desktop, VPN и Host Agent не менялись; по 17 модулей Host Agent на каждом узле
 совпадают с GitHub, службы активны. Незавершённая Operations UI не включена в выпуск.
 
+Windows-исходники продвинуты до принятой `main`; активная ветка орбитальной
+Operations UI сохранена поверх неё. Сверены 54 файла незавершённой работы:
+52 остались побайтно прежними, в двух MD-файлах сохранён весь исходный diff
+вместе с новым описанием HH. Временный stash удалён после проверки.
+Общий inventory предупреждает только о сохранённой ветке и dirty worktree;
+у DE/NL issues пусты. Desktop 1.0.2 совпадает по 146 файлам, Electron 42.11.9,
+native resources и bundled Node. EXE не пересобирался и не устанавливался.
+
 До публикации прошли server 783/783, Telegram gate 66/66, 14 проверок на
 отдельной PostgreSQL и браузерные fixtures 390/1280 px. Сам Linux image прошёл
 783 server и 79 browser tests без пропусков, полный pipeline из 42 миграций
@@ -79,6 +87,14 @@ unchanged. PostgreSQL, OCR, ASR and tunnel retained their container IDs.
 Desktop, VPN and Host Agent were unchanged; all 17 Host Agent modules on each
 node match GitHub and their services are active. Unfinished Operations UI work
 is excluded from the release.
+
+Windows sources were advanced to accepted `main`, preserving the active orbital
+Operations UI branch on top. All 54 unfinished-work files were checked:
+52 remain byte-identical and both Markdown files retain their complete original
+diff alongside the new HH release text. The temporary stash was dropped after
+verification. The general inventory warns only about preserved local work;
+DE/NL issue lists are empty. Desktop 1.0.2 matches all 146 files, Electron
+42.11.9, native resources and bundled Node. No EXE was rebuilt or installed.
 
 Before publication: server 783/783, Telegram gate 66/66, 14 isolated PostgreSQL
 checks and 390/1280 px browser fixtures passed. The Linux images passed all
