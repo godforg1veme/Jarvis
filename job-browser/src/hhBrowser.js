@@ -8,6 +8,7 @@ const { dispatchCaptcha } = require('./captchaDispatch');
 const { bounded } = require('./browserHealth');
 const { readHistoryPage } = require('./hhHistoryReader');
 const { readLoginInputFields } = require('./loginInputFields');
+const { handleLoginCaptcha } = require('./loginCaptcha');
 const {readExistingApplication,visibleAppliedAction}=require('./existingApplication');
 const failure = (code) => Object.assign(new Error(code), { code });
 const CAPABILITIES = Object.freeze({ dateWindows: false, maxPages: 1000 });
@@ -63,9 +64,12 @@ class HhBrowser {
         const request = route.request();
         const method = request.method();
         if (['GET', 'HEAD', 'OPTIONS'].includes(method)) return allowedRequest(request.url()) ? route.continue() : route.abort();
+        const activeLogin = this.loginPage === page && ['waiting', 'captcha'].includes(this.loginState)
+          && Date.now() < this.loginExpiresAt;
+        if (await handleLoginCaptcha(route, { page, active: activeLogin })) return;
         let permitted = false;
         try {
-          permitted = this.loginPage === page && ['waiting','captcha'].includes(this.loginState)
+          permitted = activeLogin
             && Date.now() - this.loginGestureAt <= 2000
             && request.frame() === page.mainFrame()
             && isApprovedHhLoginRequest(method, request.resourceType(), request.url());

@@ -17,6 +17,10 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
+Исправлена [незагружающаяся картинка капчи при входе HH](updates/2026-10-21-hh-login-captcha-repair.md).
+В отдельном браузере DE получение картинки на русском и английском прошло;
+настоящий вход участника по SMS ещё не подтверждён. Статус выпуска — в записи.
+
 21 октября [выпущены исправление входа HH, личная доставка ссылки
 и управление с телефона](updates/2026-10-21-hh-login-touch-release.md).
 Server, browser и сборщик DE обновлены; исходники обоих VPS синхронизированы.
@@ -242,6 +246,10 @@ describes publishing. Plans describe intentions. Code, checks, and actual
 deployment establish what is running.
 
 ### Current status
+
+Fixed the [missing CAPTCHA picture during HH sign-in](updates/2026-10-21-hh-login-captcha-repair.md).
+Picture loading in Russian and English passed in isolated Chromium on DE;
+a member's real SMS sign-in remains unverified. Deployment status is in the record.
 
 On October 21, [HH sign-in, private link delivery and phone controls](updates/2026-10-21-hh-login-touch-release.md)
 were released. DE server, browser and collector are updated; both VPS source
