@@ -28,6 +28,19 @@ Browser, OCR, PostgreSQL, ASR и cloudflared сохранили ID. NL полу�
 момент, чтобы не ждать обычного интервала после выпуска. Настройки, lease другого
 пользователя и отправленные отклики не менялись.
 
+Итоговая сверка подтвердила совпадение принятой версии в Windows, GitHub и обоих
+VPS. На обоих VPS issues пусты; совпали 17 модулей Host Agent на каждом узле.
+Desktop 1.0.2: все 146 файлов, Electron 42.11.9 и bundled Node совпадают;
+пересборка и установка не выполнялись. Проверка из чистого worktree сначала
+не нашла локальные Electron build inputs; повторная проверка из канонического
+Windows-каталога с имеющимися зависимостями прошла.
+
+Незавершённая орбитальная Operations UI сохранена в своей ветке поверх свежей
+`main`. Все 28 файлов вне общих документов восстановлены побайтно; в двух
+MD-файлах сохранены её дополнения вместе с записью этого выпуска. Временный
+stash удалён после сверки. Общий checker предупреждает только о сохранённой
+активной ветке и её незакоммиченной работе. В публикацию они не вошли.
+
 Ниже сохранена диагностика и локальная приёмка до согласования публикации.
 
 21 октября владелец поручил восстановить поиск на VPS и проверить работу
@@ -100,6 +113,20 @@ subsequent container replacement, the collector saved progress and recorded
 `JOB_COLLECTION_STOPPED` during graceful shutdown; the owner's next check was
 rescheduled immediately to avoid waiting for the regular interval after release.
 Settings, other users' leases and submitted applications were not changed.
+
+Final inventory confirmed the accepted version matches across Windows, GitHub
+and both VPS nodes. Both VPS issue lists are empty; all 17 Host Agent modules
+match on each node. Desktop 1.0.2 matches all 146 files, Electron 42.11.9 and
+bundled Node; no rebuild or installation was performed. The clean worktree's
+first check lacked local Electron build inputs; repeating from the canonical
+Windows checkout with its existing dependencies passed.
+
+Unfinished orbital Operations UI work is preserved in its branch atop current
+`main`. All 28 files outside shared documents were restored byte for byte;
+both shared Markdown files retain its additions alongside this release record.
+The temporary stash was removed after verification. The overall checker warns
+only about that preserved active branch and its uncommitted work. None of it
+was included in this publication.
 
 The diagnosis and local acceptance before publication approval are preserved below.
 
