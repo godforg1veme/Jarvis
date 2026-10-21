@@ -40,7 +40,36 @@ revision, expiry и однократное потребление ввода/п�
 и очистку. Это локальная проверка, а не настоящее нажатие из клиента Telegram.
 Независимая проверка прав не нашла блокирующих замечаний; найденная возможность
 сохранить пустой активный поиск закрыта также в repository и старом редакторе.
-Фактический результат установки и очистки будет записан после выпуска.
+
+Выпущено по поручению владельца в GitHub `main`; исходники Windows, DE и NL
+синхронизированы. Код и runtime release: `87b6cf33fceea3c676ec5276888169a8a59c2247`,
+`/home/deploy/releases/jarvis-87b6cf3-empty-job-filters`.
+Server image: `sha256:e6d54401e9992173fe76dc8dd2713a7d5a38ac045c0c021994dd80c331b9070c`;
+collector image: `sha256:9a2784a69b1f145778ae1922639e5237a81f202a2ff25bef1e138fb23bb125e8`.
+Слои образов одинаковы; отличается Compose service label. Linux image прошёл
+785/785 unit и 10/10 PostgreSQL acceptance в отдельной internal Docker-сети.
+Тестовая БД и сеть удалены; локальная PostgreSQL остановлена.
+
+Сеня найден по паре UUID/числовой Telegram ID. Операция очистки записана в
+`job_tasks` под постоянным request ID; повтор этой операции не сбрасывает
+более новые настройки. Revision поиска изменился с 3 на 4: запросы и исключения
+пустые, зарплата null, город пустой, формат null, поиск выключен и на паузе.
+Checkpoint, progress и lease очищены; старые подтверждения фильтров и ввод
+аннулированы. Ожидающих карточек было 0. Сверка в той же транзакции подтвердила:
+настройки и revisions остальных пользователей не менялись. После запуска новой
+версии это состояние и отрисовка панели ещё раз проверены чтением из рабочей БД.
+
+Обновлены только server и collector DE. Оба running, server healthy, restarts 0.
+По 330 файлов server/shared в каждом контейнере совпадают с принятой версией.
+Browser с исправленной капчей, PostgreSQL, OCR, ASR и tunnel сохранили container IDs.
+Окружение и volumes сохранены, bind-secret сохранил inode. Source guards DE/NL
+прошли. HTTPS live/ready, Mini App и вход HH — 200; анонимный me — ожидаемый 401.
+Host Agent и VPN-службы DE/NL активны и не менялись. Desktop 1.0.2 совпадает по
+146 файлам, native Electron и bundled Node; пересборка EXE не нужна.
+Незавершённая Operations UI и исходный diff её документов сохранены. Общий
+inventory предупреждает только об этой активной локальной работе.
+Настоящий ввод новых фильтров человеком в Telegram остаётся для приёмки.
+Приватные подтверждения: `/home/deploy/maintenance/empty-job-filters-20261021`.
 
 ## English
 
@@ -73,5 +102,38 @@ message/menu handlers and an isolated database passed multiline input, preview,
 save, deduplication and clear. This is local verification, not a real Telegram
 client tap-through. Independent permission review found no blockers; the
 reported ability to save an active empty search was also closed in the
-repository and legacy editor. Installation and reset results will be recorded
-after deployment.
+repository and legacy editor.
+
+Published to GitHub `main` with owner authorization; Windows, DE and NL sources
+are synchronized. Code and runtime release: `87b6cf33fceea3c676ec5276888169a8a59c2247`,
+`/home/deploy/releases/jarvis-87b6cf3-empty-job-filters`.
+Server image: `sha256:e6d54401e9992173fe76dc8dd2713a7d5a38ac045c0c021994dd80c331b9070c`;
+collector image: `sha256:9a2784a69b1f145778ae1922639e5237a81f202a2ff25bef1e138fb23bb125e8`.
+Image layers are identical; their Compose service labels differ. The Linux
+image passed 785/785 unit tests and 10/10 PostgreSQL acceptance tests on an
+isolated internal Docker network. Test database and network were removed;
+the local PostgreSQL instance was stopped.
+
+Senya was identified by both internal UUID and numeric Telegram ID. The reset
+is recorded in `job_tasks` under a stable request ID; repeating that operation
+does not reset newer settings. Search revision changed from 3 to 4: queries and
+exclusions are empty, salary and format are null, city is empty, search is
+disabled and paused. Checkpoint, progress and lease were cleared; old filter
+confirmations and input were invalidated. There were zero queued cards. The
+same transaction verified that other users' settings and revisions did not
+change. A read from the production database after startup confirmed this
+state and successful settings-panel rendering again.
+
+Only DE server and collector were replaced. Both run, server is healthy, and
+both have zero restarts. All 330 server/shared files in each container match
+the accepted version. Browser with its CAPTCHA repair, PostgreSQL, OCR, ASR
+and tunnel retained their container IDs. Environment and volumes were
+preserved; the bind-mounted secret retained its inode. DE/NL source guards
+passed. Public HTTPS live/ready, Mini App and HH entry returned 200; anonymous
+me returned the expected 401. Host Agent and VPN services on DE/NL remain
+active and unchanged. Desktop 1.0.2 matches all 146 files, native Electron and
+bundled Node; no EXE rebuild is required. Unfinished Operations UI work and
+its original documentation diff were preserved. The general inventory warns
+only about this active local work. Real user input in Telegram remains a
+client acceptance check. Private evidence:
+`/home/deploy/maintenance/empty-job-filters-20261021`.
