@@ -9,7 +9,7 @@ source changes; verify the deployed revision before a server rollout.
 
 ## Change control
 
-21 октября 2026, согласовано владельцем; локальная разработка:
+21 октября 2026, согласовано владельцем и установлено на DE:
 «Подключить HH» выдаёт личную временную ссылку текстом и URL-кнопкой
 «Открыть вход HH». Запуск из Mini App также отправляет её этому пользователю
 в личный Telegram. URL ограничен настроенным HTTPS origin и
@@ -19,10 +19,10 @@ source changes; verify the deployed revision before a server rollout.
 Неизвестная доставка сверяется по исходной операции и не повторяется
 автоматически. Нижняя клавиатура Telegram и запасные кнопки окна HH остаются.
 Тап по полю HH включает ввод с клавиатуры телефона; значения полей не входят
-в метаданные снимка. Публикация и настоящая клиентская приёмка ещё не подтверждены.
-[Согласованная схема](superpowers/specs/2026-10-21-hh-login-touch-design.md).
+в метаданные снимка. Настоящая клиентская приёмка ещё не подтверждена.
+[Выпуск и проверки](updates/2026-10-21-hh-login-touch-release.md).
 
-October 21, 2026, owner-approved local development: “Подключить HH” provides a
+October 21, 2026, owner-approved and deployed on DE: “Подключить HH” provides a
 personal temporary link as text and an “Открыть вход HH” URL button. Mini App
 requests also deliver it to that user's private Telegram chat. The URL is
 restricted to the configured HTTPS origin and `/mini/job-connect/#ticket=<64 hex>`;
@@ -30,8 +30,8 @@ it is excluded from Jarvis history and logs. Private scope, current jobs access,
 isolated HH profiles, expiry and resume confirmation in the originating Mini App
 remain. Unknown delivery is not automatically repeated. Keep the Telegram bottom
 keyboard and fallback HH controls; tapping an HH field enables phone-keyboard
-input without returning field values as metadata. Deployment and live client
-acceptance remain unverified. [Approved design](superpowers/specs/2026-10-21-hh-login-touch-design.md).
+input without returning field values as metadata. Live client acceptance remains
+unverified. [Release and checks](updates/2026-10-21-hh-login-touch-release.md).
 
 19 октября 2026, по запросу владельца: пользовательские часы и даты — МСК,
 фиксированный UTC+3. В «Life OS → Напоминания → Добавить/Перенести» ввод без

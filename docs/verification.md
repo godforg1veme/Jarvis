@@ -1,5 +1,15 @@
 # Проверки перед выпуском
 
+Выпуск HH на DE 21 октября: [результат](updates/2026-10-21-hh-login-touch-release.md).
+Новые Linux images прошли 783 server и 79 browser tests без пропусков,
+42 миграции с pgvector и 14 PostgreSQL acceptance. Установленные файлы,
+миграция 040, volumes, окружение приложения и публичный HTTPS проверены.
+
+HH release on DE, October 21: [results](updates/2026-10-21-hh-login-touch-release.md).
+New Linux images passed 783 server and 79 browser tests without skips,
+42 pgvector migrations and 14 PostgreSQL acceptance checks. Installed files,
+migration 040, volumes, application environment and public HTTPS were verified.
+
 Личный вход HH, локально 21 октября:
 [результат и ограничения](updates/2026-10-21-hh-login-touch-development.md).
 Server 783/783, Telegram 66/66, browser 70 passed и 9 Windows skips;

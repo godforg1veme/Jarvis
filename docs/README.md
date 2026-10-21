@@ -17,9 +17,11 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
-21 октября локально подготовлены [исправление входа HH, личная доставка ссылки
-и управление с телефона](updates/2026-10-21-hh-login-touch-development.md).
-VPS пока не обновлялись; настоящий вход участника ещё требует проверки.
+21 октября [выпущены исправление входа HH, личная доставка ссылки
+и управление с телефона](updates/2026-10-21-hh-login-touch-release.md).
+Server, browser и сборщик DE обновлены; исходники обоих VPS синхронизированы.
+Linux: 783 server, 79 browser, 42 миграции и 14 PostgreSQL-проверок прошли.
+Настоящий вход участника и клавиатура iPhone ещё требуют проверки.
 
 21 октября [восстановлен сборщик поиска работы на DE](updates/2026-10-21-job-collector-access-repair.md):
 добавлена недостающая настройка владельца, поиск продолжил сохранённый прогресс.
@@ -241,9 +243,11 @@ deployment establish what is running.
 
 ### Current status
 
-On October 21, [HH sign-in, private link delivery and phone controls](updates/2026-10-21-hh-login-touch-development.md)
-were prepared locally. The VPS runtime is unchanged; real member sign-in still
-requires acceptance.
+On October 21, [HH sign-in, private link delivery and phone controls](updates/2026-10-21-hh-login-touch-release.md)
+were released. DE server, browser and collector are updated; both VPS source
+checkouts are synchronized. Linux checks passed: 783 server, 79 browser,
+42 migrations and 14 PostgreSQL tests. Real member sign-in and the iPhone
+keyboard still require acceptance.
 
 On October 21, [the DE job collector was restored](updates/2026-10-21-job-collector-access-repair.md):
 the missing owner setting was added, and search resumed from saved progress.

@@ -2,6 +2,9 @@
 
 ## Русский
 
+Более новый результат: [выпуск на DE и проверки](2026-10-21-hh-login-touch-release.md).
+Ниже сохранена запись локальной разработки до публикации.
+
 21 октября 2026 подготовлено локально по поручению владельца. Ветка
 `codex/hh-login-touch`; GitHub и VPS этим этапом не обновлялись. Работа над
 Operations UI в исходной папке сохранена отдельно.
@@ -61,6 +64,9 @@ Desktop runtime не менялся; общий Desktop packaging-check в от�
 на DE, синхронизация исходников обоих VPS и вход пользователя. EXE не требуется.
 
 ## English
+
+Newer result: [DE release and verification](2026-10-21-hh-login-touch-release.md).
+The local development record below is preserved as pre-release history.
 
 Prepared locally on October 21, 2026 with owner authorization, on
 `codex/hh-login-touch`. This stage did not publish to GitHub or update either
