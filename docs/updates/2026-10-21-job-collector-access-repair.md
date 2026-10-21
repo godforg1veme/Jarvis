@@ -4,6 +4,32 @@
 
 ## Русский
 
+### Постоянное исправление выпущено
+
+После согласования владельцем код опубликован в GitHub `main` коммитом
+`1d20d4c7c307aab67e5e6f072274f31f93300bd7`. Оба VPS получили этот SHA и прошли
+source guard. На DE установлен отдельный release
+`/home/deploy/releases/jarvis-1d20d4c-job-collector-access`, server и сборщик
+используют образ `sha256:b55adfdffdc9891269655a627f2a348ce3bb852497100601828874a4d5574ae7`.
+Сверены все 328 файлов server/shared и параметры окружения обоих контейнеров;
+расхождений нет. Основной Compose теперь передаёт owner ID без временного overlay.
+Прежние releases и смонтированный inode секрета сохранены.
+
+Сам образ прошёл 781/781 unit-тестов в Linux UTC и 3/3 доменных проверок с
+изолированной PostgreSQL. Server healthy, restart count обоих контейнеров 0;
+live/ready и Mini App через публичный HTTPS вернули 200. Python urllib получил
+403 на внешнем маршруте, поэтому HTTP-проверка повторена curl и прошла.
+Browser, OCR, PostgreSQL, ASR и cloudflared сохранили ID. NL получил исходники;
+рабочие компоненты на нём не менялись. Desktop не требовал пересборки.
+
+В 11:00:58 МСК зарегистрирована новая отправленная карточка вакансии.
+При последующей замене контейнера сборщик сохранил прогресс и штатно записал
+`JOB_COLLECTION_STOPPED`; ближайшая проверка владельца перенесена на текущий
+момент, чтобы не ждать обычного интервала после выпуска. Настройки, lease другого
+пользователя и отправленные отклики не менялись.
+
+Ниже сохранена диагностика и локальная приёмка до согласования публикации.
+
 21 октября владелец поручил восстановить поиск на VPS и проверить работу
 нескольких пользователей с разными ролями и персональными разрешениями.
 
@@ -43,12 +69,39 @@ Linux-проверок с настоящей PostgreSQL прошли. После
 Временная БД не имела доступа к production-сети и удалена после проверки.
 Независимая ревизия после исправления очереди не нашла подтверждённых дефектов.
 
-Новый код ещё не опубликован и не установлен: ремонт DE ограничен конфигурацией
+До согласования выпуска новый код ещё не был опубликован и установлен: ремонт DE ограничивался конфигурацией
 прежнего контейнера. Для постоянного выпуска нужна публикация проверенной ветки
 по release-workflow и обновление исходников обоих VPS; изменяется только сборщик
 DE. Desktop не требует пересборки. NL не запускает поиск работы.
 
 ## English
+
+### Permanent fix released
+
+After owner approval, the code was published to GitHub `main` as
+`1d20d4c7c307aab67e5e6f072274f31f93300bd7`. Both VPS nodes received this SHA and
+passed the source guard. DE runs the separate release
+`/home/deploy/releases/jarvis-1d20d4c-job-collector-access`; server and collector
+use image `sha256:b55adfdffdc9891269655a627f2a348ce3bb852497100601828874a4d5574ae7`.
+All 328 server/shared files and both containers' environment values match.
+The main Compose file now forwards the owner ID without the temporary overlay.
+Previous releases and the mounted secret inode were preserved.
+
+The image itself passed 781/781 unit tests in Linux UTC and 3/3 domain checks
+with isolated PostgreSQL. Server is healthy and both containers have zero
+restarts; public HTTPS live/ready and Mini App returned 200. Python urllib
+received 403 on the external route, so the HTTP checks were repeated with curl
+and passed. Browser, OCR, PostgreSQL, ASR and cloudflared retained their IDs.
+NL received source updates without changes to its running components.
+Desktop did not require rebuilding.
+
+A newly sent vacancy card was recorded at 11:00:58 Moscow time. During the
+subsequent container replacement, the collector saved progress and recorded
+`JOB_COLLECTION_STOPPED` during graceful shutdown; the owner's next check was
+rescheduled immediately to avoid waiting for the regular interval after release.
+Settings, other users' leases and submitted applications were not changed.
+
+The diagnosis and local acceptance before publication approval are preserved below.
 
 On October 21, the owner requested restoring VPS job search and checking support
 for multiple users with different roles and personal permissions.
@@ -89,7 +142,7 @@ permitted users and existing HH session isolation checks. The temporary database
 had no access to the production network and was removed afterwards. Independent
 review found no confirmed defects after the queue fix.
 
-The new code is neither published nor installed: DE repair changes only the
+Before release approval, the new code was neither published nor installed: DE repair changed only the
 previous container's configuration. A permanent release requires publishing the
 verified branch under release-workflow and synchronizing both VPS source trees;
 only the DE collector component changes. Desktop does not require rebuilding.

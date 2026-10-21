@@ -4,13 +4,15 @@
 [результат ремонта DE и локальных проверок](updates/2026-10-21-job-collector-access-repair.md).
 781/781 unit; 8/8 Linux-проверок с отдельной PostgreSQL. Новый сценарий проверяет
 роли, персональный allow/deny, блокировку, отзыв прав и 101 запрещённый поиск
-перед разрешёнными. Код защиты пока локальный; на DE восстановлена конфигурация.
+перед разрешёнными. Код опубликован и установлен на DE; сам новый образ прошёл
+781 unit и 3 PostgreSQL-проверки. Оба VPS source checkout синхронизированы.
 
 Job collector access, October 21:
 [DE repair and local checks](updates/2026-10-21-job-collector-access-repair.md).
 781/781 unit tests; 8/8 Linux checks with isolated PostgreSQL. The new scenario
 covers roles, personal allow/deny, blocking, revocation and 101 denied searches
-ahead of permitted users. The defensive code remains local; DE configuration is repaired.
+ahead of permitted users. The code is published and installed on DE; the new image
+passed 781 unit tests and 3 PostgreSQL checks. Both VPS source checkouts are synchronized.
 
 ```powershell
 # Set JARVIS_JOB_TEST_DATABASE_URL privately to an isolated database, never production.
