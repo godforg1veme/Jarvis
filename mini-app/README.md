@@ -4,11 +4,11 @@
 
 ## Русский
 
-22 октября локально подготовлена постоянная панель собственных резюме после
+22 октября на DE выпущена постоянная панель собственных резюме после
 подключения HH: выбор основного, обновление списка и отдельное включение
 бесплатного поднятия не чаще раза в 4 часа. Смена и включение требуют
 подтверждения в этой Mini App; неизвестный результат не повторяется.
-[Состояние и проверки](../docs/updates/2026-10-22-hh-resume-management-development.md).
+[Состояние и проверки](../docs/updates/2026-10-22-hh-resume-management-release.md).
 
 21 октября на DE выпущены исправление запросов входа HH, личная доставка временной
 ссылки текстом и кнопкой в Telegram и прямой ввод с клавиатуры телефона после
@@ -107,11 +107,11 @@ production browser fixtures с недоступным SDK и отказом се
 
 ## English
 
-October 22: a persistent personal resume panel is prepared locally: primary
+October 22: DE received a persistent personal resume panel: primary
 selection, catalog refresh and separate free raising opt-in, at most once
 every four hours. Selection and enabling require confirmation in this Mini
 App; unknown outcomes are not replayed.
-[Status and verification](../docs/updates/2026-10-22-hh-resume-management-development.md).
+[Status and verification](../docs/updates/2026-10-22-hh-resume-management-release.md).
 
 On October 21 DE received the HH authentication request fix, private
 Telegram delivery of temporary links as text and a button, and phone-keyboard

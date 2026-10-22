@@ -17,9 +17,10 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
-22 октября локально подготовлено [управление резюме HH](updates/2026-10-22-hh-resume-management-development.md):
+22 октября выпущено [управление резюме HH](updates/2026-10-22-hh-resume-management-release.md):
 постоянный выбор основного, обновление списка и отдельное включение бесплатного
-автоподнятия. На VPS не установлено; текущие проверки и границы — в записи разработки.
+автоподнятия. На DE обновлены server, browser и collector; исходники обоих VPS
+синхронизированы. Реальный выбор и первое поднятие остаются клиентской приёмкой.
 
 21 октября выпущены [пустые фильтры поиска и ввод фраз списком](updates/2026-10-21-empty-job-filters.md).
 Проверены ПК Edge, 785 server tests, 66 Telegram и 10 PostgreSQL-сценариев.
@@ -264,9 +265,10 @@ deployment establish what is running.
 
 ### Current status
 
-October 22: [HH resume management](updates/2026-10-22-hh-resume-management-development.md)
-is prepared locally: persistent primary selection, catalog refresh and a separate
-free auto-raise opt-in. Not installed on VPS; verification and limits are in the development record.
+October 22: released [HH resume management](updates/2026-10-22-hh-resume-management-release.md):
+persistent primary selection, catalog refresh and a separate free auto-raise opt-in.
+DE server, browser and collector are updated; both VPS source checkouts are synchronized.
+Real selection and the first raise remain client acceptance checks.
 
 October 21: released [empty job filters and multiline phrase input](updates/2026-10-21-empty-job-filters.md).
 Verified with PC Edge, 785 server tests, 66 Telegram checks and 10 PostgreSQL scenarios.
