@@ -2,6 +2,9 @@
 
 [Русский](#русский) | [English](#english)
 
+Более новый результат / Newer result:
+[выпуск и живая проверка / release and live verification](2026-10-22-living-sky-release.md).
+
 ## Русский
 
 После [выпуска орбитальной панели](2026-10-22-orbital-monitoring-release.md)
@@ -55,7 +58,8 @@
 Скриншоты и короткое видео находятся локально в
 `.superpowers/orbital-operations/living-sky/`. Просмотр с тестовыми данными:
 `node scripts/previewOperations.cjs`, `http://127.0.0.1:5188/ops/`.
-В production эти изменения не установлены. Плавность и расход батареи
+На момент локальной приёмки изменения ещё не были установлены; последующий
+выпуск записан по ссылке выше. Плавность и расход батареи
 физического телефона пока не измерены. Декодирование 8K требует около 128 MiB
 для RGBA-буфера изображения; фактический расход с GPU-композицией не измерен.
 
@@ -112,6 +116,7 @@ Verified locally:
 Screenshots and a short video are saved locally under
 `.superpowers/orbital-operations/living-sky/`. Preview with synthetic data:
 `node scripts/previewOperations.cjs`, `http://127.0.0.1:5188/ops/`.
-These changes have not been installed in production. Smoothness and battery
+At local acceptance these changes were not yet installed; the subsequent release
+is recorded in the link above. Smoothness and battery
 usage on a physical phone have not been measured. Decoding 8K requires about
 128 MiB for its RGBA image buffer; actual usage including GPU composition is unmeasured.

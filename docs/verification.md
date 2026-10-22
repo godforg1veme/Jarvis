@@ -79,15 +79,17 @@ node scripts/testOperationsBrowser.cjs
 node scripts/previewOperations.cjs
 ```
 
-Живой фон, локально 22 октября:
-[результат](updates/2026-10-22-living-sky-development.md).
+Живой фон, выпуск 22 октября:
+[результат](updates/2026-10-22-living-sky-release.md).
 46/46 unit, build, движение/пауза/resize/fallback фона и прежние browser/CSP
-сценарии прошли. На физическом телефоне нагрузка не измерена; доработка не выпущена.
+сценарии прошли. Linux image 787/787, 11 публичных assets и живая панель прошли.
+DE server и оба VPS source checkout обновлены; нагрузка на физическом телефоне не измерена.
 
-Living sky, local development on October 22:
-[results](updates/2026-10-22-living-sky-development.md).
+Living sky, release on October 22:
+[results](updates/2026-10-22-living-sky-release.md).
 All 46 unit tests, build, sky motion/pause/resize/fallback and the existing
-browser/CSP scenarios passed. Physical phone load is unmeasured; the update is unreleased.
+browser/CSP scenarios passed. Linux image 787/787, all 11 public assets and the live
+panel passed. DE server and both VPS source checkouts are updated; physical phone load is unmeasured.
 
 ```powershell
 node scripts/testLivingSky.cjs

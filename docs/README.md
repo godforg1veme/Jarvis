@@ -59,10 +59,11 @@ fixtures на 1440/662/390/320 px прошли.
 DE server обновлён; оба VPS синхронизированы. Linux 786/786, public smoke и UI assets прошли.
 Вход и девять разделов с реальными данными проверены; FPS физического телефона остаётся для клиентской проверки.
 
-Локально подготовлен [живой фон](updates/2026-10-22-living-sky-development.md):
+Установлен [живой фон](updates/2026-10-22-living-sky-release.md):
 параллакс Млечного Пути и трёх слоёв звёзд, мерцание, общая пауза.
 Источник NASA/Gaia заменяет прежнюю текстуру: локальные варианты 4K/8K без апскейла.
-Unit 46/46, build, browser и CSP прошли; эта доработка ещё не выпущена.
+Unit 46/46, build, browser и CSP прошли. Образ прошёл 787 Linux-проверок,
+11 публичных файлов совпали; DE server и оба VPS source checkout обновлены.
 
 Выпущены [надёжность Desktop и единые проверки](updates/2026-10-20-desktop-reliability-release.md):
 ограниченные HTTP-запросы, сохранение ID до отправки, ручная проверка результата
@@ -320,10 +321,11 @@ filtered service list with inline controls. Unit 42/42, build, WebGL and browser
 DE server is updated and both VPS sources are synchronized. Linux 786/786, public
 smoke and UI asset checks passed. Owner sign-in and all nine sections with real data passed; physical phone FPS remains a client check.
 
-A [living sky update](updates/2026-10-22-living-sky-development.md) is ready locally:
+The [living sky update](updates/2026-10-22-living-sky-release.md) is installed:
 Milky Way and three star layers with parallax, twinkling and shared pause.
 NASA/Gaia replaces the previous texture with local 4K/8K variants without upscaling.
-All 46 unit tests, build, browser and CSP checks passed; this update is not released yet.
+All 46 unit tests, build, browser and CSP checks passed. The image passed 787 Linux
+checks, all 11 public files matched; DE server and both VPS source checkouts are updated.
 
 [Desktop reliability and a local test entry point](updates/2026-10-20-desktop-reliability-release.md)
 are released: bounded HTTP, IDs saved before sending, read-only result

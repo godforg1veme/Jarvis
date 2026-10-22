@@ -29,10 +29,30 @@ NASA/Gaia 4K/8K, 1800 звёзд на широком экране и 900 на у
   панель и вложенное подтверждение прошли. Повторная ревизия не нашла
   подтверждённых дефектов после исправления responsive sizes, углов и fallback.
 
-Статус: публикация и установка выполняются. Результат VPS и публичных проверок
-будет записан после завершения. Установленный Desktop 1.0.2 совпадает с исходниками;
-его сборка и установка не нужны. Физический телефон недоступен: FPS, расход
-батареи и память с GPU-композицией не измерены.
+Установлено на [рабочую панель](https://jarvis.rilora.ru/ops/).
+Код выпуска: `07edda299f0f226d081974c876e14b80604a15f5`, отдельный release
+`/home/deploy/releases/jarvis-07edda2-living-sky`, образ
+`jarvis-living-sky:07edda299f0f`, здоровый контейнер `312a0807530d`.
+Оба VPS source checkout обновлены из GitHub `main`; последующие изменения
+документации не требуют повторной сборки образа.
+
+Образ прошёл 787/787 Linux-проверок без пропусков; 336 серверных/shared файлов
+сверены с исходниками. Все 11 файлов Operations совпали с локальной принятой
+сборкой (в HTML нормализованы окончания строк); ресурсы Mini App совпали с
+прежним работающим образом. Публичные `/health/live`, `/health/ready`, `/ops/`
+доступны, хеши всех 11 публичных файлов совпали с контейнером, API без входа
+возвращает 401. Окружение, volumes и inode секретного bind mount сохранены;
+другие контейнеры не заменялись. Шесть сервисов сообщают healthy, свежие метрики
+поступают. В существующей сессии владельца загружены новый фон и сервисная панель;
+проверены пауза, продолжение и возврат к системе.
+
+Установленный Desktop 1.0.2 совпадает с исходниками; его сборка и установка
+не нужны. Host Agent и VPN не менялись. Локальная задача остаётся на
+`codex/orbital-monitoring`, поскольку `main` занят чужим чистым worktree;
+чужие checkout и refs сохранены. Их сохранение отмечается предупреждением
+общего source inventory и не влияет на чистые source/release guards VPS.
+Физический телефон недоступен: FPS, расход батареи и память с GPU-композицией
+не измерены.
 
 ## English
 
@@ -61,7 +81,27 @@ Final checks before publication:
   and nested confirmation passed. Follow-up source review found no confirmed
   defects after responsive sizes, corner coverage and fallback fixes.
 
-Status: publication and installation are in progress. VPS and public verification
-results will be recorded after completion. Installed Desktop 1.0.2 matches the
-source; no Desktop build or installation is needed. A physical phone is
-unavailable: FPS, battery use and memory including GPU composition are unmeasured.
+Installed on the [live Operations panel](https://jarvis.rilora.ru/ops/).
+Application revision: `07edda299f0f226d081974c876e14b80604a15f5`, dedicated release
+`/home/deploy/releases/jarvis-07edda2-living-sky`, image
+`jarvis-living-sky:07edda299f0f`, healthy container `312a0807530d`.
+Both VPS source checkouts were updated from GitHub `main`; subsequent documentation
+changes do not require another image build.
+
+The image passed all 787 Linux checks without skips; 336 server/shared files
+were compared with the source. All 11 Operations files matched the accepted local
+build (HTML line endings normalized); Mini App assets matched the previous running
+image. Public `/health/live`, `/health/ready` and `/ops/` are available; all 11 public
+file hashes match the container, and the API returns 401 without sign-in.
+Environment, volumes and the secret bind-mount inode are preserved; no other
+containers were replaced. All six services report healthy and fresh metrics
+arrive. The existing owner session loaded the new sky and service panel;
+pause, resume and return to the system were checked.
+
+Installed Desktop 1.0.2 matches the source; no Desktop build or installation is
+needed. Host Agent and VPN were unchanged. The local task remains on
+`codex/orbital-monitoring` because `main` is checked out in someone else's clean
+worktree; other checkouts and refs are preserved. This produces a warning in the
+shared source inventory without affecting clean VPS source/release guards.
+A physical phone is unavailable: FPS, battery use and memory including GPU
+composition are unmeasured.
