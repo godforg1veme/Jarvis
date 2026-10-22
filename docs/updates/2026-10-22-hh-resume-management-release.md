@@ -47,9 +47,18 @@ Edge: панель проверена на ширине 1280/390, прежний
 и первое поднятие после личного включения остаются клиентской приёмкой.
 Независимая ревизия специалиста недоступна из-за лимита назначенной модели.
 
-NL получает исходники; HH-сервисы там не запускаются. Desktop не менялся
-и не требует новой сборки. Общая инвентаризация и сохранение незавершённой
-Operations UI работы проверяются отдельно при завершении выпуска.
+NL получил исходники; HH-сервисы там не запускаются. Desktop не менялся:
+сверены 146 файлов, Electron 42.11.9 и bundled Node; EXE 1.0.2 соответствует.
+DE/NL source guards, server inputs и 17 модулей Host Agent на каждом узле
+совпадают с принятой main; служебные и VPN-процессы активны без замены.
+Windows main-worktree синхронизирован. В основной папке сохранена активная
+ветка Operations UI, включающая этот выпуск и свои неопубликованные коммиты;
+это единственная причина предупреждений итоговой инвентаризации из этой папки.
+Первый запуск сверки из чистого worktree не нашёл локальные build inputs
+Desktop; повтор из основной папки подтвердил установленный клиент.
+HTTPS с Windows также вернул 200. Живое открытие в автоматизированном Edge
+на ПК завершилось тайм-аутом, поэтому этот браузерный сценарий не подтверждён;
+проверки интерфейса выше относятся к локальным fixtures.
 Остаётся известное ограничение: access lock удерживается на время одного
 browser RPC до 90 секунд, что может задержать операции с тем же lock.
 Приватные результаты: `/home/deploy/maintenance/hh-resume-release-20261022`.
@@ -99,9 +108,18 @@ anonymous me/resumes return the expected 401. Real primary selection and the
 first raise after personal opt-in remain client acceptance checks. Independent
 specialist review was unavailable due to the assigned model's usage limit.
 
-NL receives source synchronization without starting HH services. Desktop is
-unchanged and needs no rebuild. Final inventory and preservation of unfinished
-Operations UI work are checked separately at release completion. One known
+NL received source synchronization without starting HH services. Desktop is
+unchanged: all 146 files, Electron 42.11.9 and bundled Node match the installed
+1.0.2 client. DE/NL source guards, server inputs and all 17 Host Agent modules
+on each host match accepted main; infrastructure and VPN services stay active
+without replacement. The Windows main worktree is synchronized. The canonical
+folder retains an active Operations UI branch containing this release and its
+own unpublished commits; this alone explains inventory warnings from that
+folder. The first inventory from the clean worktree lacked local Desktop build
+inputs; rerunning from the canonical folder verified the installed client.
+Windows HTTPS also returned 200. A live automated Edge navigation on the PC
+timed out and remains unverified; the UI checks above refer to local fixtures.
+One known
 limit remains: the access lock is held during a browser RPC for up to 90 seconds,
 which can delay operations using that lock. Private evidence:
 `/home/deploy/maintenance/hh-resume-release-20261022`.
