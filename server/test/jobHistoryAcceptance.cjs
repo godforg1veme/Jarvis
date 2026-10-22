@@ -1,6 +1,14 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const {historyFixture,historyItem,historyPage}=require('./helpers/jobHistoryFixture');
 const {JobSearchRepository}=require('../src/jobs/jobSearchRepository');
+const {jobTransaction}=require('../src/jobs/jobTransaction');
+async function connectEntitledMember(f){
+ await f.pool.query("INSERT INTO conversations(user_id,channel,external_chat_id) VALUES($1,'telegram','202')",[f.stranger]);
+ await f.pool.query("INSERT INTO job_connections(user_id,resume_id,status) VALUES($1,'secondResume','connected')",[f.stranger]);
+ const role=(await f.pool.query("INSERT INTO access_roles(name) VALUES('Jobs fixture') RETURNING id")).rows[0].id;
+ await f.pool.query("INSERT INTO access_role_permissions(role_id,permission) VALUES($1,'jobs')",[role]);
+ await f.pool.query("INSERT INTO access_memberships(user_id,telegram_id,role_id) VALUES($1,'202',$2)",[f.stranger,role]);
+}
 
 test('real handlers/RPC/PG import active and archived histories, preserve dates, details and status events',async()=>{
  const f=await historyFixture();try{
@@ -27,7 +35,7 @@ test('real handlers/RPC/PG import active and archived histories, preserve dates,
 
 test('already-applied inspect is classified correctly and added to tracker without another submission',async()=>{
  const f=await historyFixture();try{
- const search=new JobSearchRepository(f.pool);await f.cb('job:menu');
+ const search=new JobSearchRepository(f.pool,{accessService:f.runtime.telegramService.accessService});await f.cb('job:menu');
  const snapshot={externalId:'123',title:'Fixture existing vacancy',company:'Fixture',url:'https://hh.ru/vacancy/123',publishedAt:'2026-10-01T12:00:00Z',archived:false};
  const v=await search.upsertVacancy({externalId:'123',snapshot});await search.recordMatch({userId:f.owner,vacancyId:v.id,filterRevision:1});
  const d=await f.runtime.telegramService.draftService.createManual({scope:f.scope,vacancyId:v.id,mode:'custom',text:'Private fixture draft'});
@@ -74,7 +82,7 @@ test('foreign scope, missing records and revoked identity cannot read, refresh o
  const f=await historyFixture();try{
  await f.cb('job:applications:0');await f.tick();await f.tick();const row=(await f.runtime.historyRepository.list({scope:f.scope})).items[0];
  for(const action of ['job:applications:0','job:applications_sync',`job:application:${row.id}`,`job:application_refresh:${row.id}`]){
-  assert.match((await f.cb(action,202)).answer,/владельцу/);assert.match((await f.cb(action,101,-100,'group')).answer,/личном/);assert.match((await f.cb(action,101,999)).answer,/личном/);
+  assert.match((await f.cb(action,202)).answer,/личном чате и при действующем разрешении/);assert.match((await f.cb(action,101,-100,'group')).answer,/личном/);assert.match((await f.cb(action,101,999)).answer,/личном/);
  }
  await assert.rejects(f.runtime.historyRepository.get({scope:{...f.scope,userId:f.stranger},id:row.id}));
  const update=f.callbackUpdate('job:applications_sync');await f.messages.handleCallback(update);assert.equal((await f.messages.handleCallback(update)).status,'duplicate');
@@ -86,7 +94,7 @@ test('unstable pagination becomes incomplete; missing rows and unknown operation
  const f=await historyFixture();try{
  f.pages.set('active:0',historyPage('active',[historyItem()],{total:2}));await f.cb('job:applications:0');await f.tick();await f.tick();
  assert.equal((await f.runtime.historySync.state(f.scope)).status,'incomplete');assert.equal((await f.runtime.historyRepository.list({scope:f.scope})).total,1);
- const search=new JobSearchRepository(f.pool);const v=await search.upsertVacancy({externalId:'123',snapshot:{title:'Fixture vacancy',company:'Fixture company',url:'https://hh.ru/vacancy/123',publishedAt:'2026-10-01',archived:false}});
+ const search=new JobSearchRepository(f.pool,{accessService:f.runtime.telegramService.accessService});const v=await search.upsertVacancy({externalId:'123',snapshot:{title:'Fixture vacancy',company:'Fixture company',url:'https://hh.ru/vacancy/123',publishedAt:'2026-10-01',archived:false}});
  await f.ownOperation(v,'unknown');
  assert.equal((await f.runtime.historyRepository.list({scope:f.scope})).total,2);
  f.pages.set('active:0',historyPage('active',[]));await f.cb('job:applications_sync');await f.tick();await f.tick();
@@ -97,11 +105,106 @@ test('unstable pagination becomes incomplete; missing rows and unknown operation
 
 test('linking a verified own topic merges only that operation, preserves native resume and known letter',async()=>{
  const f=await historyFixture();try{
- await f.cb('job:applications:0');await f.tick();await f.tick();const search=new JobSearchRepository(f.pool);
+ await f.cb('job:applications:0');await f.tick();await f.tick();const search=new JobSearchRepository(f.pool,{accessService:f.runtime.telegramService.accessService});
  const v=await search.upsertVacancy({externalId:'123',snapshot:{title:'Fixture vacancy',publishedAt:'2026-10-01'}});
  await f.ownOperation(v,'sent','11','Private approved letter');
  const list=await f.runtime.historyRepository.list({scope:f.scope});assert.equal(list.total,1);assert.equal(list.items[0].origin,'jarvis');
  const detail=await f.cb(`job:application:${list.items[0].id}`);assert.match(detail.answer,/Отправлен через Jarvis/);assert.match(detail.answer,/Private approved letter/);
  const history=(await f.pool.query('SELECT content FROM messages')).rows.map(x=>x.content).join('\n');assert.ok(!history.includes('Private approved letter'));
+ }finally{await f.close();}
+});
+
+test('hourly scheduler includes every connected entitled user without search settings and respects the completion deadline',async()=>{
+ const f=await historyFixture();try{
+  await connectEntitledMember(f);
+  assert.equal((await f.pool.query('SELECT count(*)::int AS n FROM job_searches')).rows[0].n,0);
+  assert.equal(await f.runtime.historySync.scheduleDue(),2);
+  let rows=(await f.pool.query('SELECT user_id,run_id,status FROM job_history_syncs ORDER BY user_id')).rows;
+  assert.equal(rows.length,2);
+  assert.ok(rows.every(row=>row.status==='queued'));
+  assert.equal(await f.runtime.historySync.scheduleDue(),0);
+  assert.deepEqual((await f.pool.query('SELECT user_id,run_id,status FROM job_history_syncs ORDER BY user_id')).rows,rows);
+  await f.pool.query("UPDATE job_history_syncs SET status='complete',updated_at=$1 WHERE user_id=$2",[f.clock.now,f.owner]);
+  f.clock.now=new Date(f.clock.now.getTime()+3599000);
+  assert.equal(await f.runtime.historySync.scheduleDue(),0);
+  f.clock.now=new Date(f.clock.now.getTime()+1000);
+  assert.equal(await f.runtime.historySync.scheduleDue(),1);
+  const owner=(await f.pool.query('SELECT run_id,status FROM job_history_syncs WHERE user_id=$1',[f.owner])).rows[0];
+  assert.equal(owner.status,'queued');assert.notEqual(owner.run_id,rows.find(row=>row.user_id===f.owner).run_id);
+  assert.equal((await f.pool.query('SELECT run_id FROM job_history_syncs WHERE user_id=$1',[f.stranger])).rows[0].run_id,rows.find(row=>row.user_id===f.stranger).run_id);
+ }finally{await f.close();}
+});
+
+test('history worker starts a first full run before the user opens the history menu',async()=>{
+ const f=await historyFixture();try{
+  assert.equal((await f.pool.query('SELECT count(*)::int AS n FROM job_history_syncs')).rows[0].n,0);
+  await f.tick();
+  const state=await f.runtime.historySync.state(f.scope);
+  assert.equal(state.status,'queued');assert.equal(state.section,'archived');assert.equal(f.reads,1);
+  await f.tick();assert.equal((await f.runtime.historySync.state(f.scope)).status,'complete');
+ }finally{await f.close();}
+});
+
+test('hourly scheduling preserves active checkpoints, retries terminal runs, and excludes revoked or disconnected users',async()=>{
+ const f=await historyFixture();try{
+  await connectEntitledMember(f);
+  const [first,second]=await Promise.all([f.runtime.historySync.scheduleDue(),f.runtime.historySync.scheduleDue()]);
+  assert.equal(first+second,2);
+  await f.pool.query("UPDATE job_history_syncs SET status='paused',section='archived',page=3,pass=2,seen_ids='[\"11\"]' WHERE user_id=$1",[f.owner]);
+  await f.pool.query("UPDATE job_history_syncs SET status='failed',failure_code='JOB_HH_UNAVAILABLE',updated_at=$1 WHERE user_id=$2",[f.clock.now,f.stranger]);
+  f.clock.now=new Date(f.clock.now.getTime()+3600000);
+  assert.equal(await f.runtime.historySync.scheduleDue(),1);
+  const paused=(await f.pool.query('SELECT * FROM job_history_syncs WHERE user_id=$1',[f.owner])).rows[0];
+  assert.equal(paused.status,'paused');assert.equal(paused.section,'archived');assert.equal(paused.page,3);assert.equal(paused.pass,2);
+  const retried=(await f.pool.query('SELECT status,failure_code FROM job_history_syncs WHERE user_id=$1',[f.stranger])).rows[0];
+  assert.equal(retried.status,'queued');assert.equal(retried.failure_code,null);
+  await f.pool.query('UPDATE access_memberships SET blocked=true WHERE user_id=$1',[f.stranger]);
+  await f.pool.query("UPDATE job_history_syncs SET status='complete',updated_at=$1 WHERE user_id=$2",[f.clock.now,f.stranger]);
+  f.clock.now=new Date(f.clock.now.getTime()+3600000);
+  assert.equal(await f.runtime.historySync.scheduleDue(),0);
+  await f.pool.query("UPDATE job_connections SET status='disconnected' WHERE user_id=$1",[f.owner]);
+  await f.pool.query("UPDATE job_history_syncs SET status='complete',updated_at=$1 WHERE user_id=$2",[new Date(f.clock.now.getTime()-3600000),f.owner]);
+  assert.equal(await f.runtime.historySync.scheduleDue(),0);
+ }finally{await f.close();}
+});
+
+test('revocation or disconnection after claim blocks HH read before RPC dispatch',async()=>{
+ const f=await historyFixture();try{
+  assert.equal(await f.runtime.historySync.scheduleDue(),1);
+  const run=await f.runtime.historySync.claim();
+  let reads=0;
+  const read=async()=>{reads++;return historyPage();};
+  await f.pool.query("UPDATE job_connections SET status='disconnected' WHERE user_id=$1",[f.owner]);
+  await assert.rejects(f.runtime.historySync.readPage({run,read}),{code:'JOB_HH_NOT_CONNECTED'});
+  assert.equal(reads,0);
+  await f.pool.query("UPDATE job_connections SET status='connected' WHERE user_id=$1",[f.owner]);
+  await f.pool.query("DELETE FROM user_identities WHERE user_id=$1 AND provider='telegram'",[f.owner]);
+  await assert.rejects(f.runtime.historySync.readPage({run,read}),{code:'JOB_SCOPE_DENIED'});
+  assert.equal(reads,0);
+  assert.equal((await f.pool.query('SELECT status FROM job_history_syncs WHERE user_id=$1',[f.owner])).rows[0].status,'running');
+ }finally{await f.close();}
+});
+
+test('history read dispatches under access lock, releases it during HH wait, and refuses revoked data',async()=>{
+ const f=await historyFixture();try{
+  await f.runtime.historySync.scheduleDue();
+  const run=await f.runtime.historySync.claim();
+  let started,release;
+  const reading=new Promise(resolve=>{started=resolve;});
+  const done=new Promise(resolve=>{release=resolve;});
+  const pending=f.runtime.historySync.readPage({run,read:()=>{
+   started();return done.then(()=>historyPage());
+  }});
+  let timeout;
+  try{
+   await reading;
+   await Promise.race([
+    jobTransaction(f.pool,c=>c.query("DELETE FROM user_identities WHERE user_id=$1 AND provider='telegram'",[f.owner])),
+    new Promise((_,reject)=>{timeout=setTimeout(()=>reject(Error('Access lock stayed held during HH wait')),2000);}),
+   ]);
+  }finally{clearTimeout(timeout);release();}
+  assert.equal((await pending).section,'active');
+  await assert.rejects(f.runtime.historySync.applyPage({run,leaseId:run.lease_id,result:historyPage()}),{code:'JOB_SCOPE_DENIED'});
+  assert.equal((await f.pool.query('SELECT count(*)::int AS n FROM job_history_observations WHERE user_id=$1',[f.owner])).rows[0].n,0);
  }finally{await f.close();}
 });

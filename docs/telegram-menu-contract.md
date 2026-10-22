@@ -9,6 +9,32 @@ source changes; verify the deployed revision before a server rollout.
 
 ## Change control
 
+22 октября 2026, согласовано владельцем, подготовлено локально:
+история откликов и приглашений HH обновляется полностью раз в час у каждого
+пользователя с действующим `jobs`, личным подключением и проверенным Telegram
+scope. Включение поиска новых вакансий на это не влияет. Первая проверка не
+требует открытия раздела. Текущая проверка и её checkpoint не заменяются;
+ручная кнопка «Обновить из HH» остаётся.
+В «Отклики» у каждой записи показано время проверки. Приглашение из архива
+обозначается «Приглашение (архив)», без доказательства последней полной
+проверки или при нераспознанном новом статусе — «Приглашение не подтверждено».
+Порядок использует исходную дату HH, а не время импорта; неизвестные даты идут
+после известных. Migration 044 хранит дату записи, раздел и доказательство
+полного обхода. Callback grammar, кнопки, права и подтверждение отклика прежние.
+[Локальные проверки и ограничения](updates/2026-10-22-hh-history-hourly-development.md).
+
+October 22, 2026, owner-approved and prepared locally: complete HH history is
+refreshed hourly for every user with current `jobs` access, a personal HH
+connection and verified private Telegram scope. Vacancy-search activation is
+independent, and opening history is not required for the first refresh. Active
+work and checkpoints are retained; manual refresh remains. Each row shows its
+status-check time. Archived invitations are labelled as archived; invitations
+without proof from the latest full pass, or followed by an unrecognized status,
+are labelled unconfirmed. Sorting uses original HH dates, with unknown dates
+after known ones. Migration 044 stores topic date, section and full-pass proof.
+Existing callbacks, buttons, permissions and application confirmation remain.
+[Local checks and limits](updates/2026-10-22-hh-history-hourly-development.md).
+
 22 октября 2026, согласовано владельцем и выпущено на DE:
 «Поиск работы → Резюме HH» после личного подключения показывает собственные
 резюме с отметкой основного. Выбор и отдельный выключатель автоподнятия ведут

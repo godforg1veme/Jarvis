@@ -17,6 +17,12 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
+22 октября локально подготовлены [почасовая история HH и проверка актуальности приглашений](updates/2026-10-22-hh-history-hourly-development.md).
+Полный обход для всех подключённых пользователей не зависит от поиска вакансий.
+Архивные и неподтверждённые приглашения отделены от подтверждённых, исправлена
+сортировка по дате HH. На VPS пока не установлено; живая сверка ограничена
+активным ручным режимом HH.
+
 22 октября выпущены [выбор резюме кнопками бота и автоподнятие по умолчанию](updates/2026-10-22-hh-resume-bot-defaults-release.md).
 Явный off и unknown сохраняются. Проверены 787 server tests, 32 PostgreSQL
 сценария, включая Telegram owner/member и гонку отзыва права. На DE обновлены
@@ -283,6 +289,12 @@ describes publishing. Plans describe intentions. Code, checks, and actual
 deployment establish what is running.
 
 ### Current status
+
+October 22: [hourly HH history and invitation freshness](updates/2026-10-22-hh-history-hourly-development.md)
+are prepared locally. Full refresh covers every eligible connected user,
+independently of vacancy-search activation. Archived and unconfirmed invitations
+have separate labels; ordering uses original HH dates. Not deployed to VPS;
+live comparison is blocked by the existing HH manual mode.
 
 October 22: released [bot resume selection and default automatic raising](updates/2026-10-22-hh-resume-bot-defaults-release.md).
 Explicit off and unknown stops are preserved. Verified:

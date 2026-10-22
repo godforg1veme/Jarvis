@@ -34,7 +34,7 @@ async function historyFixture(){
  const cb=async(...args)=>{const result=await messages.handleCallback(callbackUpdate(...args));if(result.buttons)telegramReplyMarkup(result.buttons);return result;};
  const tick=async()=>{clock.now=new Date(clock.now.getTime()+2000);await runtime.historyWorker.tick();};
  const ownOperation=async(v,status,externalId=null,text='Private approved text')=>{
-  await new JobSearchRepository(f.pool).recordMatch({userId:f.owner,vacancyId:v.id,filterRevision:1});
+  await new JobSearchRepository(f.pool,{accessService:runtime.telegramService.accessService}).recordMatch({userId:f.owner,vacancyId:v.id,filterRevision:1});
   const draft=await runtime.telegramService.draftService.createManual({scope:f.scope,vacancyId:v.id,mode:'custom',text});
   const confirmation=await runtime.applicationRepository.prepare({scope:f.scope,draftId:draft.id});
   const claimed=await runtime.applicationRepository.claim({scope:f.scope,confirmationId:confirmation.id});

@@ -2,7 +2,6 @@ const fail=()=>{throw Object.assign(new Error('JOB_HH_DOM_CHANGED'),{code:'JOB_H
 const id=x=>/^[1-9]\d{0,19}$/.test(String(x))&&(typeof x!=='number'||Number.isSafeInteger(x))?String(x):null;
 const text=(x,max)=>typeof x==='string'&&x.trim()&&x.length<=max?x.trim():null;
 function sourceDate(row){
- if(row.initialState!=='RESPONSE')return null;
  if(typeof row.creationTime==='string'&&/^\d{4}-\d\d-\d\dT.*(?:Z|[+-]\d\d:?\d\d)$/.test(row.creationTime)&&Number.isFinite(Date.parse(row.creationTime)))return new Date(row.creationTime).toISOString();
  if(Number.isSafeInteger(row.creationTimeMillis)&&row.creationTimeMillis>=946684800000&&row.creationTimeMillis<4102444800000)return new Date(row.creationTimeMillis).toISOString();return null;
 }
@@ -16,7 +15,7 @@ function normalizeHistory(raw,{section,page}){
  const pages=Math.max(1,Number(raw.pages));if(pages>1000||page>=pages||(raw.total>0&&!raw.topics.length)||raw.topics.length>raw.total)fail();const seen=new Set();
  const items=raw.topics.map(row=>{const topicId=id(row?.id),vacancyId=id(row?.vacancyId),resumeId=id(row?.resumeId);if(!topicId||!vacancyId||!resumeId||seen.has(topicId))fail();seen.add(topicId);
  const vs=raw.vacancies.filter(v=>id(v?.vacancyId)===vacancyId);if(vs.length>1)fail();const v=vs[0];
- return{topicId,vacancyId,resumeId,resumeHash:null,resumeTitle:null,title:text(v?.name,500),company:text(v?.company?.name,300),url:`https://hh.ru/vacancy/${vacancyId}`,appliedAt:sourceDate(row),status:employerStatus(row),archived:typeof v?.closedForApplicants==='boolean'?v.closedForApplicants:null};});return{section,page,pages,total:raw.total,items};
+ return{topicId,vacancyId,resumeId,resumeHash:null,resumeTitle:null,title:text(v?.name,500),company:text(v?.company?.name,300),url:`https://hh.ru/vacancy/${vacancyId}`,appliedAt:row.initialState==='RESPONSE'?sourceDate(row):null,topicCreatedAt:sourceDate(row),status:employerStatus(row),archived:typeof v?.closedForApplicants==='boolean'?v.closedForApplicants:null};});return{section,page,pages,total:raw.total,items};
 }
 async function readHistoryPage(page,args){
  const u=new URL(page.url());if(u.origin!=='https://hh.ru'||u.pathname!=='/applicant/negotiations'||u.username||u.password||u.searchParams.getAll('filter').length!==1||u.searchParams.get('filter')!==args.section||u.searchParams.getAll('page').length!==1||u.searchParams.get('page')!==String(args.page))fail();

@@ -5,8 +5,9 @@ class JobHistoryWorker{
   }
   async tick(){
     if(this.running)return;this.running=true;let run;
-    try{run=await this.repository.claim();if(!run)return;
-      const result=await this.client.forUser(run.user_id).history({section:run.section,page:run.page});
+    try{await this.repository.scheduleDue();run=await this.repository.claim();if(!run)return;
+      const result=await this.repository.readPage({run,read:({section,page})=>this.client.forUser(run.user_id).history({section,page})});
+      if(result===null)return;
       await this.repository.applyPage({run,leaseId:run.lease_id,result});
     }catch(error){if(run)await this.repository.fail({run,leaseId:run.lease_id,code:error?.code});else this.report('JOB_HISTORY_QUEUE_UNAVAILABLE');}
     finally{this.running=false;}

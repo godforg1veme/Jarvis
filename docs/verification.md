@@ -1,5 +1,29 @@
 # Проверки перед выпуском
 
+## Почасовая история HH / Hourly HH history
+
+Локальная разработка 22 октября:
+[результат и ограничения](updates/2026-10-22-hh-history-hourly-development.md).
+Для PostgreSQL требуется отдельная тестовая БД. Проверяются граница часа,
+все подключённые пользователи, независимость от поиска вакансий, сохранение
+checkpoint, права, архивные/неподтверждённые статусы и исходная дата HH.
+
+Local development, October 22:
+[results and limits](updates/2026-10-22-hh-history-hourly-development.md).
+Use an isolated PostgreSQL database. Checks cover hourly deadlines, all eligible
+connected users, independence from vacancy search, checkpoints, permissions,
+archived/unconfirmed observations and original HH dates.
+
+```powershell
+npm test --prefix server
+npm test --prefix job-browser
+# JARVIS_JOB_TEST_DATABASE_URL: isolated test database only.
+npm run test:jobs:history --prefix server
+# Uses the installed Edge on Windows.
+$env:PLAYWRIGHT_CHANNEL='msedge'
+node --test job-browser/test/historyAcceptance.cjs
+```
+
 ## HH resume management and default raising
 
 Управление резюме и текущая политика, выпуск 22 октября:

@@ -17,3 +17,14 @@ test('unknown dates/details stay unknown; explicit empty archive is valid',()=>{
  const i=normalizeHistory(r,{section:'active',page:0}).items[0];assert.equal(i.appliedAt,null);assert.equal(i.title,null);assert.equal(i.status,'not_viewed');
  assert.deepEqual(normalizeHistory({section:'archived',total:0,pages:'0',topics:[],vacancies:[]},{section:'archived',page:0}).items,[]);
 });
+
+test('invitation creation time is distinct from an application date and survives archive import',()=>{
+ const r=raw();r.section='archived';r.topics[0].initialState='INVITATION';r.topics[0].lastState='INVITATION';
+ const item=normalizeHistory(r,{section:'archived',page:0}).items[0];
+ assert.equal(item.appliedAt,null);
+ assert.equal(item.topicCreatedAt,'2026-10-16T07:00:00.000Z');
+ r.topics[0].creationTime='yesterday';r.topics[0].creationTimeMillis=1720000000000;
+ assert.equal(normalizeHistory(r,{section:'archived',page:0}).items[0].topicCreatedAt,new Date(1720000000000).toISOString());
+ delete r.topics[0].creationTimeMillis;
+ assert.equal(normalizeHistory(r,{section:'archived',page:0}).items[0].topicCreatedAt,null);
+});

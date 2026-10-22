@@ -6,9 +6,12 @@ const {itemSchema}=require('./jobHistorySchema');
 const merged=`WITH observed AS (
  SELECT h.id,'hh'::text AS row_kind,h.title,h.company,h.external_vacancy_id,
  h.resume_title,h.resume_native_id,h.applied_at,h.first_seen_at,h.checked_at,h.status_checked_at,h.employer_status,
- h.vacancy_archived,a.id AS operation_id,a.status AS send_status,a.approved_text,
+ h.vacancy_archived,h.topic_created_at,h.history_section,
+ COALESCE(h.last_seen_run_id=s.last_success_run_id,false) AS current_observation,
+ a.id AS operation_id,a.status AS send_status,a.approved_text,
  CASE WHEN a.status='sent' THEN 'jarvis' ELSE 'hh' END AS origin
  FROM job_history_observations h
+ LEFT JOIN job_history_syncs s ON s.user_id=h.user_id
  LEFT JOIN LATERAL(SELECT proved.* FROM(
    SELECT a.*,count(*) OVER() AS candidates FROM job_applications a JOIN job_vacancies v ON v.id=a.vacancy_id
    WHERE a.user_id=h.user_id AND a.external_id=h.topic_id AND a.status='sent'
@@ -20,14 +23,15 @@ const merged=`WITH observed AS (
  UNION ALL
  SELECT a.id,'local',v.snapshot->>'title',v.snapshot->>'company',v.external_id,
  NULL,NULL,NULL::timestamptz,a.created_at,NULL,NULL,'unknown',
- COALESCE((v.snapshot->>'archived')::boolean,false),a.id,a.status,a.approved_text,'jarvis'
+ COALESCE((v.snapshot->>'archived')::boolean,false),NULL::timestamptz,NULL::text,false,a.id,a.status,a.approved_text,'jarvis'
  FROM job_applications a JOIN job_vacancies v ON v.id=a.vacancy_id
  WHERE a.user_id=$1 AND NOT EXISTS(SELECT 1 FROM observed h WHERE h.operation_id=a.id)
 )`;
 class JobHistoryRepository {
   constructor(pool,{accessService=null}={}){this.pool=pool;this.accessService=accessService;}
-  async upsertIn(client,userId,input,now=new Date()){
+  async upsertIn(client,userId,input,now=new Date(),observation=null){
     const x=itemSchema.parse(input);
+    if(observation&&(!['active','archived'].includes(observation.section)||!uuid.safeParse(observation.runId).success))throw jobError('JOB_HH_INVALID_RESPONSE');
     const old=(await client.query('SELECT * FROM job_history_observations WHERE user_id=$1 AND topic_id=$2 FOR UPDATE',[userId,x.topicId])).rows[0];
     if(old&&(old.external_vacancy_id!==x.vacancyId||old.resume_native_id!==x.resumeId
       ||old.resume_hash&&x.resumeHash&&old.resume_hash!==x.resumeHash))throw jobError('JOB_HH_INVALID_RESPONSE');
@@ -36,16 +40,19 @@ class JobHistoryRepository {
       AND ($4::text IS NULL OR a.resume_id=$4) LIMIT 2`,[userId,x.topicId,x.vacancyId,x.resumeHash])).rows;
     const linked=candidates.length===1?candidates[0].id:null;
     const row=(await client.query(`INSERT INTO job_history_observations(user_id,topic_id,external_vacancy_id,resume_native_id,
-      resume_hash,resume_title,title,company,applied_at,employer_status,status_checked_at,vacancy_archived,application_id,first_seen_at,last_seen_at,checked_at)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,CASE WHEN $10='unknown' THEN NULL ELSE $13::timestamptz END,$11,$12,$13,$13,$13)
+      resume_hash,resume_title,title,company,applied_at,employer_status,status_checked_at,vacancy_archived,application_id,first_seen_at,last_seen_at,checked_at,
+      topic_created_at,history_section,last_seen_run_id)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,CASE WHEN $10='unknown' THEN NULL ELSE $13::timestamptz END,$11,$12,$13,$13,$13,$15,$16,$17)
       ON CONFLICT(user_id,topic_id) DO UPDATE SET resume_hash=COALESCE(excluded.resume_hash,job_history_observations.resume_hash),
       resume_title=COALESCE(excluded.resume_title,job_history_observations.resume_title),title=COALESCE(excluded.title,job_history_observations.title),
       company=COALESCE(excluded.company,job_history_observations.company),applied_at=COALESCE(excluded.applied_at,job_history_observations.applied_at),
       employer_status=CASE WHEN excluded.employer_status='unknown' THEN job_history_observations.employer_status ELSE excluded.employer_status END,
       status_checked_at=COALESCE(excluded.status_checked_at,job_history_observations.status_checked_at),
       vacancy_archived=CASE WHEN $14::boolean IS NULL THEN job_history_observations.vacancy_archived ELSE excluded.vacancy_archived END,
-      application_id=COALESCE(excluded.application_id,job_history_observations.application_id),last_seen_at=excluded.last_seen_at,checked_at=excluded.checked_at
-      RETURNING *`,[userId,x.topicId,x.vacancyId,x.resumeId,x.resumeHash,x.resumeTitle,x.title,x.company,x.appliedAt,x.status,x.archived??false,linked,now,x.archived])).rows[0];
+      application_id=COALESCE(excluded.application_id,job_history_observations.application_id),last_seen_at=excluded.last_seen_at,checked_at=excluded.checked_at,
+      topic_created_at=COALESCE(excluded.topic_created_at,job_history_observations.topic_created_at),
+      history_section=excluded.history_section,last_seen_run_id=excluded.last_seen_run_id
+      RETURNING *`,[userId,x.topicId,x.vacancyId,x.resumeId,x.resumeHash,x.resumeTitle,x.title,x.company,x.appliedAt,x.status,x.archived??false,linked,now,x.archived,x.topicCreatedAt??null,observation?.section??null,observation?.runId??null])).rows[0];
     if(!old||old.employer_status!==row.employer_status)await client.query('INSERT INTO job_history_events(observation_id,employer_status,observed_at) VALUES($1,$2,$3)',[row.id,row.employer_status,now]);
     return row;
   }
@@ -58,8 +65,8 @@ class JobHistoryRepository {
     await assertJobScope(this.pool,scope,this.accessService);if(!Number.isInteger(page)||page<0||page>9999)throw jobError('JOB_INVALID_PAGE');
     // Letter bodies are selected only for a scoped detail card, never for list rendering.
     const rows=(await this.pool.query(`${merged} SELECT id,row_kind,title,company,external_vacancy_id,origin,send_status,
-      employer_status,applied_at,first_seen_at,checked_at,status_checked_at FROM records
-      ORDER BY COALESCE(applied_at,first_seen_at) DESC,id LIMIT 10 OFFSET $2`,[scope.userId,page*10])).rows;
+      employer_status,applied_at,topic_created_at,history_section,current_observation,first_seen_at,checked_at,status_checked_at FROM records
+      ORDER BY COALESCE(topic_created_at,applied_at,CASE WHEN row_kind='local' THEN first_seen_at END) DESC NULLS LAST,id LIMIT 10 OFFSET $2`,[scope.userId,page*10])).rows;
     const total=(await this.pool.query(`${merged} SELECT count(*)::int AS n FROM records`,[scope.userId])).rows[0].n;
     return{items:rows,total};
   }
