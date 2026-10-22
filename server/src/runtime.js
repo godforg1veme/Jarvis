@@ -613,6 +613,7 @@ async function createRuntime(config, overrides = {}) {
         registerUserRoutes: (routes) => registerMiniAppSelfRoutes(routes, { accessService, pool,
           memoryService, knowledgeService, deviceService, missionControlService, assistant, conversationRepository,
           getJobConnectionSessionService: () => jobRuntime?.connectionSessionService,
+          getJobResumeService: () => jobRuntime?.resumeService,
           getJobLoginLinkDelivery: () => jobRuntime?.loginLinkDelivery }) });
     }
     if (!bot && config.telegramBotToken) {

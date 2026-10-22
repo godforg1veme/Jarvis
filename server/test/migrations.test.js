@@ -48,6 +48,7 @@ test('migration files are ordered and narrowly named', () => {
     '038_mini_app_requests.sql',
     '039_job_member_hh_sessions.sql',
     '040_job_hh_login_delivery.sql',
+    '041_job_resume_management.sql',
   ]);
 });
 

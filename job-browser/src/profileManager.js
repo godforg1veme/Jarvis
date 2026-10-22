@@ -98,6 +98,7 @@ class ProfileManager {
     this.members = new Map();
     this.creating = new Map();
     this.creationTail = Promise.resolve();
+    this.selections = new Map();
   }
 
   async prepareMemberRoot(userId) {
@@ -148,6 +149,13 @@ class ProfileManager {
   }
 
   async selectPrimaryResume(userId, resumeId) {
+    const previous=this.selections.get(userId)||Promise.resolve();
+    const current=previous.catch(()=>{}).then(()=>this.selectPrimaryResumeNow(userId,resumeId));
+    this.selections.set(userId,current);
+    try {return await current;} finally {if(this.selections.get(userId)===current)this.selections.delete(userId);}
+  }
+  async waitSelection(userId) { await this.selections.get(userId)?.catch(()=>{}); }
+  async selectPrimaryResumeNow(userId, resumeId) {
     if (!UUID.test(userId || '') || !/^[a-zA-Z0-9]{1,100}$/.test(resumeId || '')) throw fail('JOB_BROWSER_ACCESS_DENIED');
     const runtime = await this.forUser(userId);
     const resumes = await runtime.browser.listResumes();

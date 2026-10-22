@@ -22,7 +22,7 @@ const fail = (code) => { throw Object.assign(new Error(code), { code }); };
 
 function registerMiniAppSelfRoutes({ route, authorize, requireOrigin }, services) {
   const { accessService, memoryService, knowledgeService, deviceService, missionControlService,
-    assistant, conversationRepository, pool, getJobConnectionSessionService, getJobLoginLinkDelivery } = services;
+    assistant, conversationRepository, pool, getJobConnectionSessionService, getJobLoginLinkDelivery, getJobResumeService } = services;
   const chatLimiter = new FixedWindowRateLimiter();
   const requirePermission = async (request, permission, mutation = false) => {
     const session = await authorize(request, { mutation });
@@ -35,6 +35,28 @@ function registerMiniAppSelfRoutes({ route, authorize, requireOrigin }, services
     if (!service) fail('JOB_LOGIN_UNAVAILABLE');
     return service;
   };
+  const jobResumes = () => { const service=getJobResumeService?.(); if(!service)fail('JOB_RESUME_UNAVAILABLE');return service; };
+  route('GET','/jobs/resumes',async request=>{
+    const actor=await requirePermission(request,'jobs');const result=await jobResumes().get(actor.userId);
+    await requirePermission(request,'jobs');return {ok:true,...result};
+  });
+  route('POST','/jobs/resumes/refresh',async request=>{
+    const actor=await requirePermission(request,'jobs',true);
+    const parsed=z.strictObject({requestId:z.uuid()}).safeParse(request.body);if(!parsed.success)fail('invalid_request');
+    const result=await jobResumes().refresh(actor.userId,parsed.data.requestId);
+    await requirePermission(request,'jobs');return {ok:true,...result};
+  });
+  route('POST','/jobs/resumes/settings',async request=>{
+    const actor=await requirePermission(request,'jobs',true);
+    const {settingsInput}=require('./jobs/jobResumeRepository');const parsed=settingsInput.safeParse(request.body);if(!parsed.success)fail('invalid_request');
+    const result=await jobResumes().settings(actor.userId,parsed.data);
+    await requirePermission(request,'jobs');return {ok:true,...result};
+  });
+  route('GET','/jobs/resumes/operations/:requestId',async request=>{
+    const actor=await requirePermission(request,'jobs');if(!z.uuid().safeParse(request.params.requestId).success)fail('invalid_request');
+    const result=await jobResumes().operation(actor.userId,request.params.requestId);
+    await requirePermission(request,'jobs');return {ok:true,...result};
+  });
   const sessionIdFrom = (request) => {
     const parsed = z.uuid().safeParse(request.params.sessionId);
     if (!parsed.success) fail('invalid_request');

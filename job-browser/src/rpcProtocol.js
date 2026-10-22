@@ -25,6 +25,8 @@ function validRequest(value, ownerId = null) {
   if (!exact(value, ['userId', 'operation', 'args']) || !UUID.test(value.userId)
     || (ownerId && value.userId !== ownerId)) return false;
   const args = value.args;
+  if (['raise_resume','raise_resume_status'].includes(value.operation)) return exact(args, ['operationId','resumeId']) && UUID.test(args.operationId || '')
+    && typeof args.resumeId === 'string' && /^[a-zA-Z0-9]{1,100}$/.test(args.resumeId);
   if (value.operation === 'login_start' || value.operation === 'login_frame' || value.operation === 'login_status')
     return exact(args, ['sessionId']) && UUID.test(args.sessionId || '');
   if (value.operation === 'login_input') return exact(args, ['sessionId','sequence','event'])
