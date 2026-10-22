@@ -17,10 +17,19 @@ async function ready() {
   }
   throw new Error('Local fixture server did not start');
 }
+async function assertModalFocus(page, dialog, background, label) {
+  assert.equal(await dialog.evaluate((el) => el.contains(document.activeElement)), true, `${label}: focus enters dialog`);
+  await background.evaluate((el) => el.focus());
+  assert.equal(await dialog.evaluate((el) => el.contains(document.activeElement)), true, `${label}: background is inert`);
+  for (let i = 0; i < 12; i += 1) {
+    await page.keyboard.press(i < 6 ? 'Tab' : 'Shift+Tab');
+    assert.equal(await dialog.evaluate((el) => document.activeElement === document.body || el.contains(document.activeElement)), true, `${label}: Tab stays in dialog`);
+  }
+}
 (async () => {
   await ready();
   browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || 'msedge' });
-  const page = await browser.newPage();
+  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   const errors = []; page.on('pageerror', (error) => errors.push(error.message));
   let releaseLogs; let releaseAction; let actionCount = 0; let alphaLogsCount = 0;
   await page.route('**/ops/api/**', async (route) => {
@@ -45,72 +54,64 @@ async function ready() {
   await page.goto(`${base}#/services`);
   const alpha = page.getByRole('button', { name: /Service alpha/ });
   const beta = page.getByRole('button', { name: /Service beta/ });
+  await alpha.waitFor();
+  assert.equal(await alpha.getAttribute('aria-expanded'), 'true', 'first service expands by default');
+
   await alpha.focus(); await page.keyboard.press('Enter');
-  const drawer = page.getByRole('dialog', { name: 'Service alpha', exact: true });
-  await drawer.waitFor();
-  assert.equal(await drawer.evaluate((element) => element.contains(document.activeElement)), true, 'focus enters service dialog');
-  await alpha.evaluate((element) => element.focus());
-  assert.equal(await alpha.evaluate((element) => element === document.activeElement), false, 'modal background is inert even to programmatic focus');
-  for (let i = 0; i < 16; i += 1) {
-    await page.keyboard.press(i < 8 ? 'Tab' : 'Shift+Tab');
-    assert.equal(await page.evaluate(() => document.activeElement === document.body || Boolean(document.activeElement.closest('dialog[open]'))), true, 'background cannot receive keyboard focus');
-  }
-  await drawer.getByRole('button', { name: 'RESTART', exact: true }).click();
-  const confirmation = page.getByRole('dialog', { name: /RESTART \/ Service alpha/ });
+  assert.equal(await alpha.getAttribute('aria-expanded'), 'false', 'Enter collapses accordion');
+  await page.keyboard.press('Enter');
+  assert.equal(await alpha.getAttribute('aria-expanded'), 'true', 'Enter reopens accordion');
+  await page.getByRole('button', { name: 'Перезапустить' }).click();
+  const confirmation = page.getByRole('dialog', { name: /Перезапустить \/ Service alpha/ });
   await confirmation.waitFor();
-  assert.equal(await confirmation.getByRole('button', { name: 'Отмена' }).evaluate((el) => el === document.activeElement), true, 'safe confirmation choice receives focus');
-  await drawer.getByRole('button', { name: 'RESTART', exact: true }).evaluate((element) => element.focus());
-  assert.equal(await confirmation.evaluate((element) => element.contains(document.activeElement)), true, 'underlying drawer becomes inert during confirmation');
-  for (let i = 0; i < 8; i += 1) {
-    await page.keyboard.press(i < 4 ? 'Tab' : 'Shift+Tab');
-    assert.equal(await confirmation.evaluate((el) => document.activeElement === document.body || el.contains(document.activeElement)), true, 'confirmation excludes underlying drawer controls');
-  }
+  assert.equal(await confirmation.getByRole('button', { name: 'Отмена' }).evaluate((el) => el === document.activeElement), true, 'safe choice receives focus');
+  await assertModalFocus(page, confirmation, alpha, 'confirmation');
   await page.keyboard.press('Escape');
   await confirmation.waitFor({ state: 'detached' });
-  assert.equal(await drawer.getByRole('button', { name: 'RESTART', exact: true }).evaluate((el) => el === document.activeElement), true, 'focus returns to confirmation trigger');
-  await page.keyboard.press('Escape'); await drawer.waitFor({ state: 'detached' });
-  assert.equal(await alpha.evaluate((el) => el === document.activeElement), true, 'focus returns to service trigger');
-  await alpha.click(); await drawer.waitFor();
-  releaseLogs();
-  await page.waitForTimeout(50);
-  assert.equal(await drawer.locator('pre').innerText(), 'alpha current log', 'old logs cannot overwrite reopened same service');
-  await page.keyboard.press('Escape');
-  await beta.click();
-  const betaDrawer = page.getByRole('dialog', { name: 'Service beta', exact: true });
-  await betaDrawer.waitFor();
-  releaseLogs();
-  await page.waitForTimeout(50);
-  assert.match(await betaDrawer.locator('pre').innerText(), /beta log/);
-  assert.doesNotMatch(await betaDrawer.innerText(), /alpha delayed log/);
-  await betaDrawer.getByRole('button', { name: 'STOP', exact: true }).click();
-  const stopConfirmation = page.getByRole('dialog', { name: /STOP \/ Service beta/ });
+  assert.equal(await page.getByRole('button', { name: 'Перезапустить' }).evaluate((el) => el === document.activeElement), true, 'cancel restores command focus');
+
+  const alphaLogs = page.getByRole('dialog', { name: 'Service alpha', exact: true });
+  await page.getByRole('button', { name: /Логи Просмотр логов сервиса/ }).click();
+  await alphaLogs.waitFor();
+  await assertModalFocus(page, alphaLogs, alpha, 'logs');
+  await page.keyboard.press('Escape'); await alphaLogs.waitFor({ state: 'detached' });
+  assert.equal(await page.getByRole('button', { name: /Логи Просмотр логов сервиса/ }).evaluate((el) => el === document.activeElement), true, 'logs restore opener focus');
+  await page.getByRole('button', { name: /Логи Просмотр логов сервиса/ }).click();
+  await alphaLogs.waitFor();
+  await page.waitForFunction(() => document.querySelector('dialog.service-logs-dialog pre')?.textContent.includes('alpha current log'));
+  releaseLogs(); await delay(75);
+  assert.equal(await alphaLogs.locator('pre').innerText(), 'alpha current log', 'delayed prior response cannot replace reopened logs');
+  await page.keyboard.press('Escape'); await alphaLogs.waitFor({ state: 'detached' });
+
+  await page.getByRole('button', { name: 'Остановить', exact: true }).click();
+  const stopConfirmation = page.getByRole('dialog', { name: /Остановить \/ Service alpha/ });
   await stopConfirmation.getByRole('button', { name: 'Выполнить' }).click();
-  await page.waitForFunction(() => document.querySelector('.operation-state')?.textContent.includes('выполняется'));
-  assert.equal(actionCount, 1);
-  assert.equal(await betaDrawer.getByRole('button', { name: 'STOP', exact: true }).isDisabled(), true);
-  assert.equal(await betaDrawer.getByRole('button', { name: 'ЗАКРЫТЬ ×' }).evaluate((el) => document.activeElement === el), true, 'pending action returns focus to enabled close control');
-  await page.keyboard.press('Escape'); await betaDrawer.waitFor({ state: 'detached' });
-  await alpha.click(); await drawer.waitFor();
+  await page.waitForFunction(() => document.querySelector('.service-accordion-result')?.textContent.includes('выполняется'));
+  assert.equal(actionCount, 1, 'confirmation sends one request');
+  assert.equal(await page.getByRole('button', { name: 'Остановить', exact: true }).isDisabled(), true, 'pending action locks command');
+  assert.equal(await alpha.evaluate((el) => el === document.activeElement), true, 'submit restores focus to enabled accordion trigger');
+  await beta.click();
+  assert.equal(await beta.getAttribute('aria-expanded'), 'true', 'another service remains navigable while action waits');
   releaseAction();
-  await page.waitForTimeout(75);
-  assert.doesNotMatch(await drawer.innerText(), /операция успешно завершена/);
-  assert.equal(actionCount, 1, 'close and reopen never repeats mutation');
-  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.service-accordion-actions button:disabled'));
+  await alpha.click();
+  assert.match(await page.locator('.service-accordion-item[data-service-key="alpha"] .service-accordion-result').innerText(), /Операция успешно завершена/, 'result persists after switching rows');
+  assert.equal(actionCount, 1, 'row switch never repeats mutation');
+
   for (const width of [390, 320]) {
     await page.setViewportSize({ width, height: 740 });
-    await beta.click(); await betaDrawer.waitFor();
-    const box = await betaDrawer.boundingBox();
-    assert.ok(box.x >= 0 && box.x + box.width <= width, 'drawer fits mobile viewport');
-    await betaDrawer.getByRole('button', { name: 'STOP', exact: true }).click();
-    await stopConfirmation.waitFor();
-    const confirmationBox = await stopConfirmation.boundingBox();
-    assert.ok(confirmationBox.x >= 0 && confirmationBox.x + confirmationBox.width <= width, 'confirmation fits mobile viewport');
-    await stopConfirmation.getByRole('button', { name: 'Отмена' }).click();
-    await betaDrawer.getByRole('button', { name: 'ЗАКРЫТЬ ×' }).click();
-    assert.equal(await beta.evaluate((el) => document.activeElement === el), true);
+    await page.locator('.service-accordion-item[data-service-key="alpha"] .service-action-logs').click();
+    await alphaLogs.waitFor();
+    const logsBox = await alphaLogs.boundingBox();
+    assert.ok(logsBox.x >= 0 && logsBox.x + logsBox.width <= width, 'logs dialog fits mobile viewport');
+    await page.keyboard.press('Escape'); await alphaLogs.waitFor({ state: 'detached' });
+    await page.getByRole('button', { name: 'Перезапустить' }).click();
+    const box = await confirmation.boundingBox();
+    assert.ok(box.x >= 0 && box.x + box.width <= width, 'confirmation fits mobile viewport');
+    await page.keyboard.press('Escape'); await confirmation.waitFor({ state: 'detached' });
   }
   assert.deepEqual(errors, []);
-  console.log('PASS: modal semantics, focus, nested Escape, return focus, stale logs/action and single submission');
+  console.log('PASS: accordion, native modal focus/inert/Tab/Escape, stale logs, pending result, single submission, mobile fit');
 })().catch((error) => { console.error(error); process.exitCode = 1; }).finally(async () => {
   if (browser) await browser.close();
   vite.kill();

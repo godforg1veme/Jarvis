@@ -12,9 +12,9 @@ import { ParserPage } from './pages/ParserPage';
 import { EventsPage } from './pages/EventsPage';
 import { BackupsPage } from './pages/BackupsPage';
 import type { Overview } from './types';
-import './styles.css';
-import './extended.css';
-import './bootstrap.css';
+import './orbital.css';
+import './orbital-shell.css';
+import './inspector.css';
 
 const pages = new Set<PageKey>(['overview', 'infrastructure', 'services', 'connections', 'parser', 'incidents', 'events', 'backups', 'sessions']);
 function pageFromHash(): PageKey {
@@ -55,30 +55,48 @@ function App() {
   const authorized = access === 'authorized';
   const [page, setPage] = useState<PageKey>(pageFromHash());
   const [liveRevision, setLiveRevision] = useState(0);
+  const [dataStale, setDataStale] = useState(false);
   const bootstrap = useCallback(async () => {
     setAccess('checking');
-    try { setOverview(await getOverview()); setAccess('authorized'); }
+    try { setOverview(await getOverview()); setDataStale(false); setAccess('authorized'); }
     catch (error) {
       setOverview(null);
       setAccess(error instanceof ApiError && error.status === 401 ? 'unauthenticated' : 'unavailable');
     }
   }, []);
   useEffect(() => { void bootstrap(); }, [bootstrap]);
+  useEffect(() => {
+    if (!authorized || liveRevision === 0) return;
+    let active = true;
+    void getOverview().then((value) => { if (active) { setOverview(value); setDataStale(false); } }).catch((error) => {
+      if (!active) return;
+      if (error instanceof ApiError && error.status === 401) { setOverview(null); setAccess('unauthenticated'); }
+      else setDataStale(true);
+    });
+    return () => { active = false; };
+  }, [authorized, liveRevision]);
   useEffect(() => { const handler = () => setPage(pageFromHash()); window.addEventListener('hashchange', handler); return () => window.removeEventListener('hashchange', handler); }, []);
   useEffect(() => {
     if (!authorized) return undefined;
+    let active = true;
     const stream = new EventSource('/ops/api/stream');
     const refresh = () => setLiveRevision((value) => value + 1);
     stream.addEventListener('snapshot', refresh); stream.addEventListener('event', refresh); stream.addEventListener('refresh', refresh);
-    stream.addEventListener('error', () => { void getOverview().catch((error) => { if (error instanceof ApiError && error.status === 401) { stream.close(); setOverview(null); setAccess('unauthenticated'); } }); });
+    stream.addEventListener('error', () => {
+      void getOverview().then((value) => { if (active) { setOverview(value); setDataStale(false); } }).catch((error) => {
+        if (!active) return;
+        if (error instanceof ApiError && error.status === 401) { stream.close(); setOverview(null); setAccess('unauthenticated'); }
+        else setDataStale(true);
+      });
+    });
     const timer = window.setInterval(refresh, 30000);
-    return () => { window.clearInterval(timer); stream.close(); };
+    return () => { active = false; window.clearInterval(timer); stream.close(); };
   }, [authorized]);
   const navigate = (next: PageKey) => { window.location.hash = `/${next}`; setPage(next); };
   if (access === 'checking') return <main className="boot" role="status" aria-busy="true">JARVIS OPS / INITIALIZING</main>;
   if (access === 'unavailable') return <main className="login bootstrap-unavailable"><div className="login-brand">J</div><p>JARVIS / OPERATIONS</p><h1>Панель временно недоступна</h1><section><p role="alert">Не удалось подключиться к серверу. Проверьте соединение и повторите подключение.</p><button onClick={() => void bootstrap()}>Повторить подключение</button></section></main>;
   if (!authorized || !overview) return <LoginView onApproved={(value) => { setOverview(value); setAccess('authorized'); }} />;
-  return <AppShell page={page} onNavigate={navigate}>
+  return <AppShell page={page} onNavigate={navigate} overview={overview} dataStale={dataStale}>
     {page === 'overview' ? <OverviewPage initial={overview} refreshToken={liveRevision} /> : null}
     {page === 'infrastructure' ? <InfrastructurePage refreshToken={liveRevision} /> : null}
     {page === 'services' ? <ServicesPage refreshToken={liveRevision} /> : null}

@@ -1,0 +1,134 @@
+/* Approved translucent service-list workspace. One sky continues underneath. */
+@font-face { font-family: 'Inter'; src: url('../public/assets/fonts/InterVariable.woff2') format('woff2'); font-weight: 100 900; font-display: swap; }
+:root { font-family: Inter,'Segoe UI',sans-serif; }
+.orbital-app { position: relative; isolation: isolate; font-family: Inter,'Segoe UI',sans-serif; }
+.shared-space { position: fixed; inset: -3%; z-index: -1; pointer-events: none; overflow: hidden; background: #050607; }
+.shared-space img { width: 100%; height: 100%; display: block; object-fit: cover; opacity: .78; animation: shared-sky-drift 150s ease-in-out infinite alternate; }
+.shared-space[data-motion=paused] img { animation-play-state: paused; }
+@keyframes shared-sky-drift { from { transform: translate(-.6%,.3%) scale(1.025); } to { transform: translate(.6%,-.3%) scale(1.04); } }
+.is-focused .universe,.is-returning .universe { flex: 1 1 0; }
+.orbital-workspace { flex: 0 0 clamp(380px,31vw,440px); width: clamp(380px,31vw,440px); height: min(82dvh,780px); min-height: 440px; max-height: calc(100dvh - 150px); align-self: center; display: flex; flex-direction: column; margin: 0 0 0 18px; padding: 6px 0 0; overflow: hidden; border: 0; border-radius: 22px; background: linear-gradient(105deg,#080c1166,#080c1194 70%); backdrop-filter: blur(1px); box-shadow: none; color: #e8edf2; }
+.workspace-toolbar { flex-shrink: 0; height: 40px; padding: 0 16px; }
+.workspace-toolbar button { width: 34px; height: 34px; }
+.workspace-toolbar button svg { width: 17px; height: 17px; }
+.workspace-tabs { flex-shrink: 0; padding: 0 23px 12px; }
+.workspace-tabs button { font-size: 12px; padding: 8px 11px; background: #ffffff04; }
+.orbital-workspace main { flex: 1 1 auto; min-height: 0; padding: 0 24px 40px; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: transparent transparent; }
+.orbital-workspace main:hover,.orbital-workspace main:focus-within { scrollbar-color: #9ba7b44d transparent; }
+.orbital-workspace main::-webkit-scrollbar { width: 3px; }
+.orbital-workspace main::-webkit-scrollbar-track { background: transparent; }
+.orbital-workspace main::-webkit-scrollbar-thumb { background: transparent; border-radius: 8px; }
+.orbital-workspace main:hover::-webkit-scrollbar-thumb,.orbital-workspace main:focus-within::-webkit-scrollbar-thumb { background: #9ba7b44d; }
+.orbital-workspace main::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+.orbital-workspace .page-heading { position: sticky; top: 0; z-index: 4; margin: 0 0 18px; padding: 12px 0 18px; background: #0a0e12b8; backdrop-filter: blur(10px); }
+.orbital-workspace .page-heading h1 { font-size: 32px; font-weight: 500; letter-spacing: -.04em; }
+.orbital-workspace .page-heading > span { font-size: 14px; line-height: 1.6; color: #b1bbc8; margin-top: 10px; }
+.orbital-workspace .service-card,.orbital-workspace .health-checks article,.orbital-workspace .metric-card,.orbital-workspace .backup-grid article { border-color: #ffffff0c; background: #10161d70; box-shadow: none; }
+.orbital-workspace .card-name b { font-size: 16px; }
+.orbital-workspace .state,.orbital-workspace .observed { font-size: 12px; }
+.orbital-workspace .health-checks b,.orbital-workspace .connection-row b,.orbital-workspace .session-row b,.orbital-workspace .incident-list b { font-size: 15px; }
+.orbital-workspace .health-checks span,.orbital-workspace .health-checks small,.orbital-workspace .connection-row small,.orbital-workspace .session-row small { font-size: 12px; line-height: 1.6; }
+.orbital-workspace .notice,.orbital-workspace .muted { font-size: 14px; line-height: 1.7; }
+.is-expanded .universe { flex: 1 1 0; }
+.is-expanded .orbital-workspace { width: 60%; flex-basis: 60%; height: calc(100dvh - 150px); max-height: 850px; }
+@media(max-width:1100px) and (min-width:901px) { .orbital-workspace { flex-basis: 380px; width: 380px; margin-left: 10px; } }
+@media(max-width:900px) {
+  .is-focused .universe,.is-returning .universe,.is-expanded .universe { flex: none; }
+  .orbital-workspace,.is-expanded .orbital-workspace { flex: none; width: min(460px,100%); align-self: center; margin: 0 0 90px; height: min(76dvh,700px); min-height: 450px; max-height: none; }
+  .orbital-workspace main { padding: 0 20px 96px; scroll-padding-bottom: 90px; }
+  .shared-space img { object-position: 43% center; }
+}
+@media(prefers-reduced-motion:reduce) { .shared-space img { animation: none; } }
+
+/* The same reading hierarchy continues across all operational sections. */
+.orbital-workspace { --line: #ffffff16; }
+.orbital-workspace .page-heading { background: linear-gradient(#0a0e127a 85%,#0a0e1200); backdrop-filter: blur(1px); padding-top: 8px; }
+.orbital-workspace .page-heading h1 { font-size: clamp(28px,8.5cqi,36px); font-weight: 550; }
+.orbital-workspace .page-heading > span { font-size: 14px; line-height: 1.65; }
+.read-state { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 0; margin: 0 0 20px; border-bottom: 1px solid var(--line); color: #a9b5c4; font-size: 14px; line-height: 1.6; }
+.read-state > div { flex: 1 1 190px; }
+.read-state b { display: block; font-size: 14px; font-weight: 500; color: #e3bd9a; }
+.read-state span { display: block; margin-top: 5px; font-size: 13px; }
+.read-state button { min-height: 44px; padding: 9px 15px; border: 1px solid #ffffff24; border-radius: 12px; background: #ffffff08; color: #e0e5ed; font-size: 13px; }
+.read-state.is-loading { color: #adb7c6; }
+.orbital-workspace .host-strip { grid-template-columns: 1fr 1fr; }
+.orbital-workspace .host-strip > div { padding: 18px 10px; }
+.orbital-workspace .host-strip > div:last-child { grid-column: 1/-1; flex-direction: row; align-items: center; gap: 12px; padding-left: 0; border-top: 1px solid var(--line); }
+.orbital-workspace .host-strip small { font-size: 11px; letter-spacing: 0; }
+.orbital-workspace .host-strip span { font-size: 12px; }
+.orbital-workspace .host-strip strong { font-size: 17px; line-height: 1.5; }
+.orbital-workspace .health-checks { grid-template-columns: 1fr; gap: 0; }
+.orbital-workspace .health-checks article { border: 0; border-bottom: 1px solid var(--line); background: none; border-radius: 0; padding: 18px 0; }
+.orbital-workspace .service-grid { grid-template-columns: 1fr; gap: 0; }
+.orbital-workspace .service-card { grid-template-columns: 38px minmax(0,1fr); gap: 10px 14px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none; padding: 21px 0; }
+.orbital-workspace .service-card .service-symbol { grid-column: 1; grid-row: 1/3; border: 0; background: none; }
+.orbital-workspace .service-card .card-name { grid-column: 2; }
+.orbital-workspace .service-card .state { grid-column: 2; }
+.orbital-workspace .service-card .observed { grid-column: 2; text-align: left; }
+.orbital-workspace .card-name small { display: none; }
+.orbital-workspace .section-heading { align-items: center; flex-wrap: wrap; }
+.orbital-workspace .section-heading small { font-size: 11px; }
+.orbital-workspace .metric-card { border: 1px solid #ffffff10; border-radius: 15px; padding: 16px; min-height: 165px; }
+.orbital-workspace .metric-card > small { font-size: 12px; letter-spacing: 0; line-height: 1.6; }
+.orbital-workspace .metric-card > strong { font-size: 31px; }
+.additional-metrics { margin-top: 12px; }
+.additional-metrics > summary { min-height: 48px; padding: 15px 0; font-size: 14px; color: #c0cad6; cursor: pointer; }
+.additional-metrics[open] > summary { margin-bottom: 8px; }
+summary:focus-visible { outline: 2px solid #e2e4e7; outline-offset: 4px; border-radius: 4px; }
+.orbital-workspace .spark-empty { font-size: 11px; line-height: 1.5; }
+.orbital-workspace .inventory article { font-size: 14px; padding: 19px 0; }
+.orbital-workspace .inventory small { font-size: 12px; }
+.orbital-workspace .profile { border: 0; background: none; border-radius: 0; }
+.orbital-workspace .profile-head { padding: 20px 0; gap: 13px; flex-wrap: wrap; }
+.orbital-workspace .profile-head small { font-size: 10px; letter-spacing: .02em; }
+.orbital-workspace .profile-head > span { font-size: 12px; }
+.orbital-workspace .connection-columns > div { padding: 20px 0; }
+.orbital-workspace .connection-columns h3 { font-size: 15px; color: #d7dfe9; margin-bottom: 15px; }
+.orbital-workspace .connection-row { padding: 16px 0; }
+.orbital-workspace .connection-row em { font-size: 12px; }
+.orbital-workspace .row-action { min-height: 44px; padding: 10px 12px; font-size: 12px; border: 1px solid #ffffff16; border-radius: 12px; margin-top: 5px; }
+.orbital-workspace .session-row { grid-template-columns: 30px minmax(0,1fr); padding: 20px 0; border: 0; border-bottom: 1px solid var(--line); background: none; border-radius: 0; }
+.orbital-workspace .session-row > div:last-child { grid-column: 2; grid-row: auto; }
+.orbital-workspace .secondary,.orbital-workspace .danger { min-height: 44px; border-radius: 12px; padding: 10px 16px; font-size: 13px; }
+.orbital-workspace .parser-hero { grid-template-columns: 1fr; border: 0; border-radius: 0; }
+.orbital-workspace .parser-hero > div { border: 0; border-bottom: 1px solid var(--line); padding: 20px 0; }
+.orbital-workspace .parser-hero small { font-size: 11px; letter-spacing: .02em; }
+.orbital-workspace .parser-hero strong { font-size: 17px; line-height: 1.6; }
+.orbital-workspace .parser-hero > span { font-size: 13px; padding: 18px 0; line-height: 1.6; }
+.orbital-workspace .timeline > div { grid-template-columns: 1fr; font-size: 14px; gap: 8px; padding: 22px 0; }
+.orbital-workspace .timeline time { font-size: 12px; }
+.orbital-workspace .incident-list { gap: 0; }
+.orbital-workspace .incident-list article { border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 23px 0; background: none; gap: 12px; }
+.orbital-workspace .incident-list article i,.orbital-workspace .incident-list article em { font-size: 12px; letter-spacing: 0; }
+.orbital-workspace .incident-list small,.orbital-workspace .incident-list time { font-size: 12px; line-height: 1.6; }
+.orbital-workspace .event-table > div { grid-template-columns: 1fr; font-size: 14px; gap: 10px; padding: 22px 0; }
+.orbital-workspace .event-table time { font-size: 12px; }
+.orbital-workspace .event-table details { grid-column: 1/-1; }
+.orbital-workspace .event-table summary { min-height: 44px; display: list-item; padding: 12px 0; cursor: pointer; font-size: 12px; color: #b5c0ce; }
+.orbital-workspace .event-table code { display: block; padding: 14px; border-radius: 12px; background: #0004; font-size: 12px; line-height: 1.7; }
+.orbital-workspace .backup-grid article { border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 22px 0; background: none; }
+.orbital-workspace .backup-grid b { font-size: 17px; }
+.orbital-workspace .backup-grid article > span,.orbital-workspace .backup-grid time,.orbital-workspace .backup-grid small { font-size: 13px; line-height: 1.65; }
+.orbital-workspace .empty-state { border: 0; min-height: 180px; background: none; padding: 24px 0; }
+.orbital-workspace .empty-state b { font-size: 17px; letter-spacing: -.02em; }
+.orbital-workspace .empty-state span { font-size: 14px; }
+.service-accordion-detail { animation: service-detail-reveal .18s ease-out; }
+@keyframes service-detail-reveal { from { opacity: .25; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@media(max-width:900px) {
+  /* Reserve a real dock row: it no longer covers controls in the inspector. */
+  .orbital-app.is-focused { height: 100dvh; min-height: 0; overflow: hidden; padding-bottom: max(8px,env(safe-area-inset-bottom)); }
+  .is-focused .orbital-body { flex: 1 1 0; min-height: 0; gap: 0; }
+  .is-focused .universe,.is-focused.is-expanded .universe { flex: 0 0 24dvh; height: 24dvh; min-height: 140px; }
+  .is-focused .orbital-workspace,.is-focused.is-expanded .orbital-workspace { flex: 1 1 0; min-height: 0; max-height: none; height: auto; width: min(520px,100%); margin: 0; }
+  .is-focused .orbital-workspace main { padding-bottom: 28px; scroll-padding-bottom: 24px; }
+  .is-focused .orbital-navigation { position: relative; left: auto; bottom: auto; transform: none; flex: 0 0 58px; margin: 10px auto 3px; }
+  .is-focused .orbital-footer { flex: 0 0 auto; font-size: 10px; justify-content: center; padding: 3px 0; }
+  .is-focused .orbital-footer > span:last-child { display: none; }
+  .workspace-toolbar button { min-width: 44px; min-height: 40px; }
+  .workspace-tabs button { min-height: 40px; }
+}
+@media(max-height:650px) and (max-width:900px) {
+  .is-focused .universe,.is-focused.is-expanded .universe { flex-basis: 17dvh; height: 17dvh; min-height: 85px; }
+}
+@media(prefers-reduced-motion:reduce) { .orbital-workspace *, .read-state { scroll-behavior: auto; } .service-accordion-detail { animation: none; } }
+

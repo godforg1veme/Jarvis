@@ -52,6 +52,33 @@ npm run test:jobs:access --prefix server
 node --test server/test/jobRuntime.test.js
 ```
 
+Орбитальная Operations UI, локально 21 октября:
+[результат и ограничения](updates/2026-10-21-orbital-monitoring-development.md).
+Unit 40/40, build, девять страниц на 1440/662/390/320 px, WebGL, fallback,
+bootstrap и подтверждения сервисов прошли. Production/VPS и FPS телефона
+этими fixtures не подтверждаются.
+
+Orbital Operations UI, local development on October 21:
+[results and limitations](updates/2026-10-21-orbital-monitoring-development.md).
+Unit 40/40, build, nine pages at 1440/662/390/320 px, WebGL, fallback, bootstrap and
+service confirmations passed. These fixtures do not verify production/VPS or
+phone frame rates.
+
+```powershell
+npm test --prefix ops-ui
+npm run build --prefix ops-ui
+node scripts/testOrbitalOperations.cjs
+# Build first; serves production assets under the existing Operations CSP.
+node scripts/testOrbitalProduction.cjs
+node scripts/testOperationsBootstrap.cjs
+node scripts/testOperationsServiceDialog.cjs
+# Existing browser suite requires Vite on 127.0.0.1:5179/ops/ and Playwright.
+# On Windows: PLAYWRIGHT_CHANNEL=msedge; PLAYWRIGHT_MODULE may select a runtime.
+node scripts/testOperationsBrowser.cjs
+# Synthetic read-only preview, bound only to loopback:
+node scripts/previewOperations.cjs
+```
+
 Выпуск 20 октября: [результат](updates/2026-10-20-desktop-reliability-release.md).
 Новый Linux image прошёл 778/778, отдельный PostgreSQL применил 41 миграцию и
 проверил новый status lookup. Установленный Desktop: 146 файлов, Electron и

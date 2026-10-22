@@ -1,10 +1,24 @@
-import { useEffect, useState } from 'react';
 import { getParser } from '../api/client';
+import { PageHeading } from '../components/PageHeading';
+import { ReadState } from '../components/ReadState';
 import { dateLabel, statusLabels } from '../format';
-import type { ParserData } from '../types';
+import { useOperationsRead } from '../hooks/useOperationsRead';
 
 export function ParserPage({ refreshToken = 0 }: { refreshToken?: number }) {
-  const [data, setData] = useState<ParserData | null>(null);
-  useEffect(() => { void getParser().then(setData).catch(() => setData({ service: null, results: [] })); }, [refreshToken]);
-  return <><div className="page-heading"><p>EXTERNAL / READ ONLY</p><h1>Telegram Parser</h1><span>Наблюдение без изменения установленного парсера</span></div>{!data ? <div className="notice">Загрузка…</div> : <><section className="parser-hero"><div><small>СОСТОЯНИЕ UNIT</small><strong className={data.service?.state || 'unknown'}><i />{statusLabels[data.service?.state || 'unknown'] || data.service?.state || 'нет данных'}</strong></div><div><small>ПОСЛЕДНИЙ СИГНАЛ</small><strong>{dateLabel(data.service?.observedAt || null)}</strong></div><span>READ ONLY / исходники, сессии и настройки не затрагиваются</span></section>{data.results.length ? <div className="timeline">{data.results.map((result) => <div key={result.id}><time>{dateLabel(result.observedAt)}</time><b>{result.kind}</b><span>{result.summary}</span></div>)}</div> : <div className="notice quiet">Операционных ошибок парсера пока не записано.</div>}</>}</>;
+  const { data, loading, failed, retry } = useOperationsRead(getParser, refreshToken);
+  return <>
+    <PageHeading title="Telegram Parser" description="Наблюдение без изменения установленного парсера" />
+    <ReadState loading={loading} failed={failed} hasData={data !== null} retry={retry} label="данные парсера" />
+    {data ? <>
+      <section className="parser-hero"><div><small>СОСТОЯНИЕ СЕРВИСА{failed ? ' · ПОСЛЕДНИЕ ДАННЫЕ' : ''}</small>
+        <strong className={failed ? 'unknown' : data.service?.state || 'unknown'}><i />{statusLabels[data.service?.state || 'unknown'] || data.service?.state || 'Нет данных'}{failed ? ' · ранее' : ''}</strong></div>
+        <div><small>ПОСЛЕДНИЙ СИГНАЛ</small><strong>{dateLabel(data.service?.observedAt || null)}</strong></div>
+        <span>Только наблюдение · исходники, сессии и настройки не затрагиваются</span></section>
+      {data.results.length ? <div className="timeline">{data.results.map((result) => <div key={result.id}>
+        <time>{dateLabel(result.observedAt)}</time><b>{result.kind}</b><span>{result.summary}</span>
+      </div>)}</div> : <div className="notice quiet">{data.service
+        ? failed ? 'На момент последней проверки операционных ошибок не было.' : 'Операционных ошибок парсера пока не записано.'
+        : 'Данные о сервисе парсера пока не получены.'}</div>}
+    </> : null}
+  </>;
 }
