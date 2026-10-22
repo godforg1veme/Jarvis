@@ -9,7 +9,11 @@
 Исходники обоих VPS синхронизированы. Desktop и Host Agent не менялись.
 Server release: `64f27bced804711fcdc27d9745d1d721acd534fa`, каталог
 `/home/deploy/releases/jarvis-64f27bc-orbital`, контейнер `1a23ab0a9d97`.
-Более поздние изменения документации не требуют пересборки этого образа.
+После этого соседний выпуск обновил server до
+`f98f530a362a90cf6e3953ffb76497d2f1aec377` (контейнер `310b719a3f4e`).
+Повторная сверка подтвердила: все 8 Operations UI assets сохранены побайтно
+и совпадают с публичным сайтом. Server healthy. История установки панели выше
+сохранена; текущий server описан в [соседнем выпуске](2026-10-22-hh-resume-bot-defaults-release.md).
 
 Состав: орбитальная сцена, общий движущийся фон, прозрачная панель, девять
 существующих разделов и мобильная компоновка. Основные метрики видны сразу,
@@ -57,7 +61,12 @@ and installed on DE: [live panel](https://jarvis.rilora.ru/ops/).
 Both VPS source checkouts are synchronized. Desktop and Host Agent were unchanged.
 Server release: `64f27bced804711fcdc27d9745d1d721acd534fa`, directory
 `/home/deploy/releases/jarvis-64f27bc-orbital`, container `1a23ab0a9d97`.
-Later documentation changes do not require rebuilding this image.
+A subsequent parallel release updated server to
+`f98f530a362a90cf6e3953ffb76497d2f1aec377` (container `310b719a3f4e`).
+A new verification confirmed that all 8 Operations UI assets were preserved
+byte-for-byte and match the public website. Server is healthy. The panel's
+installation history above is retained; current server is documented in the
+[parallel release](2026-10-22-hh-resume-bot-defaults-release.md).
 
 Scope: orbital scene, a shared moving sky, translucent workspace, nine existing
 sections and mobile layout. Primary metrics are visible immediately; additional
