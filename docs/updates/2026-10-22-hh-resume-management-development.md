@@ -50,7 +50,14 @@ CSRF, чужим actor, CAS, неизвестным результатом, ин
 Браузерный fixture проверяет native multipart, отдельное полномочие, один клик,
 cooldown и запрет 307. Edge: новая панель 1280/390 и прежний Mini App fixture
 320/390/1280 прошли. Файлы снимков — в игнорируемом `.superpowers/job-resumes/`.
-Linux-проверка durable ledger ещё выполняется. Отдельная ревизия специалистом
+На Linux browser прошёл 89/89 без пропусков, server — 785/785, PostgreSQL —
+19/19. Проверены восстановление ledger после перезапуска, неопределённая
+попытка и сбой между записью намерения и операции. Проверки выполнялись
+в отдельных контейнерах с тестовыми данными; production-профили не подключались.
+В тестовой копии shell-файлы приведены к LF: исходный Windows-архив давал
+ошибку окончания строки в прежнем backup fixture. Резервное копирование и
+восстановление production не запускались. Исходники VPS остались на `95056fc`.
+Отдельная ревизия специалистом
 не выполнена: назначенные исполнители остановились из-за лимита их модели.
 
 Для выпуска потребуется согласовать публикацию этой новой функции, применить
@@ -58,6 +65,12 @@ Linux-проверка durable ledger ещё выполняется. Отдел�
 использует общий server image; его файлы тоже нужно синхронизировать. EXE не менялся.
 Реальный выбор резюме и первое бесплатное поднятие после личного включения
 пользователем остаются клиентской приёмкой.
+
+Ограничения текущей реализации: проверка прав удерживает общий access lock
+на время одного browser RPC (тайм-аут 90 секунд), поэтому зависший HH может
+временно задержать операции, использующие этот lock. Неизвестная попытка без
+сохранённого результата блокирует дальнейшее автоподнятие; кнопка проверки
+не заменяет ручную сверку в HH и не сбрасывает блокировку.
 
 ## English
 
@@ -107,7 +120,13 @@ routes, CSRF, foreign actors, CAS, unknown outcomes, cadence and revoked jobs
 access. Browser fixtures cover native multipart, separate capability, one
 click, cooldown and rejected 307. Edge passed the new panel at 1280/390 and
 the existing Mini App fixture at 320/390/1280. Screenshots are ignored under
-`.superpowers/job-resumes/`. Linux durable-ledger verification is still running.
+`.superpowers/job-resumes/`. Linux passed browser 89/89 without skips, server
+785/785 and PostgreSQL 19/19. This includes ledger recovery after restart,
+unknown outcomes and a crash between durable intent and operation storage.
+Tests used separate containers and synthetic data, without production profiles.
+Shell files in the test copy were normalized to LF: the Windows archive caused
+an existing backup fixture to fail on line endings. No production backup or
+restore was run. VPS source checkouts remain at `95056fc`.
 Independent specialist review was unavailable because the assigned agents
 hit their model's usage limit.
 
@@ -116,3 +135,9 @@ credential, and rebuilt server/browser components. Collector shares the
 server image and its files also need synchronization. Desktop EXE is unchanged.
 Real primary selection and the first free raise after personal user opt-in
 remain client acceptance checks.
+
+Current limitations: permission checks retain the shared access boundary's
+global lock during one browser RPC (90-second timeout), so a stalled HH request
+can delay other operations using that lock. An unknown attempt without a saved
+receipt blocks further automatic raising. The check button neither replaces
+manual HH inspection nor clears that block.
