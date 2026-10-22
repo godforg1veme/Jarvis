@@ -65,7 +65,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || '../job-browser/no
         }
         state = 'success';
         await page.getByRole('button', { name: 'Повторить подключение' }).click();
-        await page.getByRole('heading', { name: 'Обзор', exact: true }).waitFor();
+        await page.getByRole('heading', { name: 'Система Jarvis.', exact: true }).waitFor();
         await page.waitForFunction(() => Boolean(window.fixtureStream));
         state = '401';
         await page.evaluate(() => window.fixtureStream.dispatchEvent(new Event('error')));
