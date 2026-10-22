@@ -4,6 +4,9 @@
 
 ## Русский
 
+Историческая запись разработки. Более новый результат:
+[выпуск на DE 22 октября](2026-10-22-hh-resume-management-release.md).
+
 Локальная разработка по запросу владельца: после подключения HH Mini App
 постоянно показывает список собственных резюме и основное резюме для откликов.
 Раньше выбор появлялся только при первом подключении. Произвольное первое
@@ -73,6 +76,9 @@ cooldown и запрет 307. Edge: новая панель 1280/390 и преж
 не заменяет ручную сверку в HH и не сбрасывает блокировку.
 
 ## English
+
+Historical development record. Superseded by the
+[October 22 DE release](2026-10-22-hh-resume-management-release.md).
 
 Local development requested by the owner: after HH connection, Mini App keeps
 the user's resume list and primary application resume visible. Previously the
