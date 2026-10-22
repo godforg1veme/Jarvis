@@ -60,7 +60,7 @@ class ReleaseStatusTests(unittest.TestCase):
         self.assertEqual(release, self.repo)
         overlay.write_text('services: {job-ocr: {read_only: true}}\n')
         self.git('add', 'deploy'); self.git('commit', '-m', 'changed overlay')
-        delta = status.git(self.repo, 'diff', '--name-only', previous, 'HEAD', *inputs)
+        delta = status.release_input_delta(self.repo, previous, 'HEAD', inputs + ['deploy/local-image.yml'])
         self.assertEqual(delta, 'deploy/job-ocr-frozen.yml')
         self.assertEqual(status.release_config_source(str(base))[1], ['deploy/docker-compose.yml'])
         for invalid in ['', 'deploy/docker-compose.yml', f'{base},', f'{base},{self.repo / "other.yml"}']:

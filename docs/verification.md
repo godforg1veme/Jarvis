@@ -52,17 +52,17 @@ npm run test:jobs:access --prefix server
 node --test server/test/jobRuntime.test.js
 ```
 
-Орбитальная Operations UI, локально 21 октября:
-[результат и ограничения](updates/2026-10-21-orbital-monitoring-development.md).
-Unit 40/40, build, девять страниц на 1440/662/390/320 px, WebGL, fallback,
-bootstrap и подтверждения сервисов прошли. Production/VPS и FPS телефона
-этими fixtures не подтверждаются.
+Орбитальная Operations UI, выпуск 22 октября:
+[результат и ограничения](updates/2026-10-22-orbital-monitoring-release.md).
+Unit 42/42, build, девять страниц на 1440/662/390/320 px, WebGL, fallback,
+bootstrap и подтверждения сервисов прошли. Отдельно проверены DE, оба source checkout,
+публичные assets и девять разделов с реальными данными. FPS физического телефона не измерялся.
 
-Orbital Operations UI, local development on October 21:
-[results and limitations](updates/2026-10-21-orbital-monitoring-development.md).
-Unit 40/40, build, nine pages at 1440/662/390/320 px, WebGL, fallback, bootstrap and
-service confirmations passed. These fixtures do not verify production/VPS or
-phone frame rates.
+Orbital Operations UI, release on October 22:
+[results and limitations](updates/2026-10-22-orbital-monitoring-release.md).
+Unit 42/42, build, nine pages at 1440/662/390/320 px, WebGL, fallback, bootstrap and
+service confirmations passed. Separate live checks covered DE, both source checkouts,
+public assets and all nine sections with real data. Physical phone frame rates were not measured.
 
 ```powershell
 npm test --prefix ops-ui

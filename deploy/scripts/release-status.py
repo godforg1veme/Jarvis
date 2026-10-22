@@ -34,6 +34,13 @@ def release_config_source(configs):
     return release, [path.relative_to(release).as_posix() for path in paths]
 
 
+def release_input_delta(repo, revision, ref, compose_inputs):
+    # Local overlays may exist only in the immutable release. Always treat
+    # inputs as paths, including those absent from the source checkout.
+    return git(repo, "diff", "--name-only", revision, ref, "--", "server", "ops-ui", "shared",
+               "deploy/server.Dockerfile", *compose_inputs)
+
+
 def command(args, *, cwd=None, input=None, binary=False):
     try:
         result = subprocess.run(args, cwd=cwd, input=input, capture_output=True,
@@ -244,8 +251,7 @@ walk('src');walk('/app/shared');for(const p of ['package.json','package-lock.jso
             revision = git(release, "rev-parse", "HEAD")
             server["releaseRevision"] = revision
             # Include compiled UI and image/unit inputs, even when JS hashes match.
-            delta = git(repo, "diff", "--name-only", revision, ref, "server", "ops-ui", "shared",
-                        "deploy/server.Dockerfile", *compose_inputs)
+            delta = release_input_delta(repo, revision, ref, compose_inputs)
             server["releaseInputsMatch"] = not bool(delta)
         else:
             server["releaseInputsMatch"] = None

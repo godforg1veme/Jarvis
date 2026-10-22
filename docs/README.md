@@ -43,14 +43,15 @@ Linux: 783 server, 79 browser, 42 миграции и 14 PostgreSQL-провер
 оба VPS синхронизированы, server и сборщик DE обновлены. Новый образ прошёл
 781 unit и 3 PostgreSQL-проверки; публичный HTTPS smoke прошёл.
 
-Локально готова [орбитальная панель мониторинга](updates/2026-10-21-orbital-monitoring-development.md):
+Установлена [орбитальная панель мониторинга](updates/2026-10-22-orbital-monitoring-release.md):
 ядро, шесть планет и единая тёмная рабочая область для существующих девяти разделов.
 Только поиск в шапке, пять иконок снизу, движущиеся планеты и выезжающий сайдбар.
 Выбранная сцена получила узкий Млечный Путь, разнесённые орбиты, индивидуальные
 скорости, редкие фоновые события и безопасное кадрирование. Выбранный сайдбар B
-реализован: прозрачный список с фильтрами и управлением внутри строки. Unit 40/40, build, WebGL и browser
+реализован: прозрачный список с фильтрами и управлением внутри строки. Unit 42/42, build, WebGL и browser
 fixtures на 1440/662/390/320 px прошли.
-Не опубликована; визуальное принятие владельцем и проверка на VPS остаются.
+DE server обновлён; оба VPS синхронизированы. Linux 786/786, public smoke и UI assets прошли.
+Вход и девять разделов с реальными данными проверены; FPS физического телефона остаётся для клиентской проверки.
 
 Выпущены [надёжность Desktop и единые проверки](updates/2026-10-20-desktop-reliability-release.md):
 ограниченные HTTP-запросы, сохранение ID до отправки, ручная проверка результата
@@ -291,14 +292,15 @@ The permanent configuration and queue fixes are published in `main`; both VPS
 sources are synchronized, and the DE server and collector are updated. The new
 image passed 781 unit tests and 3 PostgreSQL checks; public HTTPS smoke passed.
 
-The [orbital monitoring redesign](updates/2026-10-21-orbital-monitoring-development.md)
-is ready locally: a core, six planets and a dark workspace for the existing nine
+The [orbital monitoring redesign](updates/2026-10-22-orbital-monitoring-release.md)
+is installed: a core, six planets and a dark workspace for the existing nine
 pages. Search-only header, five-icon dock, moving planets and sliding workspace.
 The approved scene has a narrow Milky Way, separated orbits, individual speeds,
 rare ambient events and safe framing. Approved sidebar B is implemented: a translucent
-filtered service list with inline controls. Unit 40/40, build, WebGL and browser fixtures at
+filtered service list with inline controls. Unit 42/42, build, WebGL and browser fixtures at
 1440/662/390/320 px passed.
-Not deployed; owner visual acceptance and VPS checks remain.
+DE server is updated and both VPS sources are synchronized. Linux 786/786, public
+smoke and UI asset checks passed. Owner sign-in and all nine sections with real data passed; physical phone FPS remains a client check.
 
 [Desktop reliability and a local test entry point](updates/2026-10-20-desktop-reliability-release.md)
 are released: bounded HTTP, IDs saved before sending, read-only result
