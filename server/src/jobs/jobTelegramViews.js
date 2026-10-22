@@ -3,7 +3,7 @@ function response(answer, buttons = []) {
     historyAnswer: 'Поиск работы: результат действия показан владельцу.' };
 }
 function button(text, action, id) { return { text, data: `job:${action}${id == null ? '' : `:${id}`}` }; }
-function homeView({ search, usage, connection, captchaEnabled = false }) {
+function homeView({ search, usage, connection, captchaEnabled = false, resumeEnabled = false }) {
   const enabled = search.settings.activated && !search.settings.paused;
   return response(`Поиск работы\n${enabled ? 'Поиск включён' : 'Поиск выключен'}${!search.settings.queries.length?'\nДобавь запросы в настройках: каждую фразу с новой строки.':''}
 Проверка: каждые ${Math.round(search.settings.intervalMs / 60000)} мин.
@@ -17,6 +17,7 @@ ${search.status === 'attention' ? 'Последняя проверка не за
     [button('Настройки', 'settings'), button('Сохранённые', 'saved', 0)],
     [button('Отклики', 'applications', 0), button('Проверить сейчас', 'check')],
     [button('Профиль и примеры', 'profile'), button('Подключить HH', 'connect')],
+    ...(resumeEnabled&&connection?.status==='connected'?[[button('Резюме HH','resumes')]]:[]),
     [button('Редактировать базовое сопроводительное', 'base_letter')],
     ...(captchaEnabled ? [[button('Проверить HH', 'captcha')]] : []),
     [button('Назад', 'back')],

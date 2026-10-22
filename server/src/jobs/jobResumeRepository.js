@@ -1,13 +1,14 @@
 const { z } = require('zod');
 const { isDeepStrictEqual } = require('node:util');
 const { jobError, assertUserJobAccess } = require('./jobSchemas');
+const { applyResumeDefaults } = require('./jobResumeDefaults');
 const resumeId = z.string().regex(/^[a-zA-Z0-9]{1,100}$/);
 const resumeSchema = z.object({ id:resumeId, title:z.string().trim().min(1).max(500), canRaise:z.boolean().optional() }).strict();
 const settingsInput = z.object({ requestId:z.uuid(), expectedRevision:z.number().int().positive(), connectionRevision:z.number().int().positive(),
   resumeId, autoRaiseEnabled:z.boolean() }).strict();
 const stamp = a => JSON.stringify([a.userId,a.revision,a.roleId??null,a.roleRevision??0]);
 class JobResumeRepository {
-  constructor(pool,accessService) { this.pool=pool; this.accessService=accessService; }
+  constructor(pool,accessService,now=Date.now) { this.pool=pool; this.accessService=accessService; this.now=now; }
   async transaction(userId,fn) {
     z.uuid().parse(userId);const c=await this.pool.connect();
     try { await c.query('BEGIN');await c.query("SELECT pg_advisory_xact_lock(hashtext('jarvis-access-admin'))");
@@ -19,8 +20,8 @@ class JobResumeRepository {
   async current(c,userId) {
     const connection=(await c.query('SELECT resume_id,status,revision FROM job_connections WHERE user_id=$1',[userId])).rows[0];
     await c.query('INSERT INTO job_resume_managers(user_id) VALUES($1) ON CONFLICT DO NOTHING',[userId]);
-    const manager=(await c.query('SELECT * FROM job_resume_managers WHERE user_id=$1',[userId])).rows[0];
-    return {connection,manager};
+    const manager=(await c.query('SELECT * FROM job_resume_managers WHERE user_id=$1 FOR UPDATE',[userId])).rows[0];
+    return {connection,manager:await applyResumeDefaults(c,userId,connection,manager,this.now)};
   }
   async claim(userId,requestId,kind,payload={}) {
     z.uuid().parse(requestId);

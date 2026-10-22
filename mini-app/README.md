@@ -4,6 +4,11 @@
 
 ## Русский
 
+На DE выпущено изменение от 22 октября: новые и ранее подключённые
+резюме получают автоподнятие по умолчанию, если нет явного off или unknown.
+Настройка общая с кнопками Telegram; подсказка объясняет возможность выключения.
+[Выпуск и проверки](../docs/updates/2026-10-22-hh-resume-bot-defaults-release.md).
+
 22 октября на DE выпущена постоянная панель собственных резюме после
 подключения HH: выбор основного, обновление списка и отдельное включение
 бесплатного поднятия не чаще раза в 4 часа. Смена и включение требуют
@@ -106,6 +111,11 @@ production browser fixtures с недоступным SDK и отказом се
 [результат](../docs/updates/2026-10-18-telegram-mini-app-release.md).
 
 ## English
+
+Deployed on DE on October 22: new and existing connected resumes get default
+automatic raising unless an explicit off or unknown stop applies. Settings
+are shared with Telegram buttons; the hint explains how to disable raising.
+[Release and verification](../docs/updates/2026-10-22-hh-resume-bot-defaults-release.md).
 
 October 22: DE received a persistent personal resume panel: primary
 selection, catalog refresh and separate free raising opt-in, at most once

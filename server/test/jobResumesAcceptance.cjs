@@ -29,7 +29,7 @@ async function fixture() {
       async raiseResume(input){raises.push({userId,...input});return{outcome:nextOutcome,...(nextOutcome==='unknown'?{}:{verified:true})};},
       async resumeRaiseStatus(){return{outcome:'raised',verified:true};},
     };}};
-    const repository=new JobResumeRepository(f.pool,access),service=new JobResumeService({repository,browserClient,now:()=>clock});
+    const repository=new JobResumeRepository(f.pool,access,()=>clock),service=new JobResumeService({repository,browserClient,now:()=>clock});
     const worker=new JobResumeWorker({repository,service,browserClient,now:()=>clock});
     return{...f,access,owner,member,lists,selected,reads,selections,raises,repository,service,worker,
       advance(){clock+=INTERVAL+1000;},loseSelection(){lostSelection=true;},unknown(){nextOutcome='unknown';},
@@ -55,9 +55,26 @@ test('owned resume catalog, CAS selection, original-ID recovery and application 
     assert.equal((await service.get(owner.userId)).resumes.length,2);assert.equal((await service.get(owner.userId)).lastError,'refresh_failed');
   }finally{await f.close();}
 });
-test('auto raise is explicit, personal, four-hour bounded, durable on unknown and stops after rights revocation',async()=>{
+test('interrupted local off recovers by original ID without requiring a browser response',async()=>{
+  const f=await fixture();try {
+    const userId=f.owner.userId,input=await f.input(userId,'ownerA',false);
+    await f.repository.claim(userId,input.requestId,'settings',input);
+    await f.pool.query("UPDATE job_resume_operations SET created_at=now()-interval '3 minutes' WHERE user_id=$1 AND request_id=$2",[userId,input.requestId]);
+    let reads=0;
+    const original=f.service.browserClient.forUser;
+    f.service.browserClient.forUser=(id)=>({...original(id),async connection(){reads++;throw Error('Fixture browser offline');}});
+    assert.equal((await f.service.operation(userId,input.requestId)).status,'complete');
+    assert.equal((await f.service.get(userId)).autoRaise.enabled,false);
+    assert.equal(reads,0);assert.equal(f.selections.length,0);assert.equal(f.raises.length,0);
+  }finally{await f.close();}
+});
+
+test('auto raise preference is personal, four-hour bounded, durable on unknown and stops after rights revocation',async()=>{
   const f=await fixture();try {
     const {owner,member,service,worker}=f;await service.get(owner.userId);await service.get(member.userId);
+    assert.equal((await service.get(owner.userId)).autoRaise.enabled,true);
+    await service.settings(owner.userId,await f.input(owner.userId,'ownerA',false));
+    await service.settings(member.userId,await f.input(member.userId,'memberA',false));
     await worker.tick();assert.equal(f.raises.length,0);
     await service.settings(owner.userId,await f.input(owner.userId,'ownerA',true));
     await Promise.all([worker.raiseOne(owner.userId),worker.raiseOne(owner.userId)]);assert.equal(f.raises.length,1);assert.equal(f.raises[0].resumeId,'ownerA');

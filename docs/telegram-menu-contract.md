@@ -9,6 +9,41 @@ source changes; verify the deployed revision before a server rollout.
 
 ## Change control
 
+22 октября 2026, согласовано владельцем и выпущено на DE:
+«Поиск работы → Резюме HH» после личного подключения показывает собственные
+резюме с отметкой основного. Выбор и отдельный выключатель автоподнятия ведут
+к полному названию и «Подтвердить / Отмена». Mini App и бот сохраняют один
+primary. Новая политика включает бесплатное поднятие по умолчанию, сохраняя
+прежний явный off и остановку unknown; минимум 4 часа и один primary прежние.
+Выключение текущего расписания доступно и без резюме в каталоге или связи с HH.
+
+Callbacks: `job:resumes`, `job:resumes_refresh`, `job:rs_pick:<menu-uuid>:<0..19>`,
+`job:rs_auto:<menu-uuid>:<0|1>`, `job:rs_ok:<confirmation-uuid>`,
+`job:rs_status:<confirmation-uuid>`. Значений HH в них нет. Migration 043
+добавляет confirmation kind `resume`; новых guided-input kinds нет.
+Снимок меню и preview имеют TTL 10 минут, user/conversation/private chat,
+access stamp, manager/connection revision. Подтверждение потребляется один раз;
+тот же UUID связывает исходную settings-операцию и проверку unknown без нового
+select. Другая навигация отменяет preview. Отзыв jobs сериализован с записью
+выбора. Смена primary отменяет прежние подтверждения отклика с другим резюме.
+[Установка и проверки](updates/2026-10-22-hh-resume-bot-defaults-release.md).
+
+October 22, 2026, owner-approved and deployed on DE:
+after personal HH connection, “Job search → HH resumes” shows only the user's
+resumes and marks the primary. Selection and the separate auto-raise switch
+show the full title with Confirm / Cancel. Bot and Mini App share one primary.
+The new policy enables free raising by default while preserving explicit off
+and unknown stops; one primary and the four-hour minimum remain. Disabling the
+current schedule works even when the resume disappeared or HH is unavailable.
+The closed callback forms above contain no HH values. Migration 043 adds a
+`resume` confirmation kind, with no guided-input kinds. Menu/preview snapshots
+retain a ten-minute expiry, user/conversation/private-chat scope, access stamp
+and manager/connection revisions. A confirmation is consumed once; the same UUID
+binds the original settings request and unknown reconciliation without another
+select. Other navigation cancels preview. Permission revocation is serialized
+with selection writes; changing primary invalidates older application approvals
+using another resume. [Deployment and checks](updates/2026-10-22-hh-resume-bot-defaults-release.md).
+
 21 октября 2026, согласовано владельцем: новые фильтры поиска пустые.
 В «Настройки → Поисковые запросы / Исключения → Добавить» одно сообщение
 принимает несколько фраз, по одной на строку, с общим предпросмотром и

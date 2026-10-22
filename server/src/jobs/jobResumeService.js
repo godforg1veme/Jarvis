@@ -45,6 +45,12 @@ class JobResumeService {
     if(!claim.fresh)return this.operation(userId,input.requestId);
     let selectionStarted=false;
     try {
+      // Stopping this user's current schedule is a local setting. It must
+      // remain possible when HH is offline or the primary resume disappeared.
+      if(!input.autoRaiseEnabled&&claim.connection.resume_id===input.resumeId) {
+        await this.completeSettings(userId,claim.operation);
+        return {requestId:input.requestId,status:'complete',kind:'settings'};
+      }
       const list=z.array(resumeSchema).max(20).parse(await this.browserClient.forUser(userId).listResumes());
       if(!list.some(r=>r.id===input.resumeId))throw jobError('JOB_LOGIN_RESUME_INVALID');
       await this.repository.transaction(userId,async(c,a)=>{
@@ -52,12 +58,14 @@ class JobResumeService {
         if(stamp(a)!==claim.operation.payload.stamp)throw jobError('JOB_ACCESS_REVOKED');
         if(connection?.revision!==input.connectionRevision||manager.revision!==input.expectedRevision)throw jobError('revision_conflict');
         if(input.autoRaiseEnabled && manager.last_outcome==='unknown')throw jobError('operation_unknown');
+        // Serialize dispatch and its commit with permission revocation and a
+        // concurrent primary change. The durable request was claimed above.
+        selectionStarted=true;
+        await this.browserClient.forUser(userId).selectResume({resumeId:input.resumeId});
+        const selected=await this.browserClient.forUser(userId).connection();
+        if(selected.resumeId!==input.resumeId)throw jobError('operation_unknown');
+        await this.completeSettingsLocked(c,a,userId,claim.operation);
       });
-      selectionStarted=true;
-      await this.browserClient.forUser(userId).selectResume({resumeId:input.resumeId});
-      const selected=await this.browserClient.forUser(userId).connection();
-      if(selected.resumeId!==input.resumeId)throw jobError('operation_unknown');
-      await this.completeSettings(userId,claim.operation);
     } catch(e) {
       await this.repository.finish(userId,input.requestId,selectionStarted?'unknown':'failed').catch(()=>{});
       if(selectionStarted)return {requestId:input.requestId,status:'unknown',kind:'settings'};
@@ -66,8 +74,10 @@ class JobResumeService {
     return {requestId:input.requestId,status:'complete',kind:'settings'};
   }
   async completeSettings(userId,op) {
+    return this.repository.transaction(userId,(c,a)=>this.completeSettingsLocked(c,a,userId,op));
+  }
+  async completeSettingsLocked(c,a,userId,op) {
     const input=op.payload.input;
-    return this.repository.transaction(userId,async(c,a)=>{
       if(stamp(a)!==op.payload.stamp)throw jobError('JOB_ACCESS_REVOKED');
       const {connection,manager}=await this.repository.current(c,userId);
       const fresh=(await c.query('SELECT status FROM job_resume_operations WHERE user_id=$1 AND request_id=$2',[userId,op.request_id])).rows[0];
@@ -79,9 +89,9 @@ class JobResumeService {
       }
       const next=Math.max(this.now(),manager.last_raise_at?new Date(manager.last_raise_at).getTime()+INTERVAL:0);
       await c.query(`UPDATE job_resume_managers SET revision=revision+1,auto_raise_enabled=$2,auto_raise_resume_id=$3,
-        next_raise_at=$4,updated_at=now() WHERE user_id=$1`,[userId,input.autoRaiseEnabled,input.resumeId,input.autoRaiseEnabled?new Date(next):null]);
+        next_raise_at=$4,auto_raise_preference=$2,auto_raise_policy_applied=true,updated_at=now() WHERE user_id=$1`,
+        [userId,input.autoRaiseEnabled,input.resumeId,input.autoRaiseEnabled?new Date(next):null]);
       await c.query(`UPDATE job_resume_operations SET status='complete',result='{}',completed_at=now() WHERE user_id=$1 AND request_id=$2`,[userId,op.request_id]);
-    });
   }
   async operation(userId,requestId) {
     let op=await this.repository.status(userId,requestId);
@@ -93,6 +103,12 @@ class JobResumeService {
       if(changed){await this.repository.finish(userId,requestId,'failed');return publicOperation(await this.repository.status(userId,requestId));}
     }
     if(op.kind==='settings'&&(op.status==='unknown'||op.status==='working'&&this.now()-new Date(op.created_at).getTime()>120000)) {
+      const localOff=await this.repository.transaction(userId,async c=>{
+        const {connection}=await this.repository.current(c,userId);
+        return op.payload.input.autoRaiseEnabled===false&&connection?.status==='connected'
+          && connection.resume_id===op.payload.input.resumeId&&connection.revision===op.payload.input.connectionRevision;
+      });
+      if(localOff){await this.completeSettings(userId,op);return publicOperation(await this.repository.status(userId,requestId));}
       // Read the original operation's selected target; never reissue select_resume.
       const selected=await this.browserClient.forUser(userId).connection().catch(()=>null);
       if(selected?.resumeId===op.payload.input.resumeId) {

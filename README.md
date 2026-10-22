@@ -36,9 +36,10 @@ Windows-приложение и облачный API для подключённ
   запасным управлением. Профили отделены от профиля владельца; настоящий вход
   ещё требует проверки участником. [Текущий выпуск](docs/updates/2026-10-21-hh-login-touch-release.md).
 - В личном профиле HH можно постоянно выбирать основное резюме для откликов.
-  Список обновляется каждые 15 минут и вручную; бесплатное автоподнятие выбранного
-  резюме включается отдельно, не чаще раза в 4 часа.
-  [Выпуск и проверки](docs/updates/2026-10-22-hh-resume-management-release.md).
+  Выбор также доступен кнопками бота. Список обновляется каждые 15 минут и вручную;
+  бесплатное автоподнятие включено по умолчанию, не чаще раза в 4 часа.
+  Явное выключение и остановка после неизвестного результата сохраняются.
+  [Выпуск и проверки](docs/updates/2026-10-22-hh-resume-bot-defaults-release.md).
 - Поиск работы собирает вакансии HH отдельным фоновым процессом на DE и отправляет
   отобранные карточки в личный Telegram соответствующего пользователя. В боте доступны управление поиском,
   сохранённые вакансии, подготовка и редактирование сопроводительных писем.
@@ -170,7 +171,7 @@ Telegram is Jarvis's first cloud client. The project also includes a Windows app
 - Dates and clocks use Moscow UTC+3; reminder input without a timezone also means Moscow. See the [release and checks](docs/updates/2026-10-19-moscow-time-release.md).
 - The Telegram Mini App includes an actual rotating 3D core, private chat and administration with Telegram IDs, roles and personal overrides. The owner appoints administrators. See the [release and client checks](docs/updates/2026-10-18-telegram-mini-app-release.md).
 - Members with current `jobs` permission can connect their own HH account through a temporary HTTPS link on a phone or PC, then confirm a resume in the originating Mini App. The link arrives as private Telegram message text and a button. The HH window supports taps and phone-keyboard input, with the bottom panel retained as fallback. Profiles are separate from the owner's; real sign-in still needs member acceptance. See the [current release](docs/updates/2026-10-21-hh-login-touch-release.md).
-- The personal HH profile keeps a primary resume selector available for applications. The catalog refreshes every 15 minutes and on request; free automatic raising of the selected resume requires a separate opt-in and runs at most once every four hours. See the [release and verification](docs/updates/2026-10-22-hh-resume-management-release.md).
+- The personal HH profile and Telegram bot buttons offer a primary resume selector for applications. The catalog refreshes every 15 minutes and on request. Free automatic raising is on by default and runs at most once every four hours, preserving explicit off choices and unknown-result stops. See the [release and verification](docs/updates/2026-10-22-hh-resume-bot-defaults-release.md).
 - Job search collects HH vacancies in a separate background process on DE and sends filtered cards to the relevant user's private Telegram chat. Search controls, saved vacancies, and cover-letter preparation and editing are available in the bot. New filters are empty; queries and exclusions accept one phrase per line with confirmation before saving. Search requires at least one query. The model runs on request; submitting an application requires approval of the exact letter. Live application submission still needs acceptance.
 - DE uses the fine-tuned HH OCR with image rectification: up to three automatic attempts, then a photo for the owner in Telegram. An unknown result stops automation earlier. Replying to the photo authorizes one submission; verified access resumes the search from its saved position. The human flow passed on 16 October; the first live OCR attempt on 18 October did not confirm access and handed a photo to the owner. A later live OCR answer test, approved by the owner, returned solved and resumed collection; a fully autonomous cycle remains unconfirmed. This CAPTCHA flow needs no Tailscale connection or separate web screen. See the [release and verification limits](docs/updates/2026-10-18-hh-ocr-live-acceptance.md).
 - The knowledge service stores private document metadata and text for owner-scoped search. It supports text and office formats, plus page-linked PDF search. Uploaded content is treated as untrusted data.
