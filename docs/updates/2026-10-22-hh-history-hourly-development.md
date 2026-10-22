@@ -4,6 +4,9 @@
 
 ## Русский
 
+Обновление: [выпущено 22 октября](2026-10-22-hh-history-hourly-release.md).
+Ниже сохранён результат локальной разработки до выпуска.
+
 Подготовлено локально 22 октября 2026 по поручению владельца. На VPS не
 установлено; production-данные и сообщения Telegram не менялись.
 
@@ -65,6 +68,9 @@ checkpoint, concurrency, отзыв доступа, отключение HH, а�
 подключённого профиля, новые подписи и следующий почасовой запуск.
 
 ## English
+
+Update: [deployed on October 22](2026-10-22-hh-history-hourly-release.md).
+The local, pre-deployment record is retained below.
 
 Prepared locally on October 22, 2026 at the owner's request. Not deployed;
 production data and Telegram messages were not changed.

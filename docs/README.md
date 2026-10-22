@@ -17,11 +17,12 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
-22 октября локально подготовлены [почасовая история HH и проверка актуальности приглашений](updates/2026-10-22-hh-history-hourly-development.md).
+22 октября выпущены [почасовая история HH и проверка актуальности приглашений](updates/2026-10-22-hh-history-hourly-release.md).
 Полный обход для всех подключённых пользователей не зависит от поиска вакансий.
 Архивные и неподтверждённые приглашения отделены от подтверждённых, исправлена
-сортировка по дате HH. На VPS пока не установлено; живая сверка ограничена
-активным ручным режимом HH.
+сортировка по дате HH. На DE обновлены server/browser и применена 044,
+оба VPS синхронизированы. Первый полный обход завершён: 27 страниц, 527 записей.
+Все десять приглашений со скриншота подтверждены в архиве HH за 2021–2024 годы.
 
 22 октября выпущены [выбор резюме кнопками бота и автоподнятие по умолчанию](updates/2026-10-22-hh-resume-bot-defaults-release.md).
 Явный off и unknown сохраняются. Проверены 787 server tests, 32 PostgreSQL
@@ -290,11 +291,13 @@ deployment establish what is running.
 
 ### Current status
 
-October 22: [hourly HH history and invitation freshness](updates/2026-10-22-hh-history-hourly-development.md)
-are prepared locally. Full refresh covers every eligible connected user,
+October 22: [hourly HH history and invitation freshness](updates/2026-10-22-hh-history-hourly-release.md)
+are deployed. Full refresh covers every eligible connected user,
 independently of vacancy-search activation. Archived and unconfirmed invitations
-have separate labels; ordering uses original HH dates. Not deployed to VPS;
-live comparison is blocked by the existing HH manual mode.
+have separate labels; ordering uses original HH dates. DE server/browser and
+migration 044 are updated and both VPS sources match. The first full pass
+completed: 27 pages, 527 records. All ten screenshot invitations were confirmed
+in HH's archive, dated 2021–2024.
 
 October 22: released [bot resume selection and default automatic raising](updates/2026-10-22-hh-resume-bot-defaults-release.md).
 Explicit off and unknown stops are preserved. Verified:

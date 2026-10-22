@@ -75,6 +75,18 @@ deadline across metadata, fetch and body reads.
 
 #### HH: состояние на 22 октября / State on October 22
 
+Выпущено [почасовое обновление полной истории HH](updates/2026-10-22-hh-history-hourly-release.md)
+для всех подключённых пользователей с действующим `jobs`, независимо от поиска
+вакансий. Migration 044 хранит раздел, исходную дату и доказательство полного
+обхода; бот отличает архивные и неподтверждённые приглашения. На DE обновлены
+server/browser, источники обоих VPS синхронизированы.
+
+[Hourly full HH history refresh](updates/2026-10-22-hh-history-hourly-release.md)
+is deployed for every eligible connected user, independently of vacancy search.
+Migration 044 stores section, original date and full-pass proof; the bot labels
+archived and unconfirmed invitations. DE server/browser are updated and both
+VPS source checkouts are synchronized.
+
 Личный вход использует временную HTTPS-ссылку, доставленную в личный Telegram
 текстом и кнопкой; страница поддерживает нажатия и клавиатуру телефона.
 После подключения список собственных резюме доступен постоянно в Mini App

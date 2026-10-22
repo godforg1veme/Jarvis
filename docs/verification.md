@@ -2,14 +2,22 @@
 
 ## Почасовая история HH / Hourly HH history
 
-Локальная разработка 22 октября:
-[результат и ограничения](updates/2026-10-22-hh-history-hourly-development.md).
+Выпуск 22 октября:
+[результат и ограничения](updates/2026-10-22-hh-history-hourly-release.md).
+Новые Linux-образы: 787/787 server, 13/13 PostgreSQL history, 90/90 browser
+и 4/4 Chromium history, без пропусков. Live/ready и миграция 044 прошли.
+Первый живой автоматический обход завершён: 27 страниц, 527 записей; все десять
+карточек со скриншота подтверждены в архиве HH и показывают архивную подпись.
 Для PostgreSQL требуется отдельная тестовая БД. Проверяются граница часа,
 все подключённые пользователи, независимость от поиска вакансий, сохранение
 checkpoint, права, архивные/неподтверждённые статусы и исходная дата HH.
 
-Local development, October 22:
-[results and limits](updates/2026-10-22-hh-history-hourly-development.md).
+Release, October 22:
+[results and limits](updates/2026-10-22-hh-history-hourly-release.md).
+New Linux images: 787/787 server, 13/13 PostgreSQL history, 90/90 browser
+and 4/4 Chromium history, without skips. Live/ready and migration 044 passed.
+The first live automatic pass completed: 27 pages, 527 records. All ten
+screenshot cards were confirmed in HH's archive and render an archive label.
 Use an isolated PostgreSQL database. Checks cover hourly deadlines, all eligible
 connected users, independence from vacancy search, checkpoints, permissions,
 archived/unconfirmed observations and original HH dates.

@@ -9,7 +9,7 @@ source changes; verify the deployed revision before a server rollout.
 
 ## Change control
 
-22 октября 2026, согласовано владельцем, подготовлено локально:
+22 октября 2026, согласовано владельцем и выпущено на DE:
 история откликов и приглашений HH обновляется полностью раз в час у каждого
 пользователя с действующим `jobs`, личным подключением и проверенным Telegram
 scope. Включение поиска новых вакансий на это не влияет. Первая проверка не
@@ -21,9 +21,9 @@ scope. Включение поиска новых вакансий на это �
 Порядок использует исходную дату HH, а не время импорта; неизвестные даты идут
 после известных. Migration 044 хранит дату записи, раздел и доказательство
 полного обхода. Callback grammar, кнопки, права и подтверждение отклика прежние.
-[Локальные проверки и ограничения](updates/2026-10-22-hh-history-hourly-development.md).
+[Выпуск, проверки и ограничения](updates/2026-10-22-hh-history-hourly-release.md).
 
-October 22, 2026, owner-approved and prepared locally: complete HH history is
+October 22, 2026, owner-approved and deployed on DE: complete HH history is
 refreshed hourly for every user with current `jobs` access, a personal HH
 connection and verified private Telegram scope. Vacancy-search activation is
 independent, and opening history is not required for the first refresh. Active
@@ -33,7 +33,7 @@ without proof from the latest full pass, or followed by an unrecognized status,
 are labelled unconfirmed. Sorting uses original HH dates, with unknown dates
 after known ones. Migration 044 stores topic date, section and full-pass proof.
 Existing callbacks, buttons, permissions and application confirmation remain.
-[Local checks and limits](updates/2026-10-22-hh-history-hourly-development.md).
+[Deployment, checks and limits](updates/2026-10-22-hh-history-hourly-release.md).
 
 22 октября 2026, согласовано владельцем и выпущено на DE:
 «Поиск работы → Резюме HH» после личного подключения показывает собственные
