@@ -12,9 +12,13 @@ const messages = {
   JOB_LOGIN_RESUME_INVALID: 'HH не подтвердил выбранное резюме. Обнови страницу входа и попробуй снова.',
   JOB_LOGIN_UNAVAILABLE: 'Личный вход HH пока не настроен на сервере.',
   JOB_BROWSER_BUSY: 'Сейчас браузер занят. Подожди немного и попробуй снова.',
+  JOB_RESUME_UNAVAILABLE: 'Управление резюме временно не настроено.',
+  JOB_RESUME_RAISE_UNAVAILABLE: 'Автоподнятие пока не настроено на сервере. Выбор резюме доступен.',
+  JOB_HH_NOT_CONNECTED: 'Сначала подключи свой профиль HH.',
 };
 const jobLoginCodes = new Set(['JOB_ACCESS_REVOKED','JOB_LOGIN_SESSION_INVALID','JOB_LOGIN_SESSION_EXPIRED',
-  'JOB_LOGIN_TICKET_INVALID','JOB_LOGIN_RESUME_INVALID','JOB_LOGIN_UNAVAILABLE','JOB_LOGIN_ALREADY_ACTIVE','JOB_BROWSER_BUSY']);
+  'JOB_LOGIN_TICKET_INVALID','JOB_LOGIN_RESUME_INVALID','JOB_LOGIN_UNAVAILABLE','JOB_LOGIN_ALREADY_ACTIVE','JOB_BROWSER_BUSY',
+  'JOB_RESUME_UNAVAILABLE','JOB_RESUME_RAISE_UNAVAILABLE','JOB_HH_NOT_CONNECTED']);
 export class ApiError extends Error {
   constructor(code, uncertain = false) { super(messages[code] || 'Не удалось выполнить запрос. Проверь данные и повтори.'); this.code = code; this.uncertain = uncertain; }
 }

@@ -2,7 +2,8 @@ const http = require('node:http');
 const { createHash, timingSafeEqual } = require('node:crypto');
 const { UUID, validRequest, SAFE_CODES } = require('./rpcProtocol');
 
-function createRpcServer({ browser, profiles = null, ownerId, token, connectToken = null, submissions = null, applyToken = null, health = async () => true }) {
+function createRpcServer({ browser, profiles = null, ownerId, token, connectToken = null, resumeToken = null, submissions = null, applyToken = null, health = async () => true }) {
+  if (resumeToken !== null && (!/^[\x21-\x7e]{32,256}$/.test(resumeToken) || [token,connectToken,applyToken].includes(resumeToken))) throw new Error('JOB_BROWSER_CONFIG_INVALID');
   if (!UUID.test(ownerId || '') || typeof token !== 'string' || token.length < 32 || token.length > 256
     || !/^[\x21-\x7e]+$/.test(token)) throw new Error('JOB_BROWSER_CONFIG_INVALID');
   if (connectToken !== null && (typeof connectToken !== 'string' || !/^[\x21-\x7e]{32,256}$/.test(connectToken)
@@ -13,6 +14,7 @@ function createRpcServer({ browser, profiles = null, ownerId, token, connectToke
   const expected = digest(`Bearer ${token}`);
   const expectedConnect = connectToken ? digest(`Bearer ${connectToken}`) : Buffer.alloc(32);
   const expectedApply = applyToken ? digest(`Bearer ${applyToken}`) : Buffer.alloc(32);
+  const expectedResume = resumeToken ? digest(`Bearer ${resumeToken}`) : Buffer.alloc(32);
   let active = 0;
   const respond = (res, status, value) => {
     const body = JSON.stringify(value);
@@ -25,7 +27,8 @@ function createRpcServer({ browser, profiles = null, ownerId, token, connectToke
     const credential = digest(auth), readAuthenticated = timingSafeEqual(expected, credential);
     const connectAuthenticated = timingSafeEqual(expectedConnect, credential) && Boolean(connectToken);
     const applyAuthenticated = timingSafeEqual(expectedApply, credential) && Boolean(submissions && applyToken);
-    if (!readAuthenticated && !connectAuthenticated && !applyAuthenticated) { respond(res, 401, { ok: false, code: 'JOB_BROWSER_ACCESS_DENIED' }); req.resume(); return; }
+    const resumeAuthenticated = timingSafeEqual(expectedResume, credential) && Boolean(resumeToken);
+    if (!readAuthenticated && !connectAuthenticated && !applyAuthenticated && !resumeAuthenticated) { respond(res, 401, { ok: false, code: 'JOB_BROWSER_ACCESS_DENIED' }); req.resume(); return; }
     if (req.method === 'GET' && req.url === '/health') {
       let healthy = false; try { healthy = await health() === true; } catch {}
       respond(res, healthy ? 200 : 503, healthy ? { ok: true } : { ok: false, code: 'JOB_BROWSER_UNHEALTHY' }); return;
@@ -48,8 +51,9 @@ function createRpcServer({ browser, profiles = null, ownerId, token, connectToke
       if (!validRequest(input, profiles ? null : ownerId)) { respond(res, 403, { ok: false, code: 'JOB_BROWSER_ACCESS_DENIED' }); return; }
       const connecting = ['login_start','login_frame','login_input','login_status','login_close','login_discard','select_resume'].includes(input.operation);
       const writing = ['submit','reconcile'].includes(input.operation);
+      const raising = ['raise_resume','raise_resume_status'].includes(input.operation);
       if ((connecting && !connectAuthenticated) || (writing && !applyAuthenticated)
-        || (!connecting && !writing && !readAuthenticated)) {
+        || (raising && !resumeAuthenticated) || (!connecting && !writing && !raising && !readAuthenticated)) {
         respond(res, 403, { ok: false, code: 'JOB_BROWSER_ACCESS_DENIED' }); return;
       }
       let value;
@@ -57,6 +61,7 @@ function createRpcServer({ browser, profiles = null, ownerId, token, connectToke
         if (!profiles) throw Object.assign(new Error('JOB_BROWSER_ACCESS_DENIED'), { code: 'JOB_BROWSER_ACCESS_DENIED' });
         value = await profiles.discardUnconfirmedUser(input.userId, input.args.sessionId);
       } else {
+        if(['connection','raise_resume'].includes(input.operation)) await profiles?.waitSelection?.(input.userId);
         const profile = profiles ? await profiles.forUser(input.userId) : { browser, submissions };
         const activeBrowser = profile.browser;
         value = input.operation === 'search' ? await activeBrowser.search(input.args)
@@ -65,6 +70,8 @@ function createRpcServer({ browser, profiles = null, ownerId, token, connectToke
         : input.operation === 'inspect' ? await activeBrowser.inspect(input.args)
         : input.operation === 'submit' ? await profile.submissions?.submit({ userId: input.userId, ...input.args })
         : input.operation === 'reconcile' ? await profile.submissions?.reconcile({ userId: input.userId, ...input.args })
+        : input.operation === 'raise_resume' ? await profile.raiseResume?.({ userId: input.userId, ...input.args })
+        : input.operation === 'raise_resume_status' ? await profile.raiseResumeStatus?.({ userId: input.userId, ...input.args })
         : input.operation === 'connection' ? await activeBrowser.connection()
         : input.operation === 'resumes' ? await activeBrowser.listResumes()
         : input.operation === 'login_start' ? await activeBrowser.startLogin(input.args)

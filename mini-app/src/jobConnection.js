@@ -1,3 +1,4 @@
+import { createJobResumePanel } from './jobResumes.js';
 const UUID = /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i;
 
 function button(parent, label, handler, className = 'secondary') {
@@ -52,6 +53,7 @@ export function createJobConnectionPanel({ api, actor, anchor }) {
   select.addEventListener('change', () => { confirm.disabled = !select.value; });
   const cancel = button(controls, 'Отменить подключение', cancelLogin); cancel.hidden = true;
   panel.append(heading, status, controls, linkBox, resumes); anchor.after(panel);
+  const resumeManager=createJobResumePanel({api,actor,parent:panel});
 
   function message(value) { if (!disposed) status.textContent = value; }
   function store(key, value) { try { sessionStorage.setItem(sessionKey(actor, key), value); } catch {} }
@@ -101,10 +103,12 @@ export function createJobConnectionPanel({ api, actor, anchor }) {
     if (data.connected) {
       setSession(null); clear('request'); clearTimer();
       controls.hidden = true; linkBox.hidden = true; resumes.hidden = true;
-      message(`HH подключён. Основное резюме: ${data.resumeId}. Профиль хранится в твоём личном пространстве.`);
+      message('HH подключён. Резюме и настройки обновления доступны ниже. Профиль хранится в твоём личном пространстве.');
+      resumeManager.show();
       return;
     }
     controls.hidden = false;
+    resumeManager.hide();
     if (sessionId) { connectButton.hidden = false; message('Проверяем состояние входа HH…'); void poll(); return; }
     message('Подключи свой профиль HH. Войти можно с телефона или компьютера через защищённую временную ссылку.');
     connectButton.hidden = false; connectButton.textContent = 'Подключить HH';
@@ -167,5 +171,5 @@ export function createJobConnectionPanel({ api, actor, anchor }) {
     } finally { cancel.disabled = false; }
   }
   void load().catch((error) => message(error.message || 'Не удалось загрузить состояние HH.'));
-  return { dispose() { disposed = true; clearTimer(); panel.remove(); } };
+  return { dispose() { disposed = true; clearTimer(); resumeManager.dispose(); panel.remove(); } };
 }

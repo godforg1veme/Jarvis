@@ -121,12 +121,15 @@ async function readResumes(page) {
   const cards = await page.locator('[data-qa="resume"]').evaluateAll((nodes) => nodes.slice(0, 21).map((card) => ({
     title: card.querySelector('[data-qa="resume-title"]')?.textContent?.slice(0, 500) || '',
     links: [...card.querySelectorAll('a[href]')].slice(0, 100).map((a) => a.href),
+    canRaise: (() => { const controls=[...card.querySelectorAll('button[data-qa~="resume-update-button_actions"]')]
+      .filter(n=>n.getClientRects().length && /^(?:Поднять(?: в поиске)?|Обновить)$/u.test(n.textContent.trim()));
+      return controls.length===1 ? !controls[0].disabled : null; })(),
   })));
   if (!cards.length || cards.length > 20) fail();
   const records = cards.map((card) => {
     const ids = [...new Set(card.links.map((link) => hhId(link, 'resume')).filter(Boolean))];
     if (ids.length !== 1 || !text(card.title, 500)) fail();
-    return { id: ids[0], title: text(card.title, 500) };
+    return { id: ids[0], title: text(card.title, 500), ...(typeof card.canRaise === 'boolean' ? { canRaise: card.canRaise } : {}) };
   });
   if (new Set(records.map((record) => record.id)).size !== records.length) fail();
   return records;

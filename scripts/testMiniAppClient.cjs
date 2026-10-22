@@ -10,7 +10,7 @@ const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
 const server = http.createServer(async (request, response) => {
   let relative = new URL(request.url, 'http://localhost').pathname.replace(/^\/mini\//, '') || 'index.html';
   if (relative === 'job-connect/') relative = 'job-connect.html';
-  if (relative.includes('..') || !/^(index\.html|job-connect\.html|(?:app|api|admin|core|jobConnect|jobConnection)\.js|style\.css|vendor\/(?:three\.module|three\.core|RoomEnvironment)\.js)$/.test(relative)) return response.writeHead(404).end();
+  if (relative.includes('..') || !/^(index\.html|job-connect\.html|(?:app|api|admin|core|jobConnect|jobConnection|jobResumes)\.js|(?:style|jobResumes)\.css|vendor\/(?:three\.module|three\.core|RoomEnvironment)\.js)$/.test(relative)) return response.writeHead(404).end();
   try { const content = await fs.readFile(path.join(root, relative)); response.writeHead(200, { 'Content-Type': types[path.extname(relative)], 'Content-Security-Policy': "default-src 'self'; script-src 'self' https://telegram.org; connect-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'" }).end(content); }
   catch { response.writeHead(404).end(); }
 });
@@ -31,6 +31,8 @@ async function fixture(context, { level = 'owner', outside = false, sdkBlocked =
     if (endpoint === '/me') return send(state.session ? { ok: true, csrfToken: 'fixture-csrf', actor, catalog: [] } : { ok: false }, state.session ? 200 : 401);
     if (endpoint.startsWith('/sections/')) { state.section = endpoint; return send({ ok: true, section: 'jobs', items: [{ title: 'Личный профиль' }], notice: 'Нужно личное подключение HH.' }); }
     if (endpoint === '/jobs/connection') return send({ ok: true, available: true, connected: state.jobConnected, ...(state.jobConnected ? { resumeId: 'resume-1' } : {}) });
+    if (endpoint === '/jobs/resumes') return send({ok:true,connected:state.jobConnected,primaryResumeId:'resume-1',connectionRevision:1,revision:1,
+      resumes:[{id:'resume-1',title:'Моё резюме'}],updatedAt:new Date().toISOString(),autoRaise:{enabled:false,resumeId:null,nextAt:null,lastAt:null,lastOutcome:null},lastError:null,raiseAvailable:false});
     if (endpoint === '/jobs/login' && request.method() === 'POST') {
       assert.equal(request.headers()['x-jarvis-csrf'], 'fixture-csrf'); state.jobCreateRequests.push(body);
       return send({ ok: true, status: 'created', sessionId: state.jobSessionId, ticket: state.jobTicket });
@@ -134,7 +136,7 @@ async function fixture(context, { level = 'owner', outside = false, sdkBlocked =
     const resumeSelect = page.getByRole('combobox', { name: 'Основное резюме HH' }); await resumeSelect.waitFor();
     assert.equal(await resumeSelect.locator('option').count(), 1);
     await page.getByRole('button', { name: 'Сохранить профиль', exact: true }).click();
-    await page.getByText(/HH подключён\. Основное резюме: resume-1/).waitFor();
+    await page.getByText(/HH подключён\. Резюме и настройки обновления доступны ниже/).waitFor();
     assert.deepEqual(state.jobConfirm, { sessionId: state.jobSessionId, resumeId: 'resume-1' });
     await connectPage.close();
     await page.getByRole('link', { name: 'Ассистент', exact: true }).click(); await page.getByLabel('Сообщение Jarvis').fill('Мой вопрос'); state.chatUncertain = true;

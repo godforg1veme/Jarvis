@@ -32,6 +32,7 @@ const PUBLIC_CODES = new Set([
   'JOB_LOGIN_RESUME_INVALID',
   'JOB_LOGIN_UNAVAILABLE',
   'JOB_BROWSER_BUSY',
+  'JOB_RESUME_UNAVAILABLE','JOB_RESUME_RAISE_UNAVAILABLE','JOB_HH_NOT_CONNECTED','JOB_LOGIN_RESUME_INVALID',
 ]);
 function publicError(error, reply) {
   const code = PUBLIC_CODES.has(error?.code) ? error.code : 'unavailable';

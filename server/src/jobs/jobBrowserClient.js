@@ -22,7 +22,7 @@ const CODES = new Set(['JOB_HH_MANUAL_ACTIVE', 'JOB_HH_CAPTCHA_WAITING', 'JOB_HH
   'JOB_LOGIN_SESSION_INVALID', 'JOB_LOGIN_TICKET_INVALID', 'JOB_LOGIN_RESUME_INVALID']);
 
 class JobBrowserClient {
-  constructor({ baseUrl = 'http://job-browser:8080', ownerId, token, connectToken = null, applyToken = null, fetchImpl = globalThis.fetch, allowTestHttp = false }) {
+  constructor({ baseUrl = 'http://job-browser:8080', ownerId, token, connectToken = null, resumeToken = null, applyToken = null, fetchImpl = globalThis.fetch, allowTestHttp = false }) {
     const url = new URL(baseUrl);
     if (url.username || url.password || url.pathname !== '/' || url.search || url.hash
       || (url.origin !== 'http://job-browser:8080' && !(allowTestHttp === true && url.protocol === 'http:' && url.hostname === '127.0.0.1'))
@@ -32,6 +32,8 @@ class JobBrowserClient {
     if (connectToken !== null && (typeof connectToken !== 'string' || !/^[\x21-\x7e]{32,256}$/.test(connectToken)
       || connectToken === token || connectToken === applyToken)) throw jobError('JOB_BROWSER_CONFIG_INVALID');
     this.url = new URL('/rpc', url).href; this.ownerId = ownerId; this.token = token;
+    if (resumeToken !== null && (!/^[\x21-\x7e]{32,256}$/.test(resumeToken) || [token,connectToken,applyToken].includes(resumeToken))) throw jobError('JOB_BROWSER_CONFIG_INVALID');
+    this.resumeToken = resumeToken;
     this.connectToken = connectToken; this.applyToken = applyToken; this.fetch = fetchImpl;
   }
   asApplicationAdapter() {
@@ -47,6 +49,9 @@ class JobBrowserClient {
       search: ({ query, publishedFrom, publishedTo, page = 0 }) => this.request(userId, 'search', { query, publishedFrom, publishedTo, page }),
       getVacancy: ({ externalId }) => this.request(userId, 'vacancy', { externalId: String(externalId) }),
       listResumes: () => this.request(userId, 'resumes', {}),
+      connection: () => this.request(userId, 'connection', {}),
+      raiseResume: ({ operationId, resumeId }) => this.request(userId, 'raise_resume', { operationId, resumeId }),
+      resumeRaiseStatus: ({ operationId, resumeId }) => this.request(userId, 'raise_resume_status', { operationId, resumeId }),
       history: ({section,page}) => this.request(userId, 'history', {section,page}),
       inspect: ({ externalId, resumeId }) => this.request(userId, 'inspect', { externalId: String(externalId), resumeId }),
       startLogin: ({ sessionId }) => this.request(userId, 'login_start', { sessionId }),
@@ -61,13 +66,15 @@ class JobBrowserClient {
   async request(userId, operation, args) {
     if (!UUID.test(userId || '')) throw jobError('JOB_BROWSER_ACCESS_DENIED');
     const writing = ['submit', 'reconcile'].includes(operation);
+    const raising = ['raise_resume','raise_resume_status'].includes(operation);
+    if (raising && !this.resumeToken) throw jobError('JOB_BROWSER_ACCESS_DENIED');
     if (writing && !this.applyToken) throw jobError('JOB_BROWSER_ACCESS_DENIED');
     const connecting = ['login_start', 'login_frame', 'login_input', 'login_status', 'login_close', 'login_discard', 'select_resume'].includes(operation);
     if (connecting && !this.connectToken) throw jobError('JOB_BROWSER_ACCESS_DENIED');
     let response;
     try {
       response = await this.fetch(this.url, { method: 'POST', headers: {
-        authorization: `Bearer ${writing ? this.applyToken : connecting ? this.connectToken : this.token}`, 'content-type': 'application/json' },
+        authorization: `Bearer ${raising ? this.resumeToken : writing ? this.applyToken : connecting ? this.connectToken : this.token}`, 'content-type': 'application/json' },
       body: JSON.stringify({ userId, operation, args }), redirect: 'manual', signal: AbortSignal.timeout(writing ? 120000 : 90000) });
     } catch { throw jobError('JOB_HH_UNAVAILABLE'); }
     const result = await readBoundedJson(response);
@@ -81,6 +88,13 @@ class JobBrowserClient {
       throw error;
     }
     const value = result.value;
+    if (raising) {
+      if (!value || !['raised','not_due','ineligible','failed','unknown'].includes(value.outcome)
+        || (value.outcome !== 'unknown' && value.verified !== true)
+        || value.nextAllowedAt !== undefined && !Number.isFinite(Date.parse(value.nextAllowedAt))) throw jobError('JOB_HH_INVALID_RESPONSE');
+      return { outcome:value.outcome, ...(value.verified === true ? {verified:true} : {}),
+        ...(value.nextAllowedAt ? {nextAllowedAt:new Date(value.nextAllowedAt).toISOString()} : {}) };
+    }
     if (operation === 'login_frame' && (!value || !['waiting','captcha'].includes(value.state)
       || value.mimeType !== 'image/jpeg' || !Number.isInteger(value.width) || value.width < 1 || value.width > 1024
       || !Number.isInteger(value.height) || value.height < 1 || value.height > 768
@@ -120,6 +134,7 @@ class JobBrowserClient {
       || !Number.isFinite(Date.parse(value?.publishedAt)))) throw jobError('JOB_HH_INVALID_RESPONSE');
     if (operation === 'resumes' && (!Array.isArray(value) || value.length > 20
       || !value.every((item) => /^[a-zA-Z0-9]{1,100}$/.test(item?.id || '') && typeof item.title === 'string' && item.title.length <= 500))) throw jobError('JOB_HH_INVALID_RESPONSE');
+    if (operation === 'resumes') return value.map(item=>({id:item.id,title:item.title,...(typeof item.canRaise==='boolean'?{canRaise:item.canRaise}:{})}));
     if (operation === 'inspect' && (!value || typeof value.resumeAvailable !== 'boolean' || typeof value.manualRequired !== 'boolean'
       || (value.vacancy?.externalId !== args.externalId && !(value.resumeAvailable === false && value.manualRequired === true && value.vacancy === null)))) throw jobError('JOB_HH_INVALID_RESPONSE');
     if(operation==='inspect'&&value.existingApplication){

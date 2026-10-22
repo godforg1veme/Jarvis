@@ -20,6 +20,8 @@ const { CaptchaAutomatic } = require('./captchaAutomatic');
 const { recognizeFrozenPng } = require('./ocrClient');
 const { CaptchaAttemptStore } = require('./captchaAttemptStore');
 const { ProfileManager } = require('./profileManager');
+const { ResumeRaiseLedger } = require('./resumeRaiseLedger');
+const { raiseResume } = require('./resumeRaise');
 
 async function handoverCaptcha({ journal, manual, ownerId, target, error, now = Date.now }) {
   let state = await journal.read();
@@ -81,6 +83,9 @@ async function createMemberRuntime({ userId, root, context, env, applyEnabled, o
     const ledger = new ApplicationLedger({ root: path.join(root, 'applications'), ownerId: userId });
     await ledger.directory();
     const runtime = { userId, root, context, browser, manual, manualPage, health, ledger, submissions: null,
+      raiseResumeStatus: input => new ResumeRaiseLedger({root:path.join(root,'resume-raises'),ownerId:userId}).lookup(input),
+      raiseResume: input => browser.run(() => { manual?.assertAutomatic(); return raiseResume({ browser,
+        ledger: new ResumeRaiseLedger({ root: path.join(root,'resume-raises'), ownerId: userId }), ...input }); }),
       setPrimaryResume: async (resumeId) => {
         browser.primaryResumeId = resumeId;
         if (applyEnabled) {
@@ -109,6 +114,8 @@ async function startBrowser(env = process.env, { onFatal = () => {} } = {}) {
   const applyToken = applyEnabled ? env.JARVIS_JOB_BROWSER_APPLY_TOKEN : null;
   if (applyEnabled && (!/^[\x21-\x7e]{32,256}$/.test(applyToken || '') || applyToken === token)) throw new Error('JOB_BROWSER_CONFIG_INVALID');
   const connectToken = env.JARVIS_JOB_BROWSER_CONNECT_TOKEN || null;
+  const resumeToken = env.JARVIS_JOB_BROWSER_RESUME_TOKEN || null;
+  if (resumeToken !== null && (!/^[\x21-\x7e]{32,256}$/.test(resumeToken) || [token,connectToken,applyToken,env.JARVIS_JOB_CAPTCHA_TOKEN].includes(resumeToken))) throw new Error('JOB_BROWSER_CONFIG_INVALID');
   if (connectToken !== null && (!/^[\x21-\x7e]{32,256}$/.test(connectToken) || connectToken === token
     || connectToken === applyToken || connectToken === env.JARVIS_JOB_CAPTCHA_TOKEN)) throw new Error('JOB_BROWSER_CONFIG_INVALID');
   await fs.access('/.dockerenv');
@@ -179,6 +186,9 @@ async function startBrowser(env = process.env, { onFatal = () => {} } = {}) {
         reconcile: (input) => browser.run(() => { manual?.assertAutomatic(); return guarded.reconcile(input); }) };
     }
     const ownerRuntime = { browser, submissions, manual, manualPage,
+      raiseResumeStatus: input => new ResumeRaiseLedger({root:path.join(root,'resume-raises'),ownerId}).lookup(input),
+      raiseResume: input => browser.run(() => { manual?.assertAutomatic(); return raiseResume({ browser,
+        ledger: new ResumeRaiseLedger({ root: path.join(root,'resume-raises'), ownerId }), ...input }); }),
       async setPrimaryResume(resumeId) {
         browser.primaryResumeId = resumeId;
         if (applyEnabled) {
@@ -194,7 +204,7 @@ async function startBrowser(env = process.env, { onFatal = () => {} } = {}) {
     };
     profiles = new ProfileManager({ root, ownerId, ownerRuntime, browser: context.browser(),
       createRuntime: (args) => createMemberRuntime({ ...args, env, applyEnabled, onFatal, manualEnabled, manualToken, automaticEnabled }) });
-    server = createRpcServer({ browser, profiles, ownerId, token, connectToken, submissions, applyToken, health: () => health.check() });
+    server = createRpcServer({ browser, profiles, ownerId, token, connectToken, resumeToken, submissions, applyToken, health: () => health.check() });
     await new Promise((resolve, reject) => { server.once('error', reject); server.listen(8080, '0.0.0.0', resolve); });
     if (manual) {
       broker = createCaptchaBroker({ profiles, ownerId, token: manualToken,
