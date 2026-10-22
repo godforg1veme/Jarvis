@@ -34,6 +34,13 @@ retains the owner profile; a member or administrator gets a separate profile.
 VPN and Operations continue to use their owner checks. The visible flow and
 release state are tracked in the [menu contract](telegram-menu-contract.md).
 
+The resume selector shares the Mini App resume service. Its catalog and change
+snapshots use opaque scoped confirmation IDs; HH IDs remain server-side.
+The consumed confirmation UUID is also the durable settings request ID. A lost
+reply reconciles that request, without reissuing a selection. The access lock
+serializes selection and local commit with revocation. Stopping an unchanged
+primary's schedule is a local setting and requires no available HH page.
+
 Callback families include `life:*`, `vpn:*`, `vpsup:*`, `mem:*`, `doc:*`,
 `dev:*`, `gallery:*`, `flow:*`, and `cmd:*`. `bot.js` has the outbound grammar
 gate; each family handler owns its own authorization. New callback syntax must

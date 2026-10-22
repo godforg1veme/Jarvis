@@ -81,7 +81,7 @@ function createJobRuntime({ config, pool, interactions, send, sendPhoto, fetchIm
       automatic: config.jobCaptchaAutomatic === true });
   }
   const telegramService = new JobTelegramService({ pool, searchRepository, profileRepository, draftRepository,
-    usageRepository, interactions, draftService, settingsService, applicationService, connectionService, captchaService, historyService,
+    usageRepository, interactions, draftService, settingsService, applicationService, connectionService, captchaService, historyService, resumeService,
     settingsModels: [config.jobSearchModel, config.openrouterModel, config.openrouterFallbackModel], defaultModel: config.jobSearchModel,
     accessService: jobsAccessService, ownerTelegramId: config.operationsOwnerTelegramId, loginLinkDelivery,
     jobPublicOrigin: config.miniAppEnabled ? config.miniAppPublicOrigin : '' });

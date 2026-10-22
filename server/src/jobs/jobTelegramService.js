@@ -4,6 +4,7 @@ const { response, button, homeView, cardView, draftView, listView } = require('.
 const { parseSettingsEdit, parseProfileEdit } = require('./jobSettingsService');
 const { JobLetterFlow } = require('./jobLetterFlow');
 const { JobSettingsPanel } = require('./jobSettingsPanel');
+const { JobResumeTelegram } = require('./jobResumeTelegram');
 const { createHash } = require('node:crypto');
 
 function isConfiguredOwner(context, ownerTelegramId) {
@@ -20,6 +21,10 @@ function jobScope(context, ownerTelegramId = null) {
 }
 function publicJobFailure(error) {
   const messages = { JOB_SCOPE_DENIED: 'Поиск работы доступен только в личном чате и при действующем разрешении.',
+    revision_conflict: 'Выбор резюме изменился. Открой актуальный список и подтверди заново.',
+    operation_unknown: 'Результат исходной попытки пока неизвестен. Проверь его; повтор не отправлен.',
+    JOB_RESUME_RAISE_UNAVAILABLE: 'Автоподнятие пока не настроено на сервере. Выбор резюме доступен отдельно.',
+    JOB_LOGIN_RESUME_INVALID: 'Выбранное резюме больше недоступно в твоём HH. Обнови список.',
     JOB_SEARCH_QUERIES_REQUIRED: 'Сначала добавь поисковые запросы: «Настройки → Поисковые запросы → Добавить». Пришли фразы одним сообщением, каждую с новой строки. Затем включи поиск.',
     JOB_PROFILE_UNCONFIRMED: 'Сначала проверь и подтверди профиль фактов в настройках поиска работы.',
     JOB_MODEL_NOT_CONFIGURED: 'Для писем нужно выбрать модель поиска работы и настроить OpenRouter.',
@@ -40,13 +45,17 @@ function publicJobFailure(error) {
 }
 
 class JobTelegramService {
-  constructor(options) { Object.assign(this, options); this.letterFlow = new JobLetterFlow(this); this.settingsPanel = new JobSettingsPanel(this); }
+  constructor(options) { Object.assign(this, options); this.letterFlow = new JobLetterFlow(this); this.settingsPanel = new JobSettingsPanel(this);
+    this.resumePanel=options.resumeService?new JobResumeTelegram({service:options.resumeService}):null; }
   async handleCallback(data, context) {
     const parsed = parseJobCallback(data); if (!parsed) return data.startsWith('job:') ? response('Кнопка недоступна.') : null;
     try { const scope = jobScope(context, this.ownerTelegramId); await assertJobScope(this.pool, scope, this.accessService);
       if (!['approve', 'confirm', 'cfg_ok'].includes(parsed.action)) await this.pool.query(`UPDATE job_confirmations SET status='cancelled'
         WHERE user_id=$1 AND conversation_id=$2 AND chat_id=$3 AND status='pending' AND kind IN ('settings','profile')`,
       [scope.userId, scope.conversationId, scope.chatId]);
+      if(!['rs_ok','rs_status'].includes(parsed.action))await this.pool.query(`UPDATE job_confirmations SET status='cancelled'
+        WHERE user_id=$1 AND conversation_id=$2 AND chat_id=$3 AND kind='resume' AND frozen->>'purpose'='change' AND status='pending'`,
+      [scope.userId,scope.conversationId,scope.chatId]);
       if (['menu', 'back', 'draft', 'cancel', 'regenerate', 'edit', 'translate', 'prepare', 'base_letter', 'base', 'improved', 'custom', 'custom_ai'].includes(parsed.action)) await this.pool.query(`UPDATE job_confirmations SET status='cancelled'
         WHERE user_id=$1 AND conversation_id=$2 AND chat_id=$3 AND kind='apply' AND status='pending'`,
       [scope.userId, scope.conversationId, scope.chatId]);
@@ -57,7 +66,7 @@ class JobTelegramService {
     const search = await this.searchRepository.ensure({ scope });
     const usage = await this.usageRepository.getMonth({ userId: scope.userId });
     const connection = (await this.pool.query('SELECT status,resume_id FROM job_connections WHERE user_id=$1', [scope.userId])).rows[0];
-    return homeView({ search, usage, connection, captchaEnabled: Boolean(this.captchaService) });
+    return homeView({ search, usage, connection, captchaEnabled: Boolean(this.captchaService), resumeEnabled:Boolean(this.resumePanel) });
   }
   async begin(scope, kind, targetId, revision, answer) {
     const interaction = await this.interactions.begin({ ...scope, channel: undefined, kind,
@@ -67,6 +76,8 @@ class JobTelegramService {
   async handle({ scope, context, action, targetId, field, revision, index, page = 0 }) {
     if (action === 'captcha' || action === 'captcha_refresh') return this.captchaService ? this.captchaService.request(scope, action === 'captcha_refresh') : response('Проверка HH через Telegram не настроена.');
     if (action === 'menu' || action === 'back') return this.home(scope);
+    const resume=this.resumePanel&&await this.resumePanel.handle({scope,context,action,targetId,index});
+    if(resume)return resume;
     const search = await this.searchRepository.ensure({ scope });
     const settings = await this.settingsPanel.handle({scope,action,targetId,field,revision,index,page});
     if (settings) return settings;

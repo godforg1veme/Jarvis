@@ -16,6 +16,15 @@ test('job callback and external URL grammar is closed and bounded', () => {
     'https://hh.ru/vacancy/123?token=x', 'http://hh.ru/vacancy/123', 'https://example.org/']) assert.equal(isJobVacancyUrl(bad), false);
 });
 
+test('resume button grammar allows scoped IDs and bounded choices through the outbound bot gate', () => {
+  const id=crypto.randomUUID();
+  const valid=['job:resumes','job:resumes_refresh',`job:rs_pick:${id}:0`,`job:rs_pick:${id}:19`,
+    `job:rs_auto:${id}:0`,`job:rs_auto:${id}:1`,`job:rs_ok:${id}`,`job:rs_status:${id}`];
+  for(const data of valid){assert.ok(parseJobCallback(data));assert.ok(telegramReplyMarkup([[{text:'Fixture',data}]]));}
+  for(const data of [`job:rs_pick:${id}:20`,`job:rs_pick:${id}:01`,`job:rs_pick:${id}:-1`,
+    `job:rs_auto:${id}:2`,`job:rs_ok:${id}:1`,`job:rs_pick:hhResumeId:0`,`job:rs_status:${id}\n`])assert.equal(parseJobCallback(data),null);
+});
+
 test('cards and draft preview deliver literal text with validated buttons', async () => {
   const id = crypto.randomUUID();
   const text = '<b>Literal & text</b> [unchanged](https://example.org)';

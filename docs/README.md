@@ -17,6 +17,10 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
+22 октября локально подготовлены [выбор резюме кнопками бота и автоподнятие по умолчанию](updates/2026-10-22-hh-resume-bot-defaults-development.md).
+Явный off и unknown сохраняются. Проверены 787 server tests, 32 PostgreSQL
+сценария, включая Telegram owner/member и гонку отзыва права. На VPS ещё не выпущено.
+
 22 октября выпущено [управление резюме HH](updates/2026-10-22-hh-resume-management-release.md):
 постоянный выбор основного, обновление списка и отдельное включение бесплатного
 автоподнятия. На DE обновлены server, browser и collector; исходники обоих VPS
@@ -264,6 +268,11 @@ describes publishing. Plans describe intentions. Code, checks, and actual
 deployment establish what is running.
 
 ### Current status
+
+October 22: [bot resume selection and default automatic raising](updates/2026-10-22-hh-resume-bot-defaults-development.md)
+are prepared locally. Explicit off and unknown stops are preserved. Verified:
+787 server tests and 32 PostgreSQL scenarios, including Telegram owner/member
+and permission-revocation races. Not deployed yet.
 
 October 22: released [HH resume management](updates/2026-10-22-hh-resume-management-release.md):
 persistent primary selection, catalog refresh and a separate free auto-raise opt-in.

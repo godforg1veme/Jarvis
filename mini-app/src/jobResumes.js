@@ -10,7 +10,7 @@ export function createJobResumePanel({api,actor,parent}) {
   const currentTitle=make('p',null,'muted');
   const toggleLabel=make('label',null,'job-resume-toggle'),toggle=make('input');toggle.type='checkbox';toggle.setAttribute('aria-label','Автоподнятие выбранного резюме');
   toggleLabel.append(toggle,make('span','Поднимать выбранное резюме автоматически'));
-  const hint=make('p','Только бесплатное поднятие, не чаще раза в 4 часа и когда HH разрешает. Остальные резюме и их видимость не меняются.','muted');
+  const hint=make('p','Для новых подключений автоподнятие включено по умолчанию; его можно выключить. Только бесплатно, не чаще раза в 4 часа и когда HH разрешает. Остальные резюме и их видимость не меняются.','muted');
   const details=make('p',null,'muted'),buttons=make('div',null,'job-controls'),confirmBox=make('div',null,'job-resume-confirm');confirmBox.hidden=true;
   const confirmText=make('p');confirmBox.append(confirmText);
   const btn=(parent,text,fn,primary=false)=>{const b=make('button',text,primary?'primary':'secondary');b.type='button';b.onclick=()=>{Promise.resolve(fn()).catch(e=>message(e.message||'Не удалось выполнить действие.'));};parent.append(b);return b;};
