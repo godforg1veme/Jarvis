@@ -10,9 +10,10 @@
 [Выпуск и проверки](../docs/updates/2026-10-22-hh-resume-bot-defaults-release.md).
 
 22 октября на DE выпущена постоянная панель собственных резюме после
-подключения HH: выбор основного, обновление списка и отдельное включение
-бесплатного поднятия не чаще раза в 4 часа. Смена и включение требуют
-подтверждения в этой Mini App; неизвестный результат не повторяется.
+подключения HH: выбор основного, обновление списка и отдельный выключатель
+бесплатного поднятия не чаще раза в 4 часа. После последующего выпуска оно
+включено по умолчанию с сохранением явного off и остановки после unknown.
+Ручные изменения требуют подтверждения в этой Mini App; неизвестный результат не повторяется.
 [Состояние и проверки](../docs/updates/2026-10-22-hh-resume-management-release.md).
 
 21 октября на DE выпущены исправление запросов входа HH, личная доставка временной
@@ -74,8 +75,14 @@ Dockerfile сервера содержит отдельный этап сбор�
 Реальный вход требует существующих PostgreSQL и Telegram bot, стабильного
 `JARVIS_OPERATIONS_OWNER_TELEGRAM_ID`, `JARVIS_MINI_APP_ENABLED=true` и
 `JARVIS_MINI_APP_PUBLIC_ORIGIN=https://<домен>` без пути. Migration 037 хранит
-права/аудит/сессии, 038 — квитанции ассистента; обе forward-only. Секреты идут
-через штатное окружение. Выключение UI сохраняет уже заведённые проверки прав.
+права/аудит/сессии, 038 — квитанции ассистента, 039 — временный вход HH,
+040 — доставку ссылки, 041 — управление резюме, 042 — личное предпочтение
+автоподнятия, 043 — подтверждения резюме в боте. Все миграции forward-only.
+Личный вход HH также требует `JARVIS_JOB_SEARCH_ENABLED=true` и отдельный
+`JARVIS_JOB_BROWSER_CONNECT_TOKEN` у server/browser. Для бесплатного поднятия
+нужен другой `JARVIS_JOB_BROWSER_RESUME_TOKEN` только у server/browser;
+сборщик его не получает. Секреты идут через штатное окружение.
+Выключение UI сохраняет уже заведённые проверки прав.
 
 После отдельного поручения на выпуск HTTPS URL `https://<домен>/mini/`
 настраивается как menu button через Bot API; Main Mini App можно задать
@@ -100,10 +107,13 @@ node --test server/test/miniAppPostgresAcceptance.cjs server/test/miniAppIntegra
 Первый тест требует работающий preview; `MINI_PREVIEW_URL` меняет адрес.
 Browser tests используют имеющиеся Playwright из job-browser и Edge.
 Артефакты: игнорируемая `.superpowers/mini-app-preview/`.
-Последняя правка прошла 742 server tests локально и в Linux image, а также
+Исправление входа от 18 октября прошло 742 server tests локально и в Linux image, а также
 production browser fixtures с недоступным SDK и отказом сервера. Первый выпуск
 прошёл 8 настоящих PostgreSQL acceptance, полный pipeline 40 migrations и
 отдельные 3D preview fixtures.
+Более новые проверки от 22 октября: server 787/787, PostgreSQL 32/32,
+Mini App build и Edge fixtures. Команды и границы проверок — в
+[руководстве](../docs/verification.md#hh-resume-management-and-default-raising).
 Выпуск на DE и кнопка бота проверены. Реальный Telegram/CHIPS cookie,
 телефонный FPS и второй HH остаются для клиентской приёмки.
 
@@ -118,9 +128,10 @@ are shared with Telegram buttons; the hint explains how to disable raising.
 [Release and verification](../docs/updates/2026-10-22-hh-resume-bot-defaults-release.md).
 
 October 22: DE received a persistent personal resume panel: primary
-selection, catalog refresh and separate free raising opt-in, at most once
-every four hours. Selection and enabling require confirmation in this Mini
-App; unknown outcomes are not replayed.
+selection, catalog refresh and a separate free raising switch, at most once
+every four hours. The subsequent release enables raising by default while
+preserving explicit off choices and unknown-result stops. Manual changes
+require confirmation in this Mini App; unknown outcomes are not replayed.
 [Status and verification](../docs/updates/2026-10-22-hh-resume-management-release.md).
 
 On October 21 DE received the HH authentication request fix, private
@@ -182,10 +193,13 @@ excludes these resources and its runtime is unchanged.
 Real authentication needs the existing PostgreSQL and Telegram bot, a stable
 `JARVIS_OPERATIONS_OWNER_TELEGRAM_ID`, `JARVIS_MINI_APP_ENABLED=true` and
 `JARVIS_MINI_APP_PUBLIC_ORIGIN=https://<domain>` without a path. Migration 037
-stores access/audit/sessions, 038 assistant receipts and 039 member HH login
-tickets/sessions; all are forward-only. Personal HH login also requires
+stores access/audit/sessions, 038 assistant receipts, 039 temporary HH login,
+040 link delivery, 041 resume management, 042 personal raising preferences
+and 043 bot resume confirmations. All are forward-only. Personal HH login also requires
 `JARVIS_JOB_SEARCH_ENABLED=true` and a separate
 `JARVIS_JOB_BROWSER_CONNECT_TOKEN` in the server and browser environments.
+Free raising needs a different `JARVIS_JOB_BROWSER_RESUME_TOKEN`, held only
+by server/browser and never passed to the collector.
 Keep secrets in the normal environment. Disabling the UI preserves established
 permission enforcement.
 
@@ -211,11 +225,14 @@ node --test server/test/miniAppPostgresAcceptance.cjs server/test/miniAppIntegra
 
 The first test requires a running preview; `MINI_PREVIEW_URL` overrides its URL.
 Browser tests use existing job-browser Playwright and Edge. Artifacts remain
-under ignored `.superpowers/mini-app-preview/`. The latest fix passed 742
+under ignored `.superpowers/mini-app-preview/`. The October 18 entry fix passed 742
 server tests locally and in the Linux image, plus production browser fixtures
 with an unavailable SDK and server rejection. The first release passed 8 actual
 PostgreSQL acceptance tests, the full 40-migration pipeline and separate 3D
 preview fixtures.
+Newer October 22 checks passed server 787/787, PostgreSQL 32/32,
+Mini App build and Edge fixtures. Commands and verification limits are in the
+[guide](../docs/verification.md#hh-resume-management-and-default-raising).
 DE deployment and the bot button were verified. Actual Telegram/CHIPS cookies,
 phone FPS and a second HH account still need client acceptance.
 

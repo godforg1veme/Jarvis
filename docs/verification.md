@@ -1,5 +1,39 @@
 # Проверки перед выпуском
 
+## HH resume management and default raising
+
+Управление резюме и текущая политика, выпуск 22 октября:
+[резюме](updates/2026-10-22-hh-resume-management-release.md),
+[бот и поднятие по умолчанию](updates/2026-10-22-hh-resume-bot-defaults-release.md).
+Linux server 787/787 и PostgreSQL 32/32 прошли, включая десять сценариев бота
+и гонки отзыва `jobs`. Mini App build и Edge fixtures на 1280/390 и
+320/390/1280 прошли. На DE применены 041–043; read-only сверка 22 октября
+подтвердила все 45 файлов миграций. Это результаты прежних запусков и текущего
+аудита, а не повторный запуск тестов при правке документации.
+Реальные нажатия owner/member, вход HH с телефона и первое успешное поднятие
+остаются клиентской приёмкой; первый worker tick дал `not_due`.
+
+Resume management and current policy, October 22 release:
+[resumes](updates/2026-10-22-hh-resume-management-release.md),
+[bot and default raising](updates/2026-10-22-hh-resume-bot-defaults-release.md).
+Linux server 787/787 and PostgreSQL 32/32 passed, including ten bot scenarios
+and `jobs` revocation races. Mini App build and Edge fixtures at 1280/390 and
+320/390/1280 passed. DE has 041–043 applied; the October 22 read-only comparison
+confirmed all 45 migration files. These are prior test results and the current
+audit, not tests rerun for this documentation edit. Real owner/member taps,
+phone HH sign-in and the first successful raise remain client acceptance;
+the first worker tick returned `not_due`.
+
+```powershell
+npm test --prefix server
+npm run build --prefix mini-app
+node scripts/testMiniAppClient.cjs
+# JARVIS_JOB_TEST_DATABASE_URL: только отдельная тестовая БД / isolated test DB only.
+node --test server/test/jobResumesAcceptance.cjs server/test/jobResumeDefaultsAcceptance.cjs server/test/jobResumeTelegramAcceptance.cjs
+```
+
+## Ранее проверенные этапы / Earlier verification records
+
 Выпуск HH на DE 21 октября: [результат](updates/2026-10-21-hh-login-touch-release.md).
 Новые Linux images прошли 783 server и 79 browser tests без пропусков,
 42 миграции с pgvector и 14 PostgreSQL acceptance. Установленные файлы,
@@ -190,13 +224,13 @@ node --test server/test/openRouterRouting.test.js server/test/providers.test.js 
 npm test --prefix server
 ```
 
-Последняя правка Mini App: [вход без SDK и удаление «Помощи»](updates/2026-10-18-mini-app-entry-help-removal.md).
+Исправление Mini App от 18 октября: [вход без SDK и удаление «Помощи»](updates/2026-10-18-mini-app-entry-help-removal.md).
 742 server tests прошли локально и в Linux image; production browser fixtures
 включают недоступный SDK, успешный fixture-вход и отказ сервера. Публичная проба
 подтвердила отправку synthetic fragment и отказ неверной подписи; настоящий
 вход владельца после исправления ещё не подтверждён.
 
-Latest Mini App fix: [entry without the SDK and Help removal](updates/2026-10-18-mini-app-entry-help-removal.md).
+October 18 Mini App fix: [entry without the SDK and Help removal](updates/2026-10-18-mini-app-entry-help-removal.md).
 742 server tests passed locally and in the Linux image; production browser
 fixtures cover an unavailable SDK, successful fixture login and server rejection.
 A public probe confirmed synthetic-fragment submission and invalid-signature

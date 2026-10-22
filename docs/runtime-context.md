@@ -73,6 +73,49 @@ deadline across metadata, fetch and body reads.
 
 ### Job search
 
+#### HH: состояние на 22 октября / State on October 22
+
+Личный вход использует временную HTTPS-ссылку, доставленную в личный Telegram
+текстом и кнопкой; страница поддерживает нажатия и клавиатуру телефона.
+После подключения список собственных резюме доступен постоянно в Mini App
+и кнопках бота. Обновление каталога идёт по запросу и в фоне раз в 15 минут.
+Смена основного резюме требует подтверждения и отменяет прежние подтверждения
+откликов. Бесплатное поднятие одного основного резюме включено по умолчанию,
+не чаще раза в четыре часа и только при доступной кнопке HH; явный off и
+остановка после unknown сохраняются. Unknown сверяется по исходной операции,
+без повторного POST. Реальный вход участника и первое успешное поднятие ещё
+требуют клиентской приёмки.
+
+Миграции 040–043 добавляют доставку ссылки, каталог и операции резюме,
+личное предпочтение автоподнятия и confirmation kind `resume` в боте.
+`JARVIS_JOB_BROWSER_CONNECT_TOKEN` даёт временный вход и выбор резюме;
+отдельный `JARVIS_JOB_BROWSER_RESUME_TOKEN` разрешает бесплатное поднятие.
+Оба credentials доступны только server/browser; сборщик их не получает.
+Профили изолированы по UUID, текущее право `jobs` проверяется и в фоновых задачах.
+[Вход и мобильный ввод](updates/2026-10-21-hh-login-touch-release.md),
+[резюме и текущая политика](updates/2026-10-22-hh-resume-bot-defaults-release.md).
+Датированные результаты ниже сохраняют историю прежних этапов.
+
+Personal sign-in uses a temporary HTTPS link delivered as private Telegram text
+and a button; the page supports taps and the phone keyboard. After connection,
+the personal resume list stays available in Mini App and bot buttons. The catalog
+refreshes on request and every 15 minutes in the background. Changing primary
+requires confirmation and invalidates previous application approvals. Free raising
+of one primary is enabled by default, at most every four hours and only when HH's
+button is available; explicit off choices and unknown-result stops are preserved.
+Unknown outcomes are checked by the original operation without another POST.
+Real member sign-in and the first successful raise still need client acceptance.
+
+Migrations 040–043 add link delivery, resume catalog and operations, personal
+raising preferences and the bot's `resume` confirmation kind.
+`JARVIS_JOB_BROWSER_CONNECT_TOKEN` grants temporary login and resume selection;
+the separate `JARVIS_JOB_BROWSER_RESUME_TOKEN` permits free raising. Only
+server/browser hold these credentials; the collector receives neither. Profiles
+are UUID-isolated, with current `jobs` access checked for background work too.
+[Sign-in and phone input](updates/2026-10-21-hh-login-touch-release.md),
+[resumes and current policy](updates/2026-10-22-hh-resume-bot-defaults-release.md).
+The dated results below preserve earlier stages.
+
 [Исследование 403](updates/2026-10-18-hh-captcha-403-investigation.md): native XHR
 и browser/API cookies проверены с отменой answer POST. На DE включён ограниченный
 классификатор ошибок HH и закрытые timing/request fields; причина прежнего 403

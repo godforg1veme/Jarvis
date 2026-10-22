@@ -377,6 +377,40 @@ unrecoverable, while changing it without re-encryption breaks existing memory.
 
 ## Job search (DE, opt-in; first release 2026-10-15)
 
+### HH: требования на 22 октября / Requirements on October 22
+
+На DE установлены личный вход HH с доставкой ссылки в Telegram и мобильным
+вводом, управление резюме через Mini App/бота и бесплатное поднятие по умолчанию.
+Требуются миграции 040–043; в рабочей БД проверены все 45 файлов миграций.
+Для личного входа и выбора резюме server/browser используют отдельный
+`JARVIS_JOB_BROWSER_CONNECT_TOKEN`, для бесплатного поднятия — другой
+`JARVIS_JOB_BROWSER_RESUME_TOKEN`. Ни один не передаётся collector.
+Значения задаются только в закрытом окружении; профили и прежние настройки сохраняются.
+Server и collector должны использовать актуальный server code; browser должен
+поддерживать операции резюме. Политика сохраняет явный off и unknown, не разрешает
+повторную отправку и не сбрасывает остановленные пользователем поиски.
+Новые поиски требуют хотя бы одной фразы и явного включения пользователем.
+NL получает исходники, job services на нём не запускаются. Desktop не менялся.
+[Вход](../docs/updates/2026-10-21-hh-login-touch-release.md),
+[резюме](../docs/updates/2026-10-22-hh-resume-management-release.md),
+[текущая политика и порядок установки](../docs/updates/2026-10-22-hh-resume-bot-defaults-release.md).
+
+DE runs personal HH sign-in with Telegram link delivery and phone input,
+Mini App/bot resume management and free raising by default. Migrations 040–043
+are required; all 45 migration files were verified in the production database.
+Server/browser use a separate `JARVIS_JOB_BROWSER_CONNECT_TOKEN` for personal
+sign-in and resume selection, and a different `JARVIS_JOB_BROWSER_RESUME_TOKEN`
+for free raising. Neither is passed to the collector. Keep values in the private
+environment and preserve profiles and existing settings. Server and collector
+need current server code; browser must support resume operations. The policy
+preserves explicit off choices and unknown stops, forbids replay and does not
+reset searches disabled by their users. New searches require at least one query
+and explicit user activation. NL receives source updates without job services.
+Desktop is unchanged.
+[Sign-in](../docs/updates/2026-10-21-hh-login-touch-release.md),
+[resumes](../docs/updates/2026-10-22-hh-resume-management-release.md),
+[current policy and installation record](../docs/updates/2026-10-22-hh-resume-bot-defaults-release.md).
+
 The collector requires the same `JARVIS_OPERATIONS_OWNER_TELEGRAM_ID` as the
 server. It uses current role and personal `jobs` grants for every user, including
 background work; that owner setting does not restrict collection to one person.
@@ -390,11 +424,12 @@ published; the browser receives neither PostgreSQL nor model/Telegram secrets.
 The collector receives a read credential; only the bot and browser receive
 the distinct apply credential when explicitly enabled. See
 [browser runtime and tests](../job-browser/README.md) and
-[current readiness](../docs/updates/2026-10-15-job-search-development.md).
+[current readiness](../docs/README.md).
 
 First production deployment is recorded in the
 [release result](../docs/updates/2026-10-15-job-search-release.md). DE services
-are enabled; the owner's search settings still require Telegram activation.
+are enabled. Each user's search activation is separate from service deployment;
+the first-release record does not describe the current activation state.
 
 Publish only after owner authorization under the release workflow. Preserve
 the existing private HH profile volume; configure its external volume name,
@@ -405,7 +440,7 @@ exclusions must remain unchanged. NL receives source updates but runs no job
 collector/browser. Desktop does not need rebuilding for these server changes.
 
 Enabling the feature exposes the Telegram job path, but searches start only
-after the owner activates settings. «Подключить HH» verifies the saved login
+after that user activates settings. «Подключить HH» verifies the saved login
 and primary resume. Confirm the fact profile/examples before generating letters.
 Use the dedicated job model/budget settings; the existing OpenRouter key is
 reused without changing the main assistant model. Live acceptance covers

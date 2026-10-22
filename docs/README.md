@@ -24,8 +24,9 @@ server/collector, применены 042/043; оба VPS синхронизир�
 проверка вернула `not_due`, поднятие не подтверждено; автоматика включена.
 
 22 октября выпущено [управление резюме HH](updates/2026-10-22-hh-resume-management-release.md):
-постоянный выбор основного, обновление списка и отдельное включение бесплатного
-автоподнятия. На DE обновлены server, browser и collector; исходники обоих VPS
+постоянный выбор основного, обновление списка и отдельный выключатель бесплатного
+автоподнятия. Последующий выпуск включил его по умолчанию, как описано выше.
+На DE обновлены server, browser и collector; исходники обоих VPS
 синхронизированы. Реальный выбор и первое поднятие остаются клиентской приёмкой.
 
 21 октября выпущены [пустые фильтры поиска и ввод фраз списком](updates/2026-10-21-empty-job-filters.md).
@@ -197,14 +198,19 @@ OCR не запускался; с 18 октября действует отде�
 и продолжение прежнего progress. Запросы обновления сохраняются при сбоях;
 health проверяет Chromium, а ошибки получают понятные сообщения.
 
-Последняя сверка выполнена 19 октября 2026 года после
-[выпуска личного HH](updates/2026-10-19-member-hh-login-release.md).
-Windows и GitHub содержат код приложения из `35a340a19a31056e029b780bbde0c8342a5f8cb6`;
-оба VPS source checkout синхронизированы с `main`. На DE server, job-browser и
-job-collector запущены из этого SHA; миграция 039 и healthchecks подтверждены.
-Desktop 1.0.2 не менялся и соответствует своему принятому коду. Профильный
-volume владельца сохранён. Подробности — в [записи выпуска](updates/2026-10-19-member-hh-login-release.md)
-и [порядке сверки](updates/2026-10-09-release-workflow.md).
+Сверка 22 октября 2026 года: GitHub, основная Windows-папка и чистые source
+checkout обоих VPS совпали на `3ac38f947db1fa4ffb185d8394b2877d44c8372e`.
+Server DE healthy, его 338 файлов и входные файлы сборки соответствуют принятому
+коду; release SHA — `07edda299f0f226d081974c876e14b80604a15f5`, последующий
+коммит меняет только документы. Код browser и collector также совпал с GitHub.
+В рабочей БД DE применены все 45 файлов миграций, включая 040–043.
+Desktop 1.0.2, Electron, bundled Node и Host Agent на обоих узлах прошли сверку.
+Публичные live/ready, Operations и Mini App с Windows вернули 200; из DE — 403.
+На момент сверки рабочая ветка Windows совпадала с GitHub; локальная `main` в другом чистом
+worktree отстаёт на пять коммитов. Это состояние refs, а не невыпущенный код.
+Новые живые проверки HH, голоса и VPN-трафика в этот аудит не входили.
+Подробности установленного сервера — в [последнем выпуске](updates/2026-10-22-living-sky-release.md),
+порядок повторной сверки — в [руководстве](release-workflow.md).
 
 ### Основные документы
 
@@ -286,8 +292,9 @@ both VPS sources are synchronized. The first background check returned `not_due`
 raising is unconfirmed and automation remains enabled.
 
 October 22: released [HH resume management](updates/2026-10-22-hh-resume-management-release.md):
-persistent primary selection, catalog refresh and a separate free auto-raise opt-in.
-DE server, browser and collector are updated; both VPS source checkouts are synchronized.
+persistent primary selection, catalog refresh and a separate free auto-raise switch.
+The subsequent release enabled it by default, as described above. DE server,
+browser and collector are updated; both VPS source checkouts are synchronized.
 Real selection and the first raise remain client acceptance checks.
 
 October 21: released [empty job filters and multiline phrase input](updates/2026-10-21-empty-job-filters.md).
@@ -461,14 +468,19 @@ a new image reached Telegram, and the server confirmed `solved`, an idle
 coordinator, and continued progress from the saved position. Refresh requests
 survive failures; health checks test Chromium, and failures receive clear messages.
 
-The latest component comparison was performed on October 19, 2026 after the
-[member HH release](updates/2026-10-19-member-hh-login-release.md). Windows and
-GitHub contain application code from `35a340a19a31056e029b780bbde0c8342a5f8cb6`;
-both VPS source checkouts match `main`. On DE, server, job-browser and
-job-collector run from that SHA; migration 039 and healthchecks passed. Desktop
-1.0.2 was unchanged and still matches its accepted code. The owner profile
-volume was preserved. See the [release record](updates/2026-10-19-member-hh-login-release.md)
-and [release/version checks](updates/2026-10-09-release-workflow.md).
+Comparison on October 22, 2026: GitHub, the primary Windows checkout and clean
+source checkouts on both VPS nodes matched `3ac38f947db1fa4ffb185d8394b2877d44c8372e`.
+DE server is healthy; its 338 files and build inputs match the accepted code.
+Its release SHA is `07edda299f0f226d081974c876e14b80604a15f5`; the following
+commit changes documentation only. Browser and collector code also matched GitHub.
+The DE production database has all 45 migration files applied, including 040–043.
+Desktop 1.0.2, Electron, bundled Node and Host Agent on both nodes passed comparison.
+Public live/ready, Operations and Mini App returned 200 from Windows and 403 from DE.
+At comparison time the Windows task branch matched GitHub; local `main` in another clean worktree
+is five commits behind. This is a ref difference, with no unpublished code.
+New live HH, voice and VPN traffic checks were outside this audit.
+See the [latest release](updates/2026-10-22-living-sky-release.md) for installed-server
+details and the [guide](release-workflow.md) for repeating the comparison.
 
 ### Main documents
 
