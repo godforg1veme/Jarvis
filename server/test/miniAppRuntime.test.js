@@ -38,6 +38,23 @@ test('production static allowlist, missing build, Telegram framing scope and no 
   } finally { await app.close(); }
 });
 
+test('production Mini App serves the connected resume panel module and stylesheet', async () => {
+  const path = require('node:path');
+  const fs = require('node:fs/promises');
+  const root = path.resolve(__dirname, '../../mini-app/src');
+  const app = buildApp({ config: { logLevel: 'silent', miniAppEnabled: true } });
+  registerMiniAppAssets(app, { root });
+  try {
+    for (const name of ['jobConnection.js', 'jobResumes.js', 'jobResumes.css']) {
+      const response = await app.inject(`/mini/${name}`);
+      assert.equal(response.statusCode, 200, name);
+      assert.equal(response.body, await fs.readFile(path.join(root, name), 'utf8'));
+      assert.match(response.headers['content-type'], name.endsWith('.css') ? /^text\/css/ : /^text\/javascript/);
+      assert.equal(response.headers['cache-control'], 'no-store');
+    }
+  } finally { await app.close(); }
+});
+
 test('Mini App logs suppress encoded URL/query credentials and parser errors', async () => {
   let output = '';
   const app = buildApp({ config: { miniAppEnabled: true, logLevel: 'info' } });
