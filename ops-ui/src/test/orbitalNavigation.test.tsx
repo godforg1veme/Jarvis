@@ -4,6 +4,7 @@ import { AppShell } from '../components/AppShell';
 import { pageLabels, pagesForPlanet, planetForPage, planets, type PageKey } from '../components/orbital/navigation';
 
 vi.mock('../components/orbital/OrbitalScene', () => ({ default: () => <div>Scene fixture</div> }));
+vi.mock('../components/orbital/SkyParticles', () => ({ SkyParticles: () => null }));
 afterEach(cleanup);
 beforeEach(() => { window.history.replaceState(null, '', '/'); });
 

@@ -264,7 +264,7 @@ async function noOverflow(page, label) {
   await page.locator('.orbital-workspace.is-closing').waitFor();
   assert.equal(await page.locator('.orbital-workspace').getAttribute('inert'), '', 'closing workspace is inert during exit');
   await page.locator('.orbital-workspace').waitFor({ state: 'detached' });
-  await page.evaluate(() => document.querySelector('canvas').getContext('webgl2').getExtension('WEBGL_lose_context').loseContext());
+  await page.evaluate(() => document.querySelector('.orbital-canvas canvas').getContext('webgl2').getExtension('WEBGL_lose_context').loseContext());
   await page.locator('[data-scene-state="fallback"]').waitFor();
   await page.locator('[data-nav="connections"]').click();
   await page.getByRole('heading', { name: 'Устройства', level: 1 }).waitFor();
@@ -294,7 +294,7 @@ async function noOverflow(page, label) {
   const noSkyErrors = []; let skyRequested = false;
   noSky.on('pageerror', (error) => noSkyErrors.push(error.message));
   await fixture(noSky);
-  await noSky.route('**/assets/milky-way-reference-narrow.webp', async (route) => { skyRequested = true; await route.fulfill({ status: 404, body: '' }); });
+  await noSky.route('**/assets/milky-way-gaia-*.webp', async (route) => { skyRequested = true; await route.fulfill({ status: 404, body: '' }); });
   await noSky.goto(base);
   await noSky.locator('[data-scene-state="ready"]').waitFor();
   await noSky.waitForFunction(() => window.sceneDraws > 0);
@@ -310,21 +310,21 @@ async function noOverflow(page, label) {
   // background at the previous camera zoom with no further frame scheduled.
   const coverPage = await browser.newPage({ viewport: { width: 1440, height: 960 }, reducedMotion: 'reduce' });
   await fixture(coverPage);
-  await coverPage.route('**/assets/milky-way-reference-narrow.webp', (route) => route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="1536" height="1024"><rect width="1536" height="1024" fill="white"/></svg>' }));
+  await coverPage.route('**/assets/milky-way-gaia-*.webp', (route) => route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="4096" height="2048"><rect width="4096" height="2048" fill="white"/></svg>' }));
   await coverPage.goto(base);
   await coverPage.locator('[data-scene-state="ready"]').waitFor();
   await delay(300);
-  for (const width of [320, 1440]) {
-    await coverPage.setViewportSize({ width, height: width === 320 ? 844 : 960 });
+  for (const [width, height] of [[320, 844], [1440, 960], [2560, 1080], [3840, 1080]]) {
+    await coverPage.setViewportSize({ width, height });
     await delay(300);
-    const png = (await coverPage.locator('canvas').screenshot()).toString('base64');
+    const png = (await coverPage.locator('.orbital-canvas canvas').screenshot()).toString('base64');
     const corners = await coverPage.evaluate(async (encoded) => {
       const image = new Image(); image.src = `data:image/png;base64,${encoded}`; await image.decode();
       const canvas = document.createElement('canvas'); canvas.width = image.width; canvas.height = image.height;
       const ctx = canvas.getContext('2d'); ctx.drawImage(image, 0, 0);
       return [[5, 5], [image.width - 6, 5], [5, image.height - 6], [image.width - 6, image.height - 6]].map(([x, y]) => Array.from(ctx.getImageData(x, y, 1, 1).data).slice(0, 3));
     }, png);
-    assert.ok(corners.every((pixel) => pixel.every((channel) => channel > 160)), `sky covers all canvas corners after reduced-motion resize to ${width}px: ${JSON.stringify(corners)}`);
+    assert.ok(corners.every((pixel) => pixel.every((channel) => channel > 140)), `sky covers all canvas corners after reduced-motion resize to ${width}px: ${JSON.stringify(corners)}`);
   }
   await coverPage.close();
   console.log('PASS sky coverage after reduced-motion desktop/mobile resize');

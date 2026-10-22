@@ -79,6 +79,20 @@ node scripts/testOperationsBrowser.cjs
 node scripts/previewOperations.cjs
 ```
 
+Живой фон, локально 22 октября:
+[результат](updates/2026-10-22-living-sky-development.md).
+46/46 unit, build, движение/пауза/resize/fallback фона и прежние browser/CSP
+сценарии прошли. На физическом телефоне нагрузка не измерена; доработка не выпущена.
+
+Living sky, local development on October 22:
+[results](updates/2026-10-22-living-sky-development.md).
+All 46 unit tests, build, sky motion/pause/resize/fallback and the existing
+browser/CSP scenarios passed. Physical phone load is unmeasured; the update is unreleased.
+
+```powershell
+node scripts/testLivingSky.cjs
+```
+
 Выпуск 20 октября: [результат](updates/2026-10-20-desktop-reliability-release.md).
 Новый Linux image прошёл 778/778, отдельный PostgreSQL применил 41 миграцию и
 проверил новый status lookup. Установленный Desktop: 146 файлов, Electron и

@@ -39,8 +39,10 @@ let browser;
   // The approved sky must actually decode under the production policy; silently
   // falling back to stars would otherwise let this test pass with a broken URL.
   assert.equal(await page.evaluate(async () => {
-    const image = new Image(); image.src = '/ops/assets/milky-way-reference-narrow.webp';
-    await image.decode(); return image.naturalWidth > 1000;
+    const sky = document.querySelector('.shared-space__milky-way');
+    await sky.decode();
+    const image = new Image(); image.src = sky.currentSrc;
+    await image.decode(); return image.naturalWidth >= 4096;
   }), true, 'local sky texture decodes under existing CSP');
   assert.equal(await page.locator('.orbital-header').evaluate((el) => getComputedStyle(el).height), '74px');
   await page.locator('[data-nav="services"]').click();

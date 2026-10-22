@@ -2,10 +2,6 @@
 @font-face { font-family: 'Inter'; src: url('../public/assets/fonts/InterVariable.woff2') format('woff2'); font-weight: 100 900; font-display: swap; }
 :root { font-family: Inter,'Segoe UI',sans-serif; }
 .orbital-app { position: relative; isolation: isolate; font-family: Inter,'Segoe UI',sans-serif; }
-.shared-space { position: fixed; inset: -3%; z-index: -1; pointer-events: none; overflow: hidden; background: #050607; }
-.shared-space img { width: 100%; height: 100%; display: block; object-fit: cover; opacity: .78; animation: shared-sky-drift 150s ease-in-out infinite alternate; }
-.shared-space[data-motion=paused] img { animation-play-state: paused; }
-@keyframes shared-sky-drift { from { transform: translate(-.6%,.3%) scale(1.025); } to { transform: translate(.6%,-.3%) scale(1.04); } }
 .is-focused .universe,.is-returning .universe { flex: 1 1 0; }
 .orbital-workspace { flex: 0 0 clamp(380px,31vw,440px); width: clamp(380px,31vw,440px); height: min(82dvh,780px); min-height: 440px; max-height: calc(100dvh - 150px); align-self: center; display: flex; flex-direction: column; margin: 0 0 0 18px; padding: 6px 0 0; overflow: hidden; border: 0; border-radius: 22px; background: linear-gradient(105deg,#080c1166,#080c1194 70%); backdrop-filter: blur(1px); box-shadow: none; color: #e8edf2; }
 .workspace-toolbar { flex-shrink: 0; height: 40px; padding: 0 16px; }
@@ -36,9 +32,7 @@
   .is-focused .universe,.is-returning .universe,.is-expanded .universe { flex: none; }
   .orbital-workspace,.is-expanded .orbital-workspace { flex: none; width: min(460px,100%); align-self: center; margin: 0 0 90px; height: min(76dvh,700px); min-height: 450px; max-height: none; }
   .orbital-workspace main { padding: 0 20px 96px; scroll-padding-bottom: 90px; }
-  .shared-space img { object-position: 43% center; }
 }
-@media(prefers-reduced-motion:reduce) { .shared-space img { animation: none; } }
 
 /* The same reading hierarchy continues across all operational sections. */
 .orbital-workspace { --line: #ffffff16; }
