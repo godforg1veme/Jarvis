@@ -17,9 +17,11 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
-22 октября локально подготовлены [выбор резюме кнопками бота и автоподнятие по умолчанию](updates/2026-10-22-hh-resume-bot-defaults-development.md).
+22 октября выпущены [выбор резюме кнопками бота и автоподнятие по умолчанию](updates/2026-10-22-hh-resume-bot-defaults-release.md).
 Явный off и unknown сохраняются. Проверены 787 server tests, 32 PostgreSQL
-сценария, включая Telegram owner/member и гонку отзыва права. На VPS ещё не выпущено.
+сценария, включая Telegram owner/member и гонку отзыва права. На DE обновлены
+server/collector, применены 042/043; оба VPS синхронизированы. Первая фоновая
+проверка вернула `not_due`, поднятие не подтверждено; автоматика включена.
 
 22 октября выпущено [управление резюме HH](updates/2026-10-22-hh-resume-management-release.md):
 постоянный выбор основного, обновление списка и отдельное включение бесплатного
@@ -269,10 +271,12 @@ deployment establish what is running.
 
 ### Current status
 
-October 22: [bot resume selection and default automatic raising](updates/2026-10-22-hh-resume-bot-defaults-development.md)
-are prepared locally. Explicit off and unknown stops are preserved. Verified:
+October 22: released [bot resume selection and default automatic raising](updates/2026-10-22-hh-resume-bot-defaults-release.md).
+Explicit off and unknown stops are preserved. Verified:
 787 server tests and 32 PostgreSQL scenarios, including Telegram owner/member
-and permission-revocation races. Not deployed yet.
+and permission-revocation races. DE server/collector are updated with 042/043;
+both VPS sources are synchronized. The first background check returned `not_due`;
+raising is unconfirmed and automation remains enabled.
 
 October 22: released [HH resume management](updates/2026-10-22-hh-resume-management-release.md):
 persistent primary selection, catalog refresh and a separate free auto-raise opt-in.

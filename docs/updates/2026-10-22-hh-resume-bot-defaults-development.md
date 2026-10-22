@@ -4,6 +4,9 @@
 
 ## Русский
 
+Историческая запись разработки. Более новый результат:
+[выпуск на DE](2026-10-22-hh-resume-bot-defaults-release.md).
+
 По новому запросу владельца подготовлены автоподнятие по умолчанию и кнопочный
 выбор основного резюме в Telegram. Это локальные изменения; предыдущий
 [выпуск](2026-10-22-hh-resume-management-release.md) на VPS пока сохраняет
@@ -51,6 +54,9 @@ select. Изменение primary делает старые подтвержд�
 клиентской приёмкой.
 
 ## English
+
+Historical development record. Superseded by the
+[DE release](2026-10-22-hh-resume-bot-defaults-release.md).
 
 The owner's new request adds automatic raising by default and a button-based
 primary resume selector in Telegram. These are local changes. The previous

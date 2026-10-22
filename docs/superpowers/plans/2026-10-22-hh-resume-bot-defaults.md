@@ -27,4 +27,6 @@ confirmation remain mandatory. Development is local until release authorization.
 - [x] Integration: existing PG tests, Telegram gate, server suite, Mini App build
   and UI fixture; update RU/EN product/status/development notes and menu contract.
 - [x] Independent review and correction of confirmed defects where available.
-- [ ] Report verified local state and propose the concrete release if needed.
+- [x] Report verified local state and propose the concrete release if needed.
+
+Owner authorized publication. [Deployed result](../../updates/2026-10-22-hh-resume-bot-defaults-release.md).

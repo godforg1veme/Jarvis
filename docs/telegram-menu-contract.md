@@ -9,7 +9,7 @@ source changes; verify the deployed revision before a server rollout.
 
 ## Change control
 
-22 октября 2026, локальная разработка по явному запросу владельца:
+22 октября 2026, согласовано владельцем и выпущено на DE:
 «Поиск работы → Резюме HH» после личного подключения показывает собственные
 резюме с отметкой основного. Выбор и отдельный выключатель автоподнятия ведут
 к полному названию и «Подтвердить / Отмена». Mini App и бот сохраняют один
@@ -26,9 +26,9 @@ access stamp, manager/connection revision. Подтверждение потре
 тот же UUID связывает исходную settings-операцию и проверку unknown без нового
 select. Другая навигация отменяет preview. Отзыв jobs сериализован с записью
 выбора. Смена primary отменяет прежние подтверждения отклика с другим резюме.
-Это пока не production-контракт установки: [разработка и проверки](updates/2026-10-22-hh-resume-bot-defaults-development.md).
+[Установка и проверки](updates/2026-10-22-hh-resume-bot-defaults-release.md).
 
-October 22, 2026, local development explicitly requested by the owner:
+October 22, 2026, owner-approved and deployed on DE:
 after personal HH connection, “Job search → HH resumes” shows only the user's
 resumes and marks the primary. Selection and the separate auto-raise switch
 show the full title with Confirm / Cancel. Bot and Mini App share one primary.
@@ -42,7 +42,7 @@ and manager/connection revisions. A confirmation is consumed once; the same UUID
 binds the original settings request and unknown reconciliation without another
 select. Other navigation cancels preview. Permission revocation is serialized
 with selection writes; changing primary invalidates older application approvals
-using another resume. Not deployed yet: [development and checks](updates/2026-10-22-hh-resume-bot-defaults-development.md).
+using another resume. [Deployment and checks](updates/2026-10-22-hh-resume-bot-defaults-release.md).
 
 21 октября 2026, согласовано владельцем: новые фильтры поиска пустые.
 В «Настройки → Поисковые запросы / Исключения → Добавить» одно сообщение
