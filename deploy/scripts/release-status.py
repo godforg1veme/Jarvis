@@ -244,7 +244,7 @@ walk('src');walk('/app/shared');for(const p of ['package.json','package-lock.jso
             revision = git(release, "rev-parse", "HEAD")
             server["releaseRevision"] = revision
             # Include compiled UI and image/unit inputs, even when JS hashes match.
-            delta = git(repo, "diff", "--name-only", revision, ref, "server", "ops-ui", "shared",
+            delta = git(repo, "diff", "--name-only", revision, ref, "--", "server", "ops-ui", "shared",
                         "deploy/server.Dockerfile", *compose_inputs)
             server["releaseInputsMatch"] = not bool(delta)
         else:
