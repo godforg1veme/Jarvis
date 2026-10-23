@@ -6,6 +6,8 @@
 
 Статус на 23 октября 2026 года по записям выпусков. Новую сверку окружения
 проводи по [руководству по выпуску](release-workflow.md).
+Результат переноса истории и проверки сохранности правил:
+[уплотнение документации](updates/2026-10-23-documentation-consolidation.md).
 
 ### Текущее состояние
 
@@ -62,6 +64,8 @@
 
 Status as of October 23, 2026, based on release records. Use the
 [release guide](release-workflow.md) for a fresh environment comparison.
+For history preservation and rule-retention checks, see the
+[documentation consolidation record](updates/2026-10-23-documentation-consolidation.md).
 
 ### Current status
 
