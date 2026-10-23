@@ -23,3 +23,56 @@ test('job prompt separates untrusted content and rejects invented references and
   assert.throws(() => parseJobLetter('{"text":"Letter","factIds":["invented"]}', profile));
   assert.throws(() => parseJobLetter('{"text":"Letter","factIds":[],"send":true}', profile));
 });
+
+
+const { JobModelAdapter } = require('../src/jobs/jobModelAdapter');
+const { FREE_MODELS } = require('../src/providers/freeFirstProvider');
+
+function catalogModel(id, prompt, completion) {
+  return { id, context_length: 100000, pricing: { prompt, completion, request: '0' },
+    architecture: { input_modalities: ['text'], output_modalities: ['text'] }, supported_parameters: [] };
+}
+
+test('job adapter selects verified free model, retries eligible failure, then uses priced backup with usage', async () => {
+  const requests = [];
+  const modelA = FREE_MODELS[0], modelB = FREE_MODELS[1], paid = 'test/paid';
+  const fetchImpl = async (url, init) => {
+    if (url.endsWith('/models/user')) return Response.json({ data: [catalogModel(modelA, '0', '0'),
+      catalogModel(modelB, '0', '0'), catalogModel(paid, '0.000001', '0.000002')] });
+    if (url.endsWith('/key')) return Response.json({ data: { free_model_daily_requests: { remaining: 10 } } });
+    const body = JSON.parse(init.body); requests.push(body.model);
+    assert.equal(body.usage.include, true);
+    if (body.model !== paid) return Response.json({ error: { message: 'busy' } }, { status: 429 });
+    return Response.json({ id: 'paid-request', usage: { cost: 0.002 }, choices: [{ message: { content: 'draft' } }] });
+  };
+  const adapter = new JobModelAdapter({ config: { openrouterApiKey: 'fixture', openrouterModel: paid }, fetchImpl });
+  const result = await adapter.generate({ messages: [{ role: 'user', content: 'draft' }] });
+  assert.deepEqual(requests, [modelA, modelB, paid]);
+  assert.equal(result.model, paid);
+  assert.equal(result.usage.cost, 0.002);
+  assert.equal(result.requestId, 'paid-request');
+});
+
+test('job adapter makes no requests without OpenRouter key', async () => {
+  let calls = 0;
+  const adapter = new JobModelAdapter({ config: {}, fetchImpl: async () => { calls++; throw Error('unexpected'); } });
+  await assert.rejects(adapter.generate({ messages: [{ role: 'user', content: 'draft' }] }), { code: 'JOB_MODEL_NOT_CONFIGURED' });
+  assert.equal(calls, 0);
+});
+
+
+test('job adapter keeps a verified free model when generation reports zero cost', async () => {
+  const modelId = FREE_MODELS[0]; const requests = [];
+  const fetchImpl = async (url, init) => {
+    if (url.endsWith('/models/user')) return Response.json({ data: [catalogModel(modelId, '0', '0'),
+      catalogModel('test/paid', '0.000001', '0.000002')] });
+    if (url.endsWith('/key')) return Response.json({ data: { free_model_daily_requests: { remaining: 1 } } });
+    requests.push(JSON.parse(init.body).model);
+    return Response.json({ id: 'free-request', usage: { cost: 0 }, choices: [{ message: { content: 'draft' } }] });
+  };
+  const adapter = new JobModelAdapter({ config: { openrouterApiKey: 'fixture', openrouterModel: 'test/paid' }, fetchImpl });
+  const result = await adapter.generate({ messages: [{ role: 'user', content: 'draft' }] });
+  assert.deepEqual(requests, [modelId]);
+  assert.equal(result.usage.cost, 0);
+  assert.equal(result.model, modelId);
+});

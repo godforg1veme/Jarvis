@@ -38,12 +38,19 @@ API соискателя не используется.
 ## Что уже настроено
 
 OpenRouter использует существующий `OPENROUTER_API_KEY`. Его значение не нужно
-присылать в Telegram или чат разработки. Модель поиска задаётся отдельно через
-`JARVIS_JOB_MODEL` либо настройки поиска в Telegram. Общая модель Jarvis
-от этого не меняется. `JARVIS_JOB_BUDGET_USD=3` означает уведомление,
+присылать в Telegram или чат разработки. Подготовлен [автоматический выбор модели](updates/2026-10-22-jobs-automatic-model-development.md):
+общая очередь OpenRouter проверяет бесплатные варианты и настроенный платный
+резерв. Персональная настройка модели и отдельная переменная окружения удалены;
+на VPS это изменение ещё не установлено. `JARVIS_JOB_BUDGET_USD=3` означает уведомление,
 а не остановку запросов после трёх долларов.
-Предварительный кандидат — `deepseek/deepseek-v4.1-flash`; основание и
-ограничения выбора описаны в [сравнении моделей](job-search-model-evaluation.md).
+Прежнее [сравнение моделей](job-search-model-evaluation.md) сохраняет историю
+ручного выбора до перехода на автоматическую очередь.
+
+OpenRouter uses the existing API key; do not send it in chat. Automatic model
+selection is prepared locally: the shared queue checks free models, then
+configured paid fallback. Per-user model selection and the separate environment
+variable are removed. This update is not deployed yet. The budget setting
+remains a notification threshold. The model comparison above is historical.
 
 Проверка окружения работающего DE-контейнера подтвердила наличие ключа
 OpenRouter. Переменные подключения HH в этом контейнере отсутствуют;
@@ -81,7 +88,7 @@ OpenRouter. Переменные подключения HH в этом конт�
 ## Включение после принятия и выпуска
 
 Выпуск выполняется по [порядку Jarvis](release-workflow.md). На DE включаются
-`JARVIS_JOB_SEARCH_ENABLED=true`, отдельная выбранная модель и профиль Compose
+`JARVIS_JOB_SEARCH_ENABLED=true`, настроенный общий маршрут OpenRouter и профиль Compose
 `job-search-de`. Сборщик использует существующий server image и приватную БД;
 второй polling Telegram-бот не запускается. На NL сборщик не запускается.
 Браузер получает отдельные owner UUID, RPC secret и существующий приватный

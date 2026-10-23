@@ -5,6 +5,13 @@ const { parseJobCallback } = require('../src/jobs/jobTelegramCallbacks');
 const { validateContext } = require('../src/telegram/telegramInteractionRepository');
 const id = '12345678-1234-4234-8234-123456789abc';
 
+test('legacy text editor cannot set a model',()=>{
+ const {parseSettingsEdit}=require('../src/jobs/jobSettingsService');
+ const {defaultJobSettings,settingsSchema}=require('../src/jobs/jobSchemas');
+ assert.throws(()=>parseSettingsEdit('модель = obsolete/custom',defaultJobSettings()),{code:'JOB_INVALID_SETTINGS_INPUT'});
+ assert.equal(settingsSchema.safeParse({...defaultJobSettings(),model:'obsolete/custom'}).success,false);
+});
+
 test('one-field settings values respect existing ranges and ordinary Russian input', () => {
   assert.equal(parseValue('salary', '150 000'), 150000);
   assert.equal(parseValue('budget', '3,5'), 3.5);
@@ -14,8 +21,9 @@ test('one-field settings values respect existing ranges and ordinary Russian inp
   for (const [field, value] of [['salary','0'],['interval','1.5'],['history','31'],['budget','0'],['budget','1e3'],['model','Bearer private-fixture'],['queries','X'],['remote','да']]) {
     assert.throws(() => parseValue(field,value));
   }
-  assert.equal(choices('model', {model:'fixture/current'}, ['fixture/default','fixture/current']).filter(x=>x.value==='fixture/current').length, 1);
-  assert.equal(choices('model', {model:''}, [])[0].value, '');
+  assert.equal(Object.hasOwn(fields,'model'),false);
+  assert.deepEqual(choices('model',{}),[]);
+  assert.throws(()=>parseValue('model','fixture/custom'));
 });
 
 test('filter lists accept one message with one phrase per line without partial or hidden parsing', () => {
@@ -40,6 +48,6 @@ test('settings callbacks are closed, bounded, revisioned and carry no user value
 test('new guided kind has a closed context without expanding legacy job contexts', () => {
   const context={targetId:id,revision:1,field:'city',returnPage:0};
   assert.deepEqual(validateContext('job_setting_value',context),context);
-  for (const input of [{...context,field:'remote'},{...context,field:'shell'},{...context,extra:1},{...context,returnPage:13}]) assert.throws(()=>validateContext('job_setting_value',input));
+  for (const input of [{...context,field:'remote'},{...context,field:'model'},{...context,field:'shell'},{...context,extra:1},{...context,returnPage:13}]) assert.throws(()=>validateContext('job_setting_value',input));
   assert.throws(()=>validateContext('job_profile_edit',context));
 });

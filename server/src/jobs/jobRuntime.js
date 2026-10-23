@@ -55,7 +55,7 @@ function createJobRuntime({ config, pool, interactions, send, sendPhoto, fetchIm
   const resumeRepository=browserClient?new JobResumeRepository(pool,jobsAccessService):null;
   const resumeService=resumeRepository?new JobResumeService({repository:resumeRepository,browserClient}):null;
   const resumeWorker=resumeService?new JobResumeWorker({service:resumeService,repository:resumeRepository,browserClient}):null;
-  for (const [key, value] of Object.entries({ model: config.jobSearchModel, budgetUsd: config.jobBudgetUsd,
+  for (const [key, value] of Object.entries({ budgetUsd: config.jobBudgetUsd,
     intervalMs: config.jobCollectorIntervalMs, historyDays: config.jobHistoryDays })) if (value !== undefined) defaults[key] = value;
   const searchRepository = new JobSearchRepository(pool, { defaults, accessService: jobsAccessService });
   const profileRepository = new JobProfileRepository(pool, { accessService: jobsAccessService });
@@ -63,7 +63,7 @@ function createJobRuntime({ config, pool, interactions, send, sendPhoto, fetchIm
   const usageRepository = new JobUsageRepository(pool);
   const deliveryRepository = new JobDeliveryRepository(pool, { accessService: jobsAccessService });
   const draftService = new JobDraftService({ pool, searchRepository, profileRepository, draftRepository, usageRepository,
-    modelAdapter: new JobModelAdapter({ config, fetchImpl }), defaultModel: config.jobSearchModel, accessService: jobsAccessService });
+    modelAdapter: new JobModelAdapter({ config, fetchImpl }), accessService: jobsAccessService });
   const settingsService = new JobSettingsService({ pool, searchRepository, profileRepository, accessService: jobsAccessService });
   const applicationRepository = new JobApplicationRepository(pool, { accessService: jobsAccessService });
   const historyRepository=new JobHistoryRepository(pool,{accessService: jobsAccessService});
@@ -82,7 +82,6 @@ function createJobRuntime({ config, pool, interactions, send, sendPhoto, fetchIm
   }
   const telegramService = new JobTelegramService({ pool, searchRepository, profileRepository, draftRepository,
     usageRepository, interactions, draftService, settingsService, applicationService, connectionService, captchaService, historyService, resumeService,
-    settingsModels: [config.jobSearchModel, config.openrouterModel, config.openrouterFallbackModel], defaultModel: config.jobSearchModel,
     accessService: jobsAccessService, ownerTelegramId: config.operationsOwnerTelegramId, loginLinkDelivery,
     jobPublicOrigin: config.miniAppEnabled ? config.miniAppPublicOrigin : '' });
   const deliveryWorker = new JobDeliveryWorker({ pool, searchRepository, deliveryRepository, send, accessService: jobsAccessService,

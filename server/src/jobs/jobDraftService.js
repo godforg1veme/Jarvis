@@ -4,8 +4,8 @@ const { jobTransaction } = require('./jobTransaction');
 const { buildJobPrompt, parseJobLetter } = require('./jobPrompt');
 
 class JobDraftService {
-  constructor({ pool, searchRepository, profileRepository, draftRepository, usageRepository, modelAdapter, defaultModel = '', now = () => new Date(), accessService = null }) {
-    Object.assign(this, { pool, searchRepository, profileRepository, draftRepository, usageRepository, modelAdapter, defaultModel, now, accessService });
+  constructor({ pool, searchRepository, profileRepository, draftRepository, usageRepository, modelAdapter, now = () => new Date(), accessService = null }) {
+    Object.assign(this, { pool, searchRepository, profileRepository, draftRepository, usageRepository, modelAdapter, now, accessService });
   }
   async createManual({ scope, vacancyId, mode, text, parentDraftId = null, expectedProfileRevision, expectedVacancyRevision }) {
     await assertJobScope(this.pool, scope, this.accessService);
@@ -32,8 +32,6 @@ class JobDraftService {
     const settings = await this.searchRepository.getSettings({ userId: scope.userId });
     if (!vacancy) throw jobError('JOB_NOT_FOUND');
     this.checkRevisions(profile, vacancy, expectedProfileRevision, expectedVacancyRevision);
-    const model = settings?.settings.model || this.defaultModel;
-    if (!model) throw jobError('JOB_MODEL_NOT_CONFIGURED');
     const previous = parentDraftId ? await this.draftRepository.get({ userId: scope.userId, draftId: parentDraftId }) : null;
     if (parentDraftId && (!previous?.current || previous.vacancy_id !== vacancyId)) throw jobError('JOB_REVISION_CONFLICT');
     const continuingDraft = mode == null;
@@ -69,7 +67,7 @@ class JobDraftService {
     try {
       await assertJobScope(this.pool, scope, this.accessService);
       await this.usageRepository.record({ userId: scope.userId, requestId, outcome: 'pending', occurredAt: this.now() });
-      const result = await this.modelAdapter.generate({ messages, model });
+      const result = await this.modelAdapter.generate({ messages });
       await this.usageRepository.record({ userId: scope.userId, requestId, providerRequestId: result.requestId,
         costUsd: result.usage?.cost ?? null, outcome: 'success', occurredAt: this.now() });
       const letter = parseJobLetter(result.text, profile.profile);

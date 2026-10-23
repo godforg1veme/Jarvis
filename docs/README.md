@@ -17,6 +17,11 @@ Desktop, сервера и Host Agent прошла. Отличия сохран�
 
 ### Текущее состояние
 
+22 октября локально подготовлен [полностью автоматический выбор модели для писем HH](updates/2026-10-22-jobs-automatic-model-development.md).
+Ручной выбор и сохранённые персональные модели удаляются; используется общая
+очередь проверенных бесплатных моделей и настроенный платный резерв.
+Выпуск на VPS ещё не выполнялся.
+
 22 октября выпущены [почасовая история HH и проверка актуальности приглашений](updates/2026-10-22-hh-history-hourly-release.md).
 Полный обход для всех подключённых пользователей не зависит от поиска вакансий.
 Архивные и неподтверждённые приглашения отделены от подтверждённых, исправлена
@@ -290,6 +295,11 @@ describes publishing. Plans describe intentions. Code, checks, and actual
 deployment establish what is running.
 
 ### Current status
+
+October 22: [fully automatic model selection for HH letters](updates/2026-10-22-jobs-automatic-model-development.md)
+is prepared locally. Manual selection and stored per-user models are removed;
+letters use verified free models and configured global paid fallback.
+Not deployed to VPS yet.
 
 October 22: [hourly HH history and invitation freshness](updates/2026-10-22-hh-history-hourly-release.md)
 are deployed. Full refresh covers every eligible connected user,

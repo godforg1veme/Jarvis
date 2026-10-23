@@ -10,7 +10,7 @@ const settingsSchema = z.object({
   targetRub: z.number().int().min(1).max(100000000).nullable(), officeCity: z.string().max(120),
   remote: z.boolean().nullable(), historyDays: z.number().int().min(1).max(30),
   intervalMs: z.number().int().min(60000).max(86400000), budgetUsd: z.number().positive().max(10000),
-  model: z.string().max(255), paused: z.boolean(), activated: z.boolean(),
+  paused: z.boolean(), activated: z.boolean(),
 }).strict();
 function parseJobSettings(value) {
   const settings = settingsSchema.parse(value);

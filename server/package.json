@@ -12,7 +12,7 @@
     "start": "node src/index.js",
     "jobs:collect": "node src/jobs/collectorMain.js",
     "test:jobs:postgres": "node --test test/jobPostgresAcceptance.cjs test/jobCollectorAcceptance.cjs test/jobDraftAcceptance.cjs test/jobTelegramAcceptance.cjs test/jobLetterModesAcceptance.cjs test/jobApplicationsAcceptance.cjs test/jobDeliveryAcceptance.cjs test/jobHistoryAcceptance.cjs test/jobSettingsPanelAcceptance.cjs",
-    "test:jobs:settings": "node --test test/jobSettingsPanelAcceptance.cjs",
+    "test:jobs:settings": "node --test test/jobSettingsPanelAcceptance.cjs test/jobAutomaticModelAcceptance.cjs",
     "test:jobs:access": "node --test test/jobCollectorAccessPostgresAcceptance.cjs test/jobMemberConnectionPostgresAcceptance.cjs",
     "test:jobs:history": "node --test test/jobHistoryAcceptance.cjs test/jobHistoryFreshnessAcceptance.cjs",
     "test:jobs:e2e": "node --test test/jobE2eAcceptance.cjs",

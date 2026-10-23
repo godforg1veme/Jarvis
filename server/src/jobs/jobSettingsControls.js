@@ -7,7 +7,6 @@ const fields = Object.freeze({
   interval: { key:'intervalMs', label:'🕒 Проверять', hint:'Интервал проверки в минутах: целое от 1 до 1440.', presets:[900000,1800000,3600000,7200000] },
   history: { key:'historyDays', label:'📅 История', hint:'Глубина первоначальной выдачи: от 1 до 30 дней. Это не срок хранения откликов.', presets:[1,7,14,30] },
   budget: { key:'budgetUsd', label:'🔔 Уведомление о расходах', hint:'Порог уведомления в USD: больше 0, до 10 000. Он не останавливает расходы AI.', presets:[1,3,5,10] },
-  model: { key:'model', label:'🤖 Модель AI', hint:'Выбери настроенную модель или укажи другой ID OpenRouter. Изменение не вызывает AI.' },
   queries: { key:'queries', label:'🔎 Поисковые запросы', hint:'Пришли ключевые слова или фразы одним сообщением: каждая фраза с новой строки, от 2 до 200 символов. Например:\nМенеджер по закупкам\nСнабжение\nЛогистика\nВсего до 100 фраз. Повторы не добавляются.' },
   exclusions: { key:'exclusions', label:'🚫 Исключения', hint:'Пришли нежелательные слова или фразы одним сообщением: каждая с новой строки, от 1 до 100 символов. Всего до 50 фраз. Повторы не добавляются.' },
 });
@@ -44,15 +43,13 @@ function parseValue(field,input) {
     if(!(field==='budget'?/^\d+(?:[.,]\d+)?$/:/^\d+$/).test(compact)) throw jobError('JOB_INVALID_SETTING_VALUE');
     value=Number(compact.replace(',','.'))*(field==='interval'?60000:1);
   }
-  if(field==='model'&&!/^[a-zA-Z0-9][a-zA-Z0-9_./:+-]{0,254}$/.test(text)) throw jobError('JOB_INVALID_SETTING_VALUE');
   const parsed=settingsSchema.shape[fields[field].key].safeParse(value);
   if(!parsed.success) throw jobError('JOB_INVALID_SETTING_VALUE');
   return parsed.data;
 }
-function choices(field,settings,models=[]) {
+function choices(field,settings) {
   if(listFields.includes(field)) return [{value:[],label:'Очистить список'}];
   if(field==='city') return [{value:'',label:'Любой город'}];
-  if(field==='model') return [{value:'',label:'По умолчанию'}, ...[...new Set([settings.model,...models].filter(x=>typeof x==='string'&&x.trim()&&x.length<=255))].slice(0,8).map(value=>({value,label:value}))];
   return (fields[field]?.presets||[]).map(value=>({value,label:formatValue(field,value)}));
 }
 function parseSettingsCallback(value) {

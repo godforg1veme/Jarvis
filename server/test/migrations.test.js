@@ -52,6 +52,7 @@ test('migration files are ordered and narrowly named', () => {
     '042_job_resume_defaults.sql',
     '043_job_resume_telegram.sql',
     '044_job_history_freshness.sql',
+    '045_job_automatic_model.sql',
   ]);
 });
 

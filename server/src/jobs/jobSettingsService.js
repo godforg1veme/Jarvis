@@ -3,7 +3,7 @@ const { jobTransaction } = require('./jobTransaction');
 
 function parseSettingsEdit(text, current) {
   const next = structuredClone(current);
-  const keys = { зарплата: 'targetRub', город: 'officeCity', интервал: 'intervalMs', период: 'historyDays', бюджет: 'budgetUsd', модель: 'model' };
+  const keys = { зарплата: 'targetRub', город: 'officeCity', интервал: 'intervalMs', период: 'historyDays', бюджет: 'budgetUsd' };
   for (const raw of text.split('\n').map((x) => x.trim()).filter(Boolean)) {
     let match = /^(запрос|исключение)\s*([+-])\s*(.{2,200})$/iu.exec(raw);
     if (match) {
@@ -12,10 +12,10 @@ function parseSettingsEdit(text, current) {
     }
     if (/^включить$/iu.test(raw)) { next.activated = true; next.paused = false; continue; }
     if (/^удал[её]нка\s*=\s*(да|нет)$/iu.test(raw)) { next.remote = /да$/iu.test(raw); continue; }
-    match = /^(зарплата|город|интервал|период|бюджет|модель)\s*=\s*(.+)$/iu.exec(raw);
+    match = /^(зарплата|город|интервал|период|бюджет)\s*=\s*(.+)$/iu.exec(raw);
     if (!match) throw jobError('JOB_INVALID_SETTINGS_INPUT');
     const key = keys[match[1].toLowerCase()];
-    next[key] = ['model', 'officeCity'].includes(key) ? match[2].trim() : Number(match[2].replace(/\s/g, '').replace(',', '.')) * (key === 'intervalMs' ? 60000 : 1);
+    next[key] = key === 'officeCity' ? match[2].trim() : Number(match[2].replace(/\s/g, '').replace(',', '.')) * (key === 'intervalMs' ? 60000 : 1);
   }
   return parseJobSettings(next);
 }

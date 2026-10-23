@@ -21,6 +21,7 @@ const { createRpcServer } = require('../../job-browser/src/rpcServer');
 const { JobBrowserClient } = require('../src/jobs/jobBrowserClient');
 const { JobBrowserConnectionService } = require('../src/jobs/jobBrowserConnectionService');
 const { MENU } = require('../src/telegram/telegramMenu');
+const { configuredOwnerJobAccess } = require('../src/jobs/configuredOwnerJobAccess');
 
 test('real message/menu handlers + PG: guided retries, consumption, scopes, draft editing and history privacy', async () => {
   const f = await createJobPostgresFixture(); let updateId = 1000, calls = 0, connectionReads = 0, selectedResume = 'fixtureResume';
@@ -31,17 +32,18 @@ test('real message/menu handlers + PG: guided retries, consumption, scopes, draf
   rpc.listen(0, '127.0.0.1'); await once(rpc, 'listening');
   try {
     await f.pool.query("INSERT INTO user_identities(user_id,provider,external_id) VALUES($1,'telegram','101'),($2,'telegram','202')", [f.owner, f.stranger]);
-    const search = new JobSearchRepository(f.pool), profiles = new JobProfileRepository(f.pool), drafts = new JobDraftRepository(f.pool), usage = new JobUsageRepository(f.pool);
+    const accessService = configuredOwnerJobAccess(f.pool, '101');
+    const search = new JobSearchRepository(f.pool, { accessService }), profiles = new JobProfileRepository(f.pool, { accessService }), drafts = new JobDraftRepository(f.pool, { accessService }), usage = new JobUsageRepository(f.pool);
     const interactions = new TelegramInteractionRepository(f.pool);
-    const settingsService = new JobSettingsService({ pool: f.pool, searchRepository: search, profileRepository: profiles });
+    const settingsService = new JobSettingsService({ pool: f.pool, searchRepository: search, profileRepository: profiles, accessService });
     const draftService = new JobDraftService({ pool: f.pool, searchRepository: search, profileRepository: profiles,
-      draftRepository: drafts, usageRepository: usage, defaultModel: 'fixture-model',
+      draftRepository: drafts, usageRepository: usage, accessService,
       modelAdapter: { async generate() { calls++; return { text: JSON.stringify({ text: `Private fixture letter ${calls}`, factIds: ['fact_1'] }), usage: { cost: 0.001 } }; } } });
     const jobs = new JobTelegramService({ pool: f.pool, searchRepository: search, profileRepository: profiles,
-      draftRepository: drafts, usageRepository: usage, draftService, settingsService, interactions, defaultModel: 'fixture-model',
+      draftRepository: drafts, usageRepository: usage, draftService, settingsService, interactions, accessService, ownerTelegramId: '101',
       connectionService: new JobBrowserConnectionService({ pool: f.pool, browserClient: new JobBrowserClient({ ownerId: f.owner,
-        token, baseUrl: `http://127.0.0.1:${rpc.address().port}`, allowTestHttp: true }) }) });
-    const menu = new TelegramMenuService({ interactions, jobSearchService: jobs });
+        token, baseUrl: `http://127.0.0.1:${rpc.address().port}`, allowTestHttp: true }), accessService }) });
+    const menu = new TelegramMenuService({ interactions, jobSearchService: jobs, accessService, ownerTelegramId: '101' });
     const messages = new TelegramMessageService({ accessPolicy: createTelegramAccessPolicy(['101', '202']),
       updateRepository: new TelegramUpdateRepository(f.pool), userRepository: new UserRepository(f.pool),
       conversationRepository: new ConversationRepository(f.pool), menuService: menu,
@@ -62,15 +64,18 @@ test('real message/menu handlers + PG: guided retries, consumption, scopes, draf
     assert.equal(start.replyKeyboard.keyboard.at(-1)[0].text, MENU.JOBS);
     const memberStart = await msg('/start', 202);
     assert.equal(memberStart.jobSearchEntry, undefined);
-    assert.equal(memberStart.replyKeyboard.keyboard.flat().some((x) => x.text === MENU.JOBS), false);
+    assert.equal(memberStart.replyKeyboard?.keyboard?.flat().some((x) => x.text === MENU.JOBS) || false, false);
     const groupStart = await msg('/start', 101, -100, 'group');
-    assert.equal(groupStart.replyKeyboard.keyboard.flat().some((x) => x.text === MENU.JOBS), false);
-    assert.match((await cb('job:menu', 202)).answer, /владельцу/);
+    assert.equal(groupStart.replyKeyboard?.keyboard?.flat().some((x) => x.text === MENU.JOBS) || false, false);
+    assert.match((await cb('job:menu', 202)).answer, /\u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u0435\u043d|\u0440\u0430\u0437\u0440\u0435\u0448\u0435\u043d/iu);
     assert.match((await cb('job:menu', 101, -100, 'group')).answer, /личном/);
     await cb('job:menu');
-    assert.match((await msg(MENU.JOBS, 202)).answer, /владельцу/);
+    assert.match((await msg(MENU.JOBS, 202)).answer, /\u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u0435\u043d|\u0440\u0430\u0437\u0440\u0435\u0448\u0435\u043d/iu);
     assert.match((await msg(MENU.JOBS, 101, -100, 'group')).answer, /личном/);
     const jobMenu = await msg(MENU.JOBS);
+    const initialSearch = await search.getSettings({ userId: f.owner });
+    await search.saveSettings({ scope: f.scope, expectedRevision: initialSearch.revision,
+      settings: { ...initialSearch.settings, queries: ['AI'] } });
     assert.equal(jobMenu.buttons[0][0].text, 'Включить поиск');
     await legacySettings();
     assert.equal((await interactions.getActive(f.scope)).interaction.kind, 'job_settings_edit');

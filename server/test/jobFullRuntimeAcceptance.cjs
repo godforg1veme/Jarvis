@@ -25,7 +25,7 @@ test('full runtime with real pgvector: all migrations twice, health, real bot ho
     pool = new Pool({ connectionString: databaseUrl.href });
     const config = { ...loadConfig({ NODE_ENV: 'test', JARVIS_LOG_LEVEL: 'silent', DATABASE_URL: databaseUrl.href,
       TELEGRAM_BOT_TOKEN: `5000:${crypto.randomBytes(24).toString('base64url')}`, TELEGRAM_ALLOWED_IDS: '101',
-      JARVIS_JOB_SEARCH_ENABLED: 'true', JARVIS_JOB_MODEL: 'fixture-model',
+      JARVIS_JOB_SEARCH_ENABLED: 'true',
       JARVIS_DOCUMENT_STORAGE_PATH: storage }), port: 0 };
     runtime = await createRuntime(config, { pool });
     assert.ok(runtime.jobRuntime, 'actual server wiring must expose the job runtime');

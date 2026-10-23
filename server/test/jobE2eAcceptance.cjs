@@ -68,9 +68,14 @@ test('E2E local HTTP + actual bot + PG: configure, collect, letter, approval, lo
       async submit(input) { return (await fetch(`${origin}/connector/submit`, { method: 'POST',
         headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) })).json(); },
       async reconcile({ operationId }) { return (await fetch(`${origin}/connector/reconcile?operationId=${operationId}`)).json(); } };
-    jobs = createJobRuntime({ config: { jobSearchEnabled: true, jobSearchModel: 'fixture-model',
+    jobs = createJobRuntime({ config: { jobSearchEnabled: true, operationsOwnerTelegramId:'101', openrouterModel: 'fixture-model',
       openrouterApiKey: crypto.randomUUID(), modelTimeoutMs: 5000 }, pool: fixture.pool, interactions,
-      fetchImpl: (_url, init) => fetch(`${origin}/model`, init), applicationAdapter,
+      fetchImpl: (url, init) => {
+        if (url.endsWith('/models/user')) return Promise.resolve(Response.json({data:[{id:'fixture-model',context_length:100000,
+          pricing:{prompt:'0.000001',completion:'0.000002',request:'0'},architecture:{input_modalities:['text'],output_modalities:['text']},supported_parameters:[]}]}));
+        if (url.endsWith('/key')) return Promise.resolve(Response.json({data:{}}));
+        return fetch(`${origin}/model`, init);
+      }, applicationAdapter,
       send: ({ chatId, answer, buttons }) => bot.api.sendMessage(chatId, answer, buttons?.length ? { reply_markup: telegramReplyMarkup(buttons) } : {}) });
     const menu = new TelegramMenuService({ interactions, jobSearchService: jobs.telegramService });
     const messages = new TelegramMessageService({ accessPolicy: createTelegramAccessPolicy(['101']),
@@ -94,11 +99,15 @@ test('E2E local HTTP + actual bot + PG: configure, collect, letter, approval, lo
       await bot.handleUpdate(update); return { update, reply: sent.at(-1) };
     };
     const findButton = (reply, label) => reply.reply_markup.inline_keyboard.flat().find((x) => x.text === label).callback_data;
-    await message('/start'); assert.equal(sent.at(-1).reply_markup.inline_keyboard[0][0].callback_data, 'job:menu');
+    await message('/start');
+    assert.ok(sent.at(-1).reply_markup.keyboard.flat().some(x=>x.text==='🏠 Главное'));
     await callback('job:menu');
     const settings = await callback('job:settings');
-    const queries = await callback(settings.reply.reply_markup.inline_keyboard.flat()
+    let queries = await callback(settings.reply.reply_markup.inline_keyboard.flat()
       .find((x) => x.callback_data.startsWith('job:cfg:queries:')).callback_data);
+    await callback(findButton(queries.reply,'＋ Добавить'));
+    const queryPreview=await message('AI Engineer\nAI Engineering');
+    queries=await callback(findButton(queryPreview,'Сохранить'));
     const phrase = await callback(queries.reply.reply_markup.inline_keyboard.flat()
       .find((x) => x.text.endsWith(' AI Engineering')).callback_data);
     const removal = await callback(findButton(phrase.reply, 'Удалить'));
@@ -111,7 +120,7 @@ test('E2E local HTTP + actual bot + PG: configure, collect, letter, approval, lo
     await callback('job:base_letter');
     preview = await message('Owner base fixture letter');
     await callback(findButton(preview, 'Подтвердить'));
-    collector = createCollectorRuntime({ env: { JARVIS_JOB_SEARCH_ENABLED: 'true' }, pool: fixture.pool,
+    collector = createCollectorRuntime({ env: { JARVIS_JOB_SEARCH_ENABLED: 'true', JARVIS_OPERATIONS_OWNER_TELEGRAM_ID:'101' }, pool: fixture.pool,
       hhClient: hh, currencyRates: { async get() { return null; } }, wait: async () => {} });
     await collector.tick();
     assert.equal(modelCalls, 0, 'collection must not call the model');

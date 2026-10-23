@@ -16,7 +16,7 @@ class JobSettingsPanel {
   panel(search, notice='') {
     const s=search.settings;
     const rows=Object.entries(fields).map(([field,def])=>{
-      const value=listFields.includes(field)?s[def.key].length:field==='model'?'':formatValue(field,s[def.key]);
+      const value=listFields.includes(field)?s[def.key].length:formatValue(field,s[def.key]);
       return [control(short(`${def.label}${value!==''?`: ${value}`:''}`),'cfg',field,search.revision)];
     });
     rows.push([button('← В поиск работы','menu')]);
@@ -33,12 +33,12 @@ class JobSettingsPanel {
       rows.push([button('← В настройки','settings')]);
       return response(`${notice?notice+'\n\n':''}${def.label}: ${list.length}\nСтраница ${p+1} из ${last+1}\n${list.length?'Нажми на фразу, чтобы увидеть её полностью или удалить.':'Пока нет фраз.'}`,rows);
     }
-    const options=choices(field,s,this.jobs.settingsModels);
+    const options=choices(field,s);
     const rows=options.map((x,i)=>[control(short(`${Object.is(s[def.key],x.value)?'✓ ':''}${x.label}`),'cfg_pick',field,rev,i)]);
-    if(field!=='remote') rows.push([control(field==='model'?'Указать другую':field==='city'?'Изменить город':'Ввести своё','cfg_input',field,rev)]);
+    if(field!=='remote') rows.push([control(field==='city'?'Изменить город':'Ввести своё','cfg_input',field,rev)]);
     rows.push([button('← В настройки','settings')]);
-    const current=field==='model'&&!s.model?`По умолчанию (${this.jobs.defaultModel||'не настроена'})`:formatValue(field,s[def.key]);
-    return response(`${def.label}\nСейчас: ${current}\n\n${def.hint}${field==='model'?'\nПоказаны текущая и настроенные модели; это не полный каталог OpenRouter.':''}`,rows);
+    const current=formatValue(field,s[def.key]);
+    return response(`${def.label}\nСейчас: ${current}\n\n${def.hint}`,rows);
   }
   async destination(scope,returnTo,notice) {
     const search=await this.current(scope);
@@ -72,7 +72,7 @@ class JobSettingsPanel {
         [[listFields.includes(field)?control('Отмена','cfg',field,search.revision,page):button('Отмена','settings')]]);
     }
     if(action==='cfg_pick') {
-      const choice=choices(field,s,this.jobs.settingsModels)[index];
+      const choice=choices(field,s)[index];
       if(!choice) throw jobError('JOB_INVALID_ACTION');
       return this.preview(scope,search,field,{...s,[def.key]:choice.value},listFields.includes(field)?`${def.label}: очистить весь список (${s[def.key].length} фраз).`:`${def.label}: ${formatValue(field,s[def.key])} → ${formatValue(field,choice.value)}`,page);
     }

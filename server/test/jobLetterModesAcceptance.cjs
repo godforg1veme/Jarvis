@@ -17,37 +17,39 @@ const { TelegramUpdateRepository } = require('../src/telegram/telegramUpdateRepo
 const { UserRepository } = require('../src/users/userRepository');
 const { ConversationRepository } = require('../src/conversations/conversationRepository');
 const { createTelegramAccessPolicy } = require('../src/telegram/accessPolicy');
+const { configuredOwnerJobAccess } = require('../src/jobs/configuredOwnerJobAccess');
 
 async function harness() {
   const f = await createJobPostgresFixture();
   await f.pool.query("INSERT INTO user_identities(user_id,provider,external_id) VALUES($1,'telegram','101'),($2,'telegram','202')", [f.owner, f.stranger]);
   await f.pool.query("INSERT INTO job_connections(user_id,resume_id,status) VALUES($1,'fixture-resume','connected')", [f.owner]);
-  const search = new JobSearchRepository(f.pool), profiles = new JobProfileRepository(f.pool);
-  const drafts = new JobDraftRepository(f.pool), usage = new JobUsageRepository(f.pool);
+  const accessService = configuredOwnerJobAccess(f.pool, '101');
+  const search = new JobSearchRepository(f.pool, { accessService }), profiles = new JobProfileRepository(f.pool, { accessService });
+  const drafts = new JobDraftRepository(f.pool, { accessService }), usage = new JobUsageRepository(f.pool);
   const interactions = new TelegramInteractionRepository(f.pool), prompts = [], submissions = [], snapshots = new Map();
   let updateId = 100, vacancyNumber = 100, failModel = false, unknown = false;
   const draftService = new JobDraftService({ pool: f.pool, searchRepository: search, profileRepository: profiles,
-    draftRepository: drafts, usageRepository: usage, modelAdapter: { async generate({ messages }) {
+    draftRepository: drafts, usageRepository: usage, accessService, modelAdapter: { async generate({ messages }) {
       prompts.push(messages);
       if (failModel) throw Object.assign(new Error('Fixture failure'), { code: 'JOB_MODEL_UNAVAILABLE' });
       const data = JSON.parse(messages[1].content);
       return { text: JSON.stringify({ text: `Adapted ${prompts.length}: ${data.sourceLetter}`,
         factIds: data.facts.map((x) => x.id) }), usage: { cost: 0.001 } };
     } } });
-  const applications = new JobApplicationRepository(f.pool);
+  const applications = new JobApplicationRepository(f.pool, { accessService });
   const applicationService = new JobApplicationService({ pool: f.pool, repository: applications, searchRepository: search,
-    adapter: { capabilities: { applicantApply: true },
+    accessService, adapter: { capabilities: { applicantApply: true },
       async inspect({ externalId }) { return { resumeAvailable: true, vacancy: snapshots.get(externalId) }; },
       async submit(input) { submissions.push(input); return unknown ? { outcome: 'unknown' }
         : { outcome: 'sent', verified: true, externalId: `fixture-${submissions.length}` }; },
       async reconcile() { return { outcome: 'unknown' }; } } });
-  const settingsService = new JobSettingsService({ pool: f.pool, searchRepository: search, profileRepository: profiles });
+  const settingsService = new JobSettingsService({ pool: f.pool, searchRepository: search, profileRepository: profiles, accessService });
   const jobs = new JobTelegramService({ pool: f.pool, searchRepository: search, profileRepository: profiles,
-    draftRepository: drafts, usageRepository: usage, interactions, draftService, settingsService, applicationService });
+    draftRepository: drafts, usageRepository: usage, interactions, draftService, settingsService, applicationService, accessService, ownerTelegramId: '101' });
   const messages = new TelegramMessageService({ accessPolicy: createTelegramAccessPolicy(['101', '202']),
     updateRepository: new TelegramUpdateRepository(f.pool), userRepository: new UserRepository(f.pool),
     conversationRepository: new ConversationRepository(f.pool),
-    menuService: new TelegramMenuService({ interactions, jobSearchService: jobs }),
+    menuService: new TelegramMenuService({ interactions, jobSearchService: jobs, accessService, ownerTelegramId: '101' }),
     assistant: { async answer() { return 'Fixture dialogue'; } } });
   const messageUpdate = (text, from = 101, chat = from, type = 'private') => ({ update_id: ++updateId,
     message: { message_id: updateId, from: { id: from, first_name: 'Fixture' }, chat: { id: chat, type }, text } });
@@ -70,10 +72,6 @@ async function harness() {
     await search.recordMatch({ userId: f.owner, vacancyId: row.id, filterRevision: 1 });
     return row;
   };
-  const model = async () => {
-    const s = await search.ensure({ scope: f.scope });
-    await search.saveSettings({ scope: f.scope, expectedRevision: s.revision, settings: { ...s.settings, model: 'fixture-model' } });
-  };
   const current = (v) => drafts.current({ userId: f.owner, vacancyId: v.id });
   const send = async (v) => {
     const d = await current(v), preview = await cb(`job:send:${d.id}`);
@@ -83,7 +81,7 @@ async function harness() {
   };
   await cb('job:menu');
   return { ...f, search, profiles, drafts, interactions, prompts, submissions, messages, jobs, draftService, applications,
-    cb, msg, base, vacancy, model, current, send, messageUpdate, callbackUpdate,
+    cb, msg, base, vacancy, current, send, messageUpdate, callbackUpdate,
     failModel: () => { failModel = true; }, unknown: () => { unknown = true; } };
 }
 
@@ -117,10 +115,8 @@ test('four real Telegram paths: optional profile, exact manual letters, source-a
     await f.cb(sent.data);
     assert.equal(f.submissions.length, beforeReplay);
     const third = await f.vacancy();
-    assert.match((await f.cb(`job:improved:${third.id}`)).answer, /выбрать модель/);
-    await f.model();
     const update = f.callbackUpdate(`job:improved:${third.id}`);
-    await f.messages.handleCallback(update);
+    assert.match((await f.messages.handleCallback(update)).answer, /Adapted 1/);
     assert.equal((await f.messages.handleCallback(update)).status, 'duplicate');
     assert.equal(f.prompts.length, 1);
     assert.equal(JSON.parse(f.prompts[0][1].content).sourceLetter, profile.profile.baseLetter);
@@ -143,7 +139,6 @@ test('four real Telegram paths: optional profile, exact manual letters, source-a
 test('both AI modes use facts/examples; edits preserve source and a model failure keeps the draft', async () => {
   const f = await harness();
   try {
-    await f.model();
     await f.cb('job:profile');
     const preview = await f.msg('факт: Private actual owner project\nпример: Private concise style');
     await f.cb(preview.buttons[0][0].data);
@@ -187,7 +182,7 @@ test('guided inputs: real allowlist, invalid retry, atomic consumption, expiry, 
     }
     const v = await f.vacancy();
     for (const action of ['base_letter', `custom:${v.id}`, `custom_ai:${v.id}`]) {
-      assert.match((await f.cb(`job:${action}`, 202)).answer, /владельцу/);
+      assert.match((await f.cb(`job:${action}`, 202)).answer, /\u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u0435\u043d|\u0440\u0430\u0437\u0440\u0435\u0448\u0435\u043d/iu);
       assert.match((await f.cb(`job:${action}`, 101, -100, 'group')).answer, /личном/);
       assert.match((await f.cb(`job:${action}`, 101, 999)).answer, /личном/);
       await f.cb(`job:${action}`);

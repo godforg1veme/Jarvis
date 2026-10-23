@@ -2,13 +2,13 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { loadConfig } = require('../src/config/loadConfig');
 
-test('job search is disabled by default with isolated model and agreed schedule', () => {
+test('job search is disabled by default without a separate model setting', () => {
   const config = loadConfig({ NODE_ENV: 'test' });
   assert.equal(config.jobSearchEnabled, false);
   assert.equal(config.jobCollectorIntervalMs, 1800000);
   assert.equal(config.jobHistoryDays, 14);
   assert.equal(config.jobBudgetUsd, 3);
-  assert.equal(config.jobSearchModel, '');
+  assert.equal(Object.hasOwn(config,'jobSearchModel'),false);
 });
 
 test('job configuration validates interval, budget, public origin and encryption key', () => {
@@ -19,6 +19,6 @@ test('job configuration validates interval, budget, public origin and encryption
   ]) assert.throws(() => loadConfig({ NODE_ENV: 'test', ...env }));
   const config = loadConfig({ NODE_ENV: 'test', JARVIS_JOB_SEARCH_ENABLED: 'true',
     JARVIS_JOB_MODEL: 'candidate-model', JARVIS_JOB_SECRET_KEY: '01'.repeat(32) });
-  assert.equal(config.jobSearchModel, 'candidate-model');
+  assert.equal(Object.hasOwn(config,'jobSearchModel'),false);
   assert.equal(config.jobSearchEnabled, true);
 });

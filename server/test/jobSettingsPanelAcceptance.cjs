@@ -5,7 +5,6 @@ const {KINDS,validateContext}=require('../src/telegram/telegramInteractionReposi
 
 async function fixture() {
   const f=await historyFixture(); let update=50000;
-  f.runtime.telegramService.settingsModels=['fixture/default','fixture/fallback'];
   const search=()=>f.runtime.telegramService.searchRepository.getSettings({userId:f.owner});
   const msg=(text,from=101,chat=from,type='private')=>f.messages.handle({update_id:++update,message:{message_id:update,from:{id:from},chat:{id:chat,type},text}});
   const active=async()=>(await f.runtime.telegramService.interactions.getActive(f.scope)).interaction;
@@ -17,7 +16,8 @@ const saveButton=v=>v.buttons.flat().find(b=>b.data?.startsWith('job:cfg_ok:')).
 test('real panel emits clickable settings and bounded pages without starting input or external work',async()=>{
   const f=await fixture();try{
     const panel=await f.cb('job:settings');assert.match(panel.answer,/Настройки поиска/);assert.equal(await f.active(),null);
-    assert.equal(panel.buttons.length,10);assert.ok(!panel.answer.includes('AI Engineer'));
+    assert.equal(panel.buttons.length,9);assert.ok(!panel.answer.includes('AI Engineer'));
+    assert.ok(!panel.buttons.flat().some(b=>/Модель|model/.test(b.text+' '+b.data)));
     for(const [field,def] of Object.entries(fields)) {
       const button=panel.buttons.flat().find(b=>b.data?.startsWith(`job:cfg:${field}:`));assert.ok(button,def.label);
       const view=await f.cb(button.data);assert.ok(view.buttons.length);
@@ -43,17 +43,19 @@ test('real presets and all custom scalar values save only after one scoped confi
       assert.match((await f.cb(saveButton(preview))).answer,/недоступно/);
       const current=await f.search();assert.match((await f.cb(`job:cfg_pick:${field}:${current.revision}:${index}`)).answer,/уже установлено/);
     }
-    for(const [field,text,expected] of [['salary','120 500',120500],['city','Казань','Казань'],['interval','45',2700000],['history','10',10],['budget','2,5',2.5],['model','fixture/custom','fixture/custom']]) {
+    for(const [field,text,expected] of [['salary','120 500',120500],['city','Казань','Казань'],['interval','45',2700000],['history','10',10],['budget','2,5',2.5]]) {
       const before=await f.search();await f.cb(`job:cfg_input:${field}:${before.revision}:0`);
       const pending=await f.active();assert.equal(pending.kind,'job_setting_value');
       if(field==='interval') {await f.msg('0');assert.equal((await f.active()).id,pending.id);}
       const preview=await f.msg(text);assert.equal(await f.active(),null);assert.deepEqual((await f.search()).settings,before.settings);
       await f.cb(saveButton(preview));assert.equal((await f.search()).settings[fields[field].key],expected);
     }
-    const s=await f.search();const view=await f.cb(`job:cfg:model:${s.revision}:0`);assert.match(view.answer,/fixture\/custom/);
-    const configured=view.buttons.flat().find(b=>b.text==='fixture/default');assert.ok(configured);assert.ok(!configured.data.includes('fixture'));
-    await f.cb(saveButton(await f.cb(configured.data)));assert.equal((await f.search()).settings.model,'fixture/default');
-    const selected=await f.search();const inherited=await f.cb(`job:cfg_pick:model:${selected.revision}:0`);await f.cb(saveButton(inherited));assert.equal((await f.search()).settings.model,'');
+    const s=await f.search();assert.equal(Object.hasOwn(s.settings,'model'),false);
+    for(const action of ['cfg','cfg_input','cfg_pick']) {
+      await f.cb(`job:${action}:model:${s.revision}:0`);
+      assert.equal(await f.active(),null);
+      assert.deepEqual((await f.search()).settings,s.settings);
+    }
     assert.equal(f.modelCalls,0);assert.equal(f.reads,0);assert.equal(f.submits,0);
   }finally{await f.close();}
 });

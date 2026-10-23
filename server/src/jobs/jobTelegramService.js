@@ -27,7 +27,7 @@ function publicJobFailure(error) {
     JOB_LOGIN_RESUME_INVALID: 'Выбранное резюме больше недоступно в твоём HH. Обнови список.',
     JOB_SEARCH_QUERIES_REQUIRED: 'Сначала добавь поисковые запросы: «Настройки → Поисковые запросы → Добавить». Пришли фразы одним сообщением, каждую с новой строки. Затем включи поиск.',
     JOB_PROFILE_UNCONFIRMED: 'Сначала проверь и подтверди профиль фактов в настройках поиска работы.',
-    JOB_MODEL_NOT_CONFIGURED: 'Для писем нужно выбрать модель поиска работы и настроить OpenRouter.',
+    JOB_MODEL_NOT_CONFIGURED: 'Автоматическая генерация писем ещё не настроена на сервере.',
     JOB_MODEL_UNAVAILABLE: 'Модель сейчас недоступна. Предыдущий черновик сохранён.',
     JOB_MODEL_INVALID_OUTPUT: 'Ответ модели не прошёл проверку. Предыдущий черновик сохранён.',
     JOB_MODEL_INVALID_FACTS: 'Модель использовала неподтверждённые сведения. Письмо не принято.',
@@ -187,7 +187,7 @@ ${profile.profile.facts.map((x) => x.text).join('\n')}
         const summary = kind === 'profile' ? `Факты:\n${parsed.facts.map((x) => x.text).join('\n') || 'пока нет'}\n\nПримеры стиля:\n${parsed.examples.map((x, index) => `${index + 1}. ${x}`).join('\n\n') || 'пока нет'}`
           : `Ориентир: ${parsed.targetRub} ₽; город: ${parsed.officeCity}; удалёнка: ${parsed.remote ? 'да' : 'нет'}.
 Интервал: ${parsed.intervalMs / 60000} мин; история: ${parsed.historyDays} дней.
-Модель: ${parsed.model || this.defaultModel || 'не выбрана'}; уведомление: $${parsed.budgetUsd}.
+Уведомление: $${parsed.budgetUsd}.
 Запросы: ${parsed.queries.join('; ')}\nИсключения: ${parsed.exclusions.join('; ') || 'нет'}.
 Поиск ${parsed.activated ? 'включён' : 'не включён'}; ${parsed.paused ? 'на паузе' : 'без паузы'}.`;
         return response(`Проверь изменения:\n${summary}\n\nСохранить?`, [[button('Подтвердить', 'approve', confirmation.id), button('Отмена', 'menu')]]);

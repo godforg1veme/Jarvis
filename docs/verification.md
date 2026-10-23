@@ -1,5 +1,24 @@
 # Проверки перед выпуском
 
+## Автоматическая модель писем HH / Automatic HH letter model
+
+Локальная итоговая проверка 23 октября: [результат](updates/2026-10-22-jobs-automatic-model-development.md).
+791/791 server unit, 66/66 Telegram gate и 26 PostgreSQL-сценариев прошли.
+Проверяются автоматическая очередь и стоимость, удаление настройки и старого
+ввода, сохранение фильтров, генерация/подтверждение письма и регрессии истории.
+
+Final local checks, October 23: [results](updates/2026-10-22-jobs-automatic-model-development.md).
+791/791 server unit, 66/66 Telegram gate and 26 PostgreSQL scenarios passed.
+Coverage includes automatic routing and usage, obsolete input/preference removal,
+retained filters, letter generation/send confirmation and history regressions.
+
+```powershell
+npm test --prefix server
+# Isolated test PostgreSQL only.
+npm run test:jobs:settings --prefix server
+node --test server/test/jobDraftAcceptance.cjs server/test/jobLetterModesAcceptance.cjs server/test/jobTelegramAcceptance.cjs
+```
+
 ## Почасовая история HH / Hourly HH history
 
 Выпуск 22 октября:
