@@ -25,6 +25,14 @@ Electron, устройств или VPS; эти результаты запис�
 
 ## Внутренние экраны Mini App / Mini App interiors
 
+Текущий результат: [выпуск 23 октября](updates/2026-10-23-mini-app-orbital-release.md).
+Изменения установлены на DE; Windows, GitHub и оба VPS source сверены.
+Живые Telegram/телефон/HH-сценарии остаются отдельным принятием.
+
+Current result: [October 23 release](updates/2026-10-23-mini-app-orbital-release.md).
+Deployed to DE; Windows, GitHub and both VPS sources match.
+Live Telegram/phone/HH scenarios remain separate acceptance checks.
+
 Локальный этап 23 октября: [результат и таблица покрытия](updates/2026-10-23-mini-app-interiors-development.md).
 `testMiniAppInteriors.cjs` проверяет production assets на 320/390/844/1280 px:
 диалог, карточки четырёх личных разделов, информационные VPN/Operations,

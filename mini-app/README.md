@@ -4,23 +4,17 @@
 
 ## Русский
 
-23 октября эти UX/UI-изменения выпущены на DE, исходники синхронизированы с обоими VPS. [Результат выпуска](../docs/updates/2026-10-23-mini-app-orbital-release.md) обновляет статус локальных этапов ниже.
+23 октября на DE выпущены орбитальное оформление и единый дизайн внутренних
+экранов: диалог, память, документы, устройства, Life OS, управление доступом
+и Jarvis-экраны HH. Планеты и Млечный Путь соответствуют дашборду; планеты
+движутся по орбитам. Исправлены возврат, история переходов, повтор чтения
+и сохранение черновика диалога. Убраны плашка имени/Telegram ID и постоянные
+служебные подписи. Исходники Windows и обоих VPS синхронизированы с GitHub.
+[Результат выпуска и оставшиеся проверки](../docs/updates/2026-10-23-mini-app-orbital-release.md).
 
-23 октября локально завершён единый дизайн внутренних экранов: диалог, личные
-карточки, пользователи/роли/подтверждения и все Jarvis-экраны HH. Проверены
-обычные, пустые, ошибочные и неизвестные состояния. Выпуск ещё не выполнялся.
-[Результат и покрытие](../docs/updates/2026-10-23-mini-app-interiors-development.md).
-
-23 октября локально реализовано орбитальное оформление: графитовые планеты и
-Млечный Путь как в дашборде, движение по орбитам, поиск, список и рабочая панель.
-Сохранены исправления навигации, права, черновики и подтверждения. Выпуск
-на VPS ещё не выполнялся. [Результат и проверки](../docs/updates/2026-10-23-mini-app-orbital-development.md).
-
-23 октября локально исправлена навигация личных разделов: возврат на главную,
-история переходов и перезагрузка. Добавлены сообщения для пустых списков и
-повтор чтения после ошибки; устранена двойная загрузка диалога. Орбитальное
-оформление пока не реализовано, выпуск этих UX-правок ещё не выполнялся.
-[Изменения и проверки](../docs/updates/2026-10-23-mini-app-ux-development.md).
+Материалы разработки: [UX](../docs/updates/2026-10-23-mini-app-ux-development.md),
+[орбиты](../docs/updates/2026-10-23-mini-app-orbital-development.md),
+[внутренние экраны](../docs/updates/2026-10-23-mini-app-interiors-development.md).
 
 На DE выпущено изменение от 22 октября: новые и ранее подключённые
 резюме получают автоподнятие по умолчанию, если нет явного off или unknown.
@@ -140,23 +134,17 @@ Mini App build и Edge fixtures. Команды и границы проверо
 
 ## English
 
-On October 23, these UX/UI changes were deployed to DE and source was synchronized with both VPS nodes. The [release record](../docs/updates/2026-10-23-mini-app-orbital-release.md) supersedes the local-stage status below.
+On October 23, the orbital UI and shared interior design were deployed to DE:
+chat, memory, documents, devices, Life OS, access administration and Jarvis-owned
+HH screens. Planets and the Milky Way follow the dashboard, with planets moving
+along their orbits. Return navigation, browser history, read retries and chat
+draft retention were fixed. The name/Telegram ID badge and persistent system
+captions were removed. Windows and both VPS sources match GitHub.
+[Release results and remaining checks](../docs/updates/2026-10-23-mini-app-orbital-release.md).
 
-October 23, local development: the shared design now covers chat, personal
-cards, people/roles/confirmations and all Jarvis-owned HH surfaces. Normal,
-empty, error and unknown states were checked. This is not deployed yet.
-[Results and coverage](../docs/updates/2026-10-23-mini-app-interiors-development.md).
-
-October 23, local development: the orbital UI uses the dashboard's graphite
-planets and Milky Way, with orbital motion, search, a section list and workspace.
-Navigation fixes, rights, drafts and confirmations are preserved. This UI has
-not been deployed. [Results and verification](../docs/updates/2026-10-23-mini-app-orbital-development.md).
-
-October 23, local development: personal sections now support Home navigation,
-browser history and reload. Empty lists explain their state, failed reads can
-be retried, and opening chat no longer loads history twice. The orbital design
-is not implemented yet; these UX changes have not been deployed.
-[Changes and verification](../docs/updates/2026-10-23-mini-app-ux-development.md).
+Development records: [UX](../docs/updates/2026-10-23-mini-app-ux-development.md),
+[orbits](../docs/updates/2026-10-23-mini-app-orbital-development.md),
+[interior screens](../docs/updates/2026-10-23-mini-app-interiors-development.md).
 
 Deployed on DE on October 22: new and existing connected resumes get default
 automatic raising unless an explicit off or unknown stop applies. Settings
