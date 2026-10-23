@@ -12,7 +12,7 @@ function documentedRows(contract, column, jobSearchEnabled) {
   assert.equal(rows.length, 5, 'document the four base rows and the conditional job row');
   return rows.filter((line) => jobSearchEnabled || !line.startsWith('| 5 |')).map((line) => {
     const cell = line.split('|')[column].trim();
-    return cell === 'absent' ? null : cell.split(', ').map((label) => label.replaceAll('`', ''));
+    return cell === 'absent' ? null : [...cell.matchAll(/`([^`]+)`/g)].map((match) => match[1]);
   }).filter(Boolean);
 }
 
@@ -36,7 +36,7 @@ test('agents and status index link the architecture and menu authorities', () =>
   const menu = read('docs/telegram-menu-contract.md');
   for (const name of ['telegram-button-architecture.md', 'telegram-menu-contract.md']) {
     assert.ok(agents.includes(`docs/${name}`));
-    assert.ok(index.includes(`| \`${name}\` |`));
+    assert.ok(index.includes(`](${name})`), `status index links ${name}`);
   }
   assert.equal(rootAgents, agents, 'the only authoritative agent guide must live at the repository root');
   assert.doesNotMatch(rootAgents, /jarvis\/AGENTS\.md/);
