@@ -4,7 +4,7 @@
 
 ## Русский
 
-23 октября выпущено [исправление движения](../docs/updates/2026-10-23-mini-app-motion-fix.md): «Продолжить» явно запускает орбиты при reduced motion, возврат из раздела не удерживает паузу. Настройки скорости/сброса удалены.
+23 октября выпущено [движение по умолчанию](../docs/updates/2026-10-23-mini-app-auto-motion.md): кнопка паузы удалена, орбиты и фон запускаются автоматически, включая системный reduced motion и перезагрузку.
 
 23 октября на DE выпущены орбитальное оформление и единый дизайн внутренних
 экранов: диалог, память, документы, устройства, Life OS, управление доступом
@@ -136,7 +136,7 @@ Mini App build и Edge fixtures. Команды и границы проверо
 
 ## English
 
-On October 23, the [motion repair](../docs/updates/2026-10-23-mini-app-motion-fix.md) was deployed: explicit Resume starts orbits under reduced motion, and returning from a section does not retain pause. Speed/reset settings were removed.
+On October 23, [automatic motion](../docs/updates/2026-10-23-mini-app-auto-motion.md) was deployed: the pause button is removed, and orbits and sky start automatically, including under system reduced motion and after reload.
 
 On October 23, the orbital UI and shared interior design were deployed to DE:
 chat, memory, documents, devices, Life OS, access administration and Jarvis-owned
