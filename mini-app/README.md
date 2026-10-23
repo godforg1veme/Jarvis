@@ -4,6 +4,8 @@
 
 ## Русский
 
+23 октября выпущено [исправление движения](../docs/updates/2026-10-23-mini-app-motion-fix.md): «Продолжить» явно запускает орбиты при reduced motion, возврат из раздела не удерживает паузу. Настройки скорости/сброса удалены.
+
 23 октября на DE выпущены орбитальное оформление и единый дизайн внутренних
 экранов: диалог, память, документы, устройства, Life OS, управление доступом
 и Jarvis-экраны HH. Планеты и Млечный Путь соответствуют дашборду; планеты
@@ -133,6 +135,8 @@ Mini App build и Edge fixtures. Команды и границы проверо
 [результат](../docs/updates/2026-10-18-telegram-mini-app-release.md).
 
 ## English
+
+On October 23, the [motion repair](../docs/updates/2026-10-23-mini-app-motion-fix.md) was deployed: explicit Resume starts orbits under reduced motion, and returning from a section does not retain pause. Speed/reset settings were removed.
 
 On October 23, the orbital UI and shared interior design were deployed to DE:
 chat, memory, documents, devices, Life OS, access administration and Jarvis-owned
