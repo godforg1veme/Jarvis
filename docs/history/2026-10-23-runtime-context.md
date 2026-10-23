@@ -1,0 +1,724 @@
+# Архитектура и подробности развёртывания
+
+Архив структуры документа на 23 октября 2026 года до уплотнения.
+Актуальный источник: [docs/runtime-context.md](../runtime-context.md). Датированные результаты ниже
+не являются повторной проверкой текущего окружения; поздние записи имеют приоритет.
+
+Archived layout as of October 23, 2026, before consolidation.
+Current source: [docs/runtime-context.md](../runtime-context.md). Dated results below are historical
+evidence, not a fresh environment check; later records take precedence.
+
+Корневой [AGENTS.md](../../AGENTS.md) задаёт обязательные правила. Здесь сохранены подробности подсистем и датированные результаты. Читай нужный раздел по задаче; текущий статус сверяй с [картой документации](../README.md) и живой системой.
+
+## Time display and input / Отображение и ввод времени
+
+Пользовательские даты и часы используют фиксированный МСК UTC+3 (`Etc/GMT-3`),
+независимо от зоны сервера или устройства, включая исторические даты.
+`shared/time.js` — общий форматтер, строгий parser напоминаний и `moscowIso`.
+Ввод без пояса означает +03:00; явные Z/offset сохраняют абсолютный момент.
+Неверная дата проверяется до consumption пошагового ввода. Доверенное время
+для модели формирует сервер. UTC хранения и wire timestamps не меняются;
+старые напоминания не исправляются массовым сдвигом.
+[Результат выпуска и проверки](../updates/2026-10-19-moscow-time-release.md).
+
+User-facing dates and clocks use fixed Moscow UTC+3 (`Etc/GMT-3`), independent
+of server/device timezone, including historical dates. `shared/time.js` provides
+the shared formatter, strict reminder parser and `moscowIso`. Zone-less input
+means +03:00; explicit Z/offset preserves its instant. Invalid dates are rejected
+before guided-input consumption. The server supplies the trusted model clock.
+Storage UTC and wire timestamps remain canonical; existing reminders are never
+bulk shifted. [Release and verification](../updates/2026-10-19-moscow-time-release.md).
+
+## Product
+
+Jarvis is a hybrid personal and family AI-assistant platform:
+
+- the always-on cloud control plane owns identity, conversations,
+  memory/knowledge retrieval, model routing, Telegram access, and device
+  orchestration;
+- the Electron application is the Windows client and execution edge for local
+  voice, apps, files, windows, and approved remote actions;
+- Telegram is the first cloud client, not the whole product;
+- Telegram Mini App adds a Three.js interface, private chat and access administration;
+- PWA remains planned. Server ASR is deployed as a private GigaAM
+  `v3_e2e_rnnt` ONNX worker on DE-4. Allowlisted Telegram `voice` notes route
+  through it, persist only a `voice_transcript`, and retain no raw audio.
+  The deployed synthetic OGG service-to-worker contract and a real inbound
+  owner Telegram voice were verified on 2026-09-23; paired-Desktop voice remains
+  a manual client acceptance check. Telegram `audio` and other media retain attachment
+  ingestion. The first camera/screen
+  Vision vertical slice is implemented locally and in the control plane: explicit
+  local leases, Camo-compatible camera discovery, a two-display workspace,
+  change-filtered temporal sampling, bounded Scene State, provider-neutral
+  analysis, encrypted owner-scoped visual memory, and remote
+  observation through an already active lease. Real two-display capture is
+  verified, including a live Camo 1280x720 frame on 2026-09-09; deployed-provider
+  acceptance remains unfinished. Semantic
+  retrieval and the confirmed remote-command path are implemented. Production
+  embeddings and single-device Desktop/Telegram-origin confirmation were
+  verified live on 2026-09-02; live multi-device acceptance remains unfinished.
+
+The short product model is: **cloud brain and memory, local hands on devices**.
+See `docs/README.md` for current implementation status and historical records.
+
+## Current Architecture
+
+### Audit remediation, 17 October 2026
+
+These changes are deployed; the [release record](../updates/2026-10-17-audit-remediation-release.md)
+tracks verification and client checks separately. `server/src/lifecycle.js` stops
+worker admission/timers synchronously and drains admitted tasks before the pool.
+All resources are attempted within one eight-second shutdown budget; a timeout
+does not cancel an external mutation or authorize replay. Jobs and Operations
+share the same deadline. Host Agent housekeeping expires only explicitly read-only
+responses; changing and unclassified claims remain durable.
+
+Rate-limit and Vision stores sweep expired records incrementally, with default
+caps of 10,000 rate keys, 1,000 leases and 256 capture requests per lease. Full
+stores reject admission without evicting live counters or replay guards. Telegram
+document downloads enforce the byte limit while streaming and one 30-second
+deadline across metadata, fetch and body reads.
+
+### Job search
+
+#### HH: состояние на 22 октября / State on October 22
+
+23 октября выпущен [автоматический выбор модели писем](../updates/2026-10-23-jobs-automatic-model-release.md).
+Ручная настройка и отдельная job-model переменная удалены; применяется общая
+очередь проверенных бесплатных моделей и настроенный платный резерв.
+На DE обновлены server/collector, применена 045, источники обоих VPS совпадают.
+
+October 23: [automatic letter-model selection](../updates/2026-10-23-jobs-automatic-model-release.md)
+is deployed. Manual selection and the separate job-model setting are removed;
+letters use verified free models and configured paid fallback. DE server/collector
+and migration 045 are updated; both VPS source checkouts match.
+
+Выпущено [почасовое обновление полной истории HH](../updates/2026-10-22-hh-history-hourly-release.md)
+для всех подключённых пользователей с действующим `jobs`, независимо от поиска
+вакансий. Migration 044 хранит раздел, исходную дату и доказательство полного
+обхода; бот отличает архивные и неподтверждённые приглашения. На DE обновлены
+server/browser, источники обоих VPS синхронизированы.
+
+[Hourly full HH history refresh](../updates/2026-10-22-hh-history-hourly-release.md)
+is deployed for every eligible connected user, independently of vacancy search.
+Migration 044 stores section, original date and full-pass proof; the bot labels
+archived and unconfirmed invitations. DE server/browser are updated and both
+VPS source checkouts are synchronized.
+
+Личный вход использует временную HTTPS-ссылку, доставленную в личный Telegram
+текстом и кнопкой; страница поддерживает нажатия и клавиатуру телефона.
+После подключения список собственных резюме доступен постоянно в Mini App
+и кнопках бота. Обновление каталога идёт по запросу и в фоне раз в 15 минут.
+Смена основного резюме требует подтверждения и отменяет прежние подтверждения
+откликов. Бесплатное поднятие одного основного резюме включено по умолчанию,
+не чаще раза в четыре часа и только при доступной кнопке HH; явный off и
+остановка после unknown сохраняются. Unknown сверяется по исходной операции,
+без повторного POST. Реальный вход участника и первое успешное поднятие ещё
+требуют клиентской приёмки.
+
+Миграции 040–043 добавляют доставку ссылки, каталог и операции резюме,
+личное предпочтение автоподнятия и confirmation kind `resume` в боте.
+`JARVIS_JOB_BROWSER_CONNECT_TOKEN` даёт временный вход и выбор резюме;
+отдельный `JARVIS_JOB_BROWSER_RESUME_TOKEN` разрешает бесплатное поднятие.
+Оба credentials доступны только server/browser; сборщик их не получает.
+Профили изолированы по UUID, текущее право `jobs` проверяется и в фоновых задачах.
+[Вход и мобильный ввод](../updates/2026-10-21-hh-login-touch-release.md),
+[резюме и текущая политика](../updates/2026-10-22-hh-resume-bot-defaults-release.md).
+Датированные результаты ниже сохраняют историю прежних этапов.
+
+Personal sign-in uses a temporary HTTPS link delivered as private Telegram text
+and a button; the page supports taps and the phone keyboard. After connection,
+the personal resume list stays available in Mini App and bot buttons. The catalog
+refreshes on request and every 15 minutes in the background. Changing primary
+requires confirmation and invalidates previous application approvals. Free raising
+of one primary is enabled by default, at most every four hours and only when HH's
+button is available; explicit off choices and unknown-result stops are preserved.
+Unknown outcomes are checked by the original operation without another POST.
+Real member sign-in and the first successful raise still need client acceptance.
+
+Migrations 040–043 add link delivery, resume catalog and operations, personal
+raising preferences and the bot's `resume` confirmation kind.
+`JARVIS_JOB_BROWSER_CONNECT_TOKEN` grants temporary login and resume selection;
+the separate `JARVIS_JOB_BROWSER_RESUME_TOKEN` permits free raising. Only
+server/browser hold these credentials; the collector receives neither. Profiles
+are UUID-isolated, with current `jobs` access checked for background work too.
+[Sign-in and phone input](../updates/2026-10-21-hh-login-touch-release.md),
+[resumes and current policy](../updates/2026-10-22-hh-resume-bot-defaults-release.md).
+The dated results below preserve earlier stages.
+
+[Исследование 403](../updates/2026-10-18-hh-captcha-403-investigation.md): native XHR
+и browser/API cookies проверены с отменой answer POST. На DE включён ограниченный
+классификатор ошибок HH и закрытые timing/request fields; причина прежнего 403
+ещё не доказана, unknown не повторяется. Linux browser 71/71. Одобренный тест
+в 18:37 МСК снова дал 403/unknown, CSRF совпал с cookie, `body_unavailable`;
+точная причина отказа и ограничение, исключившее тело, остаются неизвестны.
+Read-only запросы публичного HH API с Windows и DE вернули 403 от ddos-guard;
+сильная гипотеза — отказ сетевого слоя. [Материалы и границы вывода](../updates/2026-10-18-hh-captcha-403-investigation.md).
+
+[Живой тест 18 октября, 16:46 МСК](../updates/2026-10-18-hh-ocr-live-acceptance.md):
+ответ установленной OCR-модели после отдельного одобрения владельца отправлен
+один раз; POST 302 / target GET 200 / solved, сбор возобновился с progress.
+Это не приёмка полностью автономного цикла; старый unknown не воспроизвёлся.
+
+Квитанция всех CAPTCHA-отправок сохраняется в owner-bound manual state,
+экспортируется локально через `exportCaptchaReceipt.js`, без ручного текста.
+[Разбор unknown и выпуск](../updates/2026-10-18-hh-captcha-receipt-diagnosis.md)
+разделяет потерянные сведения прошлой отправки и готовую диагностику следующей.
+
+[Приватный архив автоматических попыток](../updates/2026-10-18-hh-captcha-evidence.md)
+установлен на DE: PNG, валидный ответ и закрытый receipt в owner-bound profile,
+TTL 48 часов / максимум 64 записи. Архив доступен только локальному CLI;
+публичные diagnostics и ручной Telegram reply не содержат этих данных.
+
+Установлено на DE 18 октября 2026: включён отдельный opt-in дообученной
+модели `hh-ru-captcha` с исходным выпрямлением, frozen selection и rescue.
+`JARVIS_HH_CAPTCHA_AUTOMATIC=1` разрешает до трёх durable попыток перед прежним
+Telegram фото. Unknown/перезапуск незавершённой отправки останавливает автоматику;
+успех требует прежнего verifier. `/ocr/frozen` исключает подмену общим OCR.
+Код опубликован, веса и приватные примеры не входят в Git. Linux build, права
+сокета, ресурсные ограничения и изолированные проверки прошли. При первой живой
+попытке доступ не подтвердился: budget остановлен после unknown, фото отправлено
+в Telegram; collector остаётся на attention с сохранённым progress.
+[Результат выпуска и ограничения](../updates/2026-10-18-hh-trained-ocr-release.md).
+[Увеличение лимита до трёх](../updates/2026-10-18-hh-captcha-three-attempts-development.md)
+установлено отдельно; уже переданные человеку капчи остаются в ручном режиме.
+
+Выпущен на DE 15 октября 2026: домен `server/src/jobs`, существующий Telegram
+и PostgreSQL, отдельные collector и Chromium browser. Browser владеет приватной
+HH-сессией, узкий RPC привязан к одному owner UUID; read/apply credentials
+разделены. Сбор детерминированный, модель вызывается по кнопке, отправка требует
+подтверждения точного письма и durable intent. Unknown проверяется по исходной
+операции без повторного POST. Стоп-лист работодателей сохраняется.
+Поиск включён; live submit ещё не проверен и требует подтверждения владельца.
+[Результат выпуска и ограничения](../updates/2026-10-15-job-search-release.md),
+[настройка браузера](../../job-browser/README.md).
+
+19 октября 2026 личный вход HH для участников с правом `jobs` опубликован
+и установлен на DE из `35a340a19a31056e029b780bbde0c8342a5f8cb6`.
+Mini App выдаёт короткоживущую HTTPS-ссылку для телефона или ПК; Chromium
+использует отдельный профиль участника по UUID. После входа пользователь
+возвращается в исходную Mini App и подтверждает резюме. Одноразовая ссылка
+обменивается на HttpOnly guest cookie, а connect RPC использует отдельный
+секрет. Ввод проходит в памяти и не сохраняется в БД, файлы, Telegram или логи.
+Миграция 039 применена, исходники обоих VPS синхронизированы. Реальный вход HH
+и подтверждение резюме участником ещё требуют проверки.
+[Результат выпуска](../updates/2026-10-19-member-hh-login-release.md),
+[запись разработки](../updates/2026-10-19-job-search-member-access-development.md).
+
+On October 19, 2026, personal HH sign-in for members with `jobs` permission was
+published and deployed on DE from `35a340a19a31056e029b780bbde0c8342a5f8cb6`.
+The Mini App issues a short-lived HTTPS link for a phone or PC; Chromium uses a
+UUID-scoped profile separate from the owner profile. After signing in, the
+member returns to the originating Mini App to confirm a resume. The one-time
+link exchanges for an HttpOnly guest cookie, and connect RPC uses a separate
+credential. Input passes through memory and is not saved to the database,
+files, Telegram or logs. Migration 039 is applied, and both VPS source checkouts
+are synchronized. A real HH sign-in and resume confirmation still need
+acceptance. See the [release record](../updates/2026-10-19-member-hh-login-release.md)
+and [development record](../updates/2026-10-19-job-search-member-access-development.md).
+
+Для CAPTCHA на DE установлен человеческий ответ через Telegram: headless browser
+держит один прежний HH profile, coordinator и durable claims. Закрытый broker8082
+использует отдельный CAPTCHA credential только у server/browser. Collector
+имеет read credential и проверяет паузу без обращений к HH. Host ports отсутствуют.
+
+Фото содержит только CAPTCHA PNG. Reply привязан к owner/private conversation,
+chat, message ID, challenge/revision и сроку картинки. Ответ расходуется атомарно
+перед единственным native POST; текст не проходит через AI/history/memory.
+После read-only проверки точного target обычный поиск продолжает progress.
+Unknown/replay и старые картинки не разрешают повторную отправку ответа.
+[Согласованный контракт](../superpowers/specs/2026-10-16-hh-telegram-captcha-design.md).
+
+Без нового automatic opt-in Telegram режим сразу передаёт CAPTCHA человеку.
+Прежний общий networkless `job-ocr`
+с UNIX socket сохранён для отдельного opt-in fallback при выключенном Telegram
+режиме. Journal/profile/resume/exclusions не сбрасываются. История OCR и прежнего
+[ручного web-доступа](../updates/2026-10-16-hh-mobile-manual-release.md) сохранена;
+HH gateway/noVNC/Serve link и host proxy удалены из работающего окружения. Другие
+Tailscale и VPN применения к этому изменению не относятся.
+Server/browser/collector установлены из `b0712e69875adbe62db1892007da65f34d4d636f`.
+16 октября 2026 владелец подтвердил прохождение настоящей CAPTCHA через Telegram.
+Проверка owner-scoped состояния: ответ `solved`, coordinator idle, collector
+с активной lease продолжил прежний progress; доставка выросла с 583 до 602 карточек.
+Сценарий фото → reply → однократная отправка → проверка HH → продолжение принят.
+[Результат установки](../updates/2026-10-16-hh-telegram-captcha.md).
+
+Позднее 16 октября проверка HH снова остановилась: на DE подтверждён OOM внутри
+browser container при продолжающем успешном HTTP health.
+[Восстановление браузера и очереди установлено](../updates/2026-10-16-hh-captcha-resilience-release.md)
+из `e6fe29a7e3129a34626223df9bd6a1b980da46be`: проверка Chromium, замена вкладки,
+durable refresh, bounded retries и owner-scoped уведомления. Migration 033 применена.
+Новая картинка получила binding, ответ `solved`; coordinator idle, collector
+продолжил прежний progress. Профиль, настройки и смонтированные секреты сохранены.
+
+### OpenRouter model routing
+
+`server/src/providers/freeFirstProvider.js` is the opt-in primary text router;
+`openRouterCatalog.js` bounds and caches the account-filtered model catalog.
+`JARVIS_OPENROUTER_FREE_FIRST` defaults to false. The approved free order is
+fixed; primary/fallback OpenRouter model IDs form the paid pool. This mode uses
+the primary key for the entire queue, without continuing to legacy account or
+Gemini fallbacks. Explicit job/Vision model selection is independent.
+
+Refresh happens on use after 15 minutes; it updates metadata, not the allowlist.
+Provider price ceilings protect zero-price routing even between refreshes.
+A missing fresh catalog fails closed. Tool-capable requests never retry after
+dispatch; unknown network outcomes do not switch models. Contract, current
+verification and rollout status: [development record](../updates/2026-10-19-free-first-routing-development.md).
+
+### Telegram Mini App and access control
+
+The component contract is maintained in [mini-app/README.md](../../mini-app/README.md).
+The [October 18 handoff](../updates/2026-10-18-mini-app-agent-handoff.md) summarizes
+owner decisions, deployed revisions, checks and unfinished client acceptance.
+
+- `mini-app/` builds explicit static assets served at `/mini/`; its fictional-data
+  preview is excluded from production. Three.js renders locally without a generation API.
+- `server/src/miniApp/` verifies signed Telegram initData, manages revocable hashed
+  sessions and enforces Origin/CSRF. SDK and raw fragment data use the same server
+  validation; SDK failure does not grant access.
+- `server/src/access/` owns roles, personal inherit/allow/deny, revisions and audit.
+  The protected owner derives from `JARVIS_OPERATIONS_OWNER_TELEGRAM_ID`.
+  Administrator status does not confer ownership of another person's private data.
+- Permissions are checked beyond menu visibility: Telegram handlers, Desktop
+  HTTP/WebSocket, model context/dispatch and background Life OS delivery.
+  Disabling the Mini App UI preserves established access restrictions.
+- Migrations 037/038 store access/session data and assistant request receipts;
+  migration 039 stores member HH connection tickets and temporary sessions.
+  Uncertain requests retain their original operation ID for reconciliation.
+  A `jobs` permission does not share the owner's HH browser; profiles are
+  isolated by user UUID, and current access is checked for each action.
+
+### Cloud control plane
+
+- `server/` is a Node.js 20+, CommonJS, Fastify service.
+- `server/src/telegram/` handles allowlisted Telegram users, update
+  deduplication, persistent role-aware bottom navigation, bounded inline
+  controls, PostgreSQL-backed guided text input, and a native hierarchical
+  Life OS control surface covering Mission, Timeline, projects, commitments,
+  proposals, reminders, people/relationships/family grants, modes,
+  preferences, sources, and Context Recovery. Life callbacks use a closed
+  grammar under 64 UTF-8 bytes; guided mutations are owner/conversation/chat
+  scoped, revision-aware, and consumed before execution. Family sharing adds
+  a second explicit confirmation and changing recovery continues through the
+  existing origin-bound proposal path. Migration 019 and this Telegram surface
+  were deployed on 2026-09-15; automated production-image button coverage
+  passed. The real owner read-only Life OS `Миссия` → `Life OS` return path was
+  verified in Telegram Desktop on 2026-09-24; member-specific keyboard and
+  owner-only denial remain manual client acceptance. The same subsystem also
+  provides an owner-scoped paginated gallery that can transiently deliver
+  uploaded documents and readable retained
+  Visual Memory frames before a separate keep/delete choice. Gallery callbacks
+  carry only closed source identifiers and bounded page state; bytes, storage
+  keys, and paths must not enter callbacks or conversation history. Owner-only
+  VPN and Operations entries remain authorization-checked on every action; menu
+  labels are presentation, not authority. Telegram update diagnostics may
+  retain only a closed update kind, outcome, and failure code; dialogue text,
+  callback payloads, exception details, and credentials are forbidden in update
+  diagnostics and Operations logs. Navigation, migration 015, the VPN
+  owner-context fix, and the memory gallery were deployed on 2026-09-14; live
+  owner/member media and deletion acceptance remains manual.
+- PostgreSQL with pgvector is the source of truth for cloud identity,
+  conversations, memory, private document metadata/chunks, and device domains.
+- `server/src/prompts/` builds the versioned Jarvis persona and keeps trusted
+  policy separate from user-controlled content.
+- `server/src/assistant/` invokes a provider and validates policy-sensitive
+  output with at most one corrective retry.
+- `server/src/orchestrator/` owns versioned action manifests, executor routing,
+  owner-scoped workflows, strict tool planning, bounded continuation, and
+  asynchronous result delivery. Desktop is the first executor; future server
+  workers and account connectors must implement the same registry contract.
+- `server/src/providers/` contains OpenAI-compatible and fallback adapters.
+  Provider/model selection is configuration, not Jarvis identity.
+- `server/src/knowledge/` owns owner-scoped attachment storage, bounded ingest
+  jobs, text/metadata retrieval, and citations. Never treat document content as
+  trusted instructions or expose the private storage volume.
+- `server/src/life/` owns the owner-scoped Life OS Event Spine, bounded reply
+  context, areas, projects, typed links, commitments, reminders, people,
+  explicit family grants, modes, inspectable preferences, explainable priority,
+  proposals/evidence, Timeline, recovery plans, bounded proactivity, and the
+  provider-neutral Life Source Adapter contract. The eight current external
+  adapters are fixture-only until a real provider is explicitly configured.
+  Source adapters may store only safe summaries and identifiers; raw audio,
+  images, OCR, document bodies, local paths, storage keys, credentials, and
+  provider cursors in public output are forbidden by schema.
+  Life OS v2 migrations 016–018 and the server runtime were deployed on
+  2026-09-15. The exact Russian phrase completed the isolated real-PostgreSQL
+  cycle through Action Orchestrator and the real Tool Gateway contract exactly
+  once; its verified workflow completed the linked proposal and commitment and
+  appeared in Timeline/Context Recovery. Authenticated read-only Desktop
+  bootstrap/Mission Control/Timeline requests, Compose health, and public smoke
+  also passed. The native Telegram Life OS control surface was deployed later
+  the same day; live external providers, member-client taps, and interactive
+  changing recovery on a paired Desktop remain manual acceptance. The real
+  owner read-only Mission → Life OS return path passed on 2026-09-24; see
+  `docs/updates/2026-09-23-telegram-dialogue-acceptance.md`.
+- The deployed text model is currently configured through OpenRouter. Do not
+  hard-code a provider or model into product behavior.
+
+### Windows execution edge
+
+Выпущенные изменения 20 октября: HTTP helper ограничивает полный запрос Desktop
+120 секундами и обычный JSON 2 МиБ. Чтение Visual Memory имеет отдельный предел,
+который сохраняет допустимый кадр 8 МиБ в base64 плюс 256 КиБ метаданных.
+Идентификатор text/voice сохраняется до POST через `runtimeDataPath.js` в
+`data/cloud-outbound-requests.json`; текст, аудио и ответ туда не записываются.
+Удаление записи происходит после показа ответа renderer. Неизвестный результат
+проверяется GET `/v1/desktop/requests/:clientMessageId` по user/device scope
+существующей таблицы; действие не повторяется. Сохранённые права источников
+повторно проверяются при чтении результата. Одноразовый VPN-файл не сохраняется
+для такого восстановления. [Результат и ограничения](../updates/2026-10-20-desktop-reliability-release.md).
+
+Released October 20 changes: the HTTP helper bounds the full Desktop request to
+120 seconds and ordinary JSON to 2 MiB. Visual Memory uses a separate bound
+preserving the existing 8 MiB frame in base64 plus 256 KiB of metadata. Text/voice
+IDs are stored before POST through `runtimeDataPath.js` in
+`data/cloud-outbound-requests.json`, without text, audio or response content.
+The renderer acknowledges after display. Unknown results are read through scoped
+GET `/v1/desktop/requests/:clientMessageId` using the existing table, without
+repeating an action. Current source permissions are checked against stored grants.
+One-time VPN files are excluded from recovery. DE server and Desktop are updated;
+direct Windows HTTPS/WSS connectivity remains unavailable, as recorded in the release.
+
+- Target OS: Windows; runtime: Electron + Node.js CommonJS.
+- `main.js` owns Electron lifecycle, tray, shortcuts, windows, and IPC wiring.
+- `preload.js` exposes explicit main-renderer capabilities. The overlay,
+  transcription bar and widget use separate minimal preloads in `desktop/preload/`.
+  Raw `execute-tool`/`confirm-command` handlers are removed; privileged main-window
+  handlers require the exact main webContents and its main frame.
+- `cloud/desktopCloudClient.js` persists command claims before execution. A corrupt,
+  unreadable or unexpectedly replaced journal blocks commands; missing history
+  reports an unknown outcome. Completed result bodies are capped at 100, while
+  original IDs remain as compact claims without an agreed replay expiry.
+- `renderer/` contains the launcher, task UI, voice overlay, and Voice Lab.
+- `renderer/life-os/` is the Desktop-first Mission Control surface. Its preload
+  bridge exposes only bounded Life OS operations; proposal payloads do not
+  expose frozen action arguments or owner identifiers. Local workspace paths
+  remain in `tools/workspaceRegistry.js`; cloud recovery plans refer only to
+  project IDs and opaque resource references, and execute through Tool Gateway.
+- `voice/` owns Desktop microphone capture, the local Vosk wake-word worker,
+  cloud-voice transport, quality monitoring, and calibration. The default
+  family client uses a bundled Node runtime only for the Vosk wake word; legacy
+  `stt_runtime/`/Faster Whisper remains a development-only local subsystem.
+- `tts/` keeps Silero/Piper behind `tts/ttsService.js`.
+- tools/ and actions/ implement bounded local operations. tools/appResolver.js
+  and tools/appIndexer.js index Start Menu and UWP apps with UTF-8 encoding and
+  support Russian inflection/stemming. When local resolution fails or is ambiguous,
+  agents/toolGateway.js falls back to tools/appRecoveryService.js for AI-assisted
+  candidate discovery and ranking, recording confirmed launches in apps.learned.json.
+- `renderer/quantumCore.js` provides procedural 3D WebGL (Three.js r160) avatar
+  («Quantum Holographic Core 2.0»), integrated into Cloud Chat sidebar, floating
+  Voice Overlay, and a dedicated desktop companion widget (`renderer/quantum-widget.*`)
+  with full state/emotion IPC sync.
+- `vision/` owns explicit local Vision Leases, hidden camera capture, protected
+  screen checks, two-display composition, intent routing, and cloud transport.
+  Camera media permission is restricted to the hidden capture renderer. Telegram
+  and future PWA clients may observe only through an already active owner lease;
+  they cannot start, add, or extend local capture sources.
+- `agents/toolGateway.js` is the execution authority for agent-requested OS
+  mutations. `agents/toolPolicy.js` and `agents/toolSchemas.js` are shared
+  policy/validation contracts.
+- `agents/remoteProtocol.js` validates the Desktop WSS wire contract. Pairing,
+  owner-scoped device sessions, presence, confirmed command dispatch, and
+  Tool-Gateway execution are implemented. File search results use local,
+  short-lived opaque candidates before subsequent actions. Production
+  multi-device acceptance and broader client UX remain unfinished.
+- `agent_runtime/` is the existing Python/LangGraph planner for complex local
+  Desktop Agent tasks. It is no longer the only stateful AI-related component
+  in the overall product because the cloud server persists conversations.
+- Writable local state, settings, and generated indexes (`ui-state.local.json`,
+  `history.json`, `settings.json`, `ai-settings.json`, `ai-cache.json`,
+  `app-index.json`, `apps.user.json`, `apps.learned.json`, `file-index.json`,
+  `agent-history.json`) route through the shared
+  `runtimeDataPath.js` policy:
+  when packaged (`app.isPackaged`), they are safely redirected from read-only
+  install folders (`C:\Program Files\...`) to `%APPDATA%\jarvis\data\`
+  (`app.getPath('userData')/data/`). Development continues using repository `data/`.
+  Write operations catch filesystem errors to prevent unhandled `EPERM` crashes.
+
+### Deployment
+
+- `server/src/operations/` owns the owner-only Operations panel, Telegram
+  browser approval, metadata-only family/device administration, telemetry,
+  incidents, and durable fixed service operations. `ops-ui/` is its React/Vite
+  client; `host-agent/` is the Python standard-library Unix-socket execution
+  boundary. The application container has neither a Docker socket nor sudo.
+- Operations checks track actual Telegram poll completion, database migrations,
+  stuck jobs, and a configured primary-model probe. The model probe uses only
+  a synthetic health message and a PostgreSQL-backed six-hour schedule.
+- VPN Supervisor is production-deployed across the DE and NL nodes. Host Agent
+  deterministically classifies one primary cause from the bounded
+  `vpn.health.snapshot`; Jarvis Server cross-validates and debounces it, then an
+  isolated planner may use the configured Jarvis model path with sanitized,
+  bounded node-local logs. One `need_observation` response can trigger exactly
+  one closed read-only `vpn.health.snapshot` against the same node; a changed
+  incident revision, invalid snapshot, or second request stops planning. The
+  response must match a strict seven-field schema and a closed playbook catalog.
+  The running production catalog enables only `restart_xray` and
+  `restart_hysteria2`, only for their matching service-failure incidents with
+  healthy host/network, valid target config, and a healthy opposite stack.
+  A fresh private Telegram owner confirmation is required. Execution rechecks
+  the incident, claims one durable request ID, invokes only the closed restart
+  operation, and verifies both stacks. Uncertain outcomes reconcile by that
+  same ID and are never retried; restore playbooks remain disabled. This
+  real-restart source was deployed on 2026-09-23 with migration 026. A
+  2026-09-24 NL drill exposed that Telegram Supervisor callbacks were routed to
+  DE even when their durable run belonged to NL; the first approval was safely
+  rejected and no restart was dispatched. The host-bound fix now routes by the
+  durable run's persisted host ID to exactly one configured service, and each
+  service independently checks ownership before details or action. After
+  deployment, a second owner-approved NL Xray failure drill completed the
+  limited restart with `POSTCHECK_PASSED`; both VPN stacks remained healthy,
+  open VPN incidents returned to zero, and scheduled post-repair cross-node
+  probes at 2026-09-24 13:53:25 and 13:54:35 UTC passed VLESS 443/8443 and
+  Hysteria2 443/hopping checks. Restore playbooks remain disabled. This proves
+  the tested repair path, not 99.9% availability or automatic repair of other
+  failure classes.
+  Operations samples each node's local `vpn.health.snapshot` at the configured
+  polling interval (30 seconds by default). The VPN incident adapter requires
+  three consecutive observations of the same primary diagnosis before opening
+  an incident and sending the owner a Telegram alert. This local service/host
+  alert path is separate from the cross-node external-probe timers: a failed
+  timer probe does not currently feed the incident notifier or automatically
+  create a Telegram alert. `/vpn_health` displays those external statuses, and
+  subscription generation may demote a node on failed VLESS 8443 or Hysteria2
+  hopping checks. Unknown probe results are not evidence of a healthy route.
+  Cross-node probe units and the owner-confirmed transient credential handoff
+  are deployed. All four fixed test-device bindings have distinct, fresh
+  owner-confirmed healthy proofs as of 2026-09-24. The private-chat
+  `probe.recheck` action can perform one read-only test of an existing key;
+  it must never replay an unknown install or rotate a key for recovery. Both
+  approximately 15-minute timers were enabled by an originating private-chat
+  owner confirmation on 2026-09-24 and completed healthy scheduled runs on DE
+  and NL. Timer instances name the destination peer, not the host running
+  them. On 2026-09-29, DE had `@nl.timer` enabled/active and NL had `@de.timer`
+  enabled/active; both most recent peer-probe services completed successfully.
+  Each host's self-target timer was disabled/inactive. The 2026-09-25 note
+  interpreted instance names without their host and incorrectly described a
+  rollout mismatch. Inspect both host and peer when checking timer state. The already
+  accepted `supervisor_acceptance_noop` never calls Host Agent. Before changing
+  this production boundary, verify the running playbook flags and owner
+  acceptance record; readiness alone does not prove a real repair.
+- Cross-node client probe code, root-only credential installer and systemd
+  units are deployed on DE and NL; both approximately 15-minute timers were
+  enabled after four fresh owner-confirmed proofs and a separate owner action.
+  The runners cover NL→DE and DE→NL for both VLESS and Hysteria2; snapshots
+  expose VLESS TCP 443/8443 and Hysteria2 UDP fixed-443/hopping checks. A
+  one-time URI may travel only through the
+  authenticated Host Agent socket; it is neither journaled nor returned to
+  Telegram, PostgreSQL, logs, prompts or telemetry. Telegram offers only four
+  fixed test-device bindings and an origin-bound owner confirmation for each.
+  The dedicated `probe.recheck` action runs only in the owner's private
+  Telegram chat and requires a separate confirmation in that same conversation.
+  It invokes exactly one read-only `vpn.external_probe.run` and cannot issue,
+  rotate, export, reinstall, or reveal the existing test key. VPN action
+  confirmations are bound to the creating conversation as well as channel and
+  device. The systemd unit and Host Agent use the same root-only
+  `/etc/jarvis-vpn/probes` directory; the installer may create only a missing
+  empty mode-0600 counterpart file and must refuse unsafe paths or overwrite.
+  Host Agent `probeTarget` keeps the VLESS/Hysteria2 connection endpoints
+  separate from a required `expectedExitIp`; generated probe environments use
+  only that explicit egress baseline. The correction was deployed on DE and NL
+  on 2026-09-24: both nodes now keep listener endpoints separate from their
+  peer's configured expected egress, and the generated root-only probe
+  environments match. The Host Agent regression suite and
+  `vpn.health.snapshot` passed on each node; Xray/Hysteria2 stayed active.
+  The earlier NL-to-DE VLESS recheck returned
+  `EXIT_MISMATCH` before the baseline correction. A later owner-confirmed
+  recheck was actually the opposite DE-to-NL VLESS direction and returned
+  `unknown` (`PROBE_RUN_UNKNOWN`); DE systemd exited 243/CREDENTIALS because
+  no NL test-key file was installed there. It does not establish health of the
+  installed NL-to-DE route. No credential changed. The recheck menu and server
+  now gate directions on a prior install/rotate attempt; Host Agent checks only
+  root-only credential metadata before systemd and fails closed for a missing
+  requested key. At 03:00 Moscow on 2026-09-24, the owner separately confirmed
+  a new NL-to-DE VLESS test-key install; its durable action succeeded with a
+  fresh `vless_tcp_8443` proof. A Telegram callback bug then surfaced: the
+  normalized `chatType` was not forwarded to the VPN handler, so valid private
+  recheck taps got a generic error before confirmation. The route now forwards
+  it without changing the private-chat guard. Subsequent owner-approved
+  installations and checks completed the remaining three bindings.
+  The Host Agent deploy script runs tests from the complete staged source tree
+  before copying files into `/opt/jarvis-host-agent`, because deployment tests
+  also validate sibling `deploy/vpn` unit templates that are not installed in
+  `/opt`. See `docs/updates/2026-09-24-vpn-probe-egress-baseline-deployment.md`
+  for the rollout record.
+  See `docs/superpowers/specs/2026-09-23-vpn-probe-egress-baseline-design.md`.
+  `/vpn_health` reports results separately and treats missing, stale, mismatched,
+  or ambiguous checks as unknown. External probe failures do not authorize an
+  LLM repair or key rotation. The 2026-09-23 deployed server source now
+  requires a fresh, node-matched VLESS 8443 or Hysteria2 hopping success before
+  an owner-confirmed probe install is accepted. Timer activation counts only
+  four distinct latest attempts with matching closed proof in the last 24 hours;
+  legacy success records and failed rotations do not qualify. This extra gate
+  was deployed with the integrated server on 2026-09-23. Activation enables
+  timers sequentially and sends one closed first-side disable if the second
+  enable does not confirm success; uncertain outcomes require actual timer-state
+  inspection, never blind retry. Production probe timers are now on after
+  four fresh proofs and a separate owner confirmation.
+  Their deployed systemd unit now uses an approximately 15-minute repeat
+  interval with up to 30 seconds of jitter and a two-minute post-boot first
+  run; both DE and NL effective units were verified on 2026-09-23 and later
+  enabled on 2026-09-24.
+  Later on 2026-09-24, both VLESS directions had fresh owner-confirmed proofs
+  and the corrected recheck button passed a live tap. The Hysteria2 install
+  button initially failed before confirmation because creation replaced its
+  selected protocol with VLESS. That server fix is deployed and tested. The
+  next confirmed tap reached Host Agent but failed installation because the
+  parser required the Hysteria2 IP endpoint to equal its DNS TLS name. The
+  parser fix is deployed and tested on both nodes. Subsequent fresh owner
+  confirmations completed both Hysteria2 proofs, reaching four of four.
+  A later `probe.enable` callback fix stopped passing unsupported protocol/node
+  fields to its empty action schema; its real owner tap succeeded, and both
+  timers have produced healthy scheduled results.
+- Host Agent mutation claims are persisted before execution. An interrupted
+  command has an unknown outcome and is reconciled; never retry it under a new
+  identifier merely because its connection was lost. Discovery is read-only.
+- `host-agent/jarvis_host_agent/vpn_manager.py` owns the root-only Xray state
+  and generated config. Jarvis exposes only closed `vpn.*` operations;
+  mutations require an owner confirmation bound to the originating
+  Telegram/Desktop client. VLESS URIs are one-time response artifacts and must
+  never be persisted in PostgreSQL, conversations, telemetry, or logs.
+- `host-agent/jarvis_host_agent/hysteria_vpn_manager.py` independently owns the
+  root-only Hysteria2 state and generated config. Its closed
+  `vpn.hysteria2.*` operations use the same owner-confirmation boundary, while
+  one-time `hy2://` exports follow the same non-persistence rule.
+- VPN control is multi-node: `de` uses the local Host Agent socket and `nl`
+  uses the authenticated StreamLocal-forwarded
+  `/run/jarvis-host-agent/agent-nl.sock`. Telegram requires a country choice
+  before protocol actions. Pending and recovery records retain the closed node
+  code so an uncertain NL action is never reconciled against DE. Operations
+  stores both hosts and runs a VPN-only collector and separate incident/advisory
+  path for NL.
+- Operations log archives contain bounded severity/lifecycle summaries only;
+  raw parser findings, family content, SQL values and credentials are excluded.
+- Backup scheduling and real backup/restore acceptance are deferred by the
+  owner as of 2026-09-06. Do not enable the timer as part of panel maintenance.
+
+- The production VPS (`87.120.187.202`) runs Ubuntu 24.04 LTS (SSH host `jarvis-vps`).
+- The secondary VPN/Host Agent VPS (`94.183.208.56`) runs Ubuntu 24.04.4 LTS; passwordless sudo user `deploy` and SSH access are configured via host alias `jarvis-vps-new` in `~/.ssh/config` using `~/.ssh/gemini_vps2`.
+- The canonical Windows checkout is `F:\test\jarvis`. Both VPS source checkouts use `/home/deploy/apps/jarvis` and the GitHub remote `https://github.com/godforg1veme/Jarvis.git`; `main` is the only permanent source branch. The primary VPS runs Jarvis Server, while the secondary VPS runs VPN services and Host Agent.
+- Before staging source for a VPS deployment, run `python3 /home/deploy/apps/jarvis/deploy/scripts/verify-source-checkout.py source /home/deploy/apps/jarvis`. The Windows Host Agent deploy script checks both the local checkout and its remote source before uploading anything. Never stage code from a nested `jarvis/` copy or an uncommitted overlay.
+- An immutable server release may use a detached checkout only when its full commit SHA is recorded and `python3 deploy/scripts/verify-source-checkout.py release <recorded-full-sha> <release-path>` confirms it is reachable from GitHub `main`.
+- The source checkout is deployment material, not the running server release. Do not run `git reset --hard` or `git clean` on a production tree to make it look current; prepare a fresh sibling checkout, preserve required state, compare runtime configuration, and switch only after checks pass.
+- Before replacing or removing a source directory, inspect the host paths mounted into running Compose containers. Keep each mounted file's original inode available until the container is recreated, or preserve a verified hard link in a private ignored directory. Confirm the container IDs and health after any planned restart.
+- Docker Compose runs `server` and private `postgres`; `cloudflared` is the
+  intended public ingress because the dedicated `xray.service` owns port 443.
+  The deployed VPN is VLESS + REALITY + XTLS Vision for Happ. Xray health and
+  client count are monitored by Operations; legacy x-ui is disabled but its
+  root-only rollback backup is retained.
+- The current public Tunnel hostname is `jarvis.rilora.ru`; `/health/ready` was
+  verified through Cloudflare on 2026-09-02 after the Action Orchestrator
+  migration. `cloudflared` runs as root only
+  inside its isolated container to read its read-only file-backed secret; the
+  VPS token file must remain mode `0600`.
+- `deploy/docker-compose.yml` also retains an optional Caddy profile for hosts
+  where 80/443 are available. Do not start both ingress modes accidentally.
+- Xray keeps the original VLESS + REALITY + XTLS Vision listener on TCP 443 and
+  a managed TCP 8443 fallback. Happ exports prefer 8443 with bounded client-side
+  compatibility parameters after live owner-route diagnostics found repeated
+  SYN retransmission on 443. Do not add forced ClientHello fragmentation to a
+  single-node export: it caused multi-second iOS Happ connection checks. Both
+  listeners use the same validated root-only client state; Host Agent changes
+  must preserve them together.
+- Hysteria2 v2.12.2 is deployed as an isolated fallback on the second address,
+  `87.120.187.109:443/udp`, with the DNS-only hostname `vpn.rilora.ru`, strict
+  ACME TLS, dynamic HTTP authentication via Host Agent (`127.0.0.1:3211/vpn/hysteria2/auth`),
+  and Salamander obfuscation. Key issuance, rotation, and revocation update
+  `hysteria2-state.json` without restarting `hysteria-server.service`, preserving
+  active QUIC streams and game sessions with zero downtime. Xray retains
+  TCP 443/8443. Operations monitors `hysteria-server.service` separately, and
+  rollback may remove only Hysteria2 plus its exact UDP 443 and ACME TCP 80
+  firewall rules.
+- `server/src/vpn/vpnRoutingService.js` provides domestic Russian split-routing
+  rules for Happ. Russian services (`geosite:category-ru`, `geoip:ru`, `.ru`,
+  `.su`) route directly via physical client IP using Yandex DNS `77.88.8.8` with
+  `IPIfNonMatch`; all remaining traffic routes via the active Happ VPN profile
+  (Hysteria 2 or VLESS). A dedicated
+  public endpoint `GET /happ-routing` (`https://jarvis.rilora.ru/happ-routing`) serves
+  a 1-click HTML redirect bridge to the `happ://routing/onadd/...` deeplink, avoiding
+  Telegram Bot API deep link URL limitations and Base64 chat pollution. The routing
+  profile contains only public routing/DNS rules and zero credentials or tokens.
+  The Telegram bot `/vpn` menu exposes the profile directly in the Hysteria 2 tab
+  alongside a 2-step setup guide.
+- `server/src/vpn/vpnSubscriptionService.js` and `server/src/vpn/vpnSubscriptionRepository.js`
+  provide dynamic multi-node subscriptions for Happ / Sing-box. A single subscription
+  profile aggregates four endpoints; explicit Sing-box JSON includes client-side
+  `url-test` failover, while the default Happ-compatible Base64 response is a list
+  of four URIs and does not itself guarantee automatic failover:
+  (1) 🇩🇪 DE Hysteria 2, (2) 🇳🇱 NL Hysteria 2, (3) 🇩🇪 DE VLESS 8443, and (4) 🇳🇱 NL VLESS 8443.
+  On 2026-10-08, all four active subscriptions exported four endpoints. The
+  scheduled cache accepts validated peer results for 20 minutes to cover the
+  15-minute timer plus jitter; owner-confirmed one-shot proofs retain a
+  five-minute limit. Only positively healthy routes receive preferred ordering;
+  unknown routes remain fallbacks and do not authorize credential replacement
+  or repair. See `docs/updates/2026-10-08-vpn-probe-resilience.md` for live
+  checks, deployed revision and remaining Hysteria hopping uncertainty.
+  Both DE and NL nodes run UDP port hopping across `20000:50000` via iptables NAT PREROUTING
+  DNAT to port 443 (`deploy/vpn/setup-port-hopping.sh`), mitigating observed
+  UDP 443 blocking without guaranteeing reachability on every client network.
+  On 2026-09-29 DE's live hopping DNAT was found missing after its reboot;
+  the precise loss event is unverified. Neither node had netfilter-persistent.
+  Owner-authorized maintenance restored DE's rule and persisted both nodes'
+  rules in UFW before.rules through a validated atomic helper. Both directions
+  passed fresh fixed-443/hopping and VLESS 443/8443 probes afterwards. VPN
+  services and containers were not restarted; keys, pools and URLs were preserved.
+  Persistence syntax and configuration are verified; a future reboot remains
+  operational acceptance rather than an already observed event.
+  PostgreSQL migration `022_vpn_subscriptions.sql` stores only SHA-256 token hashes
+  (`token_hash`) for strict zero raw secret persistence. `GET /sub/:token` dynamically generates
+  Sing-box JSON (or Base64 for legacy clients) demoting probe-degraded nodes via `ExternalProbeMonitor`.
+  `GET /happ-sub/:token` provides a 1-click HTML landing bridge to the Happ
+  subscription deeplink for that same URL.
+  As of 2026-09-29, a fully bound subscription serves its available endpoints
+  when some bound exports fail; incomplete bindings remain blocked. If no VPN
+  endpoint can be serialized, it returns `SUBSCRIPTION_ENDPOINTS_UNAVAILABLE`
+  rather than an empty or direct-only profile. The existing owner URL passed
+  HTTP 200 with three endpoints after deployment; missing DE Hysteria2 clients
+  and real phone-side Happ import remain separate follow-up acceptance.
+  Bound profiles also expose owner-private Telegram restoration through the
+  existing subscription repair confirmation. Only explicit missing-client
+  exports qualify; replacement saves durable child operation IDs and uses
+  owner-scoped binding compare-and-swap without token rotation. Unknown results
+  preserve checkpoints and block another repair pending reconciliation.
+  Telegram `/vpn` offers «📲 Подписки (Happ)» with creation, token rotation, and revocation.
+  Initial binding of the four client identities is a separate owner-confirmed
+  `subscription.repair` action (migration 023); an already bound or uncertain
+  repair is blocked rather than overwriting clients or issuing another access set.
+  The binding response delivers a one-time Happ URL and import button. A bound
+  profile can rotate its token to obtain a new URL; the previous URL then stops
+  working on every device. Telegram conversation history stores only a redacted
+  delivery status, never the raw subscription token. Subscription revocation
+  disables the URL but does not revoke already issued node credentials.
+  The owner names a profile before creation and may rename an active profile in
+  Telegram without rotating its token or changing bound clients. Successful
+  ordinary Happ refreshes receive the documented Base64 `profile-title` and a
+  one-hour `profile-update-interval`; the label visible in Happ remains a
+  client acceptance check when a refresh itself fails.
+  Hysteria 2 Host Agent exports connect to each node's `address` while retaining
+  its certificate `serverName` as SNI. The current deployed subscription revision
+  publishes only a validated finite public port pool in the URI authority and
+  uses Happ's 30-second multi-port default rather than an undocumented URI
+  interval parameter. A two-request
+  cross-node hopping probe is required before Hysteria is considered healthy;
+  host data-plane checks and phone-side Happ traffic remain separate acceptance
+  evidence. Probe timers are enabled after four owner-approved healthy proofs.
+  NL now has a distinct DNS-only `vpn-nl.rilora.ru` A record pointing to
+  `94.183.208.56`. Its root-only optional DNS-01 settings cause Hysteria2 to
+  maintain certificates for both `vpn.rilora.ru` and `vpn-nl.rilora.ru` through
+  a limited Cloudflare token; DE retains its old HTTP-01 behavior. The new NL
+  certificate expires 2026-12-23; the older one expires 2026-12-12. Real
+  strict-TLS Hysteria2 client probes from DE succeeded for both SNI values
+  before and after changing only NL's advertised `serverName` to the new name.
+  All six NL client credentials and the active generated VPN configuration were
+  preserved during that state switch. Renewal remains future operational
+  evidence, not an already observed event. The Hysteria installer rejects
+  DNS/address mismatches even when cached ACME files exist.
+- PostgreSQL must never be published publicly.
+- The DE-4 runs the private `gigaam-asr` service for Russian server ASR with a
+  four-CPU/8-GiB cap and no host port. Its observed steady-state RSS is about
+  1.2 GiB. `JARVIS_TELEGRAM_VOICE_ENABLED=true` enables only allowlisted
+  Telegram `voice` notes, bounded to 5 MiB, 120 seconds, and three per owner
+  per minute before download; OGG/Opus is decoded only in the worker's tmpfs.
+  Qwen remains a stopped benchmark profile. Local LLM deployment still requires
+  its own measured capacity decision.
