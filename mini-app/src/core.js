@@ -7,15 +7,21 @@ export function createCore(host, { onStatus = () => {}, items = [], onSelect = (
   const personalKeys = ['assistant', 'memory', 'documents', 'devices', 'life', 'jobs'];
   const entries = items.filter((item) => item && personalKeys.includes(item.key) && typeof item.label === 'string').slice(0, 6);
   const controller = new AbortController(), { signal } = controller;
-  let manualPause = false, workspace = false, visible = true, disposed = false, contextLost = false;
+  let manualPause = false, motionRequested = false, workspace = false, visible = true, disposed = false, contextLost = false;
   let elapsed = 0, speed = .7, frame = 0, lastFrame = 0, lastTick = 0, drawCount = 0, focusPause = false, hoverPause = false, sphereHover = false;
   let renderer;
-  const paused = () => manualPause || reduced.matches;
+  const paused = () => manualPause || (reduced.matches && !motionRequested);
+  const requestPause = (value) => { manualPause = Boolean(value); motionRequested = !manualPause; };
+  const setWorkspace = (value) => {
+    workspace = Boolean(value);
+    // A touch or pointer from the previous view must not leave the scene paused.
+    focusPause = false; hoverPause = false; sphereHover = false;
+  };
   const moving = () => !paused() && !workspace && !focusPause && !hoverPause && !sphereHover && !contextLost && !disposed && visible && !document.hidden;
   const reportMotion = () => onMotionChange({ paused: paused(), moving: moving() });
   function fallback() {
     host.dataset.render = 'fallback'; onStatus('3D недоступно · статичный вид');
-    return { available: false, get paused() { return paused(); }, setPaused(value) { manualPause = Boolean(value); reportMotion(); }, setSpeed() {}, reset() {}, setWorkspace(value) { workspace = Boolean(value); reportMotion(); }, dispose() { controller.abort(); } };
+    return { available: false, get paused() { return paused(); }, setPaused(value) { requestPause(value); reportMotion(); }, setWorkspace(value) { setWorkspace(value); reportMotion(); }, dispose() { controller.abort(); } };
   }
   try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'low-power' }); }
   catch { return fallback(); }
@@ -41,8 +47,8 @@ export function createCore(host, { onStatus = () => {}, items = [], onSelect = (
     button.addEventListener('click', () => onSelect(item.key), { signal });
     button.addEventListener('focus', () => { focusPause = true; sync(); }, { signal });
     button.addEventListener('blur', () => { focusPause = false; sync(); }, { signal });
-    button.addEventListener('pointerenter', () => { hoverPause = true; sync(); }, { signal });
-    button.addEventListener('pointerleave', () => { hoverPause = false; sync(); }, { signal });
+    button.addEventListener('pointerenter', (event) => { if (event.pointerType !== 'mouse') return; hoverPause = true; sync(); }, { signal });
+    button.addEventListener('pointerleave', (event) => { if (event.pointerType !== 'mouse') return; hoverPause = false; sync(); }, { signal });
     return { item, type, model, holder, orbit, pathGroup, button, bound: bounds[index] };
   });
   const centerLabel = document.createElement('div'); centerLabel.className = 'core-label'; centerLabel.textContent = 'JARVIS'; centerLabel.setAttribute('aria-hidden', 'true'); host.append(centerLabel);
@@ -113,7 +119,7 @@ export function createCore(host, { onStatus = () => {}, items = [], onSelect = (
   const resize = new ResizeObserver(() => { if (disposed) return; sync(); }); resize.observe(host);
   const intersection = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; sync(); }); intersection.observe(host);
   document.addEventListener('visibilitychange', sync, { signal });
-  const reducedChange = () => sync(); reduced.addEventListener('change', reducedChange);
+  const reducedChange = () => { motionRequested = false; sync(); }; reduced.addEventListener('change', reducedChange);
   renderer.domElement.addEventListener('pointermove', (event) => {
     if (event.pointerType === 'touch') return;
     const next = Boolean(pick(event));
@@ -131,7 +137,7 @@ export function createCore(host, { onStatus = () => {}, items = [], onSelect = (
   }, { signal });
   renderer.domElement.addEventListener('webglcontextrestored', () => { contextLost = false; host.dataset.render = 'webgl'; centerLabel.hidden = false; sync(); }, { signal });
   update(0); sync();
-  return { available: true, get paused() { return paused(); }, setPaused(value) { manualPause = Boolean(value); sync(); }, setSpeed(value) { speed = THREE.MathUtils.clamp(Number(value) || .7, .25, 1.8); }, reset() { elapsed = 0; sync(); }, setWorkspace(value) { workspace = Boolean(value); sync(); }, dispose() {
+  return { available: true, get paused() { return paused(); }, setPaused(value) { requestPause(value); sync(); }, setWorkspace(value) { setWorkspace(value); sync(); }, dispose() {
     if (disposed) return; disposed = true; stop(); controller.abort(); resize.disconnect(); intersection.disconnect(); reduced.removeEventListener('change', reducedChange);
     const geometries = new Set(), materials = new Set(), textures = new Set(); scene.traverse((object) => { if (object.geometry) geometries.add(object.geometry); for (const material of Array.isArray(object.material) ? object.material : object.material ? [object.material] : []) { materials.add(material); if (material.map) textures.add(material.map); } });
     geometries.forEach((item) => item.dispose()); materials.forEach((item) => item.dispose()); textures.forEach((item) => item.dispose()); renderer.dispose(); renderer.domElement.remove(); centerLabel.remove(); planets.forEach((planet) => planet.button.remove());

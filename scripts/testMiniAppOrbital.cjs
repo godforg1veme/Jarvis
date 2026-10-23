@@ -161,8 +161,6 @@ async function verifyOrbitalExperience(browser, origin) {
     await page.waitForURL('**/#home');
     await page.locator('#workspace').waitFor({ state: 'hidden' });
 
-    await page.evaluate(() => document.activeElement?.blur());
-    await page.mouse.move(1, 1);
     await page.waitForFunction(() => document.body.dataset.motion === 'running');
     await waitForMotion(page, (await snapshotMotion(page)).time);
 
@@ -234,7 +232,14 @@ async function verifyReducedMotion(browser, origin) {
     assert.equal(await page.locator('#pause').getAttribute('aria-pressed'), 'true', 'reduced-motion starts in a paused state');
     await assertFrozen(page, 'reduced motion freezes the scene');
     await page.locator('#pause').click();
-    await assertFrozen(page, 'manual resume cannot override reduced-motion preference');
+    assert.equal(await page.locator('#pause').innerText(), 'Пауза', 'explicit resume enables motion');
+    await waitForMotion(page, (await snapshotMotion(page)).time);
+    assert.equal(await page.locator('body').getAttribute('data-motion'), 'running');
+    await page.locator('#pause').click();
+    await assertFrozen(page, 'manual pause remains effective after explicit reduced-motion resume');
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await assertFrozen(page, 'new reduced-motion preference resets explicit consent');
     assert.deepEqual(errors, [], 'reduced-motion flow has no uncaught browser exceptions');
     assert.deepEqual(consoleErrors, [], 'reduced-motion flow has no Content Security Policy errors');
     assert.deepEqual(external, [], 'reduced-motion fixture makes no real external API requests');
@@ -279,7 +284,7 @@ async function verifyWebglFallback(browser, origin) {
 }
 
 async function verifyTouchPanel(browser, origin) {
-  const { context, page, errors } = await openFixture(browser, origin, {}, { hasTouch: true, isMobile: true, deviceScaleFactor: 2, reducedMotion: 'reduce' });
+  const { context, page, errors } = await openFixture(browser, origin, {}, { hasTouch: true, isMobile: true, deviceScaleFactor: 2, reducedMotion: 'no-preference' });
   try {
     await page.goto(`${origin}/mini/#section/documents`);
     await page.locator('#workspace:not([hidden])').waitFor();
@@ -297,6 +302,17 @@ async function verifyTouchPanel(browser, origin) {
     await swipe(90);
     await page.waitForURL('**/#home');
     await page.locator('#home').waitFor({ state: 'visible' });
+    await waitForMotion(page, (await snapshotMotion(page)).time);
+    assert.equal(await page.locator('.motion-settings, #speed, #reset-core').count(), 0, 'animation settings are removed');
+    const planet = page.locator('.planet-target:not([hidden])').first();
+    await planet.dispatchEvent('pointerenter', { pointerType: 'touch' });
+    await waitForMotion(page, (await snapshotMotion(page)).time);
+    await page.locator('#all-sections').tap();
+    await page.locator('[data-module="documents"]').tap();
+    await page.locator('#workspace:not([hidden])').waitFor();
+    await page.locator('#workspace-close').tap();
+    await page.waitForURL('**/#home');
+    await waitForMotion(page, (await snapshotMotion(page)).time);
     const canvasFits = await page.locator('#core-stage').evaluate(stage => {
       const canvas = stage.querySelector('canvas'), a = stage.getBoundingClientRect(), b = canvas.getBoundingClientRect();
       return Math.abs(a.width - b.width) < 1 && Math.abs(a.height - b.height) < 1;

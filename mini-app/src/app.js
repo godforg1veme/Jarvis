@@ -32,7 +32,7 @@ function showModules(value) {
   syncDock();
 }
 function syncMotion() {
-  const paused = !sessionActive || document.hidden || currentPage !== 'home' || !sceneMoving || $('#core-stage')?.dataset.render === 'fallback' || Boolean(core?.paused) || matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const paused = !sessionActive || document.hidden || currentPage !== 'home' || !sceneMoving || $('#core-stage')?.dataset.render === 'fallback' || Boolean(core?.paused);
   document.body.dataset.motion = paused ? 'paused' : 'running';
 }
 function setExpanded(expanded) {
@@ -168,8 +168,7 @@ function navigate() {
   if (hash === 'modules') requestAnimationFrame(() => { if (currentPage === 'home' && location.hash === '#modules') $('#modules').scrollIntoView(); });
   if (page !== 'home') $(`#${page.startsWith('section/') ? 'assistant' : page} h1`)?.focus({ preventScroll: true });
   else if (lastSection && hash !== 'modules') {
-    const target = document.querySelector(`[data-planet="${lastSection}"]`);
-    (target && !target.hidden ? target : $('#all-sections'))?.focus({ preventScroll: true });
+    $('#all-sections').focus({ preventScroll: true });
   }
 }
 async function start() {
@@ -270,15 +269,13 @@ async function start() {
       const { createCore } = await import('./core.js');
       if (!sessionActive) return;
       const items = ['assistant', 'memory', 'documents', 'devices', 'life', 'jobs'].filter((key) => actor.permissions.includes(key)).map((key) => ({ key, label: labels[key] }));
-      core = createCore($('#core-stage'), { items, onSelect: openSection, onMotionChange: ({ moving }) => { sceneMoving = moving; syncMotion(); }, onStatus: (text) => { $('#core-status').textContent = text; if ($('#core-stage').dataset.render === 'fallback') showModules(true); } });
+      core = createCore($('#core-stage'), { items, onSelect: openSection, onMotionChange: ({ moving, paused }) => { sceneMoving = moving; const button = $('#pause'); button.textContent = paused ? 'Продолжить' : 'Пауза'; button.setAttribute('aria-pressed', String(paused)); syncMotion(); }, onStatus: (text) => { $('#core-status').textContent = text; if ($('#core-stage').dataset.render === 'fallback') showModules(true); } });
       if (!core.available) throw new Error('WEBGL_UNAVAILABLE');
       core.setWorkspace(currentPage !== 'home');
       const pause = $('#pause');
       const sync = () => { pause.textContent = core.paused ? 'Продолжить' : 'Пауза'; pause.setAttribute('aria-pressed', String(core.paused)); syncMotion(); };
       pause.addEventListener('click', () => { core.setPaused(!core.paused); sync(); });
-      $('#speed').addEventListener('input', (event) => core.setSpeed(Number(event.target.value)));
-      $('#reset-core').addEventListener('click', () => core.reset());
-      matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', sync); sync();
+      sync();
       window.addEventListener('pagehide', () => core.dispose(), { once: true });
       window.addEventListener('pageshow', (event) => { if (event.persisted) location.reload(); });
     } catch { $('#core-stage').dataset.render = 'fallback'; $('#core-status').textContent = 'СТАТИЧНЫЙ ВИД · 3D НЕДОСТУПНО'; showModules(true); $('#pause').disabled = true; document.querySelectorAll('.motion-controls button,.motion-controls input').forEach((element) => { element.disabled = true; }); document.body.dataset.motion = 'paused'; }
