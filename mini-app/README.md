@@ -4,6 +4,8 @@
 
 ## Русский
 
+23 октября эти UX/UI-изменения выпущены на DE, исходники синхронизированы с обоими VPS. [Результат выпуска](../docs/updates/2026-10-23-mini-app-orbital-release.md) обновляет статус локальных этапов ниже.
+
 23 октября локально завершён единый дизайн внутренних экранов: диалог, личные
 карточки, пользователи/роли/подтверждения и все Jarvis-экраны HH. Проверены
 обычные, пустые, ошибочные и неизвестные состояния. Выпуск ещё не выполнялся.
@@ -137,6 +139,8 @@ Mini App build и Edge fixtures. Команды и границы проверо
 [результат](../docs/updates/2026-10-18-telegram-mini-app-release.md).
 
 ## English
+
+On October 23, these UX/UI changes were deployed to DE and source was synchronized with both VPS nodes. The [release record](../docs/updates/2026-10-23-mini-app-orbital-release.md) supersedes the local-stage status below.
 
 October 23, local development: the shared design now covers chat, personal
 cards, people/roles/confirmations and all Jarvis-owned HH surfaces. Normal,

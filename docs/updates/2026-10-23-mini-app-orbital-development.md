@@ -4,6 +4,8 @@
 
 ## Русский
 
+Более новый результат: [выпуск 23 октября](2026-10-23-mini-app-orbital-release.md). Локальный статус ниже сохранён как история этапа.
+
 Следующий локальный этап: [единый дизайн всех внутренних экранов](2026-10-23-mini-app-interiors-development.md).
 Ниже сохранён результат орбитальной оболочки и её проверок.
 
@@ -53,6 +55,8 @@ touch-событиями через CDP; физический жест треб�
 по обычному порядку выпуска.
 
 ## English
+
+Superseded by the [October 23 release](2026-10-23-mini-app-orbital-release.md). The local status below is retained as stage history.
 
 Next local stage: [the shared design across all interiors](2026-10-23-mini-app-interiors-development.md).
 The orbital-shell implementation and its checks are retained below.

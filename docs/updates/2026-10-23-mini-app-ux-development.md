@@ -4,6 +4,8 @@
 
 ## Русский
 
+Более новый результат: [выпуск 23 октября](2026-10-23-mini-app-orbital-release.md). Локальный статус ниже сохранён как история этапа.
+
 Позже 23 октября поверх этих исправлений реализован
 [орбитальный интерфейс](2026-10-23-mini-app-orbital-development.md).
 Ниже сохранён результат предшествующего этапа UX.
@@ -43,6 +45,8 @@ fixtures используют Edge и синтетические данные; �
 [План](../superpowers/plans/2026-10-23-mini-app-ux.md).
 
 ## English
+
+Superseded by the [October 23 release](2026-10-23-mini-app-orbital-release.md). The local status below is retained as stage history.
 
 Later on October 23, the [orbital UI](2026-10-23-mini-app-orbital-development.md)
 was implemented on top of these fixes. The preceding UX stage is retained below.

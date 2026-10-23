@@ -12,6 +12,8 @@ owner feedback. Sign out is in the header; login and error messages remain.
 
 ## Русский
 
+Более новый результат: [выпуск 23 октября](2026-10-23-mini-app-orbital-release.md). Локальный статус ниже сохранён как история этапа.
+
 23 октября локально завершено оформление существующих внутренних экранов Mini App
 поверх [орбитальной оболочки](2026-10-23-mini-app-orbital-development.md).
 Работа остаётся в `codex/mini-app-ux`, в отдельном worktree; GitHub и VPS не обновлялись.
@@ -60,6 +62,8 @@ image этим этапом не подтверждены. Внешних отп
 Desktop не менялся, пересборка EXE не нужна. Выпуск на VPS требует отдельного поручения.
 
 ## English
+
+Superseded by the [October 23 release](2026-10-23-mini-app-orbital-release.md). The local status below is retained as stage history.
 
 On October 23 the existing Mini App interiors were restyled on top of the
 orbital shell. Work remains local on `codex/mini-app-ux` in a separate worktree;
