@@ -164,14 +164,7 @@ async function verifyOrbitalExperience(browser, origin) {
     await page.waitForFunction(() => document.body.dataset.motion === 'running');
     await waitForMotion(page, (await snapshotMotion(page)).time);
 
-    await page.locator('#pause').click();
-    assert.equal(await page.locator('#pause').getAttribute('aria-pressed'), 'true', 'pause control reports its pressed state');
-    assert.equal(await page.locator('#pause').innerText(), 'Продолжить', 'pause control offers resume');
-    await assertFrozen(page, 'manual pause stops orbit and renderer');
-    await page.locator('#pause').click();
-    assert.equal(await page.locator('#pause').getAttribute('aria-pressed'), 'false', 'resume control clears its pressed state');
-    const resumed = await snapshotMotion(page);
-    await waitForMotion(page, resumed.time);
+    assert.equal(await page.locator('#pause, .motion-controls, .motion-settings').count(), 0, 'animation controls are absent');
 
     await assertResponsive(page, 320);
     await assertResponsive(page, 390);
@@ -229,17 +222,18 @@ async function verifyReducedMotion(browser, origin) {
   try {
     await page.waitForFunction(() => document.querySelector('#core-stage')?.dataset.render === 'webgl');
     await page.waitForFunction(() => Number(document.querySelector('#core-stage')?.dataset.frames) > 0);
-    assert.equal(await page.locator('#pause').getAttribute('aria-pressed'), 'true', 'reduced-motion starts in a paused state');
-    await assertFrozen(page, 'reduced motion freezes the scene');
-    await page.locator('#pause').click();
-    assert.equal(await page.locator('#pause').innerText(), 'Пауза', 'explicit resume enables motion');
+    await page.mouse.move(1, 1);
     await waitForMotion(page, (await snapshotMotion(page)).time);
     assert.equal(await page.locator('body').getAttribute('data-motion'), 'running');
-    await page.locator('#pause').click();
-    await assertFrozen(page, 'manual pause remains effective after explicit reduced-motion resume');
+    const skyAnimation = await page.locator('#sky-image').evaluate(el => getComputedStyle(el).animationName);
+    assert.notEqual(skyAnimation, 'none', 'sky stays animated under system reduced motion as requested');
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await assertFrozen(page, 'new reduced-motion preference resets explicit consent');
+    await waitForMotion(page, (await snapshotMotion(page)).time);
+    await page.reload();
+    await page.waitForFunction(() => document.querySelector('#core-stage')?.dataset.render === 'webgl');
+    await waitForMotion(page, (await snapshotMotion(page)).time);
+    assert.equal(await page.locator('#pause, .motion-controls').count(), 0);
     assert.deepEqual(errors, [], 'reduced-motion flow has no uncaught browser exceptions');
     assert.deepEqual(consoleErrors, [], 'reduced-motion flow has no Content Security Policy errors');
     assert.deepEqual(external, [], 'reduced-motion fixture makes no real external API requests');
@@ -360,7 +354,7 @@ async function main() {
       try { await verify(browser, origin); } catch (error) { findings.push(error.stack || error.message || String(error)); }
     }
     if (findings.length) throw new Error(`Orbital browser findings:\n${findings.map((finding, index) => `${index + 1}. ${finding}`).join('\n')}`);
-    console.log('Mini App orbital browser checks passed: WebGL/orbits, focus and pause controls, workspace navigation, search/list fallback, permissions, reduced motion, WebGL fallback, mobile/desktop layout, touch targets, local sky asset, CSP, and fixture-only requests.');
+    console.log('Mini App orbital browser checks passed: WebGL/orbits, automatic motion, focus, workspace navigation, search/list fallback, permissions, reduced motion, WebGL fallback, mobile/desktop layout, touch targets, local sky asset, CSP, and fixture-only requests.');
     console.log(`Screenshots: ${artifacts}`);
   } finally {
     await browser.close();

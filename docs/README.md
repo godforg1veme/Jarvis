@@ -4,6 +4,8 @@
 
 ## Русский
 
+По новому указанию владельца локально включено [движение Mini App по умолчанию](updates/2026-10-23-mini-app-auto-motion.md) без кнопки паузы. Этот следующий этап ещё не выпущен.
+
 На DE выпущено [исправление движения](updates/2026-10-23-mini-app-motion-fix.md): возврат и touch-hover больше не удерживают паузу, «Продолжить» работает при reduced motion; настройки скорости/сброса удалены. Исходники Windows и обоих VPS синхронизированы.
 
 23 октября выпущен [орбитальный Mini App и единый дизайн всех внутренних экранов](updates/2026-10-23-mini-app-orbital-release.md). GitHub, Windows и оба VPS синхронизированы; новый DE server healthy. Живое принятие на телефоне остаётся.
@@ -65,6 +67,8 @@
 Архивы не заменяют действующие правила и новую проверку окружения.
 
 ## English
+
+Following the owner's new instruction, [Mini App motion is enabled by default](updates/2026-10-23-mini-app-auto-motion.md) locally without a pause button. This next stage is not deployed yet.
 
 The [motion repair](updates/2026-10-23-mini-app-motion-fix.md) is deployed to DE: return navigation and touch hover no longer retain pause, Resume works under reduced motion, and speed/reset settings are removed. Windows and both VPS sources match.
 
