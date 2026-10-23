@@ -7,6 +7,30 @@
 [Результат выпуска](../docs/updates/2026-10-15-job-search-release.md).
 Playwright/Chromium согласованы владельцем 15 октября 2026.
 
+## Восстановление после CAPTCHA
+
+Локальный ремонт 23 октября: [результат и ограничения](../docs/updates/2026-10-23-hh-captcha-recovery-development.md).
+При проверке брендированной вакансии HH описание может находиться в скрытом
+static-markup контейнере. Reader сначала читает видимое описание; fallback
+разрешён только для единственного штатного branded блока. Текст ограничен
+100000 символами и 20000 узлами обхода, script/style/template/noscript исключены.
+Неоднозначный или неизвестный скрытый DOM остаётся ошибкой.
+
+После неизвестного ответа или перезапуска пауза снимается только после чтения
+исходного target с HTTP 200 и проверки содержимого. Ответ CAPTCHA не повторяется.
+`hhBrandedRecovery.test.js` проверяет этот путь через настоящий Chromium,
+включая другой адрес, CAPTCHA и HTTP 403.
+
+Browser broker сохраняет публичный `JOB_CAPTCHA_UNAVAILABLE`, но пишет в свой
+stderr закрытую причину: `JOB_CAPTCHA_OPEN_FAILED`, `JOB_CAPTCHA_FORM_UNAVAILABLE`,
+`JOB_CAPTCHA_PAGE_UNAVAILABLE`, `JOB_CAPTCHA_PICTURE_*`, `JOB_CAPTCHA_CHALLENGE_CHANGED`
+или `JOB_CAPTCHA_VERIFY_*`. Точный allowlist находится в `src/captchaPreparation.js`.
+`VERIFY_READER_FAILED` означает отказ parser; `VERIFY_HTTP_STATUS` — неподходящий
+HTTP status; `VERIFY_DIFFERENT_LOCATION` — другой target. Эти коды не доказывают
+неверный ответ OCR или принятие CAPTCHA. При расследовании сопоставляй время
+browser-кода, серверного `JOB_CAPTCHA_PREPARATION_FAILED` и private receipt;
+не включай логирование ответов, URL, DOM, картинок или исключений.
+
 [Разбор HTTP 403](../docs/updates/2026-10-18-hh-captcha-403-investigation.md):
 receipt содержит `serverError`, тип запроса и возраст картинки/страницы.
 Пояснение HH классифицируется только для небольшого объявленного несжатого

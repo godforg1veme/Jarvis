@@ -162,6 +162,11 @@ challenge/revision и сроку; расходуется атомарно до �
 Ответ не проходит через AI/history/memory. Возобновление требует read-only
 проверки точного target; unknown/replay и старые картинки не разрешают повтор.
 
+Локальный [ремонт проверки branded вакансии](updates/2026-10-23-hh-captcha-recovery-development.md)
+учитывает скрытый HH static markup и добавляет закрытые причины подготовки
+в browser-лог. До выпуска это не меняет работающий browser. Правила и пределы
+чтения, диагностика и тесты описаны в [browser guide](../job-browser/README.md#восстановление-после-captcha).
+
 `JARVIS_HH_CAPTCHA_AUTOMATIC=1` включает отдельную frozen `hh-ru-captcha` модель
 с выпрямлением и rescue: до трёх durable попыток, остановка при unknown или
 перезапуске незавершённой отправки. `/ocr/frozen` не допускает общий OCR.

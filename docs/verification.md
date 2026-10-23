@@ -23,6 +23,27 @@ PostgreSQL acceptance использует только отдельную те�
 успешной проверкой. Fixtures не доказывают работу настоящих HH, Bot API,
 Electron, устройств или VPS; эти результаты записывай отдельно.
 
+## Восстановление HH CAPTCHA / HH CAPTCHA recovery
+
+Локальный [ремонт 23 октября](updates/2026-10-23-hh-captcha-recovery-development.md)
+проверяет чтение branded static markup, границы объёма/DOM, отсутствие повторного
+ответа после unknown/restart, точный target и закрытые причины ошибок.
+Linux-прогон выполняется в отдельном контейнере без сети и account volumes;
+HTTPS fixture требует только `--add-host hh.ru:127.0.0.1`.
+
+The [October 23 local repair](updates/2026-10-23-hh-captcha-recovery-development.md)
+checks branded static markup, text/DOM bounds, no repeated answer after
+unknown/restart, exact target verification and closed error reasons. Linux tests
+use a separate networkless container without account volumes; the HTTPS fixture
+only needs `--add-host hh.ru:127.0.0.1`.
+
+```powershell
+node --test job-browser/test/hhBrandedRecovery.test.js job-browser/test/captchaPreparation.test.js
+npm test --prefix job-browser
+# Linux, isolated container, no production profile; working directory job-browser:
+node --test --test-concurrency=1 test/*.test.js test/captchaTelegramAcceptance.cjs
+```
+
 ## Внутренние экраны Mini App / Mini App interiors
 
 Текущий результат: [выпуск 23 октября](updates/2026-10-23-mini-app-orbital-release.md).

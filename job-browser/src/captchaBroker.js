@@ -2,7 +2,9 @@ const http = require('node:http');
 const { createHash, timingSafeEqual } = require('node:crypto');
 const { UUID } = require('./rpcProtocol');
 const { parseClosedJson, validCaptchaRequest } = require('./captchaTelegramProtocol');
-function createCaptchaBroker({ profiles = null, controller = null, coordinator = null, ownerId, token, run = (_userId, fn) => fn() }) {
+const { preparationCode } = require('./captchaPreparation');
+function createCaptchaBroker({ profiles = null, controller = null, coordinator = null, ownerId, token, run = (_userId, fn) => fn(),
+  report = code => process.stderr.write(`${code}\n`) }) {
   if (!UUID.test(ownerId || '') || !/^[\x21-\x7e]{32,256}$/.test(token || '')) throw new Error('JOB_CAPTCHA_CONFIG_INVALID');
   const digest = value => createHash('sha256').update(value).digest(), expected = digest(`Bearer ${token}`);
   let active = 0;
@@ -23,6 +25,7 @@ function createCaptchaBroker({ profiles = null, controller = null, coordinator =
     }
     if (active >= 2) { req.resume(); return reply(res, 429, { ok: false, code: 'JOB_CAPTCHA_BUSY' }); }
     active++;
+    let operation;
     try {
       let length = 0; const chunks = [];
       for await (const chunk of req) {
@@ -32,6 +35,7 @@ function createCaptchaBroker({ profiles = null, controller = null, coordinator =
       }
       let input; try { input = parseClosedJson(Buffer.concat(chunks).toString('utf8')); } catch { return reply(res, 400, { ok: false, code: 'JOB_CAPTCHA_INVALID_REQUEST' }); }
       if (!validCaptchaRequest(input)) return reply(res, 400, { ok: false, code: 'JOB_CAPTCHA_INVALID_REQUEST' });
+      operation = input.operation;
       const runtime = profiles ? await profiles.forUser(input.userId)
         : input.userId === ownerId && controller && coordinator ? { manualPage: controller, manual: coordinator } : null;
       if (!runtime.manual || !runtime.manualPage) throw Object.assign(new Error('JOB_CAPTCHA_UNAVAILABLE'), { code: 'JOB_CAPTCHA_UNAVAILABLE' });
@@ -39,7 +43,12 @@ function createCaptchaBroker({ profiles = null, controller = null, coordinator =
         : await run(input.userId, () => input.operation === 'challenge'
           ? runtime.manualPage.challenge(input.args.refresh) : runtime.manualPage.answer(input.args));
       reply(res, 200, { ok: true, value });
-    } catch { if (!res.writableEnded) reply(res, 503, { ok: false, code: 'JOB_CAPTCHA_UNAVAILABLE' }); }
+    } catch (error) {
+      const code = operation === 'challenge' ? preparationCode(error)
+        : operation === 'answer' ? 'JOB_CAPTCHA_ANSWER_FAILED' : 'JOB_CAPTCHA_STATUS_FAILED';
+      try { report(code); } catch { /* Reporting must not change the RPC outcome. */ }
+      if (!res.writableEnded) reply(res, 503, { ok: false, code: 'JOB_CAPTCHA_UNAVAILABLE' });
+    }
     finally { active--; }
   });
   server.maxConnections = 16;

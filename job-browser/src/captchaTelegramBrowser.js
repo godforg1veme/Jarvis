@@ -8,6 +8,7 @@ const { dispatchCaptcha } = require('./captchaDispatch');
 const { validTarget, fail } = require('./manualState');
 const { bounded } = require('./browserHealth');
 const { SERVER_ERRORS, xsrfCookieMatch } = require('./captchaResponse');
+const { preparationCode, preparationError, verificationFailure } = require('./captchaPreparation');
 const hashKey = key => createHash('sha256').update(JSON.stringify(['hh-captcha', key])).digest('hex');
 const hashOperation = id => createHash('sha256').update(JSON.stringify(['hh-telegram-operation', id])).digest('hex');
 function validPng(bytes) {
@@ -39,9 +40,10 @@ class CaptchaTelegramBrowser {
     await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 30000 });
   }
   async picture() {
+    this.pictureFailureCode = 'JOB_CAPTCHA_PAGE_UNAVAILABLE';
     if (!this.page || this.page.isClosed() || this.crashed.has(this.page)) return null;
     const target = this.coordinator.state.target, form = await readForm(this.page, target);
-    if (!form) return null;
+    if (!form) { this.pictureFailureCode = 'JOB_CAPTCHA_FORM_UNAVAILABLE'; return null; }
     const images = await this.page.locator('img').evaluateAll(nodes => nodes.slice(0, 50).flatMap((n, index) => {
       try {
         const u = new URL(n.src), r = n.getBoundingClientRect();
@@ -52,11 +54,25 @@ class CaptchaTelegramBrowser {
           && u.searchParams.size === 1 ? [{ index, key: u.searchParams.get('key') }] : [];
       } catch { return []; }
     }));
+    this.pictureFailureCode = images.length > 1 ? 'JOB_CAPTCHA_PICTURE_AMBIGUOUS' : 'JOB_CAPTCHA_PICTURE_MISSING';
     return images.length === 1 && validPictureKey(images[0].key) ? { ...images[0], form, target } : null;
   }
   run(fn) { const pending = this.tail.then(fn); this.tail = pending.catch(() => {}); return pending; }
-  challenge(refresh) { return this.run(() => this.automatic
-    ? this.automatic.challenge(this, refresh) : this.issueChallenge(refresh)); }
+  challenge(refresh) { return this.run(async () => {
+    this.preparationStage = 'open';
+    try { return await (this.automatic ? this.automatic.challenge(this, refresh) : this.issueChallenge(refresh)); }
+    catch (error) {
+      const known = preparationCode(error);
+      // The renderer may disappear after picture() checked it but before a DOM
+      // read completes. Classify the current state without exposing its error.
+      if (['JOB_CAPTCHA_PREPARATION_FAILED', 'JOB_CAPTCHA_PICTURE_FAILED'].includes(known)
+        && this.preparationStage === 'picture' && (!this.page || this.page.isClosed?.() || this.crashed.has(this.page))) {
+        throw preparationError('JOB_CAPTCHA_PAGE_UNAVAILABLE');
+      }
+      throw preparationError(known !== 'JOB_CAPTCHA_PREPARATION_FAILED' ? known
+        : this.preparationStage === 'open' ? 'JOB_CAPTCHA_OPEN_FAILED' : 'JOB_CAPTCHA_PICTURE_FAILED');
+    }
+  }); }
   async issueChallenge(refresh) {
     const status = this.coordinator.status();
     if (status.phase === 'idle') { this.current = null; return { outcome: 'idle' }; }
@@ -67,16 +83,27 @@ class CaptchaTelegramBrowser {
     }
     if (status.phase === 'checking') throw fail('JOB_CAPTCHA_BUSY');
     const opened = await this.coordinator.start(status.revision);
-    if (opened.phase !== 'active') throw fail('JOB_CAPTCHA_UNAVAILABLE');
+    if (opened.phase !== 'active') throw preparationError('JOB_CAPTCHA_OPEN_FAILED');
+    this.preparationStage = 'picture'; this.pictureFailureCode = 'JOB_CAPTCHA_PICTURE_MISSING';
     const waitPicture = async () => {
       let picture = null;
-      for (let i = 0; i < 80 && !picture; i++) { picture = await this.picture(); if (!picture) await this.page.waitForTimeout(50); }
+      for (let i = 0; i < 80 && !picture; i++) {
+        picture = await this.picture();
+        if (!picture && this.pictureFailureCode === 'JOB_CAPTCHA_PAGE_UNAVAILABLE') return null;
+        if (!picture) {
+          try { await this.page.waitForTimeout(50); }
+          catch {
+            throw preparationError(!this.page || this.page.isClosed() || this.crashed.has(this.page)
+              ? 'JOB_CAPTCHA_PAGE_UNAVAILABLE' : 'JOB_CAPTCHA_PICTURE_FAILED');
+          }
+        }
+      }
       return picture;
     };
     let picture = await waitPicture();
     if (!picture) {
       if ((await this.coordinator.finish(this.coordinator.status().revision)).phase === 'idle') return { outcome: 'idle' };
-      throw fail('JOB_CAPTCHA_UNAVAILABLE');
+      throw preparationError(verificationFailure(this.verificationReason, this.pictureFailureCode));
     }
     if (this.coordinator.state.seedRequired) {
       await this.coordinator.seedBaseline(hashKey(picture.key), this.coordinator.status().revision);
@@ -85,10 +112,10 @@ class CaptchaTelegramBrowser {
       // a picture already given to the owner.
       await this.coordinator.start(this.coordinator.status().revision);
       picture = await waitPicture();
-      if (!picture) throw fail('JOB_CAPTCHA_UNAVAILABLE');
+      if (!picture) throw preparationError(this.pictureFailureCode);
     }
     const revision = this.coordinator.status().revision;
-    if (this.coordinator.state.claims.includes(hashKey(picture.key))) throw fail('JOB_CAPTCHA_UNAVAILABLE');
+    if (this.coordinator.state.claims.includes(hashKey(picture.key))) throw preparationError('JOB_CAPTCHA_PICTURE_ALREADY_USED');
     // Export decoded image pixels only. A page/element screenshot can include
     // overlapping account UI or a fractional CSS border around the picture.
     const encoded = await this.page.locator('img').nth(picture.index).evaluate(image => {
@@ -100,8 +127,9 @@ class CaptchaTelegramBrowser {
     });
     const png = typeof encoded === 'string' ? Buffer.from(encoded, 'base64') : null;
     const after = await this.picture();
-    if (!validPng(png) || !after || !sameForm(picture.form, after.form) || picture.key !== after.key
-      || this.coordinator.status().phase !== 'active' || this.coordinator.status().revision !== revision) throw fail('JOB_CAPTCHA_UNAVAILABLE');
+    if (!validPng(png)) throw preparationError('JOB_CAPTCHA_PICTURE_INVALID');
+    if (!after || !sameForm(picture.form, after.form) || picture.key !== after.key
+      || this.coordinator.status().phase !== 'active' || this.coordinator.status().revision !== revision) throw preparationError('JOB_CAPTCHA_CHALLENGE_CHANGED');
     this.current = { ...picture, revision, png, challengeId: randomUUID(), expires: this.now() + 600000, used: false };
     return this.publicChallenge();
   }

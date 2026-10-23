@@ -106,7 +106,39 @@ async function readSearchPage(page) {
 async function readVacancyPage(page, externalId) {
   const raw = await page.evaluate(() => ({ url: location.href,
     jsonLd: [...document.querySelectorAll('script[type="application/ld+json"]')].slice(0, 20).map((s) => s.textContent.slice(0, 512001)),
-    description: document.querySelector('[data-qa="vacancy-description"]')?.innerText?.slice(0, 100000) || '',
+    description: (() => {
+      const descriptions = [...document.querySelectorAll('[data-qa="vacancy-description"]')];
+      const first = descriptions[0];
+      const visible = first && first.getClientRects().length && getComputedStyle(first).visibility === 'visible'
+        ? first.innerText?.slice(0, 100001) || '' : '';
+      if (visible.trim()) return visible.length > 100000 ? '' : visible;
+      // HH branded vacancy text is kept in a hidden static-markup container.
+      // Admit only its single declared description, never arbitrary hidden DOM.
+      if (descriptions.length !== 1) return '';
+      const container = descriptions[0].closest('.HH-ContainerForStarticMarkup-Hidden-branded-vacancy.g-invisible');
+      if (!container || !descriptions[0].matches('.vacancy-branded-user-content[data-qa="vacancy-description"]')) return '';
+      const excluded = new Set(['SCRIPT', 'STYLE', 'TEMPLATE', 'NOSCRIPT']);
+      const blocks = new Set(['ADDRESS', 'ARTICLE', 'BLOCKQUOTE', 'BR', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'OL', 'P', 'PRE', 'SECTION', 'TABLE', 'TD', 'TH', 'TR', 'UL']);
+      let output = '', tooLong = false;
+      const append = value => { if (output.length + value.length > 100000) tooLong = true; else output += value; };
+      const stack = [{ node: descriptions[0], closing: false }];
+      let visited = 0;
+      while (stack.length && !tooLong) {
+        const { node, closing } = stack.pop();
+        if (++visited > 20000) { tooLong = true; break; }
+        if (node.nodeType === Node.TEXT_NODE) { append(node.nodeValue || ''); continue; }
+        if (node.nodeType !== Node.ELEMENT_NODE || excluded.has(node.tagName)) continue;
+        const block = blocks.has(node.tagName);
+        if (closing) { if (block && output && !output.endsWith('\n')) append('\n'); continue; }
+        if (block && output && !output.endsWith('\n')) append('\n');
+        if (block) stack.push({ node, closing: true });
+        for (let child = node.lastChild; child; child = child.previousSibling) {
+          if (stack.length + visited >= 20000) { tooLong = true; break; }
+          stack.push({ node: child, closing: false });
+        }
+      }
+      return tooLong ? '' : output.replace(/\n[\t ]+/gu, '\n').replace(/[\t ]+\n/gu, '\n').replace(/\n{3,}/gu, '\n\n').trim();
+    })(),
     experience: document.querySelector('[data-qa="work-experience-text"]')?.textContent?.slice(0, 150) || '',
     workFormat: document.querySelector('[data-qa="work-formats-text"]')?.textContent?.slice(0, 200) || '',
     salaryText: document.querySelector('[data-qa="vacancy-salary"]')?.textContent?.slice(0, 1000) || '',
