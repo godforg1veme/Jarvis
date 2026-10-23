@@ -73,7 +73,9 @@ deadline across metadata, fetch and body reads.
 
 ### Job search
 
-#### HH: состояние на 22 октября / State on October 22
+<a id="hh-состояние-на-22-октября--state-on-october-22"></a>
+
+#### HH: состояние на 23 октября / State on October 23
 
 23 октября выпущен [автоматический выбор модели писем](updates/2026-10-23-jobs-automatic-model-release.md).
 Ручная настройка и отдельная job-model переменная удалены; применяется общая
@@ -116,7 +118,7 @@ VPS source checkouts are synchronized.
 Профили изолированы по UUID, текущее право `jobs` проверяется и в фоновых задачах.
 [Вход и мобильный ввод](updates/2026-10-21-hh-login-touch-release.md),
 [резюме и текущая политика](updates/2026-10-22-hh-resume-bot-defaults-release.md).
-Датированные результаты ниже сохраняют историю прежних этапов.
+Прежние результаты сохраняет [архив контекста](history/2026-10-23-runtime-context.md).
 
 Personal sign-in uses a temporary HTTPS link delivered as private Telegram text
 and a button; the page supports taps and the phone keyboard. After connection,
@@ -136,112 +138,56 @@ server/browser hold these credentials; the collector receives neither. Profiles
 are UUID-isolated, with current `jobs` access checked for background work too.
 [Sign-in and phone input](updates/2026-10-21-hh-login-touch-release.md),
 [resumes and current policy](updates/2026-10-22-hh-resume-bot-defaults-release.md).
-The dated results below preserve earlier stages.
+Earlier stages are retained in the [context archive](history/2026-10-23-runtime-context.md).
 
-[Исследование 403](updates/2026-10-18-hh-captcha-403-investigation.md): native XHR
-и browser/API cookies проверены с отменой answer POST. На DE включён ограниченный
-классификатор ошибок HH и закрытые timing/request fields; причина прежнего 403
-ещё не доказана, unknown не повторяется. Linux browser 71/71. Одобренный тест
-в 18:37 МСК снова дал 403/unknown, CSRF совпал с cookie, `body_unavailable`;
-точная причина отказа и ограничение, исключившее тело, остаются неизвестны.
-Read-only запросы публичного HH API с Windows и DE вернули 403 от ddos-guard;
-сильная гипотеза — отказ сетевого слоя. [Материалы и границы вывода](updates/2026-10-18-hh-captcha-403-investigation.md).
+#### Browser, CAPTCHA и диагностика
 
-[Живой тест 18 октября, 16:46 МСК](updates/2026-10-18-hh-ocr-live-acceptance.md):
-ответ установленной OCR-модели после отдельного одобрения владельца отправлен
-один раз; POST 302 / target GET 200 / solved, сбор возобновился с progress.
-Это не приёмка полностью автономного цикла; старый unknown не воспроизвёлся.
+Домен `server/src/jobs` использует PostgreSQL, Telegram, отдельные collector
+и Chromium browser. Browser владеет приватными HH-сессиями; профили разделены
+по UUID. Read/apply credentials разделены: collector имеет только read,
+apply доступен server/browser при явном opt-in. Сбор детерминированный,
+модель вызывается по запросу, отправка требует точного письма и durable intent.
+Unknown проверяется по исходной операции без повторного POST; стоп-лист сохраняется.
+[Настройка browser](../job-browser/README.md),
+[контракт Telegram](telegram-menu-contract.md).
 
-Квитанция всех CAPTCHA-отправок сохраняется в owner-bound manual state,
-экспортируется локально через `exportCaptchaReceipt.js`, без ручного текста.
-[Разбор unknown и выпуск](updates/2026-10-18-hh-captcha-receipt-diagnosis.md)
-разделяет потерянные сведения прошлой отправки и готовую диагностику следующей.
+Личная временная ссылка обменивается на HttpOnly guest cookie. Connect RPC имеет
+отдельный секрет; значения ввода проходят в памяти и не сохраняются в БД,
+файлы, Telegram или логи.
 
-[Приватный архив автоматических попыток](updates/2026-10-18-hh-captcha-evidence.md)
-установлен на DE: PNG, валидный ответ и закрытый receipt в owner-bound profile,
-TTL 48 часов / максимум 64 записи. Архив доступен только локальному CLI;
-публичные diagnostics и ручной Telegram reply не содержат этих данных.
+CAPTCHA broker8082 использует отдельный credential только у server/browser,
+без host ports. Collector проверяет паузу без обращений к HH. Фото содержит
+только CAPTCHA PNG. Reply привязан к owner/private conversation, chat, message ID,
+challenge/revision и сроку; расходуется атомарно до единственного native POST.
+Ответ не проходит через AI/history/memory. Возобновление требует read-only
+проверки точного target; unknown/replay и старые картинки не разрешают повтор.
 
-Установлено на DE 18 октября 2026: включён отдельный opt-in дообученной
-модели `hh-ru-captcha` с исходным выпрямлением, frozen selection и rescue.
-`JARVIS_HH_CAPTCHA_AUTOMATIC=1` разрешает до трёх durable попыток перед прежним
-Telegram фото. Unknown/перезапуск незавершённой отправки останавливает автоматику;
-успех требует прежнего verifier. `/ocr/frozen` исключает подмену общим OCR.
-Код опубликован, веса и приватные примеры не входят в Git. Linux build, права
-сокета, ресурсные ограничения и изолированные проверки прошли. При первой живой
-попытке доступ не подтвердился: budget остановлен после unknown, фото отправлено
-в Telegram; collector остаётся на attention с сохранённым progress.
-[Результат выпуска и ограничения](updates/2026-10-18-hh-trained-ocr-release.md).
-[Увеличение лимита до трёх](updates/2026-10-18-hh-captcha-three-attempts-development.md)
-установлено отдельно; уже переданные человеку капчи остаются в ручном режиме.
+`JARVIS_HH_CAPTCHA_AUTOMATIC=1` включает отдельную frozen `hh-ru-captcha` модель
+с выпрямлением и rescue: до трёх durable попыток, остановка при unknown или
+перезапуске незавершённой отправки. `/ocr/frozen` не допускает общий OCR.
+Переданные человеку состояния не открываются заново; refresh не пополняет бюджет.
+Без opt-in Telegram сразу передаёт CAPTCHA человеку. Прежний общий networkless
+`job-ocr` с UNIX socket сохранён только для отдельного opt-in fallback при
+выключенном Telegram режиме. Journal/profile/resume/exclusions не сбрасываются.
+HH gateway/noVNC/Serve link и host proxy удалены; другие применения Tailscale/VPN
+этим изменением не затрагиваются. Проверка health включает Chromium, а не только HTTP;
+замена вкладки, durable refresh и bounded retries сохраняют исходный прогресс.
 
-Выпущен на DE 15 октября 2026: домен `server/src/jobs`, существующий Telegram
-и PostgreSQL, отдельные collector и Chromium browser. Browser владеет приватной
-HH-сессией, узкий RPC привязан к одному owner UUID; read/apply credentials
-разделены. Сбор детерминированный, модель вызывается по кнопке, отправка требует
-подтверждения точного письма и durable intent. Unknown проверяется по исходной
-операции без повторного POST. Стоп-лист работодателей сохраняется.
-Поиск включён; live submit ещё не проверен и требует подтверждения владельца.
-[Результат выпуска и ограничения](updates/2026-10-15-job-search-release.md),
-[настройка браузера](../job-browser/README.md).
+Receipt всех CAPTCHA-отправок хранится в owner-bound manual state и доступен
+через локальный `exportCaptchaReceipt.js` без ручного текста. Автоматические
+попытки имеют приватный архив PNG/валидного ответа/закрытого receipt в profile:
+TTL 48 часов, максимум 64 записи, доступ только локальному CLI. Эти данные не
+попадают в публичные diagnostics; ручной Telegram reply не архивируется.
+Веса OCR и приватные примеры не входят в Git.
 
-19 октября 2026 личный вход HH для участников с правом `jobs` опубликован
-и установлен на DE из `35a340a19a31056e029b780bbde0c8342a5f8cb6`.
-Mini App выдаёт короткоживущую HTTPS-ссылку для телефона или ПК; Chromium
-использует отдельный профиль участника по UUID. После входа пользователь
-возвращается в исходную Mini App и подтверждает резюме. Одноразовая ссылка
-обменивается на HttpOnly guest cookie, а connect RPC использует отдельный
-секрет. Ввод проходит в памяти и не сохраняется в БД, файлы, Telegram или логи.
-Миграция 039 применена, исходники обоих VPS синхронизированы. Реальный вход HH
-и подтверждение резюме участником ещё требуют проверки.
-[Результат выпуска](updates/2026-10-19-member-hh-login-release.md),
-[запись разработки](updates/2026-10-19-job-search-member-access-development.md).
-
-On October 19, 2026, personal HH sign-in for members with `jobs` permission was
-published and deployed on DE from `35a340a19a31056e029b780bbde0c8342a5f8cb6`.
-The Mini App issues a short-lived HTTPS link for a phone or PC; Chromium uses a
-UUID-scoped profile separate from the owner profile. After signing in, the
-member returns to the originating Mini App to confirm a resume. The one-time
-link exchanges for an HttpOnly guest cookie, and connect RPC uses a separate
-credential. Input passes through memory and is not saved to the database,
-files, Telegram or logs. Migration 039 is applied, and both VPS source checkouts
-are synchronized. A real HH sign-in and resume confirmation still need
-acceptance. See the [release record](updates/2026-10-19-member-hh-login-release.md)
-and [development record](updates/2026-10-19-job-search-member-access-development.md).
-
-Для CAPTCHA на DE установлен человеческий ответ через Telegram: headless browser
-держит один прежний HH profile, coordinator и durable claims. Закрытый broker8082
-использует отдельный CAPTCHA credential только у server/browser. Collector
-имеет read credential и проверяет паузу без обращений к HH. Host ports отсутствуют.
-
-Фото содержит только CAPTCHA PNG. Reply привязан к owner/private conversation,
-chat, message ID, challenge/revision и сроку картинки. Ответ расходуется атомарно
-перед единственным native POST; текст не проходит через AI/history/memory.
-После read-only проверки точного target обычный поиск продолжает progress.
-Unknown/replay и старые картинки не разрешают повторную отправку ответа.
-[Согласованный контракт](superpowers/specs/2026-10-16-hh-telegram-captcha-design.md).
-
-Без нового automatic opt-in Telegram режим сразу передаёт CAPTCHA человеку.
-Прежний общий networkless `job-ocr`
-с UNIX socket сохранён для отдельного opt-in fallback при выключенном Telegram
-режиме. Journal/profile/resume/exclusions не сбрасываются. История OCR и прежнего
-[ручного web-доступа](updates/2026-10-16-hh-mobile-manual-release.md) сохранена;
-HH gateway/noVNC/Serve link и host proxy удалены из работающего окружения. Другие
-Tailscale и VPN применения к этому изменению не относятся.
-Server/browser/collector установлены из `b0712e69875adbe62db1892007da65f34d4d636f`.
-16 октября 2026 владелец подтвердил прохождение настоящей CAPTCHA через Telegram.
-Проверка owner-scoped состояния: ответ `solved`, coordinator idle, collector
-с активной lease продолжил прежний progress; доставка выросла с 583 до 602 карточек.
-Сценарий фото → reply → однократная отправка → проверка HH → продолжение принят.
-[Результат установки](updates/2026-10-16-hh-telegram-captcha.md).
-
-Позднее 16 октября проверка HH снова остановилась: на DE подтверждён OOM внутри
-browser container при продолжающем успешном HTTP health.
-[Восстановление браузера и очереди установлено](updates/2026-10-16-hh-captcha-resilience-release.md)
-из `e6fe29a7e3129a34626223df9bd6a1b980da46be`: проверка Chromium, замена вкладки,
-durable refresh, bounded retries и owner-scoped уведомления. Migration 033 применена.
-Новая картинка получила binding, ответ `solved`; coordinator idle, collector
-продолжил прежний progress. Профиль, настройки и смонтированные секреты сохранены.
+История и границы выводов: [403](updates/2026-10-18-hh-captcha-403-investigation.md),
+[receipt](updates/2026-10-18-hh-captcha-receipt-diagnosis.md),
+[архив](updates/2026-10-18-hh-captcha-evidence.md),
+[OCR opt-in](updates/2026-10-18-hh-trained-ocr-release.md),
+[одобренный живой ответ](updates/2026-10-18-hh-ocr-live-acceptance.md),
+[восстановление после OOM](updates/2026-10-16-hh-captcha-resilience-release.md).
+Один успешный ответ OCR не подтверждает полностью автономный цикл; причина
+прежнего 403 не доказана. Текущий статус и клиентская приёмка — в [карте](README.md).
 
 ### OpenRouter model routing
 
@@ -250,7 +196,10 @@ durable refresh, bounded retries и owner-scoped уведомления. Migrati
 `JARVIS_OPENROUTER_FREE_FIRST` defaults to false. The approved free order is
 fixed; primary/fallback OpenRouter model IDs form the paid pool. This mode uses
 the primary key for the entire queue, without continuing to legacy account or
-Gemini fallbacks. Explicit job/Vision model selection is independent.
+Gemini fallbacks. Explicit Vision model selection is independent. HH letters
+use the same FreeFirstProvider queue on request, with the configured global
+paid fallback and no personal model override; see the
+[October 23 release](updates/2026-10-23-jobs-automatic-model-release.md).
 
 Refresh happens on use after 15 minutes; it updates metadata, not the allowlist.
 Provider price ceilings protect zero-price routing even between refreshes.

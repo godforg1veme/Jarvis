@@ -15,7 +15,7 @@ each exporting four endpoints. Both nodes' VPN services, peer timers and live/
 persistent hopping DNAT are present. VLESS passed both directions; Hysteria2
 fixed-443 passed separate strict client checks, while hopping acceptance remains
 mixed. Scheduled proof freshness and subscription ordering corrections are
-recorded in [the current update](updates/2026-10-08-vpn-probe-resilience.md).
+recorded in [the current update](../updates/2026-10-08-vpn-probe-resilience.md).
 
 Current VPN acceptance: all four owner-confirmed cross-node test bindings have
 fresh healthy proofs from 2026-09-24. The old 2026-09-25 timer discrepancy
@@ -23,7 +23,7 @@ was a host/peer interpretation error: DE runs `@nl.timer` and NL runs
 `@de.timer`; both were enabled/active on 2026-09-29. Owner-authorized hopping
 maintenance restored missing DE DNAT and persisted both nodes' rules in UFW.
 Fresh probes on 2026-09-29 passed both directions; keys and URLs were preserved.
-See [hopping maintenance](updates/2026-09-29-hysteria-hopping-persistence.md).
+See [hopping maintenance](../updates/2026-09-29-hysteria-hopping-persistence.md).
 The recorded 2026-09-24 DE and NL runs reported
 healthy VLESS 443/8443 and Hysteria2 fixed-443/hopping checks. NL now has DNS-only
 `vpn-nl.rilora.ru -> 94.183.208.56`, a Let's Encrypt certificate for that
@@ -130,7 +130,7 @@ pools and hopping probe use Happ's 30-second multi-port default. The DE server
 and both Host Agents were deployed; migration rows for two four-port pools, public
 smoke, and disabled probe timers were verified. The real Happ port-hopping and
 split-routing acceptance remains mandatory. The current
-[VPN resilience runbook](VPN_RESILIENCE_RUNBOOK.md) defines the evidence order
+[VPN resilience runbook](../VPN_RESILIENCE_RUNBOOK.md) defines the evidence order
 and the no-timer safety boundary.
 
 The active Telegram button architecture guide and shipped-menu contract are

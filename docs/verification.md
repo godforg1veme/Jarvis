@@ -1,16 +1,32 @@
 # Проверки перед выпуском
 
+Выбирай проверки по изменённым компонентам. Начинай с узкого набора, затем
+проверяй соседние сценарии. Команды ниже не означают, что проверки уже выполнены.
+Результаты запусков и развёртывания хранятся в [updates](updates/), прежняя
+подробная хроника — в [архиве](history/2026-10-23-verification.md).
+Порядок публикации: [release-workflow.md](release-workflow.md).
+
+## Выбор проверок
+
+| Изменение | Основной маршрут |
+| --- | --- |
+| Server | `npm test --prefix server`; отдельная PostgreSQL acceptance для затронутого контракта |
+| Telegram | [Required regression gate](telegram-menu-contract.md#required-regression-gate), затем полный server suite перед выпуском |
+| HH | Нужный раздел ниже, browser suite и изолированная PostgreSQL; Linux нужен для durable-file semantics |
+| Desktop | `test:core`, IPC/package/browser проверки, затем живой установленный клиент |
+| Mini App / Operations | Tests/build и browser fixtures; реальный вход и права проверяются отдельно |
+| Host Agent | Linux unittest из полного source tree; клиентские changing actions отдельно |
+| Только документация | Ссылки, anchors, сохранность правил и команд; runtime suite обычно не нужен |
+
+PostgreSQL acceptance использует только отдельную тестовую БД, никогда production.
+Переменные подключения задавай приватно. Пропуск теста без БД не считается
+успешной проверкой. Fixtures не доказывают работу настоящих HH, Bot API,
+Electron, устройств или VPS; эти результаты записывай отдельно.
+
 ## Автоматическая модель писем HH / Automatic HH letter model
 
-Выпуск 23 октября: [результат](updates/2026-10-23-jobs-automatic-model-release.md).
-791/791 server unit, 66/66 Telegram gate и 26 PostgreSQL-сценариев прошли.
-Проверяются автоматическая очередь и стоимость, удаление настройки и старого
-ввода, сохранение фильтров, генерация/подтверждение письма и регрессии истории.
-
-Release, October 23: [results](updates/2026-10-23-jobs-automatic-model-release.md).
-791/791 server unit, 66/66 Telegram gate and 26 PostgreSQL scenarios passed.
-Coverage includes automatic routing and usage, obsolete input/preference removal,
-retained filters, letter generation/send confirmation and history regressions.
+Очередь и учёт стоимости, удаление настройки и старого ввода, сохранение фильтров,
+генерация и финальное подтверждение письма. [Результат выпуска](updates/2026-10-23-jobs-automatic-model-release.md).
 
 ```powershell
 npm test --prefix server
@@ -21,25 +37,9 @@ node --test server/test/jobDraftAcceptance.cjs server/test/jobLetterModesAccepta
 
 ## Почасовая история HH / Hourly HH history
 
-Выпуск 22 октября:
-[результат и ограничения](updates/2026-10-22-hh-history-hourly-release.md).
-Новые Linux-образы: 787/787 server, 13/13 PostgreSQL history, 90/90 browser
-и 4/4 Chromium history, без пропусков. Live/ready и миграция 044 прошли.
-Первый живой автоматический обход завершён: 27 страниц, 527 записей; все десять
-карточек со скриншота подтверждены в архиве HH и показывают архивную подпись.
-Для PostgreSQL требуется отдельная тестовая БД. Проверяются граница часа,
-все подключённые пользователи, независимость от поиска вакансий, сохранение
-checkpoint, права, архивные/неподтверждённые статусы и исходная дата HH.
-
-Release, October 22:
-[results and limits](updates/2026-10-22-hh-history-hourly-release.md).
-New Linux images: 787/787 server, 13/13 PostgreSQL history, 90/90 browser
-and 4/4 Chromium history, without skips. Live/ready and migration 044 passed.
-The first live automatic pass completed: 27 pages, 527 records. All ten
-screenshot cards were confirmed in HH's archive and render an archive label.
-Use an isolated PostgreSQL database. Checks cover hourly deadlines, all eligible
-connected users, independence from vacancy search, checkpoints, permissions,
-archived/unconfirmed observations and original HH dates.
+Граница часа, все подключённые пользователи с актуальными правами, независимость
+от поиска вакансий, checkpoint, архивные/неподтверждённые статусы и исходная дата HH.
+[Результат выпуска](updates/2026-10-22-hh-history-hourly-release.md).
 
 ```powershell
 npm test --prefix server
@@ -53,27 +53,8 @@ node --test job-browser/test/historyAcceptance.cjs
 
 ## HH resume management and default raising
 
-Управление резюме и текущая политика, выпуск 22 октября:
-[резюме](updates/2026-10-22-hh-resume-management-release.md),
-[бот и поднятие по умолчанию](updates/2026-10-22-hh-resume-bot-defaults-release.md).
-Linux server 787/787 и PostgreSQL 32/32 прошли, включая десять сценариев бота
-и гонки отзыва `jobs`. Mini App build и Edge fixtures на 1280/390 и
-320/390/1280 прошли. На DE применены 041–043; read-only сверка 22 октября
-подтвердила все 45 файлов миграций. Это результаты прежних запусков и текущего
-аудита, а не повторный запуск тестов при правке документации.
-Реальные нажатия owner/member, вход HH с телефона и первое успешное поднятие
-остаются клиентской приёмкой; первый worker tick дал `not_due`.
-
-Resume management and current policy, October 22 release:
-[resumes](updates/2026-10-22-hh-resume-management-release.md),
-[bot and default raising](updates/2026-10-22-hh-resume-bot-defaults-release.md).
-Linux server 787/787 and PostgreSQL 32/32 passed, including ten bot scenarios
-and `jobs` revocation races. Mini App build and Edge fixtures at 1280/390 and
-320/390/1280 passed. DE has 041–043 applied; the October 22 read-only comparison
-confirmed all 45 migration files. These are prior test results and the current
-audit, not tests rerun for this documentation edit. Real owner/member taps,
-phone HH sign-in and the first successful raise remain client acceptance;
-the first worker tick returned `not_due`.
+Выбор резюме в боте/Mini App, подтверждение, явный off, unknown и гонки отзыва jobs.
+[Результат выпуска](updates/2026-10-22-hh-resume-bot-defaults-release.md).
 
 ```powershell
 npm test --prefix server
@@ -83,29 +64,12 @@ node scripts/testMiniAppClient.cjs
 node --test server/test/jobResumesAcceptance.cjs server/test/jobResumeDefaultsAcceptance.cjs server/test/jobResumeTelegramAcceptance.cjs
 ```
 
-## Ранее проверенные этапы / Earlier verification records
+## Личный вход HH и доступ сборщика
 
-Выпуск HH на DE 21 октября: [результат](updates/2026-10-21-hh-login-touch-release.md).
-Новые Linux images прошли 783 server и 79 browser tests без пропусков,
-42 миграции с pgvector и 14 PostgreSQL acceptance. Установленные файлы,
-миграция 040, volumes, окружение приложения и публичный HTTPS проверены.
-
-HH release on DE, October 21: [results](updates/2026-10-21-hh-login-touch-release.md).
-New Linux images passed 783 server and 79 browser tests without skips,
-42 pgvector migrations and 14 PostgreSQL acceptance checks. Installed files,
-migration 040, volumes, application environment and public HTTPS were verified.
-
-Личный вход HH, локально 21 октября:
-[результат и ограничения](updates/2026-10-21-hh-login-touch-development.md).
-Server 783/783, Telegram 66/66, browser 70 passed и 9 Windows skips;
-14 отдельных PostgreSQL acceptance и fixtures 390/1280 px прошли.
-Реальный вход HH и клавиатура iPhone остаются для клиентской приёмки.
-
-Personal HH sign-in, local development on October 21:
-[results and limits](updates/2026-10-21-hh-login-touch-development.md).
-Server 783/783, Telegram 66/66, browser 70 passed with 9 Windows skips;
-14 isolated PostgreSQL acceptance checks and 390/1280 px fixtures passed.
-Real HH sign-in and the iPhone keyboard still require client acceptance.
+Browser fixtures используют синтетические HH/API и проверяют телефонный ввод.
+Отдельная PostgreSQL проверяет роли, персональные allow/deny, блокировку и отзыв.
+[Вход](updates/2026-10-21-hh-login-touch-release.md),
+[доступ сборщика](updates/2026-10-21-job-collector-access-repair.md).
 
 ```powershell
 npm run build --prefix mini-app
@@ -117,37 +81,18 @@ node scripts/testHhLoginTouch.cjs
 node --test server/test/jobMemberConnectionPostgresAcceptance.cjs server/test/miniAppPostgresAcceptance.cjs server/test/miniAppIntegrationAcceptance.cjs
 ```
 
-Доступ сборщика поиска работы, 21 октября:
-[результат ремонта DE и локальных проверок](updates/2026-10-21-job-collector-access-repair.md).
-781/781 unit; 8/8 Linux-проверок с отдельной PostgreSQL. Новый сценарий проверяет
-роли, персональный allow/deny, блокировку, отзыв прав и 101 запрещённый поиск
-перед разрешёнными. Код опубликован и установлен на DE; сам новый образ прошёл
-781 unit и 3 PostgreSQL-проверки. Оба VPS source checkout синхронизированы.
-
-Job collector access, October 21:
-[DE repair and local checks](updates/2026-10-21-job-collector-access-repair.md).
-781/781 unit tests; 8/8 Linux checks with isolated PostgreSQL. The new scenario
-covers roles, personal allow/deny, blocking, revocation and 101 denied searches
-ahead of permitted users. The code is published and installed on DE; the new image
-passed 781 unit tests and 3 PostgreSQL checks. Both VPS source checkouts are synchronized.
-
 ```powershell
 # Set JARVIS_JOB_TEST_DATABASE_URL privately to an isolated database, never production.
 npm run test:jobs:access --prefix server
 node --test server/test/jobRuntime.test.js
 ```
 
-Орбитальная Operations UI, выпуск 22 октября:
-[результат и ограничения](updates/2026-10-22-orbital-monitoring-release.md).
-Unit 42/42, build, девять страниц на 1440/662/390/320 px, WebGL, fallback,
-bootstrap и подтверждения сервисов прошли. Отдельно проверены DE, оба source checkout,
-публичные assets и девять разделов с реальными данными. FPS физического телефона не измерялся.
+## Operations UI и живой фон
 
-Orbital Operations UI, release on October 22:
-[results and limitations](updates/2026-10-22-orbital-monitoring-release.md).
-Unit 42/42, build, nine pages at 1440/662/390/320 px, WebGL, fallback, bootstrap and
-service confirmations passed. Separate live checks covered DE, both source checkouts,
-public assets and all nine sections with real data. Physical phone frame rates were not measured.
+Проверяются девять разделов, WebGL/fallback, CSP и подтверждения сервисов.
+Browser fixtures требуют Playwright; FPS физического телефона измеряется отдельно.
+[Панель](updates/2026-10-22-orbital-monitoring-release.md),
+[фон](updates/2026-10-22-living-sky-release.md).
 
 ```powershell
 npm test --prefix ops-ui
@@ -164,51 +109,19 @@ node scripts/testOperationsBrowser.cjs
 node scripts/previewOperations.cjs
 ```
 
-Живой фон, выпуск 22 октября:
-[результат](updates/2026-10-22-living-sky-release.md).
-46/46 unit, build, движение/пауза/resize/fallback фона и прежние browser/CSP
-сценарии прошли. Linux image 787/787, 11 публичных assets и живая панель прошли.
-DE server и оба VPS source checkout обновлены; нагрузка на физическом телефоне не измерена.
-
-Living sky, release on October 22:
-[results](updates/2026-10-22-living-sky-release.md).
-All 46 unit tests, build, sky motion/pause/resize/fallback and the existing
-browser/CSP scenarios passed. Linux image 787/787, all 11 public assets and the live
-panel passed. DE server and both VPS source checkouts are updated; physical phone load is unmeasured.
-
 ```powershell
 node scripts/testLivingSky.cjs
 ```
 
-Выпуск 20 октября: [результат](updates/2026-10-20-desktop-reliability-release.md).
-Новый Linux image прошёл 778/778, отдельный PostgreSQL применил 41 миграцию и
-проверил новый status lookup. Установленный Desktop: 146 файлов, Electron и
-bundled runtime совпадают; изолированный настоящий TCP-обрыв восстановлен с
-одним POST. В Electron проверены загрузка UI и trusted IPC. Прямой Windows
-HTTPS/WSS недоступен, поэтому online-чат, микрофон и реальные команды не приняты.
+## Desktop: core и восстановление
 
-October 20 release: [result](updates/2026-10-20-desktop-reliability-release.md).
-New Linux image passed 778/778; isolated PostgreSQL applied 41 migrations and
-verified status recovery. All 146 installed files, native Electron and bundled
-runtime match. A real isolated TCP loss recovered with one POST; installed UI
-and trusted IPC passed. Direct Windows HTTPS/WSS is unavailable, so online chat,
-microphone and real user commands remain unverified.
-
-Локальная надёжность Desktop, 20 октября 2026:
-[результат и ограничения](updates/2026-10-20-desktop-reliability-development.md).
-`npm run test:core` запускает только явный список из `scripts/coreTestManifest.json`:
-5 проверок runner, 102 cloud/Desktop и 778 server unit, без пропусков.
-Ошибка, пустой набор, skipped или todo обязательного набора дают ненулевой exit.
-Новый тест включается в manifest осознанно. PostgreSQL, Linux, browser и live
-остаются отдельными проверками; зелёный core не означает готовность выпуска.
-
-Local Desktop reliability, October 20, 2026:
-[results and limits](updates/2026-10-20-desktop-reliability-development.md).
-`npm run test:core` runs the explicit `scripts/coreTestManifest.json` only:
-5 runner, 102 cloud/Desktop and 778 server unit tests, no skips. Failed, empty,
-skipped or todo required suites return a nonzero exit. Add new tests deliberately.
-PostgreSQL, Linux, browser and live checks remain separate; core success is not
-release acceptance.
+`test:core` использует явный `scripts/coreTestManifest.json`; failed, пустой,
+skipped или todo обязательного набора дают ненулевой exit. Новые тесты включаются
+в manifest осознанно. PostgreSQL, Linux, browser и live остаются отдельными.
+Browser fixtures проверяют 1440×900 и 760×560, доступное имя поля, состояния связи,
+восстановление ответа/подтверждения, потерю ack без второго POST, overflow/runtime
+errors. Скриншоты идут в игнорируемый `build/desktop-recovery-screenshots/`.
+Playwright — тестовая зависимость. [Результат](updates/2026-10-20-desktop-reliability-release.md).
 
 ```powershell
 npm run test:core
@@ -218,89 +131,32 @@ node scripts/checkCloudPackageAssets.js
 node scripts/testDesktopRecoveryBrowser.cjs
 ```
 
-Browser fixture: 1440×900 и минимальное окно Desktop 760×560, доступное имя
-поля, состояния соединения, восстановление ответа/подтверждения, сбой ack,
-отсутствие повторного POST, overflow и runtime errors. Скриншоты сохраняются
-в игнорируемом `build/desktop-recovery-screenshots/`. Модуль Playwright нужен
-в среде проверки, но не добавлен в production-зависимости.
+## Московское время и OpenRouter
 
-Browser fixtures cover 1440×900 and Desktop's minimum 760×560 window, composer
-accessible name, connection states, response/confirmation recovery, ack failure,
-no repeated POST, overflow and runtime errors. Screenshots go to ignored
-`build/desktop-recovery-screenshots/`. Playwright is required in the test environment
-and is not added as a production dependency. These fixtures do not prove live
-Electron IPC, PostgreSQL or VPS behavior.
-
-Московское время, выпуск 19 октября:
-[результат и ограничения](updates/2026-10-19-moscow-time-release.md).
-760/760 server tests локально и в Linux `TZ=UTC`; PostgreSQL acceptance 1/1
-с 40 migrations и настоящими handlers на отдельной БД. Operations UI 3/3 и build,
-cloud 73/73, Life OS renderer/browser в UTC/LA/Tokyo, Mini App build/browser прошли.
-Установленный Desktop: 144 файла, native Electron и wake runtime совпадают.
-Старые напоминания, телефонный ввод и доставка: см. ограничения выпуска.
-
-Moscow time, October 19 release:
-[results and limits](updates/2026-10-19-moscow-time-release.md).
-760/760 server tests locally and in Linux `TZ=UTC`; PostgreSQL acceptance 1/1
-with 40 migrations and real handlers on an isolated database. Operations UI 3/3
-and build, cloud 73/73, Life OS renderer/browser in UTC/LA/Tokyo and Mini App
-build/browser passed. All 144 installed Desktop files, native Electron and
-wake runtime match. See the release for existing-reminder and client limits.
-
-To run the PostgreSQL test, set `JARVIS_MOSCOW_TEST_DATABASE_URL` privately to
-an isolated test database, never production. It creates and removes its own schema:
+`JARVIS_MOSCOW_TEST_DATABASE_URL` указывает только на изолированную БД;
+fixture создаёт и удаляет собственную схему. Проверяй UI в разных часовых поясах,
+а ввод и отображение — по [контракту времени](runtime-context.md#time-display-and-input--отображение-и-ввод-времени).
 
 ```powershell
 node --test server/test/moscowTimePostgresAcceptance.cjs
 ```
 
-OpenRouter free-first, выпуск 19 октября:
-[результат и ограничения](updates/2026-10-19-free-first-routing-release.md).
-14 routing tests, focused suite 33/33, весь server suite 756/756 прошли.
-Проверены цены/caps, очередь, квота, cache refresh и запрет повтора action-capable
-запроса. Тот же полный набор прошёл в Linux image. Новый router включён на DE;
-живой бесплатный запрос и отдельная квитанция подтвердили $0. Платный fallback
-проверен fixtures, живую платную отправку не вызывали.
-
-OpenRouter free-first, October 19 release:
-[results and limits](updates/2026-10-19-free-first-routing-release.md).
-14 routing tests, focused suite 33/33 and full server suite 756/756 passed.
-Coverage includes prices/caps, order, quota, cache refresh and action-capable
-no-retry. The same complete suite passed in the Linux image. The router is enabled
-on DE; a live free request and its separate receipt confirmed $0. Paid fallback
-uses fixtures; no live paid dispatch was triggered.
+Для OpenRouter проверяй цены/caps, очередь, квоту, обновление кеша, отсутствие
+ключа, подставной transport и запрет повтора action-capable запроса. Живой
+контракт проверяется отдельно без вывода секретов; fixtures платного fallback
+не подтверждают живую платную генерацию.
 
 ```powershell
 node --test server/test/openRouterRouting.test.js server/test/providers.test.js server/test/config.test.js
 npm test --prefix server
 ```
 
-Исправление Mini App от 18 октября: [вход без SDK и удаление «Помощи»](updates/2026-10-18-mini-app-entry-help-removal.md).
-742 server tests прошли локально и в Linux image; production browser fixtures
-включают недоступный SDK, успешный fixture-вход и отказ сервера. Публичная проба
-подтвердила отправку synthetic fragment и отказ неверной подписи; настоящий
-вход владельца после исправления ещё не подтверждён.
+## Mini App
 
-October 18 Mini App fix: [entry without the SDK and Help removal](updates/2026-10-18-mini-app-entry-help-removal.md).
-742 server tests passed locally and in the Linux image; production browser
-fixtures cover an unavailable SDK, successful fixture login and server rejection.
-A public probe confirmed synthetic-fragment submission and invalid-signature
-rejection; actual owner login after the fix remains unconfirmed.
-
-Telegram Mini App, выпуск 18 октября:
-[результат](updates/2026-10-18-telegram-mini-app-release.md).
-Linux Docker: 741 server test, 8 PostgreSQL acceptance, все 40 migrations прошли
-на отдельной БД. Оба browser набора прошли локально. HTTPS, production migrations
-и кнопка бота проверены. Реальные Telegram cookies/клиенты, телефонный FPS
-и второй HH ещё не проверены. На DE используется tunnel, не Caddy.
-
-Telegram Mini App, October 18 release:
-[results](updates/2026-10-18-telegram-mini-app-release.md).
-Linux Docker passed 741 server tests, 8 PostgreSQL acceptance tests and all 40
-migrations on an isolated DB. Both browser suites passed locally. HTTPS,
-production migrations and the bot menu were verified. Actual Telegram
-cookies/clients, phone FPS and a second HH account remain unverified.
-DE uses the tunnel, not Caddy.
+Подпись/TTL/membership, отсутствие SDK, успешный fixture-вход и отказ сервера;
+[контракт и ограничения](../mini-app/README.md). PostgreSQL tests создают только
+свои временные схемы и не обращаются к HH или Bot API. Проверка целевых migrations
+не заменяет полный runtime migration check с pgvector.
 
 ```powershell
 npm run build --prefix mini-app
@@ -312,40 +168,16 @@ npm test --prefix server
 node --test server/test/miniAppPostgresAcceptance.cjs server/test/miniAppIntegrationAcceptance.cjs
 ```
 
-PostgreSQL acceptance создаёт и удаляет только свои временные схемы, применяет
-настоящие целевые migrations без несвязанного pgvector и не обращается к HH
-или Bot API. Без явной тестовой БД эти отдельные `.cjs` tests пропускаются;
-это не считается успешной PostgreSQL-проверкой. Последний локальный запуск
-выполнен с БД, 8/8 без пропусков.
+## OCR: изолированные проверки
 
-PostgreSQL acceptance creates/drops only its own temporary schemas, applies
-actual target migrations without unrelated pgvector and never contacts HH or
-the Bot API. Without an explicit test DB these separate `.cjs` tests skip;
-that does not establish PostgreSQL acceptance. The latest local run had a
-configured isolated DB and passed 8/8 with no skips.
-
-Более новая проверка browser от 18 октября:
-[приватный журнал попыток](updates/2026-10-18-hh-captcha-evidence.md), Linux 62/62,
-все шесть browser/broker/worker сценариев с архивом PNG/ответов. Приведённое ниже
-описание первоначального этапа с двумя попытками сохраняет историю.
-
-Newer browser verification on 18 October:
-[private attempt evidence](updates/2026-10-18-hh-captcha-evidence.md), Linux 62/62
-and all six browser/broker/worker scenarios with persisted PNG/answer evidence.
-The initial two-attempt stage below is retained as history.
-
-## Дообученный OCR HH: локальные проверки 18 октября 2026
-
-Этот раздел описывает локальный этап. Более новый результат —
-[Linux установка и живая попытка](updates/2026-10-18-hh-trained-ocr-release.md):
-browser 56/56 без skips, OCR worker 10/10, изолированный UNIX socket и ресурсы
-проверены; текущая реальная попытка остановилась после unknown с отправкой фото.
-Release-status с Compose overlays проверен 15 тестами.
-
-This section records the local stage. The newer linked release covers Linux
-browser 56/56 without skips, OCR worker 10/10 and isolated socket/resource checks.
-The actual attempt stopped as unknown and sent a human photo. Compose-overlay
-release verification passed 15 tests.
+Подготовь игнорируемый bundle по [job-ocr/README.md](../job-ocr/README.md) и локальный
+PNG 250×90. Пути ниже — пример локального тестового окружения. Последняя команда
+всегда запускает offline browser/broker/photo-worker fixtures; обе переменные
+`JARVIS_FROZEN_TEST_*` добавляют настоящий CPU recognizer на canvas PNG.
+HH и Bot API синтетические. Проверяются успехи/отказы, unknown/redirect, одна
+доставка фото, restart, повтор изображения, бюджеты, scopes и identity модели;
+это не подтверждает прохождение живой CAPTCHA. Linux socket/resource/metadata
+проверки описаны отдельно в руководстве worker. [История оценки](updates/2026-10-18-hh-trained-ocr-development.md).
 
 ```powershell
 npm test --prefix job-browser
@@ -357,34 +189,6 @@ $env:JARVIS_FROZEN_TEST_PYTHON='F:/OCR Learning/PaddleOCR/.venv/Scripts/python.e
 $env:JARVIS_FROZEN_TEST_PNG='F:/test/jarvis/data/hh-ocr-evaluation/transport.png'
 node --test job-browser/test/captchaAutomaticAcceptance.cjs
 ```
-
-Последняя команда всегда проверяет browser/broker/photo-worker на фикстурах;
-при указанных двух переменных дополнительно использует настоящий CPU recognizer
-и PNG, извлечённый canvas браузера. До запуска подготовь bundle по
-[`job-ocr/README.md`](../job-ocr/README.md), исходный PNG должен быть локальным
-примером 250×90. Контекст браузера принудительно offline; ответы HH и Bot API
-подменены. Успехи с первой/второй попытки, два отказа, unknown/redirect и одна
-доставка фото проверяются через настоящий broker/client/worker. Unit tests
-покрывают durable restart, повтор картинки, лимит, старые states, scope,
-предварительное отсутствие уведомления и исключение общего OCR backend.
-
-[`Результаты`](updates/2026-10-18-hh-trained-ocr-development.md) отделяют GPU
-оценку 1 709 изображений и CPU PNG parity 73/73 от ещё не выполненных Linux
-сборки, resource-limit/socket/metadata проверок и реальной приёмки Telegram/HH.
-Новые production зависимости не установлены. Desktop не затронут.
-
-The last command always exercises browser/broker/photo-worker fixtures and,
-when both variables are provided, also the real CPU recognizer on browser-canvas
-PNG pixels. Prepare the ignored bundle first and supply a local 250×90 PNG.
-The browser context is forcibly offline; HH responses and Bot API delivery are
-synthetic. Tests cover first/second success, two rejections, unknown/redirect
-stop and one photo, with unit coverage for durable restart, repeated images,
-budgets, legacy state, scopes, early-notification suppression and model identity.
-The linked record distinguishes 1,709-image GPU evaluation and 73/73 CPU PNG
-parity from pending Linux build/resource/socket checks and live Telegram/HH
-acceptance. Production dependencies are not installed; Desktop is unaffected.
-
-Выбирай проверки для изменённых компонентов. Результаты реального клиента записывай отдельно от тестов. Порядок публикации находится в [руководстве по выпуску](release-workflow.md).
 
 ## Commands and Verification
 
@@ -502,19 +306,23 @@ npm run test:jobs:settings --prefix server
 npm run test:jobs:postgres --prefix server
 ```
 
-Проверка применяет migration 036 и проходит через настоящие message/menu handlers:
-все поля, предустановки/свой ввод, списки моделей и фраз, добавление/удаление,
-пагинация, минимум один запрос, предел списка, отсутствие записи до подтверждения,
-неизменные значения, retry/consumption/expiry/revision, отмена навигацией,
-чужие user/chat/conversation и duplicate update. Старый pending редактор сохранён.
-Ни AI, ни HH в этих проверках не вызываются; реальный Telegram UI проверяется отдельно.
+Проверки проходят через настоящие message/menu handlers и interaction repository:
+готовые/свои значения, списки фраз, добавление/удаление, пагинация, отсутствие
+записи до подтверждения, no-op, retry/consumption/expiry/revision, отмена навигацией,
+чужие scopes и duplicate update. Пустой список допустим, но поиск без запросов
+не включается. Ручного выбора модели нет; старые model callbacks/ввод отклоняются.
+Ни AI, ни HH не вызываются; реальный Telegram UI проверяется отдельно.
+[Первоначальный этап и migration 036](history/2026-10-23-verification.md),
+[текущий выпуск и migration 045](updates/2026-10-23-jobs-automatic-model-release.md).
 
-The fixture applies migration 036 through actual message/menu handlers and covers
-all fields, presets/custom values, configured model choices, phrase lists and
-pagination, addition/removal, minimum/maximum list bounds, explicit confirmation,
-no-op choices, retry/consumption/expiry/revision, navigation cancellation, foreign
-scopes and duplicate updates. Legacy pending editors stay compatible. No AI or HH
-calls occur; actual Telegram UI acceptance remains separate.
+Checks use actual message/menu handlers and the interaction repository: presets
+and custom values, phrase lists, add/remove, pagination, no writes before
+confirmation, no-op, retry/consumption/expiry/revision, navigation cancellation,
+foreign scopes and duplicate updates. Empty lists are allowed; search cannot
+start without queries. Manual model selection is absent, and obsolete model
+callbacks/input are rejected. No AI or HH calls occur; live Telegram UI checks
+remain separate. The linked archive preserves the original migration 036 stage;
+the current release adds migration 045.
 
 HH history tracking (local development, 2026-10-16):
 
