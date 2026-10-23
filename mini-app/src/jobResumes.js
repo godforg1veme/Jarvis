@@ -11,6 +11,7 @@ export function createJobResumePanel({api,actor,parent}) {
   const toggleLabel=make('label',null,'job-resume-toggle'),toggle=make('input');toggle.type='checkbox';toggle.setAttribute('aria-label','Автоподнятие выбранного резюме');
   toggleLabel.append(toggle,make('span','Поднимать выбранное резюме автоматически'));
   const hint=make('p','Для новых подключений автоподнятие включено по умолчанию; его можно выключить. Только бесплатно, не чаще раза в 4 часа и когда HH разрешает. Остальные резюме и их видимость не меняются.','muted');
+  const help=make('details',null,'job-resume-help'),helpTitle=make('summary','Бесплатно, не чаще раза в 4 часа');help.append(helpTitle,hint);
   const details=make('p',null,'muted'),buttons=make('div',null,'job-controls'),confirmBox=make('div',null,'job-resume-confirm');confirmBox.hidden=true;
   const confirmText=make('p');confirmBox.append(confirmText);
   const btn=(parent,text,fn,primary=false)=>{const b=make('button',text,primary?'primary':'secondary');b.type='button';b.onclick=()=>{Promise.resolve(fn()).catch(e=>message(e.message||'Не удалось выполнить действие.'));};parent.append(b);return b;};
@@ -18,9 +19,11 @@ export function createJobResumePanel({api,actor,parent}) {
   const reconcile=btn(buttons,'Проверить исходный запрос',checkPending);reconcile.hidden=!pending;
   const checkRaise=btn(buttons,'Проверить последнее поднятие',checkLastRaise);checkRaise.hidden=true;
   const accept=btn(confirmBox,'Подтвердить',commit,true),cancel=btn(confirmBox,'Отмена',()=>{preview=null;confirmBox.hidden=true;controls();});
-  root.append(title,status,label,currentTitle,toggleLabel,hint,details,buttons,confirmBox);parent.append(root);
+  root.append(title,status,label,currentTitle,toggleLabel,help,details,buttons,confirmBox);parent.append(root);
   function message(text) {if(!disposed)status.textContent=text;}
   function controls() {
+    root.dataset.state=busy?'pending':pending?'unknown':preview?'confirmation':data?.autoRaise?.lastOutcome==='unknown'?'unknown':'ready';
+    root.setAttribute('aria-busy',String(busy));
     const blocked=busy||Boolean(pending)||Boolean(preview)||stale;
     save.disabled=blocked||!dirty||!select.value;refresh.disabled=busy||Boolean(pending)||Boolean(preview);
     select.disabled=busy||Boolean(pending)||Boolean(preview);toggle.disabled=select.disabled||!data?.raiseAvailable||data?.autoRaise?.lastOutcome==='unknown';
@@ -76,7 +79,7 @@ export function createJobResumePanel({api,actor,parent}) {
   }
   async function commit() {
     if(!preview||busy||pending)return;
-    const id=crypto.randomUUID();savePending(actor,KIND,id);pending=id;busy=true;controls();
+    const id=crypto.randomUUID();savePending(actor,KIND,id);pending=id;busy=true;controls();message('Сохраняем настройки резюме…');
     try {
       const op=await api.request('/jobs/resumes/settings','POST',{requestId:id,...preview});
       if(op.status==='complete'||op.status==='failed') {

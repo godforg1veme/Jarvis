@@ -4,6 +4,14 @@
 
 ## Русский
 
+23 октября [единый дизайн Mini App](updates/2026-10-23-mini-app-interiors-development.md)
+распространён локально на все существующие внутренние экраны, формы и состояния.
+Проверки используют тестовые данные; на VPS изменения ещё не выпущены.
+
+23 октября локально реализован [орбитальный Mini App](updates/2026-10-23-mini-app-orbital-development.md)
+после исправления UX. Планеты и фон перенесены из дашборда; права и
+подтверждения сохранены. На VPS эти изменения пока не выпущены.
+
 Описание проекта и текущие записи переведены на два языка:
 [обновление документации от 16 октября](updates/2026-10-16-bilingual-project-docs.md).
 Изменения опубликованы в GitHub и получены обоими VPS; сверка исходников,
@@ -282,6 +290,14 @@ worktree отстаёт на пять коммитов. Это состояни�
 Они не заменяют текущие правила и живую проверку.
 
 ## English
+
+October 23: the [shared Mini App design](updates/2026-10-23-mini-app-interiors-development.md)
+was extended locally to every existing interior screen, form and state.
+Checks use fixture data; these changes have not been deployed to the VPSs.
+
+October 23: the [orbital Mini App](updates/2026-10-23-mini-app-orbital-development.md)
+was implemented locally after the UX repair. Planets and sky follow the dashboard;
+authorization and confirmations remain intact. These changes are not deployed yet.
 
 The project description and current records now have both language versions:
 [documentation update from 16 October](updates/2026-10-16-bilingual-project-docs.md).

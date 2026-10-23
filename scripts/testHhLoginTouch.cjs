@@ -14,9 +14,9 @@ const remoteHtml = `<style>*{box-sizing:border-box}body{margin:0;background:whit
 const server = http.createServer(async (req, res) => {
   if (req.url === '/hh-fixture') { res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); res.end(remoteHtml); return; }
   const name = new URL(req.url, 'http://localhost').pathname.replace(/^\/mini\//, '');
-  if (!['job-connect/', 'jobConnect.js', 'api.js', 'style.css'].includes(name)) { res.writeHead(404).end(); return; }
+  if (!['job-connect/', 'jobConnect.js', 'api.js', 'style.css', 'interior.css', 'assets/milky-way-gaia-4k.webp'].includes(name)) { res.writeHead(404).end(); return; }
   const filename = name === 'job-connect/' ? 'job-connect.html' : name;
-  try { res.writeHead(200, { 'content-type': filename.endsWith('.js') ? 'text/javascript' : filename.endsWith('.css') ? 'text/css' : 'text/html' }); res.end(await fs.readFile(path.join(root, filename))); }
+  try { res.writeHead(200, { 'content-type': filename.endsWith('.js') ? 'text/javascript' : filename.endsWith('.css') ? 'text/css' : filename.endsWith('.webp') ? 'image/webp' : 'text/html' }); res.end(await fs.readFile(path.join(root, filename))); }
   catch { res.writeHead(404).end(); }
 });
 

@@ -1,216 +1,139 @@
 import * as THREE from 'three';
-import { RoomEnvironment } from './vendor/RoomEnvironment.js';
+import { createCoreBody, createPlanetBody, bounds } from './orbitalBodies.js';
+import { PLANET_TYPES, ORBITS, orbitPosition, precession } from './orbitMotion.js';
 
-// A procedural model, not a rotating raster. No external assets or API calls.
-export function createCore(host, { onStatus = () => {} } = {}) {
+export function createCore(host, { onStatus = () => {}, items = [], onSelect = () => {}, onMotionChange = () => {} } = {}) {
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-  let paused = reduced.matches;
-  let disposed = false;
-  let visible = true;
-  let frame = 0;
-  let speed = 0.7;
-  let elapsed = 0;
-  let lastTime = 0;
-  let drawCount = 0;
+  const personalKeys = ['assistant', 'memory', 'documents', 'devices', 'life', 'jobs'];
+  const entries = items.filter((item) => item && personalKeys.includes(item.key) && typeof item.label === 'string').slice(0, 6);
+  const controller = new AbortController(), { signal } = controller;
+  let manualPause = false, workspace = false, visible = true, disposed = false, contextLost = false;
+  let elapsed = 0, speed = .7, frame = 0, lastFrame = 0, lastTick = 0, drawCount = 0, focusPause = false, hoverPause = false, sphereHover = false;
   let renderer;
-  const listeners = new AbortController();
-  const { signal } = listeners;
-  try {
-    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'low-power' });
-  } catch {
-    host.dataset.render = 'fallback';
-    onStatus('3D недоступно · статичный вид');
-    return { available: false, dispose() { listeners.abort(); } };
+  const paused = () => manualPause || reduced.matches;
+  const moving = () => !paused() && !workspace && !focusPause && !hoverPause && !sphereHover && !contextLost && !disposed && visible && !document.hidden;
+  const reportMotion = () => onMotionChange({ paused: paused(), moving: moving() });
+  function fallback() {
+    host.dataset.render = 'fallback'; onStatus('3D недоступно · статичный вид');
+    return { available: false, get paused() { return paused(); }, setPaused(value) { manualPause = Boolean(value); reportMotion(); }, setSpeed() {}, reset() {}, setWorkspace(value) { workspace = Boolean(value); reportMotion(); }, dispose() { controller.abort(); } };
   }
-  renderer.setPixelRatio(Math.min(devicePixelRatio, innerWidth < 600 ? 1.5 : 2));
-  renderer.setClearColor(0x000000, 0);
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.25;
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.domElement.setAttribute('aria-hidden', 'true');
-  host.prepend(renderer.domElement);
-  host.dataset.render = 'webgl';
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 40);
-  camera.position.set(0, 0.4, 6.8);
-  camera.lookAt(0, 0, 0);
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  const room = new RoomEnvironment();
-  const environment = pmrem.fromScene(room, 0.04);
-  scene.environment = environment.texture;
-  room.dispose();
-  pmrem.dispose();
-  const body = new THREE.Group();
-  scene.add(body);
-  const light = new THREE.PointLight(0x4de1ff, 10, 10);
-  light.position.set(-1.8, 1.2, 2.5);
-  scene.add(light, new THREE.HemisphereLight(0xc6e5ff, 0x0a172d, 2));
-  const key = new THREE.DirectionalLight(0xffffff, 5);
-  key.position.set(3, 4, 3);
-  scene.add(key);
-  const rim = new THREE.PointLight(0x1d73ff, 16, 8);
-  rim.position.set(2, -1, -1);
-  scene.add(rim);
-  const metal = new THREE.MeshPhysicalMaterial({ color: 0x8eafc2, metalness: 1,
-    roughness: 0.22, clearcoat: 0.8, clearcoatRoughness: 0.18, envMapIntensity: 1.9 });
-  const edge = new THREE.MeshStandardMaterial({ color: 0x24394d, metalness: 0.92, roughness: 0.28 });
-  const cyan = new THREE.MeshBasicMaterial({ color: 0x71e8ff, toneMapped: false });
-  const rings = [];
-  function band(radius, width, depth) {
-    const shape = new THREE.Shape();
-    shape.absarc(0, 0, radius, 0, Math.PI * 2, false);
-    const hole = new THREE.Path();
-    hole.absarc(0, 0, radius - width, 0, Math.PI * 2, true);
-    shape.holes.push(hole);
-    const geo = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: true,
-      bevelSegments: 3, steps: 1, bevelSize: 0.014, bevelThickness: 0.014, curveSegments: 96 });
-    geo.translate(0, 0, -depth / 2);
-    return geo;
-  }
-  for (let i = 0; i < 4; i += 1) {
-    const radius = 1.21 + i * 0.18;
-    const group = new THREE.Group();
-    group.add(new THREE.Mesh(band(radius, 0.10 + i * 0.012, 0.07), metal));
-    const back = new THREE.Mesh(new THREE.TorusGeometry(radius - 0.036, 0.013, 8, 128), edge);
-    back.position.z = -0.052;
-    group.add(back);
-    // Small inlaid light arcs break up continuous rings and catch rotation.
-    for (let j = 0; j < 4; j += 1) {
-      const arc = new THREE.Mesh(new THREE.TorusGeometry(radius - 0.04, 0.008, 6, 22, 0.38), cyan);
-      arc.rotation.z = j * Math.PI / 2 + i * 0.3;
-      arc.position.z = 0.046;
-      group.add(arc);
-    }
-    for (let j = 0; j < 8; j += 1) {
-      const stud = new THREE.Mesh(new THREE.SphereGeometry(0.019, 8, 6), edge);
-      const angle = j * Math.PI / 4;
-      stud.position.set(Math.cos(angle) * (radius - 0.04), Math.sin(angle) * (radius - 0.04), 0.038);
-      group.add(stud);
-    }
-    body.add(group);
-    rings.push(group);
-  }
-  const orb = new THREE.Mesh(new THREE.SphereGeometry(0.86, 64, 40),
-    new THREE.MeshPhysicalMaterial({ color: 0x082d4c, metalness: 0.48, roughness: 0.17,
-      clearcoat: 1, clearcoatRoughness: 0.04, emissive: 0x063656, emissiveIntensity: 0.65,
-      transparent: true, opacity: 0.86, envMapIntensity: 2 }));
-  body.add(orb);
-  const shell = new THREE.Mesh(new THREE.SphereGeometry(0.9, 48, 32), new THREE.ShaderMaterial({
-    uniforms: { strength: { value: 0.7 } },
-    vertexShader: `varying vec3 vNormal; varying vec3 vEye;
-      void main(){ vec4 p=modelViewMatrix*vec4(position,1.0); vNormal=normalize(normalMatrix*normal);
-      vEye=normalize(-p.xyz); gl_Position=projectionMatrix*p; }`,
-    fragmentShader: `varying vec3 vNormal; varying vec3 vEye; uniform float strength;
-      void main(){ float rim=pow(1.0-max(dot(normalize(vNormal),normalize(vEye)),0.0),3.2);
-      gl_FragColor=vec4(0.13,0.73,1.0,rim*strength); }`,
-    transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
-  }));
-  body.add(shell);
-  const wire = new THREE.Mesh(new THREE.IcosahedronGeometry(0.865, 2), new THREE.MeshBasicMaterial({
-    color: 0x3cb4ee, wireframe: true, transparent: true, opacity: 0.13 }));
-  body.add(wire);
-  // Deterministic points avoid flicker and make visual reviews repeatable.
-  const coords = new Float32Array(210 * 3);
-  for (let i = 0; i < 210; i += 1) {
-    const theta = i * 2.399963;
-    const z = 1 - 2 * (i + 0.5) / 210;
-    const s = Math.sqrt(1 - z * z);
-    coords.set([0.89 * s * Math.cos(theta), 0.89 * z, 0.89 * s * Math.sin(theta)], i * 3);
-  }
-  const pointsGeometry = new THREE.BufferGeometry();
-  pointsGeometry.setAttribute('position', new THREE.BufferAttribute(coords, 3));
-  const particles = new THREE.Points(pointsGeometry, new THREE.PointsMaterial({
-    color: 0xa8eaff, size: 0.016, transparent: true, opacity: 0.7, depthWrite: false,
-    blending: THREE.AdditiveBlending }));
-  body.add(particles);
-  let targetX = -0.1, targetY = 0, x = -0.1, y = 0;
-  let pointer = null;
-  let contextLost = false;
-  function draw(time = performance.now()) {
-    if (disposed || contextLost || !visible || document.hidden || !host.getClientRects().length) return;
-    const delta = lastTime ? Math.min((time - lastTime) / 1000, 0.05) : 0;
-    lastTime = time;
-    if (!paused) elapsed += delta * speed;
-    const t = elapsed;
-    const damping = 1 - Math.exp(-6 * delta);
-    x += (targetX - x) * damping;
-    y += (targetY - y) * damping;
-    body.rotation.set(x + Math.sin(t * 0.32) * 0.065, y + Math.sin(t * 0.23) * 0.11, -0.08);
-    body.position.y = Math.sin(t * 0.65) * 0.045;
-    rings.forEach((ring, i) => {
-      ring.rotation.set(0.38 + i * 0.57 + t * (i % 2 ? -0.18 : 0.15),
-        i * 0.72 + t * (i % 2 ? 0.22 : -0.16), i * 0.45 + t * (0.06 + i * 0.025));
-    });
-    orb.rotation.y = t * 0.09;
-    wire.rotation.y = -t * 0.12;
-    particles.rotation.y = t * 0.08;
-    shell.material.uniforms.strength.value = 0.57 + Math.sin(t * 1.6) * 0.1;
-    renderer.render(scene, camera);
-    drawCount += 1;
-    host.dataset.frames = String(drawCount);
-    if (!paused && visible && !document.hidden) frame = requestAnimationFrame(draw);
-  }
-  function stop() { cancelAnimationFrame(frame); frame = 0; lastTime = 0; }
-  function start() {
-    stop();
-    if (visible && !document.hidden && !contextLost) {
-      draw();
-      onStatus(paused ? 'ДВИЖЕНИЕ ПРИОСТАНОВЛЕНО' : 'ИНТЕРАКТИВНОЕ ЯДРО');
-    }
-  }
-  const resize = new ResizeObserver(() => {
-    const width = host.clientWidth, height = host.clientHeight;
-    if (!width || !height) return;
-    renderer.setSize(width, height);
-    camera.aspect = width / height;
-    camera.updateProjectionMatrix();
-    if (paused) draw();
+  try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'low-power' }); }
+  catch { return fallback(); }
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+  renderer.setClearColor(0, 0); renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.domElement.setAttribute('aria-hidden', 'true'); host.prepend(renderer.domElement); host.dataset.render = 'webgl';
+  const scene = new THREE.Scene(), camera = new THREE.OrthographicCamera(-1, 1, 1, -1, .1, 80);
+  camera.position.z = 13;
+  scene.add(new THREE.AmbientLight(0xffffff, .19));
+  const key = new THREE.DirectionalLight('#d7e0e5', 2.6); key.position.set(-4, 6, 8); scene.add(key);
+  const fill = new THREE.DirectionalLight('#93a7b2', 1.25); fill.position.set(4, -2, -3); scene.add(fill);
+  const core = createCoreBody(); scene.add(core.group);
+  const planets = entries.map((item) => {
+    const index = personalKeys.indexOf(item.key);
+    const type = PLANET_TYPES[index], model = createPlanetBody(index), holder = new THREE.Group();
+    holder.add(model.group); scene.add(holder);
+    const spec = ORBITS[type], path = [];
+    for (let i = 0; i < 144; i++) { const phase = i / 144 * Math.PI * 2; path.push(new THREE.Vector3(Math.cos(phase) * spec.radiusX, Math.sin(phase) * spec.radiusY, Math.sin(phase) * spec.depth)); }
+    const orbit = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(path), new THREE.LineBasicMaterial({ color: '#b8c5cb', transparent: true, opacity: .2, depthWrite: false }));
+    const pathGroup = new THREE.Group(); pathGroup.add(orbit); scene.add(pathGroup);
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'planet-target'; button.dataset.planet = item.key; button.setAttribute('aria-label', 'Открыть раздел: ' + item.label); button.textContent = item.label;
+    host.append(button);
+    button.addEventListener('click', () => onSelect(item.key), { signal });
+    button.addEventListener('focus', () => { focusPause = true; sync(); }, { signal });
+    button.addEventListener('blur', () => { focusPause = false; sync(); }, { signal });
+    button.addEventListener('pointerenter', () => { hoverPause = true; sync(); }, { signal });
+    button.addEventListener('pointerleave', () => { hoverPause = false; sync(); }, { signal });
+    return { item, type, model, holder, orbit, pathGroup, button, bound: bounds[index] };
   });
-  resize.observe(host);
-  const observer = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; start(); });
-  observer.observe(host);
-  document.addEventListener('visibilitychange', start, { signal });
-  host.addEventListener('pointerdown', (event) => {
-    if (event.button !== 0 || paused) return;
-    pointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
+  const centerLabel = document.createElement('div'); centerLabel.className = 'core-label'; centerLabel.textContent = 'JARVIS'; centerLabel.setAttribute('aria-hidden', 'true'); host.append(centerLabel);
+  const raycaster = new THREE.Raycaster(), pointer = new THREE.Vector2();
+  let renderedWidth = 0, renderedHeight = 0;
+  function pick(event) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    pointer.set((event.clientX - rect.left) / rect.width * 2 - 1, -(event.clientY - rect.top) / rect.height * 2 + 1);
+    raycaster.setFromCamera(pointer, camera);
+    return planets.find((planet) => raycaster.intersectObject(planet.model.surface, false).length) || null;
+  }
+  function projected(position) { const vector = position.clone().project(camera); return { x: (vector.x * .5 + .5) * host.clientWidth, y: (-vector.y * .5 + .5) * host.clientHeight }; }
+  function positionLabels() {
+    if (contextLost) return;
+    const width = host.clientWidth, height = host.clientHeight, accepted = [];
+    const discs = [{ x: width / 2, y: height / 2, r: 1.21 * camera.zoom }];
+    for (const planet of planets) discs.push({ ...projected(planet.holder.position), r: planet.bound * camera.zoom });
+    centerLabel.style.left = width / 2 + 'px'; centerLabel.style.top = Math.min(height - 20, height / 2 + discs[0].r + 12) + 'px';
+    for (let i = 0; i < planets.length; i++) {
+      const disc = discs[i + 1], button = planets[i].button;
+      if (button.hidden) { button.hidden = false; button.style.display = 'flex'; button.style.visibility = 'hidden'; }
+      const w = button.offsetWidth, h = button.offsetHeight;
+      const candidates = [[disc.x, disc.y + disc.r + 3], [disc.x, disc.y - disc.r - h - 3], [disc.x + disc.r + w / 2 + 5, disc.y - h / 2], [disc.x - disc.r - w / 2 - 5, disc.y - h / 2]];
+      let found = null;
+      for (const [x, y] of candidates) {
+        const rect = { left: x - w / 2, right: x + w / 2, top: y, bottom: y + h };
+        if (rect.left < 4 || rect.right > width - 4 || rect.top < 4 || rect.bottom > height - 4) continue;
+        if (accepted.some((r) => rect.left < r.right + 3 && rect.right > r.left - 3 && rect.top < r.bottom + 3 && rect.bottom > r.top - 3)) continue;
+        if (discs.some((body) => { const x0 = Math.max(rect.left, Math.min(body.x, rect.right)), y0 = Math.max(rect.top, Math.min(body.y, rect.bottom)); return Math.hypot(x0 - body.x, y0 - body.y) < body.r + 2; })) continue;
+        found = { x, y, rect }; break;
+      }
+      button.hidden = !found; button.style.display = found ? 'flex' : 'none'; button.style.visibility = found ? 'visible' : 'hidden'; button.tabIndex = found ? 0 : -1; button.style.pointerEvents = found ? 'auto' : 'none';
+      if (found) { button.style.left = found.x + 'px'; button.style.top = found.y + 'px'; accepted.push(found.rect); }
+    }
+  }
+  function fit() {
+    const width = host.clientWidth, height = host.clientHeight; if (!width || !height) return;
+    if (width !== renderedWidth || height !== renderedHeight) {
+      renderer.setSize(width, height, false); renderedWidth = width; renderedHeight = height;
+      renderer.domElement.style.width = '100%'; renderer.domElement.style.height = '100%';
+    }
+    camera.left = -width / 2; camera.right = width / 2; camera.top = height / 2; camera.bottom = -height / 2;
+    let extentX = 1.21, extentY = 1.21;
+    planets.forEach((planet) => { const p = planet.holder.position, r = planet.bound; extentX = Math.max(extentX, Math.abs(p.x) + r); extentY = Math.max(extentY, Math.abs(p.y) + r); });
+    camera.zoom = Math.min(Math.max(1, width / 2 - 18) / extentX, Math.max(1, height / 2 - 28) / extentY);
+    camera.updateProjectionMatrix(); camera.updateMatrixWorld();
+  }
+  function update(time) {
+    const positions = {};
+    const narrow = Math.min(1, Math.max(.62, host.clientWidth / 540));
+    planets.forEach((planet) => { const position = orbitPosition(planet.type, time); planet.holder.position.set(position[0] * narrow, position[1], position[2]); planet.orbit.rotation.z = precession(planet.type, time); planet.pathGroup.scale.x = narrow; planet.model.group.rotation.y = time * ORBITS[planet.type].spin; positions[planet.item.key] = [planet.holder.position.x, planet.holder.position.y, planet.holder.position.z].map((value) => Math.round(value * 1000) / 1000); });
+    core.group.rotation.y = time * .08;
+    host.dataset.orbitTime = time.toFixed(3); host.dataset.orbitPositions = JSON.stringify(positions);
+    fit(); positionLabels();
+  }
+  function draw(now = performance.now()) {
+    frame = 0;
+    if (disposed || contextLost || !visible || document.hidden || !host.getClientRects().length) return;
+    if (lastFrame && now - lastFrame < 32) { frame = requestAnimationFrame(draw); return; }
+    const delta = lastTick ? Math.min((now - lastTick) / 1000, .05) : 0; lastTick = now; lastFrame = now;
+    if (moving()) elapsed += delta * speed;
+    update(elapsed); renderer.render(scene, camera); host.dataset.frames = String(++drawCount);
+    if (moving()) frame = requestAnimationFrame(draw);
+  }
+  function stop() { cancelAnimationFrame(frame); frame = 0; lastTick = 0; lastFrame = 0; }
+  function sync() { stop(); if (visible && !document.hidden && !contextLost) draw(); onStatus(contextLost ? '3D приостановлено · статичный вид' : paused() ? 'ДВИЖЕНИЕ ПРИОСТАНОВЛЕНО' : 'ОРБИТАЛЬНАЯ СИСТЕМА'); reportMotion(); }
+  const resize = new ResizeObserver(() => { if (disposed) return; sync(); }); resize.observe(host);
+  const intersection = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; sync(); }); intersection.observe(host);
+  document.addEventListener('visibilitychange', sync, { signal });
+  const reducedChange = () => sync(); reduced.addEventListener('change', reducedChange);
+  renderer.domElement.addEventListener('pointermove', (event) => {
+    if (event.pointerType === 'touch') return;
+    const next = Boolean(pick(event));
+    if (next !== sphereHover) { sphereHover = next; sync(); }
+    renderer.domElement.style.cursor = next ? 'pointer' : '';
   }, { signal });
-  host.addEventListener('pointermove', (event) => {
-    if (!pointer || pointer.id !== event.pointerId) return;
-    targetY += (event.clientX - pointer.x) * 0.008;
-    targetX = THREE.MathUtils.clamp(targetX + (event.clientY - pointer.y) * 0.004, -0.65, 0.65);
-    pointer.x = event.clientX; pointer.y = event.clientY;
+  renderer.domElement.addEventListener('pointerleave', () => { if (sphereHover) { sphereHover = false; sync(); } renderer.domElement.style.cursor = ''; }, { signal });
+  renderer.domElement.addEventListener('click', (event) => {
+    if (contextLost) return; const planet = pick(event); if (planet) onSelect(planet.item.key);
   }, { signal });
-  const release = () => { pointer = null; };
-  window.addEventListener('pointerup', release, { signal });
-  window.addEventListener('pointercancel', release, { signal });
   renderer.domElement.addEventListener('webglcontextlost', (event) => {
     event.preventDefault(); contextLost = true; stop(); host.dataset.render = 'fallback';
-    onStatus('3D приостановлено · статичный вид');
+    planets.forEach(({ button }) => { button.hidden = true; button.style.display = 'none'; button.style.pointerEvents = 'none'; button.tabIndex = -1; });
+    centerLabel.hidden = true; onStatus('3D приостановлено · статичный вид'); reportMotion();
   }, { signal });
-  renderer.domElement.addEventListener('webglcontextrestored', () => {
-    contextLost = false; host.dataset.render = 'webgl'; start();
-  }, { signal });
-  const onReducedChange = () => { paused = reduced.matches; start(); };
-  reduced.addEventListener('change', onReducedChange);
-  start();
-  return {
-    available: true,
-    get paused() { return paused; },
-    setPaused(value) { paused = value; start(); },
-    setSpeed(value) { speed = THREE.MathUtils.clamp(value, 0.25, 1.8); },
-    reset() { targetX = -0.1; targetY = 0; x = -0.1; y = 0; if (paused) draw(); },
-    dispose() {
-      if (disposed) return;
-      disposed = true; stop(); listeners.abort(); resize.disconnect(); observer.disconnect();
-      reduced.removeEventListener('change', onReducedChange);
-      const geometries = new Set(), materials = new Set();
-      scene.traverse((object) => {
-        if (object.geometry) geometries.add(object.geometry);
-        if (object.material) materials.add(object.material);
-      });
-      geometries.forEach((geometry) => geometry.dispose());
-      materials.forEach((material) => material.dispose());
-      environment.dispose(); renderer.dispose(); renderer.domElement.remove();
-    },
-  };
+  renderer.domElement.addEventListener('webglcontextrestored', () => { contextLost = false; host.dataset.render = 'webgl'; centerLabel.hidden = false; sync(); }, { signal });
+  update(0); sync();
+  return { available: true, get paused() { return paused(); }, setPaused(value) { manualPause = Boolean(value); sync(); }, setSpeed(value) { speed = THREE.MathUtils.clamp(Number(value) || .7, .25, 1.8); }, reset() { elapsed = 0; sync(); }, setWorkspace(value) { workspace = Boolean(value); sync(); }, dispose() {
+    if (disposed) return; disposed = true; stop(); controller.abort(); resize.disconnect(); intersection.disconnect(); reduced.removeEventListener('change', reducedChange);
+    const geometries = new Set(), materials = new Set(), textures = new Set(); scene.traverse((object) => { if (object.geometry) geometries.add(object.geometry); for (const material of Array.isArray(object.material) ? object.material : object.material ? [object.material] : []) { materials.add(material); if (material.map) textures.add(material.map); } });
+    geometries.forEach((item) => item.dispose()); materials.forEach((item) => item.dispose()); textures.forEach((item) => item.dispose()); renderer.dispose(); renderer.domElement.remove(); centerLabel.remove(); planets.forEach((planet) => planet.button.remove());
+  } };
 }

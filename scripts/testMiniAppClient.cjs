@@ -6,11 +6,11 @@ const http = require('node:http');
 const { randomUUID } = require('node:crypto');
 const { chromium } = require('../job-browser/node_modules/playwright');
 const root = path.resolve(__dirname, '../mini-app/dist');
-const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
+const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.webp': 'image/webp' };
 const server = http.createServer(async (request, response) => {
   let relative = new URL(request.url, 'http://localhost').pathname.replace(/^\/mini\//, '') || 'index.html';
   if (relative === 'job-connect/') relative = 'job-connect.html';
-  if (relative.includes('..') || !/^(index\.html|job-connect\.html|(?:app|api|admin|core|jobConnect|jobConnection|jobResumes)\.js|(?:style|jobResumes)\.css|vendor\/(?:three\.module|three\.core|RoomEnvironment)\.js)$/.test(relative)) return response.writeHead(404).end();
+  if (relative.includes('..') || !/^(index\.html|job-connect\.html|(?:app|api|admin|core|orbitalBodies|orbitMotion|sectionViews|jobConnect|jobConnection|jobResumes)\.js|(?:style|orbital|interior|jobResumes)\.css|assets\/milky-way-gaia-4k\.webp|vendor\/(?:three\.module|three\.core|RoomEnvironment)\.js)$/.test(relative)) return response.writeHead(404).end();
   try { const content = await fs.readFile(path.join(root, relative)); response.writeHead(200, { 'Content-Type': types[path.extname(relative)], 'Content-Security-Policy': "default-src 'self'; script-src 'self' https://telegram.org; connect-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'" }).end(content); }
   catch { response.writeHead(404).end(); }
 });
@@ -18,7 +18,7 @@ async function fixture(context, { level = 'owner', outside = false, sdkBlocked =
   const users = [{ telegramId: '100000001', displayName: 'Владелец', level: 'owner', roleId: null, permissions: Object.keys({ assistant:1,jobs:1,life:1,memory:1,documents:1,devices:1,vpn:1,operations:1 }), overrides: {}, revision: 1 }, { telegramId: '100000003', displayName: '<b>Анна</b>', level: 'member', roleId: 'search', overrides: {}, permissions: ['jobs'], revision: 1, blocked: false }];
   const roles = [{ id: 'search', name: 'Только поиск', permissions: ['jobs'], revision: 1 }];
   const actor = level === 'member' ? users[1] : { ...users[0], level };
-  const state = { mutations: [], uncertain: false, conflict: false, session: false, op: null, section: null, blocked: false, chatUncertain: false, chatPosts: [], chatOp: null, messages: [], operationUnknown: false,
+  const state = { mutations: [], uncertain: false, conflict: false, session: false, op: null, section: null, sectionResponses: {}, sectionGates: {}, sectionReads: {}, historyGets: 0, blocked: false, chatUncertain: false, chatPosts: [], chatOp: null, messages: [], operationUnknown: false,
     jobSessionId: randomUUID(), jobTicket: 'a'.repeat(64), jobStatus: 'waiting', jobConnected: false, jobCreateRequests: [], jobClaims: [], jobConfirm: null, guestEvents: [] };
   const external = []; const errors = [];
   context.on('page', (page) => page.on('pageerror', (error) => errors.push(error.message)));
@@ -29,7 +29,14 @@ async function fixture(context, { level = 'owner', outside = false, sdkBlocked =
     const send = (data, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(data) });
     if (endpoint === '/session') { assert.equal(body.initData, 'synthetic-fixture'); if (rejectLogin) return send({ ok: false, code: 'invalid_login' }, 400); state.session = true; return send({ ok: true, csrfToken: 'fixture-csrf', actor, catalog: [] }); }
     if (endpoint === '/me') return send(state.session ? { ok: true, csrfToken: 'fixture-csrf', actor, catalog: [] } : { ok: false }, state.session ? 200 : 401);
-    if (endpoint.startsWith('/sections/')) { state.section = endpoint; return send({ ok: true, section: 'jobs', items: [{ title: 'Личный профиль' }], notice: 'Нужно личное подключение HH.' }); }
+    if (endpoint.startsWith('/sections/')) {
+      state.section = endpoint; const permission = endpoint.split('/').at(-1);
+      state.sectionReads[permission] = (state.sectionReads[permission] || 0) + 1;
+      if (state.sectionGates[permission]) await state.sectionGates[permission];
+      const response = state.sectionResponses[permission];
+      const items = permission === 'documents' ? [{ title: 'План на неделю', detail: 'Обновлён сегодня' }, { title: 'Заметки по проекту', detail: 'Личный документ' }] : [{ title: 'Личный профиль' }];
+      return response ? send(response.body, response.status || 200) : send({ ok: true, section: permission, items, notice: permission === 'jobs' ? 'Нужно личное подключение HH.' : 'Только твои данные.' });
+    }
     if (endpoint === '/jobs/connection') return send({ ok: true, available: true, connected: state.jobConnected, ...(state.jobConnected ? { resumeId: 'resume-1' } : {}) });
     if (endpoint === '/jobs/resumes') return send({ok:true,connected:state.jobConnected,primaryResumeId:'resume-1',connectionRevision:1,revision:1,
       resumes:[{id:'resume-1',title:'Моё резюме'}],updatedAt:new Date().toISOString(),autoRaise:{enabled:false,resumeId:null,nextAt:null,lastAt:null,lastOutcome:null},lastError:null,raiseAvailable:false});
@@ -53,7 +60,13 @@ async function fixture(context, { level = 'owner', outside = false, sdkBlocked =
       assert.equal(request.headers()['x-jarvis-csrf'], 'fixture-csrf'); state.jobConfirm = body; state.jobConnected = true;
       return send({ ok: true, status: 'confirmed' });
     }
-    if (endpoint === '/assistant/messages' && request.method() === 'GET') return send({ ok: true, messages: state.messages });
+    if (endpoint === '/assistant/messages' && request.method() === 'GET') {
+      state.historyGets++; const messages = state.messages.slice();
+      const gate = state.nextHistoryGate; state.nextHistoryGate = null;
+      state.historyStarted?.();
+      if (gate) await gate;
+      return state.historyFailure ? send({ ok: false }, 503) : send({ ok: true, messages });
+    }
     if (endpoint === '/assistant/messages') {
       assert.equal(request.headers()['x-jarvis-csrf'], 'fixture-csrf'); state.chatPosts.push(body); state.messages.push({ id: 'u', role: 'user', content: body.text }, { id: 'a', role: 'assistant', content: 'Ответ Jarvis' });
       if (state.chatUncertain) { state.chatOp = body; return route.abort(); }
@@ -75,10 +88,135 @@ async function fixture(context, { level = 'owner', outside = false, sdkBlocked =
   context.on('request', (request) => { if (!request.url().startsWith('http://127.0.0.1:') && !request.url().startsWith('https://telegram.org/')) external.push(request.url()); });
   return { state, external, errors };
 }
-(async () => {
+async function verifyNavigation(browser, origin) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+  const { state, errors } = await fixture(context);
+  const page = await context.newPage();
+  const modules = { memory: 'Память', documents: 'Документы', devices: 'Устройства', life: 'Life OS', jobs: 'Поиск работы', vpn: 'VPN', operations: 'Панель управления' };
+  const moduleButton = (label) => page.getByRole('button').filter({ has: page.locator('strong', { hasText: label }) });
+  const open = async (permission) => {
+    await page.locator('#home').waitFor({ state: 'visible' });
+    if (await page.locator('#modules').isHidden()) await page.locator('#all-sections').click();
+    await moduleButton(modules[permission]).click();
+    await page.waitForURL(`**/#section/${permission}`);
+    await page.locator('#assistant h1').filter({ hasText: modules[permission] }).waitFor();
+  };
+  try {
+    await page.goto(`${origin}/mini/#home`);
+    await page.locator('#application').waitFor({ state: 'visible' });
+    for (const width of [320, 390, 1280]) {
+      await page.setViewportSize({ width, height: 844 });
+      for (const permission of Object.keys(modules)) {
+        await open(permission);
+        assert.equal(await page.locator('[data-nav="assistant"]').getAttribute('aria-current'), null, 'section is not chat');
+        await page.getByRole('link', { name: 'Главная', exact: true }).click();
+        await page.locator('#home').waitFor({ state: 'visible' });
+        assert.equal(await page.locator('[data-nav="home"]').getAttribute('aria-current'), 'page');
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `navigation fits ${width}px`);
+      }
+    }
+    await open('documents');
+    await page.getByRole('link', { name: 'Jarvis — главная', exact: true }).click();
+    await page.locator('#home').waitFor({ state: 'visible' });
+    await page.goBack(); await page.waitForURL('**/#section/documents');
+    await page.locator('#assistant h1').filter({ hasText: 'Документы' }).waitFor();
+    await page.reload(); await page.locator('#assistant h1').filter({ hasText: 'Документы' }).waitFor();
+    await page.goForward(); await page.locator('#home').waitFor({ state: 'visible' });
+    const before = state.historyGets;
+    if (await page.locator('#modules').isHidden()) await page.locator('#all-sections').click();
+    await moduleButton('Ассистент').click();
+    await page.locator('#chat').waitFor({ state: 'visible' });
+    await page.waitForFunction(() => document.querySelector('.chat-history').textContent.length > 0);
+    await page.waitForTimeout(100);
+    assert.equal(state.historyGets - before, 1, 'module loads chat once');
+    await page.getByLabel('Сообщение Jarvis').fill('Несохранённый черновик');
+    await page.getByRole('link', { name: 'Главная', exact: true }).click();
+    await open('memory');
+    await page.getByRole('link', { name: 'Ассистент', exact: true }).click();
+    await page.locator('#chat').waitFor({ state: 'visible' });
+    assert.equal(await page.getByLabel('Сообщение Jarvis').inputValue(), 'Несохранённый черновик');
+    state.historyFailure = true;
+    await page.getByRole('link', { name: 'Главная', exact: true }).click();
+    await page.getByRole('link', { name: 'Ассистент', exact: true }).click();
+    await page.locator('#chat-retry').waitFor({ state: 'visible' });
+    state.historyFailure = false;
+    await page.locator('#chat-retry').click();
+    await page.locator('#chat-retry').waitFor({ state: 'detached' });
+    assert.equal(await page.getByLabel('Сообщение Jarvis').inputValue(), 'Несохранённый черновик', 'history retry retains draft');
+    await page.getByRole('link', { name: 'Главная', exact: true }).click();
+    let releaseHistory, historyStarted;
+    const started = new Promise(resolve => { historyStarted = resolve; });
+    state.historyStarted = historyStarted;
+    state.nextHistoryGate = new Promise(resolve => { releaseHistory = resolve; });
+    await page.getByRole('link', { name: 'Ассистент', exact: true }).click(); await started;
+    state.historyStarted = null;
+    await page.getByRole('button', { name: 'Отправить', exact: true }).click();
+    await page.getByText('Ответ Jarvis', { exact: true }).waitFor();
+    releaseHistory(); await page.waitForTimeout(100);
+    assert.equal(await page.getByText('Ответ Jarvis', { exact: true }).count(), 1, 'old history GET cannot replace post-send history');
+    const emptyMessages = { documents: 'Документов пока нет.', memory: 'В памяти пока нет записей.', devices: 'Устройств пока нет.', life: 'В Life OS пока нет записей.' };
+    for (const permission of Object.keys(emptyMessages)) {
+      state.sectionResponses[permission] = { body: { ok: true, items: [] } };
+      await page.getByRole('link', { name: 'Главная', exact: true }).click();
+      await open(permission);
+      await page.waitForFunction(() => !document.querySelector('#assistant').textContent.includes('Загружаем твои данные…'));
+      await page.getByText(emptyMessages[permission], { exact: true }).waitFor();
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    const uxScreenshots = path.resolve(__dirname, '../.superpowers/mini-app-preview');
+    await fs.mkdir(uxScreenshots, { recursive: true });
+    await page.screenshot({ path: path.join(uxScreenshots, 'ux-empty-mobile.png'), fullPage: true });
+    state.sectionResponses.documents = { body: { ok: false }, status: 503 };
+    await page.getByRole('link', { name: 'Главная', exact: true }).click(); await open('documents');
+    const retry = page.getByRole('button', { name: /Повторить/ }); await retry.waitFor();
+    await page.screenshot({ path: path.join(uxScreenshots, 'ux-retry-mobile.png'), fullPage: true });
+    const reads = state.sectionReads.documents;
+    state.sectionResponses.documents = { body: { ok: true, notice: 'Тестовая подсказка сервера', items: [{ title: 'После повторной загрузки' }] } };
+    await retry.click(); await page.getByText('После повторной загрузки', { exact: true }).waitFor();
+    assert.equal(state.sectionReads.documents - reads, 1, 'retry reads once');
+    await page.getByText('Тестовая подсказка сервера', { exact: true }).waitFor();
+    let release;
+    state.sectionGates.documents = new Promise(resolve => { release = resolve; });
+    state.sectionResponses.documents = { body: { ok: true, notice: 'Поздний ответ документов', items: [{ title: 'Поздний документ' }] } };
+    await page.getByRole('link', { name: 'Главная', exact: true }).click();
+    const oldReads = state.sectionReads.documents;
+    await open('documents'); await page.waitForFunction(() => document.querySelector('#assistant').textContent.includes('Загружаем'));
+    for (let attempt = 0; state.sectionReads.documents === oldReads && attempt < 100; attempt++) await page.waitForTimeout(10);
+    assert.ok(state.sectionReads.documents > oldReads, 'delayed request started');
+    await page.getByRole('link', { name: 'Главная', exact: true }).click();
+    await open('memory'); release(); delete state.sectionGates.documents;
+    await page.waitForTimeout(150);
+    assert.equal(await page.locator('#assistant h1').innerText(), 'Память');
+    assert.equal(await page.getByText('Поздний документ', { exact: true }).count(), 0, 'stale response ignored');
+    await page.goto(`${origin}/mini/#section/jobs`);
+    await page.getByText('Личный профиль HH', { exact: true }).waitFor();
+    await page.getByRole('link', { name: 'Главная', exact: true }).click();
+    await page.locator('.job-panel').waitFor({ state: 'detached' });
+    await page.goto(`${origin}/mini/#section/not-a-permission`); await page.locator('#home').waitFor({ state: 'visible' });
+    let releaseLogout;
+    state.sectionGates.documents = new Promise(resolve => { releaseLogout = resolve; });
+    await open('documents');
+    await page.getByRole('button', { name: 'Выйти', exact: true }).click();
+    await page.locator('#application').waitFor({ state: 'hidden' });
+    releaseLogout(); await page.waitForTimeout(100);
+    assert.equal(await page.locator('#application').isHidden(), true, 'late response cannot reopen logged out app');
+    assert.equal(await page.getByText('Поздний документ', { exact: true }).count(), 0, 'logout discards delayed section content');
+    assert.deepEqual(errors, []);
+  } finally { await context.close(); }
+  const member = await browser.newContext(); await fixture(member, { level: 'member' });
+  try {
+    const page = await member.newPage(); await page.goto(`${origin}/mini/#section/documents`);
+    await page.locator('#home').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#assistant').isVisible(), false, 'unauthorized deep link stays on home');
+    await page.goto(`${origin}/mini/#section/jobs`); await page.getByText('Личный профиль HH', { exact: true }).waitFor();
+  } finally { await member.close(); }
+  console.log('PASS: section routes, home/logo/back/forward/reload, single chat GET, chat draft, empty states, explicit retry, stale responses, HH disposal and member deep links at 320/390/1280px.');
+}
+async function main() {
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve)); const origin = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || 'msedge', args: ['--enable-webgl', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   try {
+    await verifyNavigation(browser, origin);
     const context = await browser.newContext({ viewport: { width: 1280, height: 1000 }, reducedMotion: 'reduce' });
     const { state, external, errors } = await fixture(context); const page = await context.newPage();
     await page.goto(`${origin}/mini/`); await page.locator('#application').waitFor({ state: 'visible' });
@@ -104,7 +242,8 @@ async function fixture(context, { level = 'owner', outside = false, sdkBlocked =
     await page.getByRole('tab', { name: 'Роли', exact: true }).click(); await page.getByRole('button', { name: '+ Создать роль' }).click(); await page.getByLabel('Название роли').fill('Документы'); await page.getByRole('checkbox', { name: 'Документы', exact: true }).check(); await page.getByRole('button', { name: 'Проверить изменения', exact: true }).click(); await page.getByRole('button', { name: 'Подтвердить и сохранить', exact: true }).click(); await page.getByRole('dialog').waitFor({ state: 'hidden' });
     await page.getByRole('button', { name: '+ Добавить', exact: true }).click(); await page.getByLabel('Telegram ID', { exact: true }).fill('100000004'); await page.getByLabel('Имя для отображения').fill('Иван'); await page.getByRole('button', { name: 'Проверить изменения', exact: true }).click(); await page.getByRole('button', { name: 'Подтвердить и сохранить', exact: true }).click(); await page.getByRole('dialog').waitFor({ state: 'hidden' });
     for (const width of [320, 390, 1280]) { await page.setViewportSize({ width, height: 900 }); assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true); await page.getByRole('link', { name: 'Главная', exact: true }).click(); await page.waitForFunction(() => document.documentElement.scrollWidth <= innerWidth); if (width === 390) await page.screenshot({ path: path.join(output, 'production-mobile.png'), fullPage: true }); }
-    await page.getByRole('button', { name: /Поиск работы/ }).click(); await page.getByText('Личный профиль HH', { exact: true }).waitFor(); assert.equal(state.section, '/sections/jobs');
+    if (await page.locator('#modules').isHidden()) await page.locator('#all-sections').click();
+    await page.locator('[data-module="jobs"]').click(); await page.getByText('Личный профиль HH', { exact: true }).waitFor(); assert.equal(state.section, '/sections/jobs');
     await page.getByRole('button', { name: 'Подключить HH', exact: true }).click();
     const jobLink = page.getByRole('link', { name: 'Открыть окно входа HH', exact: true }); await jobLink.waitFor();
     const href = await jobLink.getAttribute('href'), linkUrl = new URL(href);
@@ -144,6 +283,12 @@ async function fixture(context, { level = 'owner', outside = false, sdkBlocked =
     assert.equal(await page.getByLabel('Сообщение Jarvis').inputValue(), 'Мой вопрос');
     const stored = await page.evaluate(() => Object.values(sessionStorage).join('')); assert.equal(stored.includes('Мой вопрос'), false, 'no text persisted'); assert.equal(stored.includes('fixture-csrf'), false, 'no credential persisted');
     await page.reload(); await page.getByRole('button', { name: 'Проверить исходный запрос', exact: true }).waitFor(); assert.equal(state.chatPosts.length, 1, 'reload never resends chat');
+    await page.getByText('Ответ Jarvis', { exact: true }).waitFor();
+    assert.match(await page.locator('.chat-form [role="status"]').innerText(), new RegExp(state.chatOp.requestId), 'history load retains unknown request explanation');
+    await page.getByRole('link', { name: 'Главная', exact: true }).click();
+    await page.getByRole('link', { name: 'Ассистент', exact: true }).click();
+    await page.getByText('Ответ Jarvis', { exact: true }).waitFor();
+    assert.match(await page.locator('.chat-form [role="status"]').innerText(), new RegExp(state.chatOp.requestId), 'revisit retains unknown request explanation');
     await page.getByRole('button', { name: 'Проверить исходный запрос', exact: true }).click(); await page.getByRole('button', { name: 'Отправить', exact: true }).waitFor(); await page.getByText('Ответ Jarvis', { exact: true }).waitFor(); assert.equal(state.chatPosts.length, 1, 'chat never resends unknown request'); assert.deepEqual(await page.evaluate(() => Object.keys(sessionStorage)), [], 'completed receipt clears pending marker');
     assert.deepEqual(await page.evaluate(() => Object.keys(localStorage)), []); assert.deepEqual(external, []); assert.deepEqual(errors, []);
     await context.close();
@@ -165,4 +310,6 @@ async function fixture(context, { level = 'owner', outside = false, sdkBlocked =
     }
     console.log('PASS: blocked-SDK fragment login and server rejection, production Telegram fixture login, CSRF, role creation, Telegram ID add, owner protection, sources, confirmation, conflict draft, original-ID mutation/chat reconciliation, private sections, member guards, anonymous, keyboard, 320/390/1280, no credentials storage or unexpected requests.');
   } finally { await browser.close(); }
-})().catch((error) => { console.error(error); process.exitCode = 1; }).finally(() => server.close());
+}
+module.exports = { fixture, server };
+if (require.main === module) main().catch((error) => { console.error(error); process.exitCode = 1; }).finally(() => server.close());

@@ -3,42 +3,40 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#080e14">
+  <meta name="theme-color" content="#050607">
   <title>Jarvis · Mini App</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="./style.css">
   <link rel="stylesheet" href="./jobResumes.css">
+  <link rel="stylesheet" href="./orbital.css">
+  <link rel="stylesheet" href="./interior.css">
   <script async id="telegram-sdk" src="https://telegram.org/js/telegram-web-app.js"></script>
   <script type="module" src="./app.js"></script>
 </head>
-<body>
+<body class="orbital-mini orbital-theme">
+  <div class="mini-sky" aria-hidden="true"><img id="sky-image" src="./assets/milky-way-gaia-4k.webp" alt=""></div>
   <div id="session-state" class="preview-notice" role="status">Проверяем доступ…</div>
   <main class="shell" id="application" hidden>
-    <header class="topbar"><a class="brand" href="#home" aria-label="Jarvis — главная"><span class="brand-mark">J</span> JARVIS<span class="brand-caption">MINI APP</span></a><span id="identity" class="owner-badge">Telegram Mini App</span></header>
-    <section id="home" class="view">
-      <div class="eyebrow">ЛИЧНЫЙ ЦЕНТР УПРАВЛЕНИЯ</div>
-      <div class="hero">
-        <div class="hero-copy"><h1>Всё под<br> твоим контролем.</h1><p>Твои задачи, знания и устройства.<br> Одно пространство — твои правила.</p><a class="primary" href="#modules">Открыть пространство <span aria-hidden="true">↗</span></a><div class="hero-note"><span class="status-dot"></span> JARVIS CORE / 3D</div></div>
-        <div class="core-panel">
-          <div id="core-stage" role="img" aria-label="Объёмное ядро Jarvis: вращающиеся металлические кольца вокруг голубой сферы"><div class="core-fallback"><span>J</span></div><span class="core-wordmark" aria-hidden="true">J A R V I S</span><span id="core-loading" class="core-loading" role="status">Подготовка 3D…</span></div>
-          <div class="core-caption"><span id="core-status">ИНТЕРАКТИВНОЕ ЯДРО</span><span>01 / CORE</span></div>
-          <div class="motion-controls"><button id="pause" type="button" aria-pressed="false">Пауза</button><label for="speed">Скорость <input id="speed" type="range" min="0.25" max="1.8" step="0.05" value="0.7"></label><button id="reset-core" type="button" aria-label="Сбросить поворот ядра">Сброс</button></div>
-          <p class="drag-hint">Проведи по ядру, чтобы повернуть его</p>
-        </div>
-      </div>
-      <div class="section-heading"><h2>Твоё пространство</h2><span>ЛИЧНЫЕ РАЗДЕЛЫ</span></div>
-      <div id="modules" class="modules"></div>
-    </section>
+    <header class="topbar"><a class="brand" href="#home" aria-label="Jarvis — главная"><span class="brand-mark">J</span><span>JARVIS</span></a></header>
+    <div class="section-finder"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.3"/><path d="m15.5 15.5 4.2 4.2"/></svg><input id="section-search" type="search" aria-label="Найти раздел" placeholder="Найти раздел" autocomplete="off"><p id="section-search-status" role="status"></p></div>
+    <div class="core-panel">
+      <div id="core-stage" role="group" aria-label="Орбитальная навигация Jarvis"><div class="core-fallback"><span>J</span></div><span class="core-wordmark" aria-hidden="true">JARVIS</span><span id="core-loading" class="core-loading" role="status">Подготовка орбит…</span></div>
+      <div class="core-caption"><span id="core-status">ЛИЧНОЕ ПРОСТРАНСТВО</span><span>JARVIS / CORE</span></div>
+      <div class="motion-controls"><button id="pause" type="button" aria-pressed="false">Пауза</button><details class="motion-settings"><summary>Движение</summary><div class="motion-settings-content"><label for="speed">Скорость <input id="speed" type="range" min="0.25" max="1.8" step="0.05" value="0.7"></label><button id="reset-core" type="button" aria-label="Сбросить поворот ядра">Сбросить вид</button></div></details></div>
+    </div>
+    <section id="home" class="view"><h1 class="sr-only">Личное пространство Jarvis</h1><div class="home-actions"><p>Выбери планету или открой список разделов</p><a id="all-sections" class="secondary" href="#modules" aria-label="Открыть пространство" aria-expanded="false" aria-controls="modules">Все разделы <span aria-hidden="true">⌄</span></a></div><div id="modules" class="modules" hidden></div></section>
+    <div id="workspace" class="workspace" hidden><div class="workspace-toolbar"><span class="workspace-handle" aria-hidden="true"></span><span class="workspace-label">JARVIS / ПРОСТРАНСТВО</span><div class="workspace-tools"><button id="workspace-expand" type="button" aria-label="Развернуть раздел" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 3H3v5m0-5 6 6m7 12h5v-5m0 5-6-6"/></svg></button><a id="workspace-close" href="#home" aria-label="Закрыть раздел"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 5 19 19M19 5 5 19"/></svg></a></div></div>
     <section id="admin" class="view" hidden>
       <div class="eyebrow">АДМИНИСТРИРОВАНИЕ</div>
-      <div class="section-heading"><div><h1>Люди и доступ</h1><p class="muted">Права по ролям. Исключения — персонально.</p></div><button class="primary" id="invite" type="button">+ Добавить</button></div>
+      <div class="section-heading"><div><h1 tabindex="-1">Люди и доступ</h1><p class="muted">Права по ролям. Исключения — персонально.</p></div><button class="primary" id="invite" type="button">+ Добавить</button></div>
       <div class="tabs" role="tablist" aria-label="Управление доступом"><button id="users-tab" role="tab" aria-controls="users-panel" aria-selected="true" type="button">Пользователи <span id="user-count">3</span></button><button id="roles-tab" role="tab" aria-controls="roles-panel" aria-selected="false" tabindex="-1" type="button">Роли</button></div>
       <div id="users-panel" role="tabpanel" aria-labelledby="users-tab"><label class="search-label" for="search">Найти пользователя</label><input id="search" type="search" placeholder="Имя или Telegram ID" autocomplete="off"><div id="users" class="user-list"></div></div>
       <div id="roles-panel" role="tabpanel" aria-labelledby="roles-tab" hidden><div id="roles" class="user-list"></div><button id="add-role" class="secondary" type="button">+ Создать роль</button></div>
       <div id="audit" class="audit"></div><p class="privacy-note">Администрирование не открывает чужую переписку, память и документы.</p>
     </section>
-    <section id="assistant" class="view" hidden><div class="eyebrow">ЛИЧНЫЙ АССИСТЕНТ</div><h1>Пространство диалога</h1><p class="muted">Диалог в Mini App пока не подключён. Продолжай общение в Telegram-боте.</p><a class="secondary" href="#home">На главную</a></section>
-    <nav class="bottom-nav" aria-label="Основная навигация"><a href="#home" data-nav="home">Главная</a><a href="#assistant" data-nav="assistant">Ассистент</a><a href="#admin" data-nav="admin">Управление</a></nav>
+    <section id="assistant" class="view" hidden><div class="eyebrow">ЛИЧНЫЙ АССИСТЕНТ</div><h1 tabindex="-1">Пространство диалога</h1><p class="muted">Диалог в Mini App пока не подключён. Продолжай общение в Telegram-боте.</p><a class="secondary" href="#home">На главную</a></section>
+    </div>
+    <nav class="bottom-nav" aria-label="Основная навигация"><a href="#home" data-nav="home"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="4"/><ellipse cx="12" cy="12" rx="10" ry="5" transform="rotate(-28 12 12)"/></svg><span>Главная</span></a><a href="#assistant" data-nav="assistant"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5h16v11H9l-5 4V5Z"/><path d="M8 9h8M8 12h6"/></svg><span>Ассистент</span></a><a href="#modules" data-nav="modules"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="5" cy="6" r="2"/><circle cx="18" cy="7" r="2"/><circle cx="12" cy="18" r="2"/><path d="m7 7 9 1M6 8l5 8m6-7-4 7"/></svg><span>Разделы</span></a><a href="#admin" data-nav="admin"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 4h16v16H4zM4 10h16M10 10v10"/></svg><span>Управление</span></a></nav>
   </main>
   <dialog id="editor"><form id="editor-form"><div class="dialog-heading"><div><div class="eyebrow" id="editor-eyebrow">ПЕРСОНАЛЬНЫЕ ПРАВА</div><h2 id="editor-title">Доступ пользователя</h2></div><button class="icon-button" id="close-editor" type="button" aria-label="Закрыть">×</button></div><div id="editor-body"></div><p id="editor-error" class="form-error" role="alert"></p><div class="dialog-footer"><button class="secondary" id="cancel-editor" type="button">Отмена</button><button class="primary" type="submit">Проверить изменения</button></div></form></dialog>
   <div id="toast" class="toast" role="status" hidden></div>

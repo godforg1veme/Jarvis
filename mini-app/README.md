@@ -4,6 +4,22 @@
 
 ## Русский
 
+23 октября локально завершён единый дизайн внутренних экранов: диалог, личные
+карточки, пользователи/роли/подтверждения и все Jarvis-экраны HH. Проверены
+обычные, пустые, ошибочные и неизвестные состояния. Выпуск ещё не выполнялся.
+[Результат и покрытие](../docs/updates/2026-10-23-mini-app-interiors-development.md).
+
+23 октября локально реализовано орбитальное оформление: графитовые планеты и
+Млечный Путь как в дашборде, движение по орбитам, поиск, список и рабочая панель.
+Сохранены исправления навигации, права, черновики и подтверждения. Выпуск
+на VPS ещё не выполнялся. [Результат и проверки](../docs/updates/2026-10-23-mini-app-orbital-development.md).
+
+23 октября локально исправлена навигация личных разделов: возврат на главную,
+история переходов и перезагрузка. Добавлены сообщения для пустых списков и
+повтор чтения после ошибки; устранена двойная загрузка диалога. Орбитальное
+оформление пока не реализовано, выпуск этих UX-правок ещё не выполнялся.
+[Изменения и проверки](../docs/updates/2026-10-23-mini-app-ux-development.md).
+
 На DE выпущено изменение от 22 октября: новые и ранее подключённые
 резюме получают автоподнятие по умолчанию, если нет явного off или unknown.
 Настройка общая с кнопками Telegram; подсказка объясняет возможность выключения.
@@ -37,7 +53,7 @@ Telegram initData; личность определяется числовым Te
 обновляет revision её участников, поэтому старые пользовательские редакторы
 не сохранятся поверх новых прав. Перезапуск не снимает блокировки и назначения.
 
-Главная содержит настоящее 3D-ядро Three.js: кольца вращаются независимо,
+В выпущенной версии главная содержит 3D-ядро Three.js: кольца вращаются независимо,
 есть перетаскивание, скорость, пауза, reduced motion и статичный WebGL fallback.
 Скрытая сцена останавливается. Анимация не использует внешний API/CDN;
 вход загружает официальный Telegram Web App SDK.
@@ -122,6 +138,22 @@ Mini App build и Edge fixtures. Команды и границы проверо
 
 ## English
 
+October 23, local development: the shared design now covers chat, personal
+cards, people/roles/confirmations and all Jarvis-owned HH surfaces. Normal,
+empty, error and unknown states were checked. This is not deployed yet.
+[Results and coverage](../docs/updates/2026-10-23-mini-app-interiors-development.md).
+
+October 23, local development: the orbital UI uses the dashboard's graphite
+planets and Milky Way, with orbital motion, search, a section list and workspace.
+Navigation fixes, rights, drafts and confirmations are preserved. This UI has
+not been deployed. [Results and verification](../docs/updates/2026-10-23-mini-app-orbital-development.md).
+
+October 23, local development: personal sections now support Home navigation,
+browser history and reload. Empty lists explain their state, failed reads can
+be retried, and opening chat no longer loads history twice. The orbital design
+is not implemented yet; these UX changes have not been deployed.
+[Changes and verification](../docs/updates/2026-10-23-mini-app-ux-development.md).
+
 Deployed on DE on October 22: new and existing connected resumes get default
 automatic raising unless an explicit off or unknown stop applies. Settings
 are shared with Telegram buttons; the hint explains how to disable raising.
@@ -155,7 +187,7 @@ Administration does not open other people's conversations, memory or documents.
 Role changes increment member revisions so old user editors cannot save over
 new permissions. Restarting preserves blocks and assignments.
 
-The home screen contains an actual Three.js core with independently rotating
+The deployed home screen contains a Three.js core with independently rotating
 rings, dragging, speed, pause, reduced motion and a static WebGL fallback.
 Hidden scenes stop rendering. Animation uses no external API/CDN;
 authentication loads the official Telegram Web App SDK.

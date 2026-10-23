@@ -25,7 +25,7 @@ export function createAdmin({ api, actor, labels, onSessionError }) {
     edit = { draft, path, method, kind, confirmed: false, pending: null };
     $('#editor-title').textContent = title; $('#editor-eyebrow').textContent = 'ПРОВЕРЕННЫЙ ДОСТУП';
     body.replaceChildren(); error.textContent = ''; submit.hidden = false; submit.disabled = false; submit.textContent = 'Проверить изменения';
-    dialog.showModal();
+    dialog.dataset.kind = kind; dialog.dataset.state = 'editing'; dialog.showModal();
   }
   function readonly(user) {
     open(user.displayName || user.telegramId, {}, '', '', 'readonly');
@@ -70,7 +70,7 @@ export function createAdmin({ api, actor, labels, onSessionError }) {
         }
         row.append(group); body.append(row);
       }
-      const block = button(draft.blocked ? 'Разблокировать пользователя' : 'Заблокировать пользователя', () => { draft.blocked = !draft.blocked; block.textContent = draft.blocked ? 'Разблокировать пользователя' : 'Заблокировать пользователя'; invalidate(); }, 'block-toggle'); body.append(block);
+      const block = button(draft.blocked ? 'Разблокировать пользователя' : 'Заблокировать пользователя', () => { draft.blocked = !draft.blocked; block.textContent = draft.blocked ? 'Разблокировать пользователя' : 'Заблокировать пользователя'; block.dataset.action = draft.blocked ? 'unblock' : 'block'; invalidate(); }, 'block-toggle'); block.dataset.action = draft.blocked ? 'unblock' : 'block'; body.append(block);
       const summary = make('div', undefined, 'summary'); summary.id = 'access-summary'; body.append(summary); updateSummary();
     }
   }
@@ -88,15 +88,34 @@ export function createAdmin({ api, actor, labels, onSessionError }) {
       const row = button('', () => userEditor(user), 'user-row'); const info = make('span', undefined, 'user-info'); info.append(make('strong', user.displayName || 'Пользователь'), make('small', `Telegram ID: ${user.telegramId}`));
       row.append(make('span', (user.displayName || 'J')[0], 'avatar'), info, make('span', user.blocked ? 'Заблокирован' : user.level === 'owner' ? 'Владелец' : user.level === 'admin' ? 'Администратор' : roleName(user.roleId), `tag ${user.blocked ? 'blocked' : ''}`)); $('#users').append(row);
     }
-    if (!$('#users').children.length) $('#users').textContent = 'Пользователь не найден.';
+    if (!$('#users').children.length) $('#users').append(make('div', 'Пользователь не найден.', 'section-empty'));
     for (const role of roles) { const row = button('', () => roleEditor(role), 'user-row'); const info = make('span', undefined, 'user-info'); info.append(make('strong', role.name), make('small', `Разделов: ${role.permissions.length} · Участников: ${users.filter((user) => user.roleId === role.id).length}`)); row.append(info); $('#roles').append(row); }
+    if (!roles.length) $('#roles').append(make('div', 'Роли пока не созданы.', 'section-empty'));
   }
   async function load() {
     if (!['owner', 'admin'].includes(actor.level)) return;
-    const data = await api.request('/admin'); users = data.users; roles = data.roles; render();
+    $('#admin').dataset.state = 'loading'; $('#admin').setAttribute('aria-busy', 'true'); $('#admin-feedback')?.remove();
+    $('#admin-loading')?.remove();
+    const loading = make('p', 'Загружаем людей и роли…', 'interior-loading'); loading.id = 'admin-loading'; loading.setAttribute('role', 'status'); $('#admin .tabs').before(loading);
+    let data;
+    try { data = await api.request('/admin'); }
+    catch (problem) {
+      loading.remove();
+      $('#admin').dataset.state = 'error'; $('#admin').setAttribute('aria-busy', 'false');
+      if (['unauthorized', 'forbidden'].includes(problem.code)) throw problem;
+      const feedback = make('div', undefined, 'section-notice'); feedback.id = 'admin-feedback'; feedback.setAttribute('role', 'status');
+      feedback.append(make('p', 'Не удалось обновить список доступа. Проверь соединение и повтори.'), button('Повторить', () => load().catch(onSessionError)));
+      $('#admin .tabs').before(feedback); return;
+    }
+    loading.remove(); $('#admin').dataset.state = 'ready'; $('#admin').setAttribute('aria-busy', 'false'); users = data.users; roles = data.roles; render();
     $('#audit').replaceChildren(make('h2', 'История доступа'));
     const actions = { 'user.create': 'Добавлен пользователь', 'user.update': 'Изменены права пользователя', 'role.create': 'Создана роль', 'role.update': 'Изменена роль' };
-    for (const record of data.audit || []) $('#audit').append(make('p', `${record.createdAt || ''} · ${actions[record.kind] || 'Изменение доступа'} · ${record.target || ''} · Администратор: ${record.actorId || ''}`, 'muted'));
+    for (const record of data.audit || []) {
+      const entry = make('article', undefined, 'audit-entry');
+      const time = new Date(record.createdAt);
+      const date = Number.isFinite(time.getTime()) ? `${new Intl.DateTimeFormat('ru-RU', { timeZone: 'Etc/GMT-3', dateStyle: 'short', timeStyle: 'short' }).format(time)} МСК` : '';
+      entry.append(make('strong', actions[record.kind] || 'Изменение доступа'), make('p', [date, record.target ? `Пользователь: ${record.target}` : '', record.actorId ? `Администратор: ${record.actorId}` : ''].filter(Boolean).join(' · '), 'muted')); $('#audit').append(entry);
+    }
     if (!data.audit?.length) $('#audit').append(make('p', 'Изменений пока нет.', 'muted'));
   }
   function freeze(value) { for (const control of body.querySelectorAll('input,select,button')) control.disabled = value; }
@@ -117,15 +136,15 @@ export function createAdmin({ api, actor, labels, onSessionError }) {
       const draft = edit.draft;
       confirmation.append(make('strong', 'Подтверди изменение доступа'), make('p', edit.kind === 'role' ? `Роль «${draft.name}». Разрешено: ${draft.permissions.map((id) => labels[id]).join(', ') || 'ничего'}. Изменение затронет всех участников роли.` : `Telegram ID: ${edit.target || draft.telegramId}. Роль: ${roleName(draft.roleId)}. Уровень: ${draft.level === 'admin' ? 'Администратор' : 'Пользователь'}. ${draft.blocked ? 'Доступ будет заблокирован.' : 'Доступ активен.'}`));
       if (draft.overrides) confirmation.append(make('p', `Личные исключения: ${Object.entries(draft.overrides).map(([id, value]) => `${labels[id]} — ${value === 'allow' ? 'разрешить' : 'запретить'}`).join('; ') || 'по роли'}`));
-      body.append(confirmation); edit.confirmed = true; submit.textContent = 'Подтвердить и сохранить'; confirmation.scrollIntoView({ block: 'nearest' }); return;
+      body.append(confirmation); edit.confirmed = true; dialog.dataset.state = 'confirmation'; submit.textContent = 'Подтвердить и сохранить'; confirmation.scrollIntoView({ block: 'nearest' }); return;
     }
-    busy = true; submit.disabled = true; error.textContent = ''; freeze(true);
+    busy = true; submit.disabled = true; error.textContent = ''; dialog.dataset.state = 'pending'; freeze(true);
     edit.pending = { ...edit.draft, operationId: crypto.randomUUID() };
     try { savePending(actor, 'admin', edit.pending.operationId); await api.request(edit.path, edit.method, edit.pending); await finish(); }
     catch (problem) {
       error.textContent = problem.message;
-      if (problem.uncertain) { submit.textContent = 'Проверить исходную операцию'; error.textContent += ` ID: ${edit.pending.operationId}`; }
-      else { clearPending(actor, 'admin', edit.pending.operationId); edit.pending = null; freeze(false); edit.confirmed = false; submit.textContent = 'Проверить изменения'; $('#confirmation')?.remove(); }
+      if (problem.uncertain) { dialog.dataset.state = 'unknown'; submit.textContent = 'Проверить исходную операцию'; error.textContent += ` ID: ${edit.pending.operationId}`; }
+      else { dialog.dataset.state = 'error'; clearPending(actor, 'admin', edit.pending.operationId); edit.pending = null; freeze(false); edit.confirmed = false; submit.textContent = 'Проверить изменения'; $('#confirmation')?.remove(); }
       if (['unauthorized', 'forbidden'].includes(problem.code)) onSessionError(problem);
     } finally { busy = false; submit.disabled = false; }
   });
@@ -144,6 +163,7 @@ export function createAdmin({ api, actor, labels, onSessionError }) {
     open('Незавершённая операция', {}, '', '', 'recovery'); edit.pending = { operationId: pendingId };
     body.append(make('p', 'После перезагрузки нужно проверить результат исходного изменения. Данные черновика не сохранялись; повторная отправка отключена.', 'summary'));
     error.textContent = `ID: ${pendingId}`; submit.textContent = 'Проверить исходную операцию';
+    dialog.dataset.state = 'unknown';
   }
   return { load };
 }

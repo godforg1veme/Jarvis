@@ -1,5 +1,53 @@
 # Проверки перед выпуском
 
+## Внутренние экраны Mini App / Mini App interiors
+
+Локальный этап 23 октября: [результат и таблица покрытия](updates/2026-10-23-mini-app-interiors-development.md).
+`testMiniAppInteriors.cjs` проверяет production assets на 320/390/844/1280 px:
+диалог, карточки четырёх личных разделов, информационные VPN/Operations,
+управление доступом и Jarvis-экраны HH. Пустые списки, фильтры, ошибки,
+подтверждения и неизвестный результат проверены с сохранением исходных IDs.
+35 PNG остаются в игнорируемой `.superpowers/mini-app-interiors/`.
+
+Local stage, October 23: [results and coverage](updates/2026-10-23-mini-app-interiors-development.md).
+The interior suite checks production assets at 320/390/844/1280 px: chat,
+four personal lists, informational VPN/Operations, access administration and
+Jarvis HH surfaces. Empty lists, filters, errors, confirmations and unknown
+outcomes retain original IDs. Thirty-five PNGs remain in ignored local artifacts.
+
+```powershell
+npm run build --prefix mini-app
+node scripts/testMiniAppInteriors.cjs
+node scripts/testMiniAppClient.cjs
+node scripts/testMiniAppOrbital.cjs
+node scripts/testHhLoginTouch.cjs
+npm test --prefix server
+```
+
+## Орбитальный Mini App / Orbital Mini App
+
+Локальная реализация 23 октября: [результат и ограничения](updates/2026-10-23-mini-app-orbital-development.md).
+Server 792/792 без пропусков, Mini App build, прежние client/preview/HH touch
+fixtures и новый орбитальный набор проверяют навигацию, WebGL, движение,
+паузу, reduced motion, права, fallback, поиск и панели на 320/390/844/1280 px.
+Fixtures не подтверждают настоящий Telegram-вход и FPS физического телефона.
+
+Local implementation, October 23: [results and limits](updates/2026-10-23-mini-app-orbital-development.md).
+Server 792/792 without skips, Mini App build and the client/preview/HH touch
+and orbital browser suites cover navigation, WebGL, orbital motion, pause,
+reduced motion, authorization, fallback, search and panels at 320/390/844/1280 px.
+Fixtures do not verify actual Telegram login or physical phone frame rates.
+
+```powershell
+npm run build --prefix mini-app
+node scripts/testMiniAppClient.cjs
+node scripts/testMiniAppOrbital.cjs
+node scripts/testHhLoginTouch.cjs
+# Existing loopback-only preview: npm run dev --prefix mini-app
+node scripts/testMiniAppPreview.cjs
+npm test --prefix server
+```
+
 ## Автоматическая модель писем HH / Automatic HH letter model
 
 Выпуск 23 октября: [результат](updates/2026-10-23-jobs-automatic-model-release.md).

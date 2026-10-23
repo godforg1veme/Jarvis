@@ -18,6 +18,7 @@ export function createJobConnectionPanel({ api, actor, anchor }) {
   const panel = document.createElement('section'); panel.className = 'job-panel';
   const heading = document.createElement('h2'); heading.textContent = 'Личный профиль HH';
   const status = document.createElement('p'); status.className = 'muted job-status'; status.dataset.jobStatus = '';
+  status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
   const controls = document.createElement('div'); controls.className = 'job-controls job-connection-controls';
   const connectButton = button(controls, sessionId ? 'Создать ссылку для входа' : 'Подключить HH', start, 'primary');
   const linkBox = document.createElement('div'); linkBox.className = 'job-login-share'; linkBox.hidden = true;
@@ -75,7 +76,7 @@ export function createJobConnectionPanel({ api, actor, anchor }) {
   }
   async function start() {
     if (busy || disposed) return;
-    busy = true; refreshLink.disabled = true;
+    busy = true; refreshLink.disabled = true; connectButton.disabled = true; panel.setAttribute('aria-busy', 'true'); message('Готовим временную ссылку для входа…');
     try {
       let requestId;
       try { requestId = sessionStorage.getItem(sessionKey(actor, 'request')); } catch {}
@@ -95,7 +96,7 @@ export function createJobConnectionPanel({ api, actor, anchor }) {
       if (created.ticket) showLink(created.ticket, created.telegramDelivery);
       else { linkBox.hidden = true; cancel.hidden = false; message('Вход уже открыт. Продолжи в этом окне или отмени подключение, чтобы создать новую ссылку.'); }
       void poll();
-    } finally { busy = false; refreshLink.disabled = false; }
+    } finally { busy = false; refreshLink.disabled = false; connectButton.disabled = false; panel.setAttribute('aria-busy', 'false'); }
   }
   async function load() {
     const data = await api.request('/jobs/connection');

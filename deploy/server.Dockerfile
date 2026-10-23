@@ -10,6 +10,7 @@ WORKDIR /app/mini-app
 COPY mini-app/package.json mini-app/package-lock.json ./
 RUN npm ci
 COPY mini-app ./
+COPY --from=ui-build /app/ops-ui/public/assets/milky-way-gaia-4k.webp /app/ops-ui/public/assets/SKY-CREDITS.md /app/ops-ui/public/assets/
 RUN npm run build
 
 FROM node:22-bookworm-slim

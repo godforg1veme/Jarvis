@@ -38,20 +38,35 @@ test('production static allowlist, missing build, Telegram framing scope and no 
   } finally { await app.close(); }
 });
 
-test('production Mini App serves the connected resume panel module and stylesheet', async () => {
+test('production Mini App serves resume and orbital modules and stylesheets', async () => {
   const path = require('node:path');
   const fs = require('node:fs/promises');
   const root = path.resolve(__dirname, '../../mini-app/src');
   const app = buildApp({ config: { logLevel: 'silent', miniAppEnabled: true } });
   registerMiniAppAssets(app, { root });
   try {
-    for (const name of ['jobConnection.js', 'jobResumes.js', 'jobResumes.css']) {
+    for (const name of ['jobConnection.js', 'jobResumes.js', 'jobResumes.css', 'core.js', 'orbitalBodies.js', 'orbitMotion.js', 'orbital.css', 'interior.css', 'sectionViews.js']) {
       const response = await app.inject(`/mini/${name}`);
       assert.equal(response.statusCode, 200, name);
       assert.equal(response.body, await fs.readFile(path.join(root, name), 'utf8'));
       assert.match(response.headers['content-type'], name.endsWith('.css') ? /^text\/css/ : /^text\/javascript/);
       assert.equal(response.headers['cache-control'], 'no-store');
     }
+  } finally { await app.close(); }
+});
+
+test('orbital sky is explicitly served with image MIME while unrelated assets stay private', async () => {
+  const path = require('node:path');
+  const fs = require('node:fs/promises');
+  const root = path.resolve(__dirname, '../../ops-ui/public');
+  const app = buildApp({ config: { logLevel: 'silent', miniAppEnabled: true } });
+  registerMiniAppAssets(app, { root });
+  try {
+    const sky = await app.inject('/mini/assets/milky-way-gaia-4k.webp');
+    assert.equal(sky.statusCode, 200);
+    assert.match(sky.headers['content-type'], /^image\/webp/);
+    assert.deepEqual(sky.rawPayload, await fs.readFile(path.join(root, 'assets/milky-way-gaia-4k.webp')));
+    for (const route of ['/mini/assets/milky-way-gaia-8k.webp', '/mini/assets/private.json', '/mini/preview.html']) assert.equal((await app.inject(route)).statusCode, 404);
   } finally { await app.close(); }
 });
 

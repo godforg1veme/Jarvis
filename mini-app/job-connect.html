@@ -4,17 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="referrer" content="no-referrer">
-  <meta name="theme-color" content="#080e14">
+  <meta name="theme-color" content="#050607">
   <title>Jarvis · Вход в HH</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="/mini/style.css">
+  <link rel="stylesheet" href="/mini/interior.css">
   <script type="module" src="/mini/jobConnect.js"></script>
 </head>
-<body class="job-connect-body">
+<body class="job-connect-body orbital-connect orbital-theme">
   <main class="job-connect-shell">
-    <p class="eyebrow">JARVIS · ЛИЧНЫЙ ПРОФИЛЬ</p>
+    <header class="job-connect-header"><span class="brand-mark" aria-hidden="true">J</span><span class="job-connect-brand">JARVIS</span><span class="job-connect-context">ЛИЧНЫЙ ПРОФИЛЬ</span></header>
     <h1>Подключение HH</h1>
     <p id="job-connect-status" class="job-connect-status" role="status">Проверяем временную ссылку…</p>
+    <p class="job-connect-security">Используй только свою временную ссылку и не пересылай её другим. После входа вернись в Mini App и подтверди резюме.</p>
     <section id="job-connect-stage" class="job-connect-stage" hidden>
       <p class="job-connect-instructions">Нажимай кнопки и поля прямо на странице HH. При выборе поля откроется клавиатура телефона. Если она не появилась, используй нижнюю панель.</p>
       <div id="job-connect-viewport" class="job-connect-viewport">
@@ -31,7 +33,7 @@
         <button id="job-connect-cancel" class="secondary" type="button">Отменить</button>
       </div>
     </section>
-    <p class="job-connect-privacy">Окно работает во временной отдельной сессии браузера. Ссылка даёт доступ к этому окну: не пересылай её другим и не вводи пароль, если открыл её не сам. Ввод передаётся через HTTPS в выбранное поле HH. Для редактирования он временно остаётся в памяти вкладки и очищается при смене поля, завершении входа или закрытии окна. Ввод из нижней панели очищается после подтверждённой отправки. Пароль и код не записываются в базу, файлы или логи. Серверным браузером технически управляет владелец инфраструктуры. После входа вернись в Mini App и подтверди выбранное резюме.</p>
+    <details class="job-connect-privacy"><summary>Как защищён вход</summary><p>Окно работает во временной отдельной сессии браузера. Ссылка даёт доступ к этому окну: не пересылай её другим и не вводи пароль, если открыл её не сам. Ввод передаётся через HTTPS в выбранное поле HH. Для редактирования он временно остаётся в памяти вкладки и очищается при смене поля, завершении входа или закрытии окна. Ввод из нижней панели очищается после подтверждённой отправки. Пароль и код не записываются в базу, файлы или логи. Серверным браузером технически управляет владелец инфраструктуры. После входа вернись в Mini App и подтверди выбранное резюме.</p></details>
   </main>
 </body>
 </html>
