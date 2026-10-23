@@ -442,11 +442,19 @@ collector/browser. Desktop does not need rebuilding for these server changes.
 Enabling the feature exposes the Telegram job path, but searches start only
 after that user activates settings. «Подключить HH» verifies the saved login
 and primary resume. Confirm the fact profile/examples before generating letters.
-Use the dedicated job model/budget settings; the existing OpenRouter key is
-reused without changing the main assistant model. Live acceptance covers
+Letter generation uses the shared automatic OpenRouter queue: verified free
+models first, then configured paid fallback. There is no per-user model setting
+or separate job-model environment variable. Keep the job budget notification
+threshold; it does not stop generation. See the
+[October 23 release](../docs/updates/2026-10-23-jobs-automatic-model-release.md).
+Live acceptance covers
 cards, edits/translation and restart/dedup; any real application requires a
 selected vacancy and an explicit confirmation of the exact letter in Telegram.
 Keep fixture send results separate from that live acceptance.
+
+Модель для писем выбирает общая автоматическая очередь OpenRouter. Ручной
+настройки модели поиска больше нет; отдельный порог расходов остаётся
+уведомлением. Текущее поведение и проверки описаны в записи выпуска выше.
 
 ### Human HH CAPTCHA replies through Telegram
 

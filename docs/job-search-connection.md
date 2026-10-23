@@ -1,5 +1,32 @@
 # Подключение поиска работы
 
+## Текущий путь, 23 октября 2026
+
+Каждый пользователь с действующим правом `jobs` подключает свой HH через
+Mini App и подтверждает основное резюме в исходной сессии. Вход открывает личный
+профиль браузера на DE; username не даёт доступа к чужому аккаунту.
+Текущий контракт: [Mini App](../mini-app/README.md).
+
+История откликов и приглашений обновляется полностью раз в час независимо
+от включения поиска новых вакансий. Архивные и неподтверждённые приглашения
+имеют отдельные подписи. Модель для писем выбирается автоматически; ручного
+пункта и сохранённой персональной модели нет. Отправка письма требует прежнего
+подтверждения точного текста.
+Проверки и установка: [история HH](updates/2026-10-22-hh-history-hourly-release.md),
+[автоматическая модель](updates/2026-10-23-jobs-automatic-model-release.md).
+
+Each user with current `jobs` access connects a personal HH account through
+the Mini App and confirms the primary resume in the originating session.
+The connection opens that user's DE browser profile. History refreshes hourly,
+independently of vacancy search; archived and unconfirmed invitations have
+separate labels. Letters use automatic model selection and retain exact-text
+send confirmation. The links above own the current contract and release results.
+
+## История первого подключения, 15 октября 2026
+
+Ниже сохранены первоначальные решения, проверки и ограничения. Текущий путь
+описан выше. The original connection record follows; use the current path above.
+
 **Обновление:** владелец подтвердил, что настройки HH находятся только
 в кабинете, затем привёл уведомление о прекращении applicant API с
 15 декабря 2025. Инструкции получения доступа через это API ниже сохраняют
@@ -52,7 +79,7 @@ configured paid fallback. Per-user model selection and the separate environment
 variable are removed. DE server/collector and migration 045 are updated. The budget setting
 remains a notification threshold. The model comparison above is historical.
 
-Проверка окружения работающего DE-контейнера подтвердила наличие ключа
+Историческая проверка перед первым выпуском: окружение DE-контейнера подтвердило наличие ключа
 OpenRouter. Переменные подключения HH в этом контейнере отсутствуют;
 поиск работы там выключен. Проверялись только признаки наличия, без вывода значений.
 Владелец подтвердил, что приложение HH уже зарегистрировано. В локальном

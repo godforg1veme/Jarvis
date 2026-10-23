@@ -1,5 +1,15 @@
 # Проверка моделей для писем поиска работы
 
+Исторический результат от 15 октября 2026. Ручной выбор, описанный в решении
+ниже, заменён [автоматической очередью 23 октября](updates/2026-10-23-jobs-automatic-model-release.md).
+Сравнение сохраняется как результат того прогона; текущая доступность и цены
+определяются проверенным каталогом OpenRouter при работе очереди.
+
+Historical evaluation from October 15, 2026. The manual-selection decision below
+was superseded by the automatic queue deployed on October 23, linked above.
+These results describe that evaluation run; the router checks current model
+availability and pricing through the OpenRouter catalog.
+
 15 октября 2026, отдельные платные запросы через существующий ключ OpenRouter.
 Рабочая модель обычного чата Jarvis и настройки VPS не менялись.
 Полные ответы и профиль находятся в игнорируемых локальных материалах проверки.
