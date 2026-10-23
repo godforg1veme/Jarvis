@@ -38,18 +38,18 @@ API соискателя не используется.
 ## Что уже настроено
 
 OpenRouter использует существующий `OPENROUTER_API_KEY`. Его значение не нужно
-присылать в Telegram или чат разработки. Подготовлен [автоматический выбор модели](updates/2026-10-22-jobs-automatic-model-development.md):
+присылать в Telegram или чат разработки. Выпущен [автоматический выбор модели](updates/2026-10-23-jobs-automatic-model-release.md):
 общая очередь OpenRouter проверяет бесплатные варианты и настроенный платный
 резерв. Персональная настройка модели и отдельная переменная окружения удалены;
-на VPS это изменение ещё не установлено. `JARVIS_JOB_BUDGET_USD=3` означает уведомление,
+на DE обновлены server/collector и применена 045. `JARVIS_JOB_BUDGET_USD=3` означает уведомление,
 а не остановку запросов после трёх долларов.
 Прежнее [сравнение моделей](job-search-model-evaluation.md) сохраняет историю
 ручного выбора до перехода на автоматическую очередь.
 
 OpenRouter uses the existing API key; do not send it in chat. Automatic model
-selection is prepared locally: the shared queue checks free models, then
+selection is deployed: the shared queue checks free models, then
 configured paid fallback. Per-user model selection and the separate environment
-variable are removed. This update is not deployed yet. The budget setting
+variable are removed. DE server/collector and migration 045 are updated. The budget setting
 remains a notification threshold. The model comparison above is historical.
 
 Проверка окружения работающего DE-контейнера подтвердила наличие ключа

@@ -4,6 +4,9 @@
 
 ## Русский
 
+Обновление: [выпущено 23 октября](2026-10-23-jobs-automatic-model-release.md).
+Ниже сохранён локальный результат до выпуска.
+
 Подготовлено локально по поручению владельца 22 октября; итоговая проверка завершена 23 октября. Ручной выбор модели
 полностью удалён из поиска работы: нет пункта панели, пресетов, ввода ID,
 старого текстового параметра и callbacks поля. Удалены `settings.model`,
@@ -36,6 +39,9 @@ collector также обновляется из-за изменения общ�
 Browser и Desktop этим изменением не затронуты.
 
 ## English
+
+Update: [deployed on October 23](2026-10-23-jobs-automatic-model-release.md).
+The pre-release local record is retained below.
 
 Prepared locally at the owner's October 22 request; final verification completed on October 23. Manual job-model
 selection is removed entirely: menu item, presets, custom ID, legacy text input,

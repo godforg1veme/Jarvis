@@ -9,7 +9,7 @@ source changes; verify the deployed revision before a server rollout.
 
 ## Change control
 
-22 октября 2026, по поручению владельца подготовлено локально: пункт «Модель AI»
+23 октября 2026, по поручению владельца выпущено на DE: пункт «Модель AI»
 полностью удалён из настроек поиска работы. Ручной ID, пресеты, старый текстовый
 ввод `модель = ...` и callbacks поля больше не принимаются. Модель для писем
 выбирается автоматически существующей очередью OpenRouter: проверенные бесплатные
@@ -17,16 +17,16 @@ source changes; verify the deployed revision before a server rollout.
 финальное подтверждение отправки письма и private scope прежние. Migration 045
 удаляет персональный выбор и аннулирует старые previews/ввод этого поля,
 сохраняя фильтры и checkpoint. Новых callback или guided kinds нет.
-[Реализация и проверки](updates/2026-10-22-jobs-automatic-model-development.md).
+[Выпуск и проверки](updates/2026-10-23-jobs-automatic-model-release.md).
 
-October 22, 2026, owner-requested and prepared locally: manual job-model
+October 23, 2026, owner-requested and deployed on DE: manual job-model
 selection is removed, including its menu item, presets, custom ID, legacy text
 input and field callbacks. Letter generation uses the existing automatic
 OpenRouter queue: verified free models, then configured global paid fallback.
 Generation remains user-triggered, with the same final send confirmation and
 private scope. Migration 045 removes saved overrides and invalidates old
 previews/model inputs while retaining filters/checkpoints. No new callbacks
-or guided kinds. [Implementation and checks](updates/2026-10-22-jobs-automatic-model-development.md).
+or guided kinds. [Release and checks](updates/2026-10-23-jobs-automatic-model-release.md).
 
 22 октября 2026, согласовано владельцем и выпущено на DE:
 история откликов и приглашений HH обновляется полностью раз в час у каждого
@@ -262,7 +262,7 @@ HH acceptance is unconfirmed; see the linked release result.
 Согласовано владельцем и установлено на DE 16 октября 2026:
 [панель настроек поиска](superpowers/specs/2026-10-16-job-settings-panel-design.md).
 История первого выпуска панели: ручной выбор модели из описания ниже удалён
-локальным изменением от 22 октября, описанным в начале этого документа.
+выпуском от 23 октября, описанным в начале этого документа.
 `job:settings` показывает компактные кнопки дохода, города, удалённых вакансий,
 интервала, глубины истории, модели AI, порога уведомления, запросов и исключений.
 Открытие панели не начинает ввод. Скалярные поля предлагают предустановки или
@@ -285,7 +285,7 @@ Migration 036 добавляет `job_setting_value`, закрытый context
 
 Owner-approved and deployed on DE on 16 October 2026.
 This is the original panel release record; manual model selection below is
-superseded by the October 22 local change at the top of this document. Settings
+superseded by the October 23 release at the top of this document. Settings
 now opens a compact button panel with separate field screens, presets/custom
 values, configured/current model choices and paginated query/exclusion lists.
 Opening the panel starts no input or AI request. Each change has an explicit

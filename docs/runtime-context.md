@@ -75,6 +75,16 @@ deadline across metadata, fetch and body reads.
 
 #### HH: состояние на 22 октября / State on October 22
 
+23 октября выпущен [автоматический выбор модели писем](updates/2026-10-23-jobs-automatic-model-release.md).
+Ручная настройка и отдельная job-model переменная удалены; применяется общая
+очередь проверенных бесплатных моделей и настроенный платный резерв.
+На DE обновлены server/collector, применена 045, источники обоих VPS совпадают.
+
+October 23: [automatic letter-model selection](updates/2026-10-23-jobs-automatic-model-release.md)
+is deployed. Manual selection and the separate job-model setting are removed;
+letters use verified free models and configured paid fallback. DE server/collector
+and migration 045 are updated; both VPS source checkouts match.
+
 Выпущено [почасовое обновление полной истории HH](updates/2026-10-22-hh-history-hourly-release.md)
 для всех подключённых пользователей с действующим `jobs`, независимо от поиска
 вакансий. Migration 044 хранит раздел, исходную дату и доказательство полного
