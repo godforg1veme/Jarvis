@@ -12,7 +12,11 @@ function documentedRows(contract, column, jobSearchEnabled) {
   assert.equal(rows.length, 5, 'document the four base rows and the conditional job row');
   return rows.filter((line) => jobSearchEnabled || !line.startsWith('| 5 |')).map((line) => {
     const cell = line.split('|')[column].trim();
-    return cell === 'absent' ? null : [...cell.matchAll(/`([^`]+)`/g)].map((match) => match[1]);
+    return cell === 'absent' ? null : cell.split(', ').map((label) => {
+      const match = label.match(/^`([^`]+)`/);
+      assert.ok(match, 'each button label is quoted separately from its availability condition');
+      return match[1];
+    });
   }).filter(Boolean);
 }
 
@@ -20,7 +24,8 @@ test('documented owner and member keyboard rows match shipped source exactly', (
   const contract = read('docs/telegram-menu-contract.md');
   for (const [owner, column] of [[true, 2], [false, 3]]) {
     for (const jobSearchEnabled of [false, true]) {
-      const actual = replyKeyboard(owner, { jobSearchEnabled }).keyboard.map((row) => row.map((button) => button.text));
+      const permissions = owner ? null : ['life', 'memory', 'documents', 'devices', ...(jobSearchEnabled ? ['jobs'] : [])];
+      const actual = replyKeyboard(owner, { jobSearchEnabled, permissions }).keyboard.map((row) => row.map((button) => button.text));
       assert.deepEqual(actual, documentedRows(contract, column, jobSearchEnabled));
     }
     assert.equal(replyKeyboard(owner).is_persistent, true);
