@@ -4,9 +4,10 @@
 
 ## Русский
 
-Подготовлено общее исправление для пользователей с действующим разрешением «Работа»,
-включая owner, admin и member. Публикация и восстановление доставки поручены владельцем.
-Установка и фактическая доставка будут записаны после проверки работающих компонентов.
+Общее исправление выпущено для пользователей с действующим разрешением «Работа»,
+включая owner, admin и member. На DE обновлены server, collector и browser.
+Исходники Windows, GitHub и обоих VPS совпадают; итоговый release-status прошёл
+без замечаний. Публикация и восстановление доставки поручены владельцем.
 
 У остановки CAPTCHA и неполной выдачи были разные причины. Скрытый штатный branded
 блок вакансии не читался при проверке исходной страницы. Отдельно сборщик считал
@@ -41,16 +42,40 @@ CAPTCHA доступна всем активным разрешённым пои
 Проверено: server 802/802, Telegram gate 66/66; изолированные Linux Chromium → RPC →
 PostgreSQL сценарии 16/16, включая роли, отзыв прав, восстановление, очереди и dedup.
 Read-only проверка HH приняла дневную и широкую выдачу без отправки CAPTCHA.
-Полный Linux browser suite: 103/103 без пропусков. Установка проверяется отдельно.
+Полный Linux browser suite: 103/103 без пропусков. Проверка допуска также прошла
+для 104 активных пользователей; ограничение первой сотней удалено после ревизии.
+
+### Установка и первая живая проверка
+
+| Узел | Фактический результат |
+| --- | --- |
+| DE server / collector | `jarvis-hh-recovery:1ed9316`, release `1ed93169697b4d36354281ab910e5697b93eb37b`; server healthy, collector running |
+| DE browser | `jarvis-hh-browser:9565e59`, healthy; 47 исходных JS-файлов сверены с принятой версией |
+| DE HTTPS | `/health/live` и `/health/ready` прошли smoke |
+| NL | Source обновлён; неизменённые Host Agent и VPN active и совпадают с принятым кодом |
+| Desktop | 1.0.2, 146 файлов и runtime совпадают; пересборка не требовалась |
+
+Окружение трёх сервисов сверено без вывода значений. Существующие volumes,
+профили, секреты и прежние release-каталоги сохранены. Схема БД не менялась.
+Изолированные тестовые БД, сеть и временный source удалены.
+
+Read-only статус CAPTCHA владельца и участника — `idle`: прежняя пауза снята.
+Участнику фактически доставлены 11 новых карточек: количество `sent` выросло с 71
+до 82, столько же вакансий доступно в профиле. Ошибка насыщенной выдачи снята,
+`hh_calendar_v1` применён. Шесть оставшихся окон и исходный период сохранены;
+checkpoint остаётся пустым до полного обхода. Полная выгрузка ещё не завершена,
+сбор и доставка продолжаются штатным фоновым процессом. Живые нажатия телефона
+и следующий CAPTCHA-цикл отдельно не проверялись.
 
 Эта запись продолжает [локальный ремонт CAPTCHA](2026-10-23-hh-captcha-recovery-development.md).
 Решение и критерии: [спецификация](../superpowers/specs/2026-10-23-hh-complete-collection-design.md).
 
 ## English
 
-A shared repair is prepared for users with current jobs permission, including owner,
-admin and member. The owner authorized publication and delivery recovery. Deployment
-and actual delivery will be recorded after checking the running components.
+A shared repair is deployed for users with current jobs permission, including owner,
+admin and member. DE server, collector and browser are updated. Windows, GitHub and
+both VPS sources match; the final release-status passed without issues. The owner
+authorized publication and delivery recovery.
 
 CAPTCHA recovery and incomplete collection had separate causes. The exact target
 verification could not read HH's standard hidden branded description. Separately,
@@ -84,7 +109,31 @@ other users to proceed.
 Verified: server 802/802, Telegram gate 66/66; isolated Linux Chromium → RPC → PostgreSQL
 scenarios 16/16, covering roles, revocation, recovery, queues and deduplication.
 Read-only HH checks accepted daily and broad searches without submitting CAPTCHA.
-The complete Linux browser suite passed 103/103 without skips. Deployment is checked separately.
+The complete Linux browser suite passed 103/103 without skips. Eligibility also passed
+with 104 active users; the first-100 limit was removed after independent review.
+
+### Deployment and first live check
+
+| Node | Actual result |
+| --- | --- |
+| DE server / collector | `jarvis-hh-recovery:1ed9316`, release `1ed93169697b4d36354281ab910e5697b93eb37b`; server healthy, collector running |
+| DE browser | `jarvis-hh-browser:9565e59`, healthy; 47 source JS files compared with the accepted code |
+| DE HTTPS | `/health/live` and `/health/ready` passed smoke |
+| NL | Source updated; unchanged Host Agent and VPN services are active and match accepted code |
+| Desktop | 1.0.2, 146 files and runtime match; no rebuild needed |
+
+The environments of all three services were compared without printing values.
+Existing volumes, profiles, secrets and previous release directories were retained.
+The database schema did not change. Isolated test databases, network and temporary
+source were removed.
+
+Read-only CAPTCHA status is `idle` for owner and member: the previous pause cleared.
+The member actually received 11 new cards: `sent` increased from 71 to 82, with the
+same number available in the profile. The saturated-search failure cleared and
+`hh_calendar_v1` applied. Six unfinished windows and the original range are retained;
+the checkpoint stays empty until full traversal. Complete delivery is still pending;
+collection and delivery continue through the normal background worker. Physical
+phone actions and the next CAPTCHA cycle were not separately tested.
 
 This record follows the [local CAPTCHA repair](2026-10-23-hh-captcha-recovery-development.md).
 Design and acceptance criteria: [specification](../superpowers/specs/2026-10-23-hh-complete-collection-design.md).
