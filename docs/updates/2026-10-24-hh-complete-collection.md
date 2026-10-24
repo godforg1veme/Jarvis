@@ -33,7 +33,12 @@ CAPTCHA доступна всем активным разрешённым пои
 выдачей; такое окно остаётся незавершённым. CAPTCHA, недоступность сайта и устаревший
 период также могут потребовать вмешательства. Эти состояния не продвигают checkpoint.
 
-Проверено: server 800/800, Telegram gate 66/66; изолированные Linux Chromium → RPC →
+Живое восстановление выявило медленные ответы HH. Проход дополнительно ограничен
+60 секундами между запросами, с разрешением прочитать хотя бы одну карточку после
+медленного поиска. Текущий запрос завершается; сохранённый курсор переходит в
+следующий проход. Это позволяет обслуживать остальных пользователей.
+
+Проверено: server 802/802, Telegram gate 66/66; изолированные Linux Chromium → RPC →
 PostgreSQL сценарии 16/16, включая роли, отзыв прав, восстановление, очереди и dedup.
 Read-only проверка HH приняла дневную и широкую выдачу без отправки CAPTCHA.
 Полный Linux browser suite: 103/103 без пропусков. Установка проверяется отдельно.
@@ -71,7 +76,12 @@ HH limits remain: a day with more than 2000 vacancies cannot be declared complet
 and remains pending. CAPTCHA, site failures and expired search ranges may also need
 intervention. These conditions never advance the checkpoint.
 
-Verified: server 800/800, Telegram gate 66/66; isolated Linux Chromium → RPC → PostgreSQL
+Live recovery exposed slow HH responses. Passes also have a 60-second budget checked
+between requests, while allowing at least one detail read after a slow listing.
+The current request finishes and its cursor is saved for the next pass, allowing
+other users to proceed.
+
+Verified: server 802/802, Telegram gate 66/66; isolated Linux Chromium → RPC → PostgreSQL
 scenarios 16/16, covering roles, revocation, recovery, queues and deduplication.
 Read-only HH checks accepted daily and broad searches without submitting CAPTCHA.
 The complete Linux browser suite passed 103/103 without skips. Deployment is checked separately.

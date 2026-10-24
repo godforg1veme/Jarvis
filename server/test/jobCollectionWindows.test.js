@@ -67,7 +67,7 @@ test('saturated day leaves its original window pending while another query compl
   assert.equal(finish.checkpoint, null);
 });
 
-test('request budget yields quickly, rotates remaining queries and keeps checkpoint open', async () => {
+for (const mode of ['requests', 'slow_detail', 'slow_search']) test(`${mode} budget yields, rotates queries and keeps checkpoint open`, async () => {
   const now = new Date('2026-10-22T12:00:00Z');
   const windows = ['first', 'second'].map((query) => ({ query, from: '2026-10-22T00:00:00Z',
     to: now.toISOString(), page: 0, offset: 0 }));
@@ -80,15 +80,17 @@ test('request budget yields quickly, rotates remaining queries and keeps checkpo
     async saveProgress({ progress: value }) { progress = structuredClone(value); },
     async finishSearch(value) { finish = value; },
   };
-  const hh = { async search() { return { found: 2, pages: 1, items: [{ id: '1' }, { id: '2' }] }; },
-    async getVacancy() { return { archived: true }; } };
+  let elapsed = 0;
+  const hh = { async search() { if (mode === 'slow_search') elapsed = 60000;
+    return { found: 2, pages: 1, items: [{ id: '1' }, { id: '2' }] }; },
+    async getVacancy() { if (mode === 'slow_detail') elapsed = 60000; return { archived: true }; } };
   const result = await new JobCollector({ searchRepository, deliveryRepository: {}, hhClient: hh,
-    now: () => now, wait: async () => {}, maxRequests: 2 }).runOnce({ userId: 'user', now });
+    now: () => new Date(now.getTime() + elapsed), wait: async () => {}, maxRequests: mode === 'requests' ? 2 : 40 }).runOnce({ userId: 'user', now });
   assert.equal(result.outcome, 'JOB_COLLECTION_LIMIT');
   assert.equal(progress.windows[0].query, 'second');
   assert.equal(progress.windows[1].offset, 1);
   assert.equal(finish.failureCode, null);
-  assert.equal(finish.nextCheckAt.getTime(), now.getTime() + 10000);
+  assert.equal(finish.nextCheckAt.getTime(), now.getTime() + elapsed + 10000);
 });
 
 test('saturated day notifies before a later window exhausts the request budget', async () => {

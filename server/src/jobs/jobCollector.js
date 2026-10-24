@@ -5,10 +5,10 @@ const { splitWindow } = require('./jobCollectionWindows');
 
 class JobCollector {
   constructor({ searchRepository, deliveryRepository, hhClient, currencyRates = null,
-    captchaEnabled = false, now = () => new Date(), wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), maxRequests = 40, shouldStop = () => false }) {
+    captchaEnabled = false, now = () => new Date(), wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), maxRequests = 40, maxRunMs = 60000, shouldStop = () => false }) {
     this.search = searchRepository; this.delivery = deliveryRepository; this.hh = hhClient;
     this.currencyRates = currencyRates; this.now = now; this.wait = wait; this.maxRequests = maxRequests;
-    this.shouldStop = shouldStop; this.captchaEnabled = captchaEnabled;
+    this.shouldStop = shouldStop; this.captchaEnabled = captchaEnabled; this.maxRunMs = maxRunMs;
   }
   async runOnce({ userId, now = this.now(), force = false }) {
     const job = await this.search.claimSearch({ userId, now, force });
@@ -20,6 +20,7 @@ class JobCollector {
       return { outcome: 'JOB_SEARCH_QUERIES_REQUIRED', matched: 0, requests: 0 };
     }
     let requests = 0, matched = 0;
+    const startedAt = this.now().getTime();
     const seen = new Set();
     const rateSnapshot = this.currencyRates ? await this.currencyRates.get({ date: now }).catch(() => null) : null;
     const lower = new Date(job.checkpoint ? new Date(job.checkpoint).getTime() - 60 * 60 * 1000
@@ -29,7 +30,9 @@ class JobCollector {
     const nextCheckAt = new Date(now.getTime() + settings.intervalMs);
     const request = async (fn) => {
       if (this.shouldStop()) throw jobError('JOB_COLLECTION_STOPPED');
-      if (requests >= this.maxRequests) throw jobError('JOB_COLLECTION_LIMIT');
+      // Permit the search and at least one detail read even when search itself
+      // is slow; otherwise a permanently slow listing could never advance.
+      if (requests >= this.maxRequests || (requests > 1 && this.now().getTime() - startedAt >= this.maxRunMs)) throw jobError('JOB_COLLECTION_LIMIT');
       if (!await this.search.renewSearch({ userId, leaseId: job.lease_id, revision: job.revision, now: this.now() })) throw jobError('JOB_COLLECTION_CHANGED');
       requests++;
       await this.wait(250);
