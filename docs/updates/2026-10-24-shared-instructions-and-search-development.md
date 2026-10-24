@@ -82,10 +82,24 @@ JSON имеют приоритет над обычным стилем общен
   npm audit из исходного набора зависимостей; автоматическое обновление
   посторонних пакетов не выполнялось.
 
-Ключ Tavily ещё не настроен. Без ключа smoke-скрипт возвращает `key_required`
-без сетевого обращения. Живые Tavily, выбранное резюме на настоящей HH,
-новый черновик на реальных моделях и нажатия owner/member в Telegram пока
-не подтверждены. Локальный reader fail-closed не доказывает поддержку всех
+Ключ Tavily сохранён в игнорируемом локальном файле; сервис подтвердил план
+Researcher с лимитом 1 000 кредитов. Прямой запрос из Windows получает HTTP 403
+до MCP-ответа. Через сеть DE VPS клиент `TavilyMcpClient` с настоящим SDK
+прошёл initialize, tools/list и tools/call: `ok`, пять источников, 7 033 мс.
+Только диагностический fetch был направлен через SSH; для его дополнительных
+соединений использовался срок 45 секунд, рабочий срок 15 секунд не менялся.
+Ключ передавался через stdin без записи на VPS; production-файлы и настройки
+не менялись. Причина различия сетевых ответов не установлена.
+
+Прочитаны [официальная инструкция настройки Tavily](https://tavily.com/agent-setup/SKILL.md)
+и `tavily-best-practices`. Применён путь интеграции в существующее приложение
+через выбранный MCP; установка отдельного CLI или глобальных навыков не нужна.
+Без ключа smoke-скрипт по-прежнему возвращает `key_required` без сети.
+Живая проверка не подтверждает установку в работающий Jarvis. Значение
+`paygo_limit` в usage API равно null, поэтому отключение PAYGO не подтверждено.
+Выбранное резюме на настоящей HH, новый черновик на реальных моделях
+и нажатия owner/member в Telegram пока не подтверждены.
+Локальный reader fail-closed не доказывает поддержку всех
 вариантов разметки HH. Подготовка релиза потребует обновить server и job-browser
 на DE и применить миграцию; исходники обоих VPS синхронизируются в рамках
 порученного выпуска. Desktop не менялся и пересборки не требует.
@@ -172,10 +186,25 @@ unverified-freshness notice. Configuration and verification are documented in
 - `git diff --check` passed. SDK installation retained three pre-existing high
   npm audit findings; unrelated packages were not automatically upgraded.
 
-The Tavily key is not configured yet. Without a key, the smoke script returns
-`key_required` without network access. Live Tavily, the selected resume on
-actual HH, new letters from real models and owner/member Telegram taps remain
-unverified. A fail-closed local reader does not prove support for every HH
+The Tavily key is stored in an ignored local file; the service confirmed the
+Researcher plan with a 1,000-credit limit. Direct Windows requests receive
+HTTP 403 before an MCP response. Through the DE VPS network, `TavilyMcpClient`
+and the real SDK completed initialize, tools/list and tools/call: `ok`, five
+sources, 7,033 ms. Only the diagnostic fetch was routed through SSH; its extra
+connections used a 45-second deadline, leaving the production 15-second
+deadline unchanged. The key traveled over stdin without being written on
+the VPS; production files and settings were not changed. The reason for the
+different network responses has not been established.
+
+The [official Tavily setup instructions](https://tavily.com/agent-setup/SKILL.md)
+and `tavily-best-practices` were read. The existing-application path was applied
+through the selected MCP integration; a separate CLI or global skills install
+is unnecessary. Without a key, the smoke script still returns `key_required`
+without network access. The live check does not verify deployment in the
+running Jarvis. The usage API reports null for `paygo_limit`, so disabled
+PAYGO has not been confirmed. The selected resume on actual HH, new letters
+from real models and owner/member Telegram taps remain unverified.
+A fail-closed local reader does not prove support for every HH
 markup variant. A future approved release needs updated server and job-browser
 components on DE and the migration; both VPS source checkouts are synchronized
 as part of that release. Desktop is unchanged and needs no rebuild.
