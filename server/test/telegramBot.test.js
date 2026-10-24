@@ -88,8 +88,8 @@ test('renders only closed bounded VPN inline buttons on the final reply', async 
   assert.equal(TELEGRAM_CALLBACK_RE.test('vpn:c:invalid'), false);
 });
 
-test('renders persistent bottom navigation separately from inline buttons', async () => {
-  const keyboard = { keyboard: [[{ text: '🏠 Главное' }, { text: '🎯 Life OS' }]], resize_keyboard: true, is_persistent: true };
+test('renders manually collapsible bottom navigation separately from inline buttons', async () => {
+  const keyboard = { keyboard: [[{ text: '🏠 Главное' }, { text: '🎯 Life OS' }]], resize_keyboard: true, is_persistent: false, one_time_keyboard: false };
   assert.deepEqual(validatedReplyKeyboard(keyboard), keyboard);
   const calls = [];
   await replyWithChunks({ async reply(text, options) { calls.push({ text, options }); } }, 'Готово', undefined, keyboard);

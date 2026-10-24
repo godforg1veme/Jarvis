@@ -2,16 +2,18 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 const { MENU, isOwner, menuAction, replyKeyboard } = require('../src/telegram/telegramMenu');
 
-test('builds distinct persistent keyboards for owner and family member', () => {
+test('builds distinct manually collapsible keyboards for owner and family member', () => {
   const owner = replyKeyboard(true);
   const member = replyKeyboard(false);
-  assert.equal(owner.is_persistent, true);
+  assert.equal(owner.is_persistent, false);
   assert.equal(owner.resize_keyboard, true);
   assert.equal(owner.keyboard.flat().some((button) => button.text === MENU.VPN), true);
   assert.equal(owner.keyboard.flat().some((button) => button.text === MENU.OPERATIONS), true);
   assert.equal(member.keyboard.flat().some((button) => button.text === MENU.VPN), false);
   assert.equal(member.keyboard.flat().some((button) => button.text === MENU.OPERATIONS), false);
   for (const layout of [owner, member, replyKeyboard(false, { permissions: [] })]) {
+    assert.equal(layout.is_persistent, false);
+    assert.equal(layout.one_time_keyboard, false);
     assert.equal(layout.keyboard.flat().some((button) => /Помощь/.test(button.text)), false);
     assert.equal(layout.keyboard.every((row) => row.length > 0), true);
   }

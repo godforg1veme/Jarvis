@@ -4,6 +4,12 @@
 
 ## Русский
 
+Локально подготовлено [обновление inline-сообщений Telegram](updates/2026-10-24-telegram-inline-edit-development.md):
+кнопки меняют исходное сообщение, длинный текст перелистывается в нём, возврат
+доступен на каждой странице. Выпуск и настоящие нажатия в Telegram ещё не выполнены.
+Нижнее меню отправляется без принудительного постоянного показа; сворачивание
+и открытие через значок Telegram требуют живой проверки после выпуска.
+
 На DE выпущен [общий ремонт HH CAPTCHA и полного сбора](updates/2026-10-24-hh-complete-collection.md):
 периоды по дням МСК, возобновление старого прогресса, одинаковая проверка доступа
 для owner/admin/member и уведомление о незавершённом сборе. Linux browser 103/103,
@@ -74,6 +80,13 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 Архивы не заменяют действующие правила и новую проверку окружения.
 
 ## English
+
+[In-place Telegram inline updates](updates/2026-10-24-telegram-inline-edit-development.md)
+are prepared locally: buttons edit the original message, long text pages within
+it, and return controls remain on every page. Deployment and real Telegram taps
+have not yet been performed.
+The bottom menu no longer requests persistent display; hiding and reopening it
+with Telegram's icon needs live verification after deployment.
 
 The [shared HH CAPTCHA and complete collection repair](updates/2026-10-24-hh-complete-collection.md)
 is deployed to DE: Moscow calendar windows, legacy progress migration, consistent

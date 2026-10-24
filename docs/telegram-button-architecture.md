@@ -19,6 +19,21 @@ investigate, not permission to silently rewrite either document.
 | Act or confirm | Domain service / Tool Gateway / Host Agent | Read-only actions may answer directly. Changing actions require the existing origin-bound confirmation and an exactly-once or original-ID reconciliation path. |
 | Reply and record | Bot, conversation repository, update repository | Deliver a safe response or classified fallback; persist only allowed conversation content. A sent fallback does not imply that an uncertain mutation was rolled back. |
 
+Text callback delivery targets `callback_query.message` directly through the
+Bot context's `editMessageText`; no chat-wide latest-message pointer is used.
+`messageService.js` prepares oversized callback text with `telegramCallbackPages.js`.
+The closed `pg:<v4-uuid>:<page>` route claims each update once and verifies the
+snapshot's user/conversation/chat/message binding and current source permissions
+before reading a page. It bypasses domain action dispatch and conversation
+history writes. The bounded, expiring in-memory snapshot is presentation state,
+not durable authorization. Existing domain callbacks continue to enforce their
+own revision and confirmation checks. Callback processing and delivery are serialized
+per chat/message, with completed queue entries removed. The [menu contract](telegram-menu-contract.md#in-place-text-navigation-local-change-october-24-2026)
+owns visible labels, pagination and media/error exceptions. Identical-content
+Bot API responses count as successful edits; other callback transport errors
+attempt a safe alert instead of sending a message. Diagnostics keep the existing
+closed delivery/fallback failure codes, even when Telegram cannot show the alert.
+
 The current `telegram_updates.status=completed` means the service handler
 finished; it is written before the Bot API send and therefore is **not** proof
 that Telegram delivered a reply. Outbound-send and fallback-send failures are

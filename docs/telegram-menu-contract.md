@@ -18,9 +18,20 @@ This consolidation changes documentation only. The
 the complete release chronology; dated wording there can be superseded.
 [Current deployment and open acceptance](README.md) are tracked separately.
 
-## Persistent bottom keyboard
+<a id="persistent-bottom-keyboard"></a>
 
-The keyboard is persistent, resizeable, and exact-text matched. Other text is
+## Collapsible bottom keyboard
+
+The keyboard is resizeable and exact-text matched. The local October 24 change,
+requested by the owner, sets `is_persistent: false` and `one_time_keyboard: false`
+for every layout and in outbound validation. Telegram is no longer asked to show
+the menu whenever the regular keyboard is hidden. The user can hide and reopen
+it with the keyboard icon near the input field; selecting an item does not request
+automatic hiding. Telegram controls initial display, scroll behavior and remembered
+visibility; the Bot API cannot guarantee a strictly manual-only appearance in every
+client. Existing chats receive the new flags on the next Home or `/start` keyboard
+delivery after installation. Real-client scroll and toggle acceptance is pending.
+Other text is
 ordinary assistant input unless a valid scoped guided interaction owns it.
 
 | Row | Owner | Family member | Route |
@@ -55,6 +66,47 @@ in the October 18 release. Old Help text follows ordinary authorized input. Owne
 authorization even if a user types a label or submits callback data directly.
 
 ## Inline controls
+
+### In-place text navigation (local change, October 24, 2026)
+
+At the owner's request, a text inline-button result replaces the text and
+keyboard of the message that was clicked. A vacancy received at 10:00 stays
+at that position when opened at 11:00; newer vacancy deliveries remain separate
+messages below it. Back, letter-mode selection, draft previews and confirmations
+use the same rule, as do other text menus. A terminal result clears old controls.
+Returning Home edits the message and includes the existing job entry when allowed;
+the persistent bottom keyboard is not resent by an inline click. Typed messages
+still receive normal replies. Photos, documents and delivery-only artifacts retain
+their separate delivery paths. Telegram edit failures attempt a safe callback
+alert, without appending a message or repeating the action. Fast paths answer
+the callback after delivery, so a failed edit uses the first answer for its alert.
+After 1.5 seconds the bot acknowledges a slow callback to stop the spinner;
+an alert after that acknowledgement is best effort and may not appear. If Telegram
+rejects the alert, the failure is logged with a closed code. Live delivery of
+error alerts still needs client acceptance, especially after a slow action.
+
+Long callback results use `pg:<random-v4-uuid>:<0..99>` and the labels
+`← Текст`, `Текст →`, with a page counter. Pages contain the complete text,
+including whitespace, as plain text. Return controls remain on every page;
+other domain action buttons appear on the last page, after the full preview.
+Paging reads the prepared snapshot and never reruns
+the callback that created it. The callback contains no letter or resource text.
+Snapshots are held only in process memory, at most 200 for 10 minutes; restart,
+expiry or eviction makes them unavailable. New navigation on the same message
+invalidates its earlier snapshot. Expired, copied or unauthorized page callbacks
+show a safe alert without creating a message or exposing cached content.
+
+Every page checks the original Telegram identity, chat, message ID, internal
+user and conversation, plus the current permissions of the original callback.
+Callbacks for one chat/message are processed and delivered in sequence so a slow
+edit cannot restore an obsolete page after a newer action.
+Domain buttons still recheck resource revisions, expiry and original-client
+confirmation through their existing handlers. No guided-input kind, database
+migration, action permission or send-confirmation boundary changes.
+
+Local automated coverage: `test/telegramCallbackPresentation.test.js`; real
+Telegram tap-through and production installation remain pending. This section
+records the requested local behavior, not a deployed release.
 
 Callback data uses a closed grammar and at most 64 UTF-8 bytes. No bodies,
 paths, storage keys, tokens, credentials, or unchecked user text may appear.
@@ -127,6 +179,7 @@ forms require parser, handler, authorization, and test before allowlisting.
 ```powershell
 cd server
 node --test test/telegramArchitectureContract.test.js test/telegramBot.test.js test/telegramMessageService.test.js test/telegramMenu.test.js test/telegramMenuService.test.js test/telegramLifeOsService.test.js test/operationsLogs.test.js
+node --test test/telegramCallbackPresentation.test.js
 ```
 
 Then run `npm test` before deployment. Production changes also need deployment

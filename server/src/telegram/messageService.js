@@ -11,6 +11,7 @@ const { recordMessageEvent } = require('../life/lifeSourceEvents');
 const { menuAction } = require('./telegramMenu');
 const { classifyTelegramFailure, telegramFailureReply } = require('./telegramFailure');
 const { DENIED_ANSWER, callbackPermissions, messagePermissions, textPermissions, permits } = require('./telegramPermissionPolicy');
+const { PAGE_CALLBACK_RE, EXPIRED_PAGE, TelegramCallbackPages } = require('./telegramCallbackPages');
 
 function telegramMenuContext({ user, conversation, input }) {
   return {
@@ -178,6 +179,7 @@ class TelegramMessageService {
     this.menuService = options.menuService || null;
     this.jobCaptchaService = options.jobCaptchaService || null;
     this.logger = options.logger || null;
+    this.callbackPages = new TelegramCallbackPages();
   }
 
   async markCompleted(updateId) {
@@ -213,14 +215,24 @@ class TelegramMessageService {
 
   async handleCallback(update) {
     const input = normalizeTelegramCallbackUpdate(update);
+    const message = update.callback_query.message;
+    input.messageId = Number.isSafeInteger(message.message_id) && message.message_id > 0 ? String(message.message_id) : null;
+    input.textMessage = typeof message.text === 'string';
     if (!await this.accessPolicy.isAllowed(input.telegramUserId)) return { status: 'forbidden' };
     const claimed = await this.updateRepository.claim(input.updateId, input.telegramUserId, 'callback');
     if (!claimed) return { status: 'duplicate' };
     try {
       const result = await this.handleClaimedCallback(input);
       await this.markCompleted(input.updateId);
-      if (this.accessService && !permits(await this.accessService.getAccessForTelegram(input.telegramUserId), callbackPermissions(input.data))) return { status: 'answered', answer: DENIED_ANSWER };
-      return result;
+      if (result?.callbackNotice) return result;
+      if (this.accessService && !permits(await this.accessService.getAccessForTelegram(input.telegramUserId), callbackPermissions(input.permissionData || input.data))) {
+        return PAGE_CALLBACK_RE.test(input.data) ? { status: 'answered', callbackNotice: DENIED_ANSWER } : { status: 'answered', answer: DENIED_ANSWER };
+      }
+      if (PAGE_CALLBACK_RE.test(input.data)) {
+        const page = this.callbackPages.lookup(input);
+        return page ? this.callbackPages.page(page.entry, page.index) : { status: 'answered', callbackNotice: EXPIRED_PAGE };
+      }
+      return this.callbackPages.prepare(result, input);
     } catch (error) {
       return this.failureResult({ updateId: input.updateId, error, phase: 'callback' });
     }
@@ -230,11 +242,20 @@ class TelegramMessageService {
     const user = await this.userRepository.findOrCreateTelegramUser({ telegramUserId: input.telegramUserId, displayName: input.displayName });
     const conversation = await this.conversationRepository.getOrCreate({ userId: user.id, channel: 'telegram', externalChatId: input.chatId });
     const menuContext = telegramMenuContext({ user, conversation, input });
+    input.userId = user.id;
+    input.conversationId = conversation.id;
+    const paging = PAGE_CALLBACK_RE.test(input.data);
+    const savedPage = paging ? this.callbackPages.lookup(input) : null;
+    if (paging && !savedPage) return { status: 'answered', callbackNotice: EXPIRED_PAGE };
+    input.permissionData = savedPage?.entry.sourceData || input.data;
 
     if (this.accessService) {
       menuContext.access = await this.accessService.getAccessForUser(user.id);
-      if (!permits(menuContext.access, callbackPermissions(input.data))) return { status: 'answered', answer: DENIED_ANSWER };
+      if (!permits(menuContext.access, callbackPermissions(input.permissionData))) return paging
+        ? { status: 'answered', callbackNotice: DENIED_ANSWER } : { status: 'answered', answer: DENIED_ANSWER };
     }
+
+    if (savedPage) return this.callbackPages.page(savedPage.entry, savedPage.index);
 
     if (input.data.startsWith('vpsup:')) {
       const supervisorCallbackHandler = this.vpnSupervisorCallbackRouter || this.vpnSupervisorService;

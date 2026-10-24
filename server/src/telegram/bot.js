@@ -1,5 +1,6 @@
-const { Bot, InputFile } = require('grammy');
-const { sendTelegramText, splitTelegramText } = require('./telegramFormatting');
+const { Bot, InputFile, GrammyError } = require('grammy');
+const { sendTelegramText, splitTelegramText, formatTelegramHtml } = require('./telegramFormatting');
+const { PAGE_CALLBACK_RE } = require('./telegramCallbackPages');
 const { isLifeCallback } = require('./telegramLifeOsService');
 const { isJobCallback, isJobVacancyUrl } = require('../jobs/jobTelegramCallbacks');
 const { isVpnCallback } = require('../vpn/vpnCommandService');
@@ -19,7 +20,7 @@ function vpnReplyMarkup(buttons, options = {}) {
         const data = String(button?.data || '');
         const url = String(button?.url || '');
         const webApp = String(button?.webApp || '');
-        const validCallback = data && !url && Buffer.byteLength(data, 'utf8') <= 64 && (TELEGRAM_CALLBACK_RE.test(data) || isLifeCallback(data) || isVpnCallback(data) || isJobCallback(data));
+        const validCallback = data && !url && Buffer.byteLength(data, 'utf8') <= 64 && (TELEGRAM_CALLBACK_RE.test(data) || PAGE_CALLBACK_RE.test(data) || isLifeCallback(data) || isVpnCallback(data) || isJobCallback(data));
         const validOperationsUrl = url && !data && options.operationsPanelUrl && url === options.operationsPanelUrl;
         const validRoutingUrl = url && !data && (url === 'https://jarvis.rilora.ru/happ-routing' || (options.routingUrl && url === options.routingUrl));
         const validSubscriptionUrl = url && !data && (
@@ -58,7 +59,7 @@ function validatedReplyKeyboard(value) {
       return { text };
     });
   });
-  return { keyboard, resize_keyboard: true, is_persistent: true };
+  return { keyboard, resize_keyboard: true, is_persistent: false, one_time_keyboard: false };
 }
 
 async function replyWithChunks(ctx, text, buttons, replyKeyboard, options = {}) {
@@ -114,8 +115,13 @@ async function sendTelegramMedia(ctx, media, options = {}) {
 }
 
 async function sendResult(ctx, result, options = {}) {
+  if (result.callbackNotice) {
+    await ctx.answerCallbackQuery({ text: result.callbackNotice, show_alert: true }).catch(() => {});
+    return;
+  }
   if (result.status === 'forbidden') {
-    await ctx.reply('Доступ к этому Jarvis не разрешён.');
+    if (ctx.callbackQuery) await ctx.answerCallbackQuery({ text: 'Доступ к этому Jarvis не разрешён.', show_alert: true }).catch(() => {});
+    else await ctx.reply('Доступ к этому Jarvis не разрешён.');
     return;
   }
   if (result.status !== 'answered') return;
@@ -123,9 +129,10 @@ async function sendResult(ctx, result, options = {}) {
     await sendTelegramMedia(ctx, result.media, options);
     return;
   }
-  await replyWithChunks(ctx, result.answer, result.buttons, result.replyKeyboard, { ...options,
+  const edited = await editCallbackResult(ctx, result, options);
+  if (!edited) await replyWithChunks(ctx, result.answer, result.buttons, result.replyKeyboard, { ...options,
     plainText: result.plainText === true, disableLinkPreview: result.disableLinkPreview === true });
-  if (result.jobSearchEntry === true) await replyWithChunks(ctx, 'Поиск вакансий и подготовка откликов:', [[{ text: 'Поиск работы', data: 'job:menu' }]], undefined, options);
+  if (result.jobSearchEntry === true && !edited) await replyWithChunks(ctx, 'Поиск вакансий и подготовка откликов:', [[{ text: 'Поиск работы', data: 'job:menu' }]], undefined, options);
   if (result.artifact) {
     const artifact = result.artifact;
     const content = String(artifact.content || '');
@@ -137,6 +144,29 @@ async function sendResult(ctx, result, options = {}) {
     }
     await ctx.replyWithDocument(new InputFile(Buffer.from(artifact.content, 'utf8'), artifact.filename));
   }
+}
+
+async function editCallbackResult(ctx, result, options) {
+  const message = ctx.callbackQuery?.message;
+  if (!message || typeof message.text !== 'string' || !Number.isSafeInteger(message.message_id)
+    || result.artifact) return false;
+  const answer = String(result.answer || '');
+  if (!answer || answer.length > 4000) throw new Error('Telegram callback text requires pagination');
+  if (result.replyKeyboard) validatedReplyKeyboard(result.replyKeyboard);
+  const buttons = [...(result.buttons || []), ...(result.jobSearchEntry ? [[{ text: 'Поиск работы', data: 'job:menu' }]] : [])];
+  const markup = buttons.length ? vpnReplyMarkup(buttons, options) : { inline_keyboard: [] };
+  try {
+    await ctx.editMessageText(result.plainText === true ? answer : formatTelegramHtml(answer), {
+      ...(result.plainText === true ? {} : { parse_mode: 'HTML' }),
+      link_preview_options: { is_disabled: result.disableLinkPreview === true },
+      reply_markup: markup,
+    });
+  } catch (error) {
+    if (error instanceof GrammyError && error.error_code === 400
+      && /^Bad Request: message is not modified\b/i.test(error.description)) return true;
+    throw error;
+  }
+  return true;
 }
 
 async function downloadTelegramAttachment(ctx, token, maxBytes = 20 * 1024 * 1024, fetchImpl = globalThis.fetch, { timeoutMs = 30_000 } = {}) {
@@ -213,6 +243,16 @@ async function deliverResult(ctx, result, options) {
 function createTelegramBot(options) {
   const bot = new Bot(options.token);
   const messageService = options.messageService;
+  const callbackTasks = new Map();
+  const serializeCallback = async (ctx, action) => {
+    const message = ctx.callbackQuery?.message;
+    const key = `${message?.chat?.id}:${message?.message_id}`;
+    const previous = callbackTasks.get(key) || Promise.resolve();
+    const pending = previous.catch(() => {}).then(action);
+    callbackTasks.set(key, pending);
+    try { return await pending; }
+    finally { if (callbackTasks.get(key) === pending) callbackTasks.delete(key); }
+  };
   if (options.onPollingHealth) bot.api.config.use(async (previous, method, payload, signal) => {
     try {
       const result = await previous(method, payload, signal);
@@ -226,12 +266,25 @@ function createTelegramBot(options) {
 
   bot.on('callback_query:data', async (ctx, next) => {
     const data = String(ctx.callbackQuery?.data || '');
-    if (!TELEGRAM_CALLBACK_RE.test(data) && !isLifeCallback(data) && !isVpnCallback(data) && !isJobCallback(data)) return next();
-    await ctx.answerCallbackQuery().catch(() => {});
-    const result = typeof messageService.handleCallback === 'function'
-      ? await messageService.handleCallback(ctx.update)
-      : (data.startsWith('vpn:') ? await messageService.handleVpnCallback(ctx.update) : null);
-    if (result) await deliverResult(ctx, result, { operationsPanelUrl: options.operationsPanelUrl, miniAppUrl: options.miniAppUrl, mediaMaxBytes: options.documentMaxBytes });
+    if (!TELEGRAM_CALLBACK_RE.test(data) && !PAGE_CALLBACK_RE.test(data) && !isLifeCallback(data) && !isVpnCallback(data) && !isJobCallback(data)) return next();
+    let acknowledged = false;
+    const acknowledge = async () => {
+      acknowledged = true;
+      await ctx.answerCallbackQuery().catch(() => {});
+    };
+    // Fast delivery failures can use the first callback answer for their alert.
+    // Long-running actions still stop the spinner; post-ACK alerts are best effort.
+    const acknowledgementTimer = setTimeout(acknowledge, 1500);
+    acknowledgementTimer.unref();
+    try {
+      await serializeCallback(ctx, async () => {
+        const result = typeof messageService.handleCallback === 'function'
+          ? await messageService.handleCallback(ctx.update)
+          : (data.startsWith('vpn:') ? await messageService.handleVpnCallback(ctx.update) : null);
+        if (result) await deliverResult(ctx, result, { operationsPanelUrl: options.operationsPanelUrl, miniAppUrl: options.miniAppUrl, mediaMaxBytes: options.documentMaxBytes });
+        if (!acknowledged && !result?.callbackNotice && result?.status !== 'forbidden') await acknowledge();
+      });
+    } finally { clearTimeout(acknowledgementTimer); }
   });
 
   if (typeof options.approvalHandler === 'function') {
@@ -251,7 +304,10 @@ function createTelegramBot(options) {
     const failureCode = classifyTelegramFailure(error.error);
     options.logger.error({ telegramFailureCode: failureCode, updateId }, 'Telegram update delivery failed');
     try {
-      await error.ctx.reply(telegramFailureReply(failureCode));
+      if (error.ctx.callbackQuery) await error.ctx.answerCallbackQuery({
+        text: 'Не удалось обновить сообщение. Если ты подтверждал действие, проверь его состояние перед повтором.', show_alert: true,
+      });
+      else await error.ctx.reply(telegramFailureReply(failureCode));
     } catch (_) {
       options.logger.warn({ telegramFailureCode: TELEGRAM_FAILURE_CODES.TELEGRAM_FALLBACK_DELIVERY_FAILED, updateId }, 'Telegram fallback reply delivery failed');
     }

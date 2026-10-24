@@ -32,9 +32,9 @@ function replyKeyboard(owner, { jobSearchEnabled = false, permissions = null } =
       [MENU.DOCUMENTS]: 'documents', [MENU.DEVICES]: 'devices', [MENU.VPN]: 'vpn',
       [MENU.OPERATIONS]: 'operations', [MENU.JOBS]: 'jobs' };
     return { keyboard: keyboard.map((row) => row.filter(({ text }) => !permissionByLabel[text]
-      || permissions.includes(permissionByLabel[text]))).filter((row) => row.length), resize_keyboard: true, is_persistent: true };
+      || permissions.includes(permissionByLabel[text]))).filter((row) => row.length), resize_keyboard: true, is_persistent: false, one_time_keyboard: false };
   }
-  return { keyboard, resize_keyboard: true, is_persistent: true };
+  return { keyboard, resize_keyboard: true, is_persistent: false, one_time_keyboard: false };
 }
 
 function isOwner(user, telegramUserId, ownerTelegramId) {

@@ -28,7 +28,8 @@ test('documented owner and member keyboard rows match shipped source exactly', (
       const actual = replyKeyboard(owner, { jobSearchEnabled, permissions }).keyboard.map((row) => row.map((button) => button.text));
       assert.deepEqual(actual, documentedRows(contract, column, jobSearchEnabled));
     }
-    assert.equal(replyKeyboard(owner).is_persistent, true);
+    assert.equal(replyKeyboard(owner).is_persistent, false);
+    assert.equal(replyKeyboard(owner).one_time_keyboard, false);
     assert.equal(replyKeyboard(owner).resize_keyboard, true);
   }
 });
