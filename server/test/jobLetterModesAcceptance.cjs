@@ -18,6 +18,7 @@ const { UserRepository } = require('../src/users/userRepository');
 const { ConversationRepository } = require('../src/conversations/conversationRepository');
 const { createTelegramAccessPolicy } = require('../src/telegram/accessPolicy');
 const { configuredOwnerJobAccess } = require('../src/jobs/configuredOwnerJobAccess');
+const { JobResumeContextService } = require('../src/jobs/jobResumeContextService');
 
 async function harness() {
   const f = await createJobPostgresFixture();
@@ -171,6 +172,92 @@ test('both AI modes use facts/examples; edits preserve source and a model failur
     assert.notEqual((await f.cb(prepared.buttons[0][0].data)).applicationStatus, 'sent');
     assert.equal(f.submissions.length, before);
     assert.equal((await f.profiles.get({ userId: f.owner })).profile.facts[0].text, 'Private actual owner project');
+  } finally { await f.close(); }
+});
+
+test('AI uses the selected resume and rejects selection races before model or draft save', async () => {
+  const f = await harness();
+  try {
+    await f.pool.query("UPDATE job_connections SET resume_id='fixtureResume' WHERE user_id=$1", [f.owner]);
+    let swapDuringRead = false, reads = 0;
+    const resume = { resumeId: 'fixtureResume', title: 'Аналитик данных', experience: 'Автоматизировала отчётность',
+      skills: 'Excel, SQL', education: '', summary: '', grammaticalGender: 'unknown' };
+    f.draftService.resumeContextService = new JobResumeContextService({ pool: f.pool,
+      accessService: configuredOwnerJobAccess(f.pool, '101'), browserClient: { forUser(userId) {
+        assert.equal(userId, f.owner);
+        return { async readResume({ resumeId }) {
+          reads++;
+          assert.equal(resumeId, 'fixtureResume');
+          if (swapDuringRead) await f.pool.query("UPDATE job_connections SET resume_id='otherResume',revision=revision+1 WHERE user_id=$1", [f.owner]);
+          return resume;
+        } };
+      } } });
+    await f.base('Owner experience source');
+    const v = await f.vacancy();
+    const grounded = await f.draftService.generate({ scope: f.scope, vacancyId: v.id, requestId: 'resume-grounding',
+      mode: 'improved', sourceText: 'Owner experience source', expectedVacancyRevision: v.revision });
+    assert.deepEqual(JSON.parse(f.prompts[0][1].content).selectedResume, resume,
+      'the provider receives the selected resume as a distinct grounding source');
+    assert.equal((await f.current(v)).id, grounded.id);
+    assert.equal((await f.pool.query("SELECT payload->>'resumeId' AS resume_id FROM job_tasks WHERE request_id='resume-grounding'")).rows[0].resume_id,
+      'fixtureResume');
+
+    await f.pool.query("UPDATE job_connections SET resume_id='fixtureResume',revision=revision+1 WHERE user_id=$1", [f.owner]);
+    swapDuringRead = true;
+    const callsBeforeReadRace = f.prompts.length;
+    await assert.rejects(f.draftService.generate({ scope: f.scope, vacancyId: v.id, requestId: 'resume-race-during-read',
+      mode: 'improved', sourceText: 'Source', expectedVacancyRevision: v.revision }), { code: 'JOB_REVISION_CONFLICT' });
+    assert.equal(f.prompts.length, callsBeforeReadRace, 'a changed selection during reading is rejected before the provider call');
+    assert.equal((await f.current(v)).id, grounded.id);
+
+    await f.pool.query("UPDATE job_connections SET resume_id='fixtureResume',revision=revision+1 WHERE user_id=$1", [f.owner]);
+    swapDuringRead = false;
+    const generate = f.draftService.modelAdapter.generate.bind(f.draftService.modelAdapter);
+    f.draftService.modelAdapter.generate = async (input) => {
+      await f.pool.query("UPDATE job_connections SET resume_id='otherResume',revision=revision+1 WHERE user_id=$1", [f.owner]);
+      return generate(input);
+    };
+    const beforeSaveRace = f.prompts.length;
+    await assert.rejects(f.draftService.generate({ scope: f.scope, vacancyId: v.id, requestId: 'resume-race-before-save',
+      mode: 'improved', sourceText: 'Source', expectedVacancyRevision: v.revision }), { code: 'JOB_REVISION_CONFLICT' });
+    assert.equal(f.prompts.length, beforeSaveRace + 1, 'the provider was called, then the stale selection was detected');
+    assert.equal((await f.current(v)).id, grounded.id, 'a stale-resume result is not saved');
+  } finally { await f.close(); }
+});
+
+test('manual draft edit uses scoped guided input, preserves text and invalidates send preview', async () => {
+  const f = await harness();
+  try {
+    const v = await f.vacancy();
+    await f.cb(`job:custom:${v.id}`);
+    await f.msg('Initial letter');
+    const original = await f.current(v);
+    const send = await f.cb(`job:send:${original.id}`);
+    const confirmation = send.buttons[0][0].data;
+    const opened = await f.cb(`job:manual_edit:${original.id}`);
+    assert.match(opened.answer, /Initial letter/);
+    assert.match(opened.answer, /новый текст письма целиком/);
+    const active = (await f.interactions.getActive(f.scope)).interaction;
+    assert.equal(active.kind, 'job_draft_manual_edit');
+    assert.match((await f.cb(`job:manual_edit:${original.id}`, 202)).answer, /недоступ|правами/iu);
+    assert.match((await f.cb(`job:manual_edit:${original.id}`, 101, -100, 'group')).answer, /личном/iu);
+    assert.match((await f.msg('password=fixture-secret-value')).answer, /Не присылай|не удалось/iu);
+    assert.equal((await f.interactions.getActive(f.scope)).interaction.id, active.id);
+    const newText = '  Fresh first line\n\nFresh second line  ';
+    const editUpdate = f.messageUpdate(newText);
+    const preview = await f.messages.handle(editUpdate);
+    assert.match(preview.answer, /Fresh second line/);
+    assert.equal((await f.messages.handle(editUpdate)).status, 'duplicate');
+    const edited = await f.current(v);
+    assert.equal(edited.text, newText);
+    assert.equal(edited.parent_draft_id, original.id);
+    assert.equal(edited.letter_mode, 'custom');
+    assert.equal(f.prompts.length, 0);
+    assert.equal((await f.pool.query('SELECT status FROM telegram_interactions WHERE id=$1', [active.id])).rows[0].status, 'consumed');
+    assert.notEqual((await f.pool.query('SELECT status FROM job_confirmations WHERE id=$1', [confirmation.split(':').at(-1)])).rows[0].status, 'pending');
+    assert.notEqual((await f.cb(confirmation)).applicationStatus, 'sent');
+    assert.match((await f.cb(`job:manual_edit:${original.id}`)).answer, /недоступн|актуальн/iu);
+    assert.equal((await f.current(v)).id, edited.id);
   } finally { await f.close(); }
 });
 

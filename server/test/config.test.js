@@ -5,6 +5,9 @@ const { loadConfig, parseAllowedTelegramIds } = require('../src/config/loadConfi
 test('loads safe development defaults', () => {
   const config = loadConfig({ NODE_ENV: 'test', JARVIS_LOG_LEVEL: 'silent' });
   assert.equal(config.host, '127.0.0.1');
+  assert.equal(config.webSearchEnabled, false);
+  assert.equal(config.tavilyApiKey, '');
+  assert.equal(config.webSearchTimeoutMs, 15000);
   assert.equal(config.port, 3210);
   assert.deepEqual(config.telegramAllowedIds, []);
   assert.equal(config.telegramVoiceEnabled, false);
@@ -22,6 +25,14 @@ test('loads safe development defaults', () => {
   assert.equal(config.operationsNlHostKey, 'vpn-nl');
   assert.equal(config.operationsNlHostLabel, 'Netherlands VPN VPS');
   assert.equal(config.operationsNlSocketPath, '/run/jarvis-host-agent/agent-nl.sock');
+});
+
+test('web search needs a server-side key and bounded timeout', () => {
+  assert.throws(() => loadConfig({ JARVIS_WEB_SEARCH_ENABLED: 'true' }), /JARVIS_TAVILY_API_KEY/);
+  const config = loadConfig({ JARVIS_WEB_SEARCH_ENABLED: 'true', JARVIS_TAVILY_API_KEY: 'fixture-only', JARVIS_WEB_SEARCH_TIMEOUT_MS: '5000' });
+  assert.equal(config.webSearchEnabled, true);
+  assert.equal(config.webSearchTimeoutMs, 5000);
+  assert.throws(() => loadConfig({ JARVIS_WEB_SEARCH_TIMEOUT_MS: '9999999' }));
 });
 
 test('VPN Supervisor acceptance requires Operations and a configured model', () => {

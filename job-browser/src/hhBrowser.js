@@ -4,6 +4,7 @@ const { classifyPage, classifySession } = require('./pageSignals');
 const { readSearchPage, readVacancyPage, readResumes } = require('./hhPageReader');
 const { readApplicationForm } = require('./hhApplicationForm');
 const { readResumePrivacy, readEmployerId, evaluatePrivacy } = require('./hhPrivacy');
+const { readResumeContent } = require('./hhResumeReader');
 const { dispatchCaptcha } = require('./captchaDispatch');
 const { bounded } = require('./browserHealth');
 const { readHistoryPage } = require('./hhHistoryReader');
@@ -249,7 +250,7 @@ class HhBrowser {
         && response?.status() === 200 && current.pathname === '/search/vacancy';
       const formCandidate = expected === 'application' && signal.state === 'unknown'
         && response?.status() === 200 && current.pathname === '/applicant/vacancy_response';
-      const privacyCandidate = expected === 'resume_privacy' && signal.state === 'unknown'
+      const privacyCandidate = (expected === 'resume_privacy' || expected === 'resume_content') && signal.state === 'unknown'
         && response?.status() === 200 && /^\/resume\/[a-zA-Z0-9]+$/.test(current.pathname);
       const historyCandidate = expected === 'history' && signal.state === 'unknown'
         && response?.status() === 200 && current.pathname === '/applicant/negotiations';
@@ -300,6 +301,15 @@ class HhBrowser {
     return this.run(() => this.read(`https://hh.ru/vacancy/${externalId}`, 'vacancy', (page) => readVacancyPage(page, externalId)));
   }
   listResumes() { return this.run(() => this.read('https://hh.ru/applicant/resumes', 'authenticated', readResumes)); }
+  resumeContent({ resumeId }) {
+    if (!/^[a-zA-Z0-9]{1,100}$/.test(resumeId || '')) return Promise.reject(failure('JOB_HH_RESUME_UNAVAILABLE'));
+    return this.run(async () => {
+      if (resumeId !== this.primaryResumeId) throw failure('JOB_HH_RESUME_UNAVAILABLE');
+      const resumes = await this.read('https://hh.ru/applicant/resumes', 'authenticated', readResumes);
+      if (!resumes.some(item => item.id === resumeId) || resumeId !== this.primaryResumeId) throw failure('JOB_HH_RESUME_UNAVAILABLE');
+      return this.read(`https://hh.ru/resume/${resumeId}`, 'resume_content', page => readResumeContent(page, resumeId));
+    });
+  }
   history({ section, page }) {
     if (!['active','archived'].includes(section) || !Number.isInteger(page) || page < 0 || page >= 1000) return Promise.reject(failure('JOB_INVALID_SEARCH'));
     return this.run(async () => {

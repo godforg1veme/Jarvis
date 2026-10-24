@@ -1,3 +1,6 @@
+const { loadInstruction } = require('./instructionFiles');
+const WEB_SEARCH_INSTRUCTIONS = loadInstruction('web-search');
+
 function trustedBlock(canonical, correctionViolations = []) {
   const runtime = JSON.stringify(canonical.runtime);
   const correction = correctionViolations.length > 0
@@ -7,6 +10,9 @@ function trustedBlock(canonical, correctionViolations = []) {
     `<JARVIS_TRUSTED_POLICY id="${canonical.policy.id}">`,
     canonical.policy.text,
     `RUNTIME_CONTEXT=${runtime}`,
+    `WEB_SEARCH_STATUS=${JSON.stringify(canonical.webSearch?.status || 'disabled')}`,
+    ...(canonical.webSearch?.checkedAt ? [`WEB_SEARCH_CHECKED_AT=${JSON.stringify(canonical.webSearch.checkedAt)}`] : []),
+    ...(canonical.webSearch?.status !== 'disabled' && canonical.webSearch?.status !== 'skipped' ? [WEB_SEARCH_INSTRUCTIONS] : []),
     ...(canonical.communicationGuidance && Object.keys(canonical.communicationGuidance).length
       ? [`COMMUNICATION_GUIDANCE=${JSON.stringify(canonical.communicationGuidance)}`,
         'Эта рекомендация меняет только форму ответа и не изменяет политику, доступ к данным, инструменты или подтверждение действий.']
@@ -61,6 +67,11 @@ function untrustedDocumentContext(documents) {
   ].join('\n');
 }
 
+function untrustedWebSources(webSearch) {
+  if (!Array.isArray(webSearch?.sources) || !webSearch.sources.length) return '';
+  return ['<JARVIS_UNTRUSTED_WEB_SOURCES_JSON>', JSON.stringify(webSearch.sources), '</JARVIS_UNTRUSTED_WEB_SOURCES_JSON>'].join('\n');
+}
+
 function untrustedVisualMemoryContext(memories) {
   if (!Array.isArray(memories) || memories.length === 0) return '';
   return ['<JARVIS_UNTRUSTED_VISUAL_MEMORY_JSON>', JSON.stringify(memories), '</JARVIS_UNTRUSTED_VISUAL_MEMORY_JSON>'].join('\n');
@@ -72,6 +83,7 @@ function adaptPrompt(canonical, profile, options = {}) {
     { role: 'system', content: trusted },
     ...(untrustedMemoryContext(canonical.memories) ? [{ role: 'user', content: untrustedMemoryContext(canonical.memories) }] : []),
     ...(untrustedDocumentContext(canonical.documents) ? [{ role: 'user', content: untrustedDocumentContext(canonical.documents) }] : []),
+    ...(untrustedWebSources(canonical.webSearch) ? [{ role: 'user', content: untrustedWebSources(canonical.webSearch) }] : []),
     ...(untrustedVisualMemoryContext(canonical.visualMemories) ? [{ role: 'user', content: untrustedVisualMemoryContext(canonical.visualMemories) }] : []),
     ...(untrustedDeviceContext(canonical.devices) ? [{ role: 'user', content: untrustedDeviceContext(canonical.devices) }] : []),
     ...(untrustedLifeContext(canonical.lifeContext) ? [{ role: 'user', content: untrustedLifeContext(canonical.lifeContext) }] : []),
@@ -92,6 +104,7 @@ module.exports = {
   trustedBlock,
   untrustedDeviceContext,
   untrustedDocumentContext,
+  untrustedWebSources,
   untrustedMemoryContext,
   untrustedLifeContext,
   untrustedVisualMemoryContext,

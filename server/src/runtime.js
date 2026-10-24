@@ -2,6 +2,9 @@ const { createResourceCloser } = require('./lifecycle');
 const { InputFile } = require('grammy');
 const { buildApp } = require('./app');
 const { AssistantService } = require('./assistant/assistantService');
+const { TavilyMcpClient } = require('./search/tavilyMcpClient');
+const { SearchIntentPlanner } = require('./search/searchIntentPlanner');
+const { WebSearchService } = require('./search/webSearchService');
 const { createPool, databaseReadinessCheck } = require('./db/pool');
 const { runMigrations } = require('./db/migrate');
 const { createAnswerProvider } = require('./providers/providerFactory');
@@ -140,6 +143,7 @@ async function createRuntime(config, overrides = {}) {
   }
 
   let assistant = overrides.assistant || null;
+  let webSearchService = null;
   let deviceService = null;
   let memoryService = null;
   let knowledgeService = null;
@@ -169,11 +173,18 @@ async function createRuntime(config, overrides = {}) {
         app.log.warn({ provider: name, err: error }, 'model provider fallback');
       },
     });
+    if (config.webSearchEnabled) {
+      webSearchService = overrides.webSearchService || new WebSearchService({
+        planner: new SearchIntentPlanner({ provider: answerProvider }),
+        client: new TavilyMcpClient({ apiKey: config.tavilyApiKey, timeoutMs: config.webSearchTimeoutMs }),
+      });
+    }
     assistant = assistant || new AssistantService({
       provider: answerProvider,
       profile: providerProfileForConfig(config),
       logger: app.log,
       accessService,
+      webSearchService,
     });
     const deviceRepository = overrides.deviceRepository || new DeviceRepository(pool);
     const conversationRepository = overrides.conversationRepository || new ConversationRepository(pool);
@@ -751,6 +762,7 @@ async function createRuntime(config, overrides = {}) {
   }
 
   const closeRuntime = createResourceCloser([
+    ...(webSearchService ? [{ name: 'webSearch', close: () => webSearchService.close() }] : []),
     ...Object.entries({ jobRuntime, operationsRuntime }).filter(([, value]) => value).map(([name, value]) => ({
       name, close: (deadline) => value.close({ deadline }),
     })),

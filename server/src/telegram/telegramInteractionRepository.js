@@ -28,6 +28,7 @@ const KINDS = new Set([
   'job_setting_value',
   'job_profile_edit',
   'job_draft_edit',
+  'job_draft_manual_edit',
   'job_draft_translate',
   'job_base_letter_edit',
   'job_custom_letter',
@@ -147,8 +148,8 @@ class TelegramInteractionRepository {
     return { interaction: result.rows[0] || null, expired: expired.rowCount > 0 };
   }
 
-  async consume({ id, userId, conversationId, chatId }) {
-    const result = await this.pool.query(`
+  async consume({ id, userId, conversationId, chatId, client = this.pool }) {
+    const result = await client.query(`
       UPDATE telegram_interactions SET status='consumed',updated_at=now()
       WHERE id=$1 AND user_id=$2 AND conversation_id=$3 AND chat_id=$4
         AND status='active' AND expires_at>now()

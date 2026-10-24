@@ -11,11 +11,12 @@ class JobDraftRepository {
     return (await this.pool.query('SELECT * FROM job_drafts WHERE user_id=$1 AND vacancy_id=$2 AND current',
       [uuid.parse(userId), uuid.parse(vacancyId)])).rows[0] || null;
   }
-  async append({ scope, vacancyId, profileRevision, vacancyRevision, parentDraftId = null, text, facts, mode = 'legacy_ai', sourceText = '' }) {
+  async append({ scope, vacancyId, profileRevision, vacancyRevision, parentDraftId = null, text, facts, mode = 'legacy_ai', sourceText = '', preserveText = false, client: transactionClient = null,
+    resumeId = null, connectionRevision = null }) {
     if (typeof text !== 'string' || !text.trim() || text.length > 10000 || !Array.isArray(facts)) throw jobError('JOB_INVALID_DRAFT');
     if (!['legacy_ai', 'base', 'improved', 'custom', 'custom_ai'].includes(mode)
       || typeof sourceText !== 'string' || sourceText.length > 10000) throw jobError('JOB_INVALID_DRAFT');
-    return jobTransaction(this.pool, async (client) => {
+    const appendInTransaction = async (client) => {
       await assertJobScope(client, scope, this.accessService);
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`job-owner:${scope.userId}`]);
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`job-draft:${scope.userId}:${vacancyId}`]);
@@ -24,6 +25,11 @@ class JobDraftRepository {
         AND v.revision=$3 AND p.revision=$4`,
       [uuid.parse(vacancyId), scope.userId, vacancyRevision, profileRevision]);
       if (!allowed.rowCount) throw jobError('JOB_REVISION_CONFLICT');
+      if (resumeId !== null) {
+        const selected = await client.query(`SELECT 1 FROM job_connections WHERE user_id=$1 AND status='connected'
+          AND resume_id=$2 AND revision=$3 FOR SHARE`, [scope.userId, resumeId, connectionRevision]);
+        if (!selected.rowCount) throw jobError('JOB_REVISION_CONFLICT');
+      }
       const current = (await client.query('SELECT id FROM job_drafts WHERE user_id=$1 AND vacancy_id=$2 AND current FOR UPDATE',
         [scope.userId, vacancyId])).rows[0];
       if (current && current.id !== parentDraftId) throw jobError('JOB_REVISION_CONFLICT');
@@ -33,8 +39,9 @@ class JobDraftRepository {
         AND status='pending' AND frozen->>'vacancyId'=$2`, [scope.userId, vacancyId]);
       return (await client.query(`INSERT INTO job_drafts(user_id,vacancy_id,parent_draft_id,profile_revision,
         vacancy_revision,text,fact_ids,letter_mode,source_text) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-      [scope.userId, vacancyId, parentDraftId, profileRevision, vacancyRevision, text.trim(), JSON.stringify(facts), mode, sourceText])).rows[0];
-    });
+      [scope.userId, vacancyId, parentDraftId, profileRevision, vacancyRevision, preserveText ? text : text.trim(), JSON.stringify(facts), mode, sourceText])).rows[0];
+    };
+    return transactionClient ? appendInTransaction(transactionClient) : jobTransaction(this.pool, appendInTransaction);
   }
 }
 

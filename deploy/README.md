@@ -82,6 +82,28 @@ pairing and smoke checks. Do not expose port 3210 or PostgreSQL directly.
 
 ## First-time preparation
 
+### Tavily MCP search
+
+The server can use the official remote `https://mcp.tavily.com/mcp/` endpoint.
+Set `JARVIS_WEB_SEARCH_ENABLED=true`, `JARVIS_TAVILY_API_KEY` and optionally
+`JARVIS_WEB_SEARCH_TIMEOUT_MS` (default 15000) in the private server environment.
+Compose forwards these variables only to `server`; no public port, sidecar or
+Desktop installation is needed. An enabled search without a key fails config
+validation. A disabled search makes no Tavily requests.
+
+Use a free Tavily account with PAYGO and automatic payments disabled. Jarvis
+does not upgrade the account or switch to a paid search provider. All users
+share that account's quota, without per-user search quotas. Basic searches
+request five results; reading full pages, crawling and research tools are not
+enabled. Token use by the existing language-model provider is billed separately
+under its existing routing settings.
+
+The key goes in an Authorization header, never in the MCP URL. Do not print
+environment values or raw MCP errors. See [runtime boundaries](../docs/runtime-context.md#shared-instructions-and-tavily-mcp)
+and [verification](../docs/verification.md#shared-instructions-and-tavily-mcp).
+Enabling this locally does not authorize changing production. Source and
+installation updates follow the release workflow.
+
 The checked-in `bootstrap-ubuntu-22.04.sh` is retained as a historical/bootstrap
 helper and has not been rewritten for the already-provisioned Ubuntu 24.04
 host. Do not run it blindly on production. Verify the current user, SSH access,

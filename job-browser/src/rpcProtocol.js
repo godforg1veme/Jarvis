@@ -36,7 +36,7 @@ function validRequest(value, ownerId = null) {
     && UUID.test(args.sessionId || '') && typeof args.preserveProfile === 'boolean' && typeof args.complete === 'boolean'
     && !(args.complete && !args.preserveProfile);
   if (value.operation === 'login_discard') return exact(args, ['sessionId']) && UUID.test(args.sessionId || '');
-  if (value.operation === 'select_resume') return exact(args, ['resumeId'])
+  if (value.operation === 'select_resume' || value.operation === 'resume_content') return exact(args, ['resumeId'])
     && typeof args.resumeId === 'string' && /^[a-zA-Z0-9]{1,100}$/.test(args.resumeId);
   if (value.operation === 'history') return exact(args, ['section','page']) && ['active','archived'].includes(args.section)
     && Number.isInteger(args.page) && args.page >= 0 && args.page < 1000;

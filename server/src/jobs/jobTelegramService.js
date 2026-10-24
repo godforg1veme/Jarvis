@@ -56,7 +56,7 @@ class JobTelegramService {
       if(!['rs_ok','rs_status'].includes(parsed.action))await this.pool.query(`UPDATE job_confirmations SET status='cancelled'
         WHERE user_id=$1 AND conversation_id=$2 AND chat_id=$3 AND kind='resume' AND frozen->>'purpose'='change' AND status='pending'`,
       [scope.userId,scope.conversationId,scope.chatId]);
-      if (['menu', 'back', 'draft', 'cancel', 'regenerate', 'edit', 'translate', 'prepare', 'base_letter', 'base', 'improved', 'custom', 'custom_ai'].includes(parsed.action)) await this.pool.query(`UPDATE job_confirmations SET status='cancelled'
+      if (['menu', 'back', 'draft', 'cancel', 'regenerate', 'edit', 'manual_edit', 'translate', 'prepare', 'base_letter', 'base', 'improved', 'custom', 'custom_ai'].includes(parsed.action)) await this.pool.query(`UPDATE job_confirmations SET status='cancelled'
         WHERE user_id=$1 AND conversation_id=$2 AND chat_id=$3 AND kind='apply' AND status='pending'`,
       [scope.userId, scope.conversationId, scope.chatId]);
       return await this.handle({ scope, context, ...parsed });
@@ -109,11 +109,13 @@ class JobTelegramService {
       if (!vacancy) throw jobError('JOB_NOT_FOUND');
       return cardView(vacancy);
     }
-    if (action === 'regenerate' || action === 'edit' || action === 'translate' || action === 'draft' || action === 'send' || action === 'cancel') {
+    if (action === 'regenerate' || action === 'edit' || action === 'manual_edit' || action === 'translate' || action === 'draft' || action === 'send' || action === 'cancel') {
       const draft = await this.draftRepository.get({ userId: scope.userId, draftId: targetId });
       if (!draft?.current) throw jobError('JOB_NOT_FOUND');
       if (action === 'cancel') return response('Письмо не отправлено. Черновик сохранён.', [[button('В поиск работы', 'menu')]]);
       if (action === 'draft') return draftView(draft);
+      if (action === 'manual_edit') return this.begin(scope, 'job_draft_manual_edit', draft.id, 1,
+        `Текущий текст сопроводительного:\n\n${draft.text}\n\nПришли новый текст письма целиком. Я сохраню его дословно и покажу перед отправкой.`);
       if (action === 'regenerate') return draftView(await this.draftService.generate({ scope, vacancyId: draft.vacancy_id,
         parentDraftId: draft.id, requestId: context.requestId }));
       if (action === 'edit' || action === 'translate') return this.begin(scope, `job_draft_${action === 'edit' ? 'edit' : 'translate'}`,

@@ -36,6 +36,16 @@ class JobLetterFlow {
       : await j.draftService.generate({ ...options, sourceText: source, requestId: context.requestId }));
   }
   async handlePendingText(text, { scope, context, interaction }) {
+    if (interaction.kind === 'job_draft_manual_edit') {
+      let value;
+      try { value = validateLetterText(text); } catch (error) {
+        if (error.code === 'JOB_INVALID_LETTER') return response('Пришли новый текст целиком, до 10 000 символов.');
+        throw error;
+      }
+      const draft = await this.jobs.draftService.replaceManual({ scope, draftId: interaction.context.targetId,
+        text: String(text), interactionId: interaction.id, interactions: this.jobs.interactions });
+      return draftView(draft);
+    }
     if (!LETTER_KINDS.has(interaction.kind)) return null;
     const j = this.jobs, value = validateLetterText(text);
     const { targetId, revision } = interaction.context;

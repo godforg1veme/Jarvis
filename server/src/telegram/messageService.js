@@ -88,7 +88,7 @@ function normalizeTelegramMessage(update) {
     .trim()
     .slice(0, 100) || `Telegram ${telegramUserId}`;
 
-  return {
+  const normalized = {
     updateId,
     telegramUserId,
     chatId,
@@ -101,6 +101,14 @@ function normalizeTelegramMessage(update) {
     replyMessageId: /^\d{1,20}$/.test(String(message.reply_to_message?.message_id || '')) ? String(message.reply_to_message.message_id) : null,
     captchaReplyHint: Array.isArray(message.reply_to_message?.photo) && String(message.reply_to_message?.caption || '').startsWith('HH CAPTCHA ·'),
   };
+  // Preserve bounded original text only for the explicit manual-draft flow.
+  // Non-enumerable fields cannot be copied by routine object spreads/serialization.
+  const original = typeof message.text === 'string' ? message.text : '';
+  Object.defineProperties(normalized, {
+    rawText: { value: original.length <= MAX_TEXT_LENGTH ? original : undefined },
+    rawTextTooLong: { value: original.length > MAX_TEXT_LENGTH },
+  });
+  return normalized;
 }
 
 function normalizeTelegramCallbackUpdate(update) {
@@ -600,7 +608,9 @@ class TelegramMessageService {
         await this.conversationRepository.appendMessage({ userId: user.id, conversationId: conversation.id, role: 'assistant', content: menuResult.historyAnswer || answer });
         return { status: 'answered', ...menuResult, answer };
       }
-      const pendingResult = await this.menuService.handlePendingText(input.text, menuContext);
+      const pendingResult = await this.menuService.handlePendingText(input.text, menuContext, {
+        rawText: input.rawText, rawTextTooLong: input.rawTextTooLong,
+      });
       if (pendingResult?.desktopInstruction) {
         guidedDesktopInstruction = pendingResult.desktopInstruction;
         input.text = guidedDesktopInstruction.text;

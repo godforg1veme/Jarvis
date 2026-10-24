@@ -4,8 +4,8 @@ const { jobTransaction } = require('./jobTransaction');
 const { buildJobPrompt, parseJobLetter } = require('./jobPrompt');
 
 class JobDraftService {
-  constructor({ pool, searchRepository, profileRepository, draftRepository, usageRepository, modelAdapter, now = () => new Date(), accessService = null }) {
-    Object.assign(this, { pool, searchRepository, profileRepository, draftRepository, usageRepository, modelAdapter, now, accessService });
+  constructor({ pool, searchRepository, profileRepository, draftRepository, usageRepository, modelAdapter, now = () => new Date(), accessService = null, resumeContextService = null }) {
+    Object.assign(this, { pool, searchRepository, profileRepository, draftRepository, usageRepository, modelAdapter, now, accessService, resumeContextService });
   }
   async createManual({ scope, vacancyId, mode, text, parentDraftId = null, expectedProfileRevision, expectedVacancyRevision }) {
     await assertJobScope(this.pool, scope, this.accessService);
@@ -21,6 +21,21 @@ class JobDraftService {
   checkRevisions(profile, vacancy, profileRevision, vacancyRevision) {
     if ((profileRevision != null && profile.revision !== profileRevision)
       || (vacancyRevision != null && vacancy.revision !== vacancyRevision)) throw jobError('JOB_REVISION_CONFLICT');
+  }
+  async replaceManual({ scope, draftId, text, interactionId, interactions }) {
+    if (typeof text !== 'string' || !text.trim() || text.length > 10000) throw jobError('JOB_INVALID_LETTER');
+    uuid.parse(draftId);
+    return jobTransaction(this.pool, async (client) => {
+      await assertJobScope(client, scope, this.accessService);
+      const draft = (await client.query('SELECT * FROM job_drafts WHERE id=$1 AND user_id=$2 AND current', [draftId, scope.userId])).rows[0];
+      if (!draft) throw jobError('JOB_REVISION_CONFLICT');
+      const consumed = await interactions.consume({ id: interactionId, ...scope, client });
+      if (!consumed || consumed.kind !== 'job_draft_manual_edit' || consumed.context?.targetId !== draftId || consumed.context?.revision !== 1)
+        throw jobError('JOB_CONFIRMATION_UNAVAILABLE');
+      return this.draftRepository.append({ scope, vacancyId: draft.vacancy_id, parentDraftId: draft.id,
+        profileRevision: draft.profile_revision, vacancyRevision: draft.vacancy_revision,
+        text, facts: draft.fact_ids || [], mode: 'custom', sourceText: text, preserveText: true, client });
+    });
   }
   async generate({ scope, vacancyId, requestId, parentDraftId = null, instruction = '', language = 'auto', mode, sourceText,
     expectedProfileRevision, expectedVacancyRevision }) {
@@ -40,7 +55,8 @@ class JobDraftService {
     if (mode === 'custom') mode = 'custom_ai';
     if (!['legacy_ai', 'improved', 'custom_ai'].includes(mode)) throw jobError('JOB_INVALID_DRAFT');
     sourceText = sourceText ?? previous?.source_text ?? '';
-    const messages = buildJobPrompt({ vacancy: vacancy.snapshot, profile: profile.profile, instruction, language, sourceText,
+    const resumeContext = this.resumeContextService ? await this.resumeContextService.getSelected({ scope }) : null;
+    const messages = buildJobPrompt({ vacancy: vacancy.snapshot, profile: profile.profile, instruction, language, sourceText, resumeContext,
       previousText: continuingDraft ? previous?.text || '' : '' });
     const inputHash = createHash('sha256').update(JSON.stringify({ mode, sourceText, instruction, language })).digest('hex');
     const task = await jobTransaction(this.pool, async (client) => {
@@ -52,11 +68,14 @@ class JobDraftService {
         AND payload->>'vacancyId'=$2`, [scope.userId, vacancyId]);
       if (running.rowCount) throw jobError('JOB_GENERATION_BUSY');
       return (await client.query(`INSERT INTO job_tasks(user_id,request_id,kind,payload,status)
-        VALUES($1,$2,'generate',$3,'running') RETURNING *`, [scope.userId, requestId, { vacancyId, parentDraftId, mode, inputHash }])).rows[0];
+        VALUES($1,$2,'generate',$3,'running') RETURNING *`, [scope.userId, requestId, { vacancyId, parentDraftId, mode, inputHash,
+          resumeId: resumeContext?.resumeId || null, connectionRevision: resumeContext?.connectionRevision || null }])).rows[0];
     });
     if (task.payload.vacancyId !== vacancyId || task.payload.parentDraftId !== parentDraftId) throw jobError('JOB_INVALID_REQUEST');
     if (task.payload.mode && task.payload.mode !== mode) throw jobError('JOB_INVALID_REQUEST');
     if (task.payload.inputHash && task.payload.inputHash !== inputHash) throw jobError('JOB_INVALID_REQUEST');
+    if (resumeContext && (task.payload.resumeId !== resumeContext.resumeId || task.payload.connectionRevision !== resumeContext.connectionRevision))
+      throw jobError('JOB_REVISION_CONFLICT');
     if (task.status === 'complete') return this.draftRepository.get({ userId: scope.userId, draftId: task.result_id });
     if (task.status === 'unknown') throw jobError('JOB_GENERATION_OUTCOME_UNKNOWN');
     // An existing running request never starts another billable model call.
@@ -71,8 +90,11 @@ class JobDraftService {
       await this.usageRepository.record({ userId: scope.userId, requestId, providerRequestId: result.requestId,
         costUsd: result.usage?.cost ?? null, outcome: 'success', occurredAt: this.now() });
       const letter = parseJobLetter(result.text, profile.profile);
+      if (resumeContext) await this.resumeContextService.assertCurrent({ scope, resumeId: resumeContext.resumeId,
+        connectionRevision: resumeContext.connectionRevision });
       const draft = await this.draftRepository.append({ scope, vacancyId, parentDraftId, profileRevision: profile.revision,
-        vacancyRevision: vacancy.revision, text: letter.text, facts: letter.factIds, mode, sourceText });
+        vacancyRevision: vacancy.revision, text: letter.text, facts: letter.factIds, mode, sourceText,
+        resumeId: resumeContext?.resumeId || null, connectionRevision: resumeContext?.connectionRevision || null });
       await this.pool.query("UPDATE job_tasks SET status='complete',result_id=$1 WHERE id=$2", [draft.id, task.id]);
       return draft;
     } catch (error) {

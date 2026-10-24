@@ -4,6 +4,11 @@
 
 ## Русский
 
+Локально подготовлены [общие инструкции моделей, Tavily MCP и правка сопроводительных](updates/2026-10-24-shared-instructions-and-search-development.md).
+Изменения ещё не выпущены. Для живой проверки Tavily нужен ключ бесплатного
+аккаунта; выбранное резюме и новый редактор проверены на локальных fixtures,
+реальные HH и нажатия Telegram остаются для приёмки.
+
 На DE выпущено [обновление inline-сообщений Telegram](updates/2026-10-24-telegram-inline-edit-release.md):
 кнопки меняют исходное сообщение, длинный текст перелистывается в нём, возврат
 доступен на каждой странице. Server healthy; 811 серверных тестов и 75 проверок
@@ -81,6 +86,11 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 Архивы не заменяют действующие правила и новую проверку окружения.
 
 ## English
+
+[Shared model instructions, Tavily MCP and cover-letter editing](updates/2026-10-24-shared-instructions-and-search-development.md)
+are implemented locally and have not been deployed. A free-account key is
+needed for live Tavily verification. Selected-resume input and manual editing
+have local fixture coverage; actual HH and Telegram taps remain unverified.
 
 [In-place Telegram inline updates](updates/2026-10-24-telegram-inline-edit-release.md)
 are deployed on DE: buttons edit the original message, long text pages within

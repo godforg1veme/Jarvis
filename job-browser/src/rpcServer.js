@@ -74,6 +74,7 @@ function createRpcServer({ browser, profiles = null, ownerId, token, connectToke
         : input.operation === 'raise_resume_status' ? await profile.raiseResumeStatus?.({ userId: input.userId, ...input.args })
         : input.operation === 'connection' ? await activeBrowser.connection()
         : input.operation === 'resumes' ? await activeBrowser.listResumes()
+        : input.operation === 'resume_content' ? await activeBrowser.resumeContent(input.args)
         : input.operation === 'login_start' ? await activeBrowser.startLogin(input.args)
         : input.operation === 'login_frame' ? await activeBrowser.loginFrame(input.args)
         : input.operation === 'login_input' ? await activeBrowser.loginInput(input.args)

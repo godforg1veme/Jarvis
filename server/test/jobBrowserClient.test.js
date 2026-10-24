@@ -5,6 +5,25 @@ const { once } = require('node:events');
 const { JobBrowserClient } = require('../src/jobs/jobBrowserClient');
 const { createRpcServer } = require('../../job-browser/src/rpcServer');
 
+test('resume content uses read credential and validates bounded private snapshot', async () => {
+  const ownerId = randomUUID(), memberId = randomUUID(), token = randomBytes(32).toString('hex');
+  const snapshot = { resumeId: 'selected', title: 'Аналитик', experience: 'Анализ данных',
+    skills: 'Excel', education: '', summary: '', grammaticalGender: 'unknown' };
+  const calls = [];
+  const profiles = { async forUser(userId) { calls.push(userId); return { browser: {
+    async resumeContent({ resumeId }) { assert.equal(resumeId, 'selected'); return snapshot; },
+  } }; } };
+  const server = createRpcServer({ ownerId, token, profiles, browser: {} });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    const client = new JobBrowserClient({ ownerId, token, baseUrl: `http://127.0.0.1:${server.address().port}`, allowTestHttp: true });
+    assert.deepEqual(await client.forUser(memberId).readResume({ resumeId: 'selected' }), snapshot);
+    assert.deepEqual(calls, [memberId]);
+    await assert.rejects(client.forUser(memberId).readResume({ resumeId: '../other' }), { code: 'JOB_BROWSER_ACCESS_DENIED' });
+    assert.deepEqual(calls, [memberId]);
+  } finally { await new Promise(resolve => server.close(resolve)); }
+});
+
 test('login frames expose only bounded keyboard geometry and reject arbitrary field data', async () => {
   const ownerId = randomUUID(), token = randomBytes(32).toString('hex'), connectToken = randomBytes(32).toString('hex');
   const field = { x: 100, y: 200, width: 300, height: 44, type: 'password', inputMode: 'text', multiline: false };

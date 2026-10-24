@@ -7,12 +7,15 @@ const { JobProfileRepository } = require('../src/jobs/jobProfileRepository');
 const { JobDraftRepository } = require('../src/jobs/jobDraftRepository');
 const { JobApplicationRepository } = require('../src/jobs/jobApplicationRepository');
 const { JobApplicationService } = require('../src/jobs/jobApplicationService');
+const { configuredOwnerJobAccess } = require('../src/jobs/configuredOwnerJobAccess');
 
 async function applicationFixture() {
   const f = await createJobPostgresFixture();
-  const search = new JobSearchRepository(f.pool), profile = new JobProfileRepository(f.pool), drafts = new JobDraftRepository(f.pool);
+  await f.pool.query("INSERT INTO user_identities(user_id,provider,external_id) VALUES($1,'telegram','101'),($2,'telegram','202')", [f.owner, f.stranger]);
+  const accessService = configuredOwnerJobAccess(f.pool, '101');
+  const search = new JobSearchRepository(f.pool, { accessService }), profile = new JobProfileRepository(f.pool, { accessService }), drafts = new JobDraftRepository(f.pool, { accessService });
   const clock = { now: new Date('2026-10-15T12:00:00Z') };
-  const repository = new JobApplicationRepository(f.pool, { now: () => clock.now });
+  const repository = new JobApplicationRepository(f.pool, { now: () => clock.now, accessService });
   let submits = 0, existing = null, rejectedResume = false, manual = false, changed = false, submitResult = { outcome: 'sent', externalId: 'fixture-response', verified: true };
   const snapshot = { externalId: '123', title: 'AI Engineer', company: 'Fixture', url: 'https://hh.ru/vacancy/123',
     description: 'Fixture tasks', publishedAt: '2026-10-15T00:00:00Z', archived: false, manualRequired: false };
@@ -33,7 +36,7 @@ async function applicationFixture() {
       if (submitResult instanceof Error) throw submitResult;
       return submitResult;
     }, async reconcile() { return { outcome: 'unknown' }; } };
-  const service = new JobApplicationService({ pool: f.pool, repository, searchRepository: search, adapter });
+  const service = new JobApplicationService({ pool: f.pool, repository, searchRepository: search, adapter, accessService });
   const prepare = async () => {
     const reply = await service.prepareConfirmation({ scope: f.scope, draftId: draft.id });
     const id = reply.buttons?.[0]?.[0]?.data.split(':').pop();
@@ -145,7 +148,8 @@ test('real PG: restart marks orphan sending as unknown; unverified acknowledgeme
 test('production default blocks applicant submission without a verified connector capability', async () => {
   const f = await applicationFixture();
   try {
-    const disabled = new JobApplicationService({ pool: f.pool, repository: f.repository, searchRepository: f.search });
+    const disabled = new JobApplicationService({ pool: f.pool, repository: f.repository, searchRepository: f.search,
+      accessService: configuredOwnerJobAccess(f.pool, '101') });
     await assert.rejects(disabled.prepareConfirmation({ scope: f.scope, draftId: f.draft.id }), { code: 'JOB_APPLICANT_API_UNAVAILABLE' });
     assert.equal(f.submits, 0);
     assert.equal((await f.pool.query('SELECT count(*)::int AS n FROM job_applications')).rows[0].n, 0);

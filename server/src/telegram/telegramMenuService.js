@@ -301,7 +301,7 @@ class TelegramMenuService {
     return null;
   }
 
-  async handlePendingText(text, context) {
+  async handlePendingText(text, context, original = {}) {
     if (!this.interactions) return null;
     const active = await this.interactions.getActive({
       userId: context.user.id, conversationId: context.conversation.id, chatId: context.chatId,
@@ -312,8 +312,12 @@ class TelegramMenuService {
       context.access = await this.accessService.getAccessForUser(context.user.id);
       if (!permits(context.access, interactionPermissions(interaction.kind))) return { answer: DENIED_ANSWER };
     }
-    const value = String(text || '').trim();
-    if (!value) return { answer: 'Напиши значение обычным текстом.', buttons: interactionCancel(interaction.id) };
+    const manualDraft = interaction.kind === 'job_draft_manual_edit';
+    if (manualDraft && original.rawTextTooLong) return {
+      answer: 'Пришли непустой текст длиной до 10 000 символов.', buttons: interactionCancel(interaction.id),
+    };
+    const value = manualDraft ? (original.rawText ?? String(text || '')) : String(text || '').trim();
+    if (!value.trim()) return { answer: 'Напиши значение обычным текстом.', buttons: interactionCancel(interaction.id) };
     if (interaction.kind.startsWith('job_')) return this.jobSearchService
       ? this.jobSearchService.handlePendingText(value, context, interaction)
       : { answer: 'Поиск работы сейчас недоступен.' };

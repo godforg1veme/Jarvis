@@ -49,6 +49,7 @@ class JobBrowserClient {
       search: ({ query, publishedFrom, publishedTo, page = 0 }) => this.request(userId, 'search', { query, publishedFrom, publishedTo, page }),
       getVacancy: ({ externalId }) => this.request(userId, 'vacancy', { externalId: String(externalId) }),
       listResumes: () => this.request(userId, 'resumes', {}),
+      readResume: ({ resumeId }) => this.request(userId, 'resume_content', { resumeId }),
       connection: () => this.request(userId, 'connection', {}),
       raiseResume: ({ operationId, resumeId }) => this.request(userId, 'raise_resume', { operationId, resumeId }),
       resumeRaiseStatus: ({ operationId, resumeId }) => this.request(userId, 'raise_resume_status', { operationId, resumeId }),
@@ -137,6 +138,10 @@ class JobBrowserClient {
     if (operation === 'resumes' && (!Array.isArray(value) || value.length > 20
       || !value.every((item) => /^[a-zA-Z0-9]{1,100}$/.test(item?.id || '') && typeof item.title === 'string' && item.title.length <= 500))) throw jobError('JOB_HH_INVALID_RESPONSE');
     if (operation === 'resumes') return value.map(item=>({id:item.id,title:item.title,...(typeof item.canRaise==='boolean'?{canRaise:item.canRaise}:{})}));
+    if (operation === 'resume_content') {
+      const { resumeSnapshotSchema } = require('./jobResumeContextService');
+      return resumeSnapshotSchema(value, args.resumeId);
+    }
     if (operation === 'inspect' && (!value || typeof value.resumeAvailable !== 'boolean' || typeof value.manualRequired !== 'boolean'
       || (value.vacancy?.externalId !== args.externalId && !(value.resumeAvailable === false && value.manualRequired === true && value.vacancy === null)))) throw jobError('JOB_HH_INVALID_RESPONSE');
     if(operation==='inspect'&&value.existingApplication){

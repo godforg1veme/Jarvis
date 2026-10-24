@@ -29,6 +29,7 @@ const { configuredOwnerJobAccess } = require('./configuredOwnerJobAccess');
 const { JobResumeRepository } = require('./jobResumeRepository');
 const { JobResumeService } = require('./jobResumeService');
 const { JobResumeWorker } = require('./jobResumeWorker');
+const { JobResumeContextService } = require('./jobResumeContextService');
 
 function createJobRuntime({ config, pool, interactions, send, sendPhoto, fetchImpl, applicationAdapter = null, accessService = null }) {
   if (!config.jobSearchEnabled) return null;
@@ -60,10 +61,11 @@ function createJobRuntime({ config, pool, interactions, send, sendPhoto, fetchIm
   const searchRepository = new JobSearchRepository(pool, { defaults, accessService: jobsAccessService });
   const profileRepository = new JobProfileRepository(pool, { accessService: jobsAccessService });
   const draftRepository = new JobDraftRepository(pool, { accessService: jobsAccessService });
+  const resumeContextService = new JobResumeContextService({ pool, browserClient, accessService: jobsAccessService });
   const usageRepository = new JobUsageRepository(pool);
   const deliveryRepository = new JobDeliveryRepository(pool, { accessService: jobsAccessService });
   const draftService = new JobDraftService({ pool, searchRepository, profileRepository, draftRepository, usageRepository,
-    modelAdapter: new JobModelAdapter({ config, fetchImpl }), accessService: jobsAccessService });
+    modelAdapter: new JobModelAdapter({ config, fetchImpl }), accessService: jobsAccessService, resumeContextService });
   const settingsService = new JobSettingsService({ pool, searchRepository, profileRepository, accessService: jobsAccessService });
   const applicationRepository = new JobApplicationRepository(pool, { accessService: jobsAccessService });
   const historyRepository=new JobHistoryRepository(pool,{accessService: jobsAccessService});

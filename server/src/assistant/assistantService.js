@@ -18,6 +18,7 @@ class AssistantService {
     this.logger = options.logger || null;
     this.lifeContextComposer = options.lifeContextComposer || null;
     this.accessService = options.accessService || null;
+    this.webSearchService = options.webSearchService || null;
   }
 
   setLifeContextComposer(composer) {
@@ -67,6 +68,10 @@ class AssistantService {
     if (effectiveInput.devices?.length) required.add('devices');
     if (effectiveInput.visualMemories?.length) { required.add('memory'); required.add('devices'); }
     await requireAccess();
+    effectiveInput.webSearch = this.webSearchService
+      ? await this.webSearchService.prepare({ currentRequest: effectiveInput.currentRequest, requireAccess })
+      : { status: 'disabled', sources: [] };
+    await requireAccess();
     const canonical = buildCanonicalPrompt(effectiveInput);
     let correctionViolations = [];
     for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -74,7 +79,13 @@ class AssistantService {
       const answer = await this.provider.answer({ ...effectiveInput, messages });
       await requireAccess();
       const validation = validateOutput(answer, canonical.runtime);
-      if (validation.ok) return String(answer).trim();
+      if (validation.ok) {
+        const response = String(answer).trim();
+        const status = canonical.webSearch.status;
+        return ['unavailable', 'quota_exhausted', 'invalid_query'].includes(status)
+          ? `${response}\n\nНе удалось проверить актуальность информации через веб-поиск.`
+          : response;
+      }
       correctionViolations = validation.violations;
       if (this.logger) {
         this.logger.warn({

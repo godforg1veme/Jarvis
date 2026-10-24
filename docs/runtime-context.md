@@ -55,6 +55,54 @@ See `docs/README.md` for current implementation status and historical records.
 
 ## Current Architecture
 
+### Shared instructions and Tavily MCP
+
+Local implementation, 24 October 2026; deployment and live Tavily/HH acceptance
+are separate checks. Shared text instructions live in
+`server/src/prompts/instructions/core.ru.md`, with cover-letter and web-search
+blocks beside them. `instructionFiles.js` reads bounded, nonempty UTF-8 files
+at startup; edits require a server restart. Missing or invalid required files
+fail closed. Existing persona, source, time, access and confirmation policies
+remain in force. Service classifiers and Supervisor retain dedicated prompts.
+
+Cover-letter generation combines core and task instructions, the selected
+personal resume when HH is connected, current user source/corrections and
+confirmed profile facts. Style examples supply style, not experience. Current
+explicit facts take precedence for that request only. No new AI quality judge
+or quality-triggered retry is enabled. Without an HH connection, generation
+can still use the actual supplied source and facts. Failure to read an already
+selected connected resume is reported instead of substituting another resume.
+Browser reads use a bounded allowlisted snapshot, UUID-scoped profile and
+current selection/revision checks through commit. Local fixtures do not prove
+that every live HH markup variant is supported.
+
+`TavilyMcpClient` uses official SDK 1.32.2, fixed HTTPS remote endpoint and a
+Bearer header. Only `tavily_search` with `basic`, five results, no raw content
+and no images is callable. A 15-second MCP deadline includes initialization,
+tool discovery and the call; response streams are capped at 256 KiB before
+parsing, including chunked/SSE responses. Cleanup aborts background SDK streams.
+No blind tools/call retry or alternate paid search is configured.
+
+The optional search planner sees only the current request, not stored history,
+documents, memories or resume. It forms a short public query; deterministic
+filters reject obvious credentials/contact data and known private-material
+markers, and prohibit new topic/name words absent from the current request
+apart from a closed set of neutral search words. This is conservative: a query
+that cannot pass the boundary is reported unavailable. These filters do not
+constitute general detection of every kind of personal data in natural language.
+Returned sources reject credential-bearing URLs and sensitive query parameters.
+Sources are bounded untrusted user-context data, separate from private S-source
+documents. Search executes once before final-answer generation and is reused
+through existing policy correction/fallback; `toolsAvailable` is unchanged.
+Access is checked before/after external reads and before returning the answer.
+
+Search is opt-in: `JARVIS_WEB_SEARCH_ENABLED`, `JARVIS_TAVILY_API_KEY`,
+`JARVIS_WEB_SEARCH_TIMEOUT_MS`. The account's free credits are shared without
+personal quotas. PAYGO/automatic payments must stay disabled in the account;
+code cannot revoke paid settings enabled outside Jarvis. Errors/quota exhaustion
+produce a safe unverified-freshness notice. Jobs do not send resumes to Tavily.
+Manual-draft behavior is owned by the [Telegram menu contract](telegram-menu-contract.md#job-search-letter-modes-and-send-confirmation).
+
 ### Audit remediation, 17 October 2026
 
 These changes are deployed; the [release record](updates/2026-10-17-audit-remediation-release.md)

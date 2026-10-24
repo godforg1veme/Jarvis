@@ -8,6 +8,36 @@
 
 ## Выбор проверок
 
+### Shared instructions and Tavily MCP
+
+Проверки новой функциональности запускаются без настоящих ключей и отправки
+отклика. MCP transport проверяется с настоящим SDK и локальными сетевыми
+ответами, чтение резюме с локальным Edge/Chromium fixture. PostgreSQL URL ниже
+нужно задать только для изолированной тестовой базы.
+
+```powershell
+node --test server/test/instructionFiles.test.js server/test/sharedInstructions.test.js server/test/tavilyMcpClient.test.js server/test/webSearchService.test.js server/test/telegramManualText.test.js
+node --test server/test/searchPrivacy.test.js
+node --test server/test/jobResumeContext.test.js server/test/jobDraftAcceptance.cjs server/test/jobLetterModesAcceptance.cjs server/test/jobTelegramAcceptance.cjs
+node --test job-browser/test/hhResumeReader.test.js
+npm test --prefix server
+npm test --prefix job-browser
+```
+
+Поведение `job_draft_manual_edit` проверяется через настоящие message/menu
+handlers и PostgreSQL CHECK 046: сохранение полного текста, invalid retry,
+scope, expiry, single consumption, stale confirmation и отсутствие AI-вызова.
+Фикстуры не подтверждают реальный Tavily аккаунт, страницу HH или нажатие
+Telegram. Живой поиск допускается после настройки бесплатного ключа без
+PAYGO; значение ключа и содержимое ответа не выводятся в diagnostics.
+
+Один живой basic-запрос к Tavily после настройки бесплатного аккаунта:
+`node server/scripts/tavilySmoke.cjs --key-file deploy/secrets/tavily-api-key`.
+Файл ключа игнорируется Git. Скрипт выводит только статус, число источников
+и длительность; пустой ключ возвращает `key_required` без сетевого обращения.
+
+### Остальные компоненты
+
 | Изменение | Основной маршрут |
 | --- | --- |
 | Server | `npm test --prefix server`; отдельная PostgreSQL acceptance для затронутого контракта |

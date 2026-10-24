@@ -35,6 +35,9 @@ const baseSchema = z.object({
   modelProvider: z.enum(['echo', 'salad', 'openrouter']),
   modelFallbackProvider: z.enum(['', 'salad', 'openrouter']),
   modelTimeoutMs: z.number().int().min(1000).max(120000),
+  webSearchEnabled: z.boolean(),
+  tavilyApiKey: z.string().max(2048),
+  webSearchTimeoutMs: z.number().int().min(1000).max(60000),
   saladBaseUrl: z.string().max(2048),
   saladApiKey: z.string().max(2048),
   saladModel: z.string().max(255),
@@ -204,6 +207,9 @@ function loadConfig(env = process.env) {
     modelProvider: String(env.JARVIS_MODEL_PROVIDER || 'echo').trim().toLowerCase(),
     modelFallbackProvider: String(env.JARVIS_MODEL_FALLBACK_PROVIDER || '').trim().toLowerCase(),
     modelTimeoutMs: Number(env.JARVIS_MODEL_TIMEOUT_MS || 60000),
+    webSearchEnabled: parseBoolean(env.JARVIS_WEB_SEARCH_ENABLED),
+    tavilyApiKey: String(env.JARVIS_TAVILY_API_KEY || '').trim(),
+    webSearchTimeoutMs: Number(env.JARVIS_WEB_SEARCH_TIMEOUT_MS || 15000),
     saladBaseUrl: String(env.SALAD_BASE_URL || 'https://ai.salad.cloud/v1').trim(),
     saladApiKey: String(env.SALAD_API_KEY || '').trim(),
     saladModel: String(env.SALAD_MODEL || '').trim(),
@@ -269,6 +275,7 @@ function loadConfig(env = process.env) {
   };
 
   const config = { ...baseSchema.parse(raw), ...loadJobConfig(env) };
+  if (config.webSearchEnabled && !config.tavilyApiKey) throw new Error('JARVIS_TAVILY_API_KEY is required when web search is enabled');
   if (config.openrouterFreeFirst && config.modelProvider !== 'openrouter') {
     throw new Error('JARVIS_OPENROUTER_FREE_FIRST requires the OpenRouter primary provider');
   }

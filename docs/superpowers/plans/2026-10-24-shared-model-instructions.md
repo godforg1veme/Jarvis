@@ -1,5 +1,7 @@
 # Общие инструкции Jarvis Implementation Plan
 
+Статус на 24 октября: код реализован локально. [Проверки и оставшаяся живая приёмка](../../updates/2026-10-24-shared-instructions-and-search-development.md). Выпуска нет.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Подключить согласованные общие инструкции и блок сопроводительных к существующим моделям Jarvis.
@@ -33,9 +35,9 @@
 
 ## Предварительная сверка
 
-- [ ] Повторить `py deploy/scripts/release-status.py --fetch`, `git status --short`, `git worktree list` и `gh pr list --state open --json number,headRefName,baseRefName`.
-- [ ] Продолжить `codex/shared-prompt-design`, проверить свежую main и пересечения. Чужие worktrees не менять.
-- [ ] Сверить актуальные `docs/verification.md` и принятый spec. При появлении новой правки пользователя обновить только затронутое решение.
+- [x] Повторить `py deploy/scripts/release-status.py --fetch`, `git status --short`, `git worktree list` и `gh pr list --state open --json number,headRefName,baseRefName`.
+- [x] Продолжить `codex/shared-prompt-design`, проверить свежую main и пересечения. Чужие worktrees не менять.
+- [x] Сверить актуальные `docs/verification.md` и принятый spec. При появлении новой правки пользователя обновить только затронутое решение.
 
 ### Task 1: Загружаемые инструкции
 
@@ -50,7 +52,7 @@
 - Produces: `loadInstruction(name, { directory } = {}) -> string`, `CORE_INSTRUCTIONS`, `COVER_LETTER_INSTRUCTIONS`.
 - Разрешённые имена: только `core`, `cover-letter`; directory переопределяется только кодом теста.
 
-- [ ] Написать тесты для нечитаемого/пустого файла, неизвестного имени и UTF-8 на временном каталоге. Убедиться, что диагностика не содержит содержимое файла или пользовательский путь.
+- [x] Написать тесты для нечитаемого/пустого файла, неизвестного имени и UTF-8 на временном каталоге. Убедиться, что диагностика не содержит содержимое файла или пользовательский путь.
 
 ```js
 const assert = require('node:assert/strict');
@@ -68,8 +70,8 @@ test('empty required instruction fails closed', () => {
 });
 ```
 
-- [ ] Запустить `node --test server/test/instructionFiles.test.js`; ожидается ошибка отсутствующего модуля до реализации.
-- [ ] Перенести согласованные тексты без приватных примеров. Реализовать загрузчик: закрытая карта имени в имя файла, чтение UTF-8, непустой текст, лимит 32 KiB на файл, безопасный код ошибки.
+- [x] Запустить `node --test server/test/instructionFiles.test.js`; ожидается ошибка отсутствующего модуля до реализации.
+- [x] Перенести согласованные тексты без приватных примеров. Реализовать загрузчик: закрытая карта имени в имя файла, чтение UTF-8, непустой текст, лимит 32 KiB на файл, безопасный код ошибки.
 
 ```js
 const fs = require('node:fs');
@@ -90,7 +92,7 @@ const COVER_LETTER_INSTRUCTIONS = loadInstruction('cover-letter');
 module.exports = { loadInstruction, CORE_INSTRUCTIONS, COVER_LETTER_INSTRUCTIONS };
 ```
 
-- [ ] Проверить загрузчик, `git diff --check`; коммитить только файлы задачи: `feat: load shared assistant instructions from files`.
+- [x] Проверить загрузчик, `git diff --check`; коммитить только файлы задачи: `feat: load shared assistant instructions from files`.
 
 ### Task 2: Общий чат и сопроводительные
 
@@ -103,10 +105,10 @@ module.exports = { loadInstruction, CORE_INSTRUCTIONS, COVER_LETTER_INSTRUCTIONS
 - Consumes: `CORE_INSTRUCTIONS`, `COVER_LETTER_INSTRUCTIONS` из Task 1.
 - Produces: прежний `PERSONA_POLICY_TEXT` и `buildJobPrompt(...) -> messages[]` с тем же wire-контрактом.
 
-- [ ] Добавить проверки действительного запроса провайдеру: общий чат и резерв получают ядро; письмо получает ядро и блок задачи; данные остаются в user-сообщении, JSON-контракт и factIds сохраняются. Не писать тест «модель всегда следует правилам».
-- [ ] Запустить узкие тесты; сначала подтвердить отсутствие общего ядра в job path.
-- [ ] В personaPolicy оставить обязательные границы, включить ядро и убрать только дублирующиеся/противоречащие ему требования стиля. Русский язык и «ты» относятся к общению Jarvis; язык письма задаёт job-контракт.
-- [ ] В jobPrompt заменить старую редакционную часть согласованным блоком; убрать навязывание каждому кандидату автоматизации и AI. Сохранить правила недоверенных вложенных команд, `chosen` language, `{text,factIds}`, проверку factIds и ограничения входа.
+- [x] Добавить проверки действительного запроса провайдеру: общий чат и резерв получают ядро; письмо получает ядро и блок задачи; данные остаются в user-сообщении, JSON-контракт и factIds сохраняются. Не писать тест «модель всегда следует правилам».
+- [x] Запустить узкие тесты; сначала подтвердить отсутствие общего ядра в job path.
+- [x] В personaPolicy оставить обязательные границы, включить ядро и убрать только дублирующиеся/противоречащие ему требования стиля. Русский язык и «ты» относятся к общению Jarvis; язык письма задаёт job-контракт.
+- [x] В jobPrompt заменить старую редакционную часть согласованным блоком; убрать навязывание каждому кандидату автоматизации и AI. Сохранить правила недоверенных вложенных команд, `chosen` language, `{text,factIds}`, проверку factIds и ограничения входа.
 
 ```js
 const { CORE_INSTRUCTIONS, COVER_LETTER_INSTRUCTIONS } = require('../prompts/instructionFiles');
@@ -120,11 +122,11 @@ const taskContract = [
 const system = [CORE_INSTRUCTIONS, COVER_LETTER_INSTRUCTIONS, taskContract].join('\n\n');
 ```
 
-- [ ] Сохранить отдельную инструкцию для перевода: «Translate the existing letter; preserve facts» не должна превращаться в полную адаптацию по умолчанию. Явная точечная правка пользователя также ограничивает изменения.
-- [ ] Не менять outputPolicyValidator и существующую коррекцию нарушений политики: отказ касается новых проверок качества.
-- [ ] Запустить `node --test server/test/instructionFiles.test.js server/test/promptPipeline.test.js server/test/jobLetterModes.test.js server/test/jobModelAdapter.test.js server/test/providers.test.js`, затем `npm test --prefix server`.
-- [ ] Проверить, что сборка сервера включает `src/prompts/instructions/*.md`; при необходимости исправить только фактический COPY/allowlist, найденный через `rg --files deploy server | rg 'Dockerfile|dockerignore'`.
-- [ ] Записать локальный результат в RU/EN update после фактических проверок. Указать отсутствие содержимого резюме до HH-этапа и отсутствие live-прогона моделей. Коммит: `feat: apply shared instructions to chat and cover letters`.
+- [x] Сохранить отдельную инструкцию для перевода: «Translate the existing letter; preserve facts» не должна превращаться в полную адаптацию по умолчанию. Явная точечная правка пользователя также ограничивает изменения.
+- [x] Не менять outputPolicyValidator и существующую коррекцию нарушений политики: отказ касается новых проверок качества.
+- [x] Запустить `node --test server/test/instructionFiles.test.js server/test/promptPipeline.test.js server/test/jobLetterModes.test.js server/test/jobModelAdapter.test.js server/test/providers.test.js`, затем `npm test --prefix server`.
+- [x] Проверить, что сборка сервера включает `src/prompts/instructions/*.md`; при необходимости исправить только фактический COPY/allowlist, найденный через `rg --files deploy server | rg 'Dockerfile|dockerignore'`.
+- [x] Записать локальный результат в RU/EN update после фактических проверок. Указать отсутствие содержимого резюме до HH-этапа и отсутствие live-прогона моделей. Коммит: `feat: apply shared instructions to chat and cover letters`.
 
 ## Приёмка и выпуск
 

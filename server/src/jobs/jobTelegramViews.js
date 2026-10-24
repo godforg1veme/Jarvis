@@ -47,6 +47,7 @@ ${v.url}`, [
 function draftView(draft) {
   return response(`Черновик сопроводительного\n\n${draft.text}\n\nПисьмо ещё не отправлено.`, [
     [button('Перегенерировать с AI', 'regenerate', draft.id), button('Изменить с AI', 'edit', draft.id)],
+    [button('Редактировать текст', 'manual_edit', draft.id)],
     [button('Перевести с AI', 'translate', draft.id), button('Отправить отклик', 'send', draft.id)],
     ...(draft.vacancy_id ? [[button('Выбрать другой вариант', 'prepare', draft.vacancy_id)]] : []),
     [button('Отмена', 'cancel', draft.id)],

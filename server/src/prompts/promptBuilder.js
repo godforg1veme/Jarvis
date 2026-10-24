@@ -75,7 +75,7 @@ function buildRuntimePolicy(runtimeContext = {}) {
     hasVerifiedToolResults: verifiedResults.length > 0,
     hasVerifiedDevices: runtimeContext.hasVerifiedDevices === true,
     instruction: tools.length === 0
-      ? 'В этом запросе инструменты недоступны: можно только ответить текстом и нельзя заявлять о выполнении действий.'
+      ? 'В этом запросе инструменты для действий недоступны: можно только ответить текстом и нельзя заявлять о выполнении действий. Отдельно переданные сервером веб-источники можно цитировать как данные.'
       : 'Разрешены только перечисленные инструменты; успех действия подтверждается только фактическим результатом инструмента.',
   };
 }
@@ -90,6 +90,9 @@ function buildCanonicalPrompt(input) {
     history: Object.freeze(normalizeHistory(input.history)),
     memories: Object.freeze(normalizeMemories(input.memories)),
     documents: Object.freeze(normalizeDocuments(input.documents)),
+    webSearch: Object.freeze({ status: String(input.webSearch?.status || 'disabled'),
+      checkedAt: typeof input.webSearch?.checkedAt === 'string' ? input.webSearch.checkedAt.slice(0, 40) : null,
+      sources: Object.freeze(Array.isArray(input.webSearch?.sources) ? input.webSearch.sources.slice(0, 5) : []) }),
     visualMemories: Object.freeze(normalizeVisualMemories(input.visualMemories)),
     devices: Object.freeze(devices),
     communicationGuidance: Object.freeze(normalizeCommunicationGuidance(input.communicationGuidance) || {}),
