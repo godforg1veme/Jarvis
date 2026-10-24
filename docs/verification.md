@@ -25,6 +25,19 @@ Electron, устройств или VPS; эти результаты запис�
 
 ## Восстановление HH CAPTCHA / HH CAPTCHA recovery
 
+Общий сбор и переход старых курсоров: [ремонт 24 октября](updates/2026-10-24-hh-complete-collection.md).
+В отдельной PostgreSQL выполняй `jobCollectorAcceptance.cjs`,
+`jobBrowserCollectorAcceptance.cjs`, `jobCaptchaEligibilityAcceptance.cjs`,
+`jobCollectionNoticeAcceptance.cjs`, `jobCollectorAccessPostgresAcceptance.cjs`,
+`jobCaptchaResilienceAcceptance.cjs` и `jobTelegramCaptchaAcceptance.cjs` из `server/test`.
+Browser acceptance включает `hhBrowserAcceptance.cjs` и `captchaTelegramAcceptance.cjs`.
+Они проверяют разбиение по МСК, сохранение offsets, роли и неизменность unknown.
+
+Shared collection and legacy cursor migration: [October 24 repair](updates/2026-10-24-hh-complete-collection.md).
+Run the seven PostgreSQL acceptance files above in a dedicated database and both
+browser acceptance files in Linux. They cover Moscow calendar splits, offsets,
+current roles and preservation of uncertain outcomes.
+
 Локальный [ремонт 23 октября](updates/2026-10-23-hh-captcha-recovery-development.md)
 проверяет чтение branded static markup, границы объёма/DOM, отсутствие повторного
 ответа после unknown/restart, точный target и закрытые причины ошибок.

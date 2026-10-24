@@ -6,12 +6,14 @@ const { JobCaptchaRepository } = require('../src/jobs/jobCaptchaRepository');
 const { JobSearchRepository } = require('../src/jobs/jobSearchRepository');
 const { JobDeliveryRepository } = require('../src/jobs/jobDeliveryRepository');
 const { JobDeliveryWorker } = require('../src/jobs/jobDeliveryWorker');
+const { configuredOwnerJobAccess } = require('../src/jobs/configuredOwnerJobAccess');
 
 async function fixture() {
   const f=await createJobPostgresFixture();
   await f.pool.query("INSERT INTO user_identities(user_id,provider,external_id) VALUES($1,'telegram','101')",[f.owner]);
-  const repository=new JobCaptchaRepository(f.pool),search=new JobSearchRepository(f.pool);
-  await search.ensure({scope:f.scope}); return {...f,repository,search};
+  const accessService=configuredOwnerJobAccess(f.pool,'101');
+  const repository=new JobCaptchaRepository(f.pool,{accessService}),search=new JobSearchRepository(f.pool,{accessService});
+  await search.ensure({scope:f.scope}); return {...f,repository,search,accessService};
 }
 const challenge=()=>({challengeId:randomUUID(),revision:3,expiresAt:new Date(Date.now()+600000).toISOString()});
 test('PG durable request acknowledgement preserves concurrent refresh and auto errors do not override clicks',async()=>{
@@ -56,13 +58,17 @@ test('PG retries use original photo and bounded attempts; unknown answer blocks 
 });
 test('PG notices deduplicate, send with paused search and reject changed conversation before delivery',async()=>{
   const f=await fixture();let sends=0;try{
-    const deliveries=new JobDeliveryRepository(f.pool);
+    const deliveries=new JobDeliveryRepository(f.pool,{accessService:f.accessService});
     await f.repository.request(f.scope,false); const requestId=(await f.repository.getRequest(f.scope)).request_id;
-    const worker=new JobDeliveryWorker({pool:f.pool,searchRepository:f.search,deliveryRepository:deliveries,send:async view=>{sends++;assert.equal(view.chatId,'101');assert.match(view.answer,/Не удалось подготовить/);return{message_id:601};}});
+    const worker=new JobDeliveryWorker({pool:f.pool,accessService:f.accessService,searchRepository:f.search,deliveryRepository:deliveries,send:async view=>{sends++;assert.equal(view.chatId,'101');assert.match(view.answer,/Не удалось подготовить/);return{message_id:601};}});
     await f.repository.notify(f.scope,'PREPARATION_DELAYED',requestId);await f.repository.notify(f.scope,'PREPARATION_DELAYED',requestId);
     assert.equal((await f.pool.query('SELECT count(*)::int n FROM job_deliveries')).rows[0].n,1);
     await worker.tick();assert.equal(sends,1);
     await f.repository.notify(f.scope,'PHOTO_UNKNOWN',requestId);
+    const claimed = await deliveries.claim();
+    assert.ok(claimed);
+    const originalClaim = deliveries.claim.bind(deliveries);
+    deliveries.claim = async () => { deliveries.claim = originalClaim; return claimed; };
     const other=(await f.pool.query("INSERT INTO conversations(user_id,channel,external_chat_id) VALUES($1,'telegram','102') RETURNING id",[f.owner])).rows[0].id;
     await f.pool.query("UPDATE job_searches SET conversation_id=$1,chat_id='102' WHERE user_id=$2",[other,f.owner]);
     await worker.tick();assert.equal(sends,1);
@@ -70,7 +76,7 @@ test('PG notices deduplicate, send with paused search and reject changed convers
     await assert.rejects(f.repository.notify({...f.scope,userId:f.stranger},'PHOTO_UNKNOWN'));
     await f.pool.query('UPDATE job_searches SET conversation_id=$1,chat_id=$2 WHERE user_id=$3',[f.scope.conversationId,f.scope.chatId,f.owner]);
     await f.pool.query('DELETE FROM user_identities WHERE user_id=$1',[f.owner]);
-    await f.repository.notify(f.scope,'PHOTO_FAILED',requestId);await worker.tick();assert.equal(sends,1,'revoked identity cannot receive notices');
+    await assert.rejects(f.repository.notify(f.scope,'PHOTO_FAILED',requestId),{code:'JOB_SCOPE_DENIED'});await worker.tick();assert.equal(sends,1,'revoked identity cannot receive notices');
   }finally{await f.close();}
 });
 test('PG recovery removes pending delay notice and explicit refresh retires obsolete queued notices',async()=>{
@@ -89,7 +95,7 @@ test('PG notice retries a transient scope lookup failure before send, without co
     const worker=new JobDeliveryWorker({pool:{query:async(...args)=>{
       if(String(args[0]).includes('user_identities'))throw Object.assign(Error('fixture connection lost'),{code:'08006'});
       return f.pool.query(...args);
-    }},searchRepository:f.search,deliveryRepository:new JobDeliveryRepository(f.pool),send:async()=>{sends++;return{message_id:701};}});
+    }},accessService:f.accessService,searchRepository:f.search,deliveryRepository:new JobDeliveryRepository(f.pool,{accessService:f.accessService}),send:async()=>{sends++;return{message_id:701};}});
     await worker.tick();assert.equal(sends,0);
     assert.equal((await f.pool.query('SELECT status FROM job_deliveries')).rows[0].status,'queued');
     await f.pool.query('UPDATE job_deliveries SET available_at=now()');worker.pool=f.pool;

@@ -14,20 +14,23 @@ const { TelegramInteractionRepository } = require('../src/telegram/telegramInter
 const { UserRepository } = require('../src/users/userRepository');
 const { ConversationRepository } = require('../src/conversations/conversationRepository');
 const { createTelegramAccessPolicy } = require('../src/telegram/accessPolicy');
+const { configuredOwnerJobAccess } = require('../src/jobs/configuredOwnerJobAccess');
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2lYoAAAAASUVORK5CYII=', 'base64');
 test('real PG/message/menu: private human reply consumed once before AI/history, stale/unknown photos and explicit refresh', async () => {
  const f = await createJobPostgresFixture(); let updateId=90000, photoId=500, sends=0, answers=0, refreshes=0, unknownSend=false, answerMode='solved';
- const search = new JobSearchRepository(f.pool), repository = new JobCaptchaRepository(f.pool);
+ const accessService=configuredOwnerJobAccess(f.pool,'101');
+ const search = new JobSearchRepository(f.pool,{accessService}), repository = new JobCaptchaRepository(f.pool,{accessService});
  let challenge = { outcome:'ready',challengeId:randomUUID(),revision:2,expiresAt:new Date(Date.now()+600000).toISOString(),png };
- const client = { status:async()=>({phase:'active',revision:2}), challenge:async(refresh)=>{ if(refresh){ refreshes++; challenge={...challenge,challengeId:randomUUID()}; } return challenge; },
+ const client = { status:async()=>({phase:'active',revision:2}), challenge:async(_userId,refresh)=>{ if(refresh){ refreshes++; challenge={...challenge,challengeId:randomUUID()}; } return challenge; },
   answer:async(args)=>{ answers++; assert.equal(args.text,'первое слово'); if(answerMode==='unknown')throw new Error('lost'); return {outcome:answerMode}; } };
  const service = new JobCaptchaService({repository,client});
  const worker = new JobCaptchaWorker({repository,client,ownerId:f.owner,sendPhoto:async args=>{ sends++;assert.ok(Buffer.isBuffer(args.png));assert.equal(args.caption,CAPTION);if(unknownSend)throw new Error('lostACK');return{message_id:++photoId}; }});
  try {
   await f.pool.query("INSERT INTO user_identities(user_id,provider,external_id) VALUES($1,'telegram','101'),($2,'telegram','202')",[f.owner,f.stranger]);
-  await search.ensure({scope:f.scope});
+  const initial=await search.ensure({scope:f.scope});
+  await search.saveSettings({scope:f.scope,expectedRevision:initial.revision,settings:{...initial.settings,queries:['Fixture'],activated:true,paused:false}});
   const interactions=new TelegramInteractionRepository(f.pool);
-  const jobs = new JobTelegramService({pool:f.pool,searchRepository:search,captchaService:service,usageRepository:{getMonth:async()=>({month:'2026-10',total:0})}});
+  const jobs = new JobTelegramService({pool:f.pool,accessService,ownerTelegramId:'101',searchRepository:search,captchaService:service,usageRepository:{getMonth:async()=>({month:'2026-10',total:0})}});
   const menu = new TelegramMenuService({interactions,jobSearchService:jobs});
   const messages = new TelegramMessageService({accessPolicy:createTelegramAccessPolicy(['101','202']),updateRepository:new TelegramUpdateRepository(f.pool),
    userRepository:new UserRepository(f.pool),conversationRepository:new ConversationRepository(f.pool),menuService:menu,jobCaptchaService:service,
@@ -36,7 +39,7 @@ test('real PG/message/menu: private human reply consumed once before AI/history,
    reply_to_message:{message_id:id,...(hint?{photo:[{}],caption:CAPTION}:{})}}});
   const cb=(data,from=101)=>messages.handleCallback({update_id:++updateId,callback_query:{id:String(updateId),from:{id:from},data,message:{message_id:9,chat:{id:from,type:'private'}}}});
   assert.ok((await cb('job:menu')).buttons.flat().some(b=>b.data==='job:captcha'));
-  assert.match((await cb('job:captcha_refresh',202)).answer,/владельцу/);assert.equal(refreshes,0);
+  assert.match((await cb('job:captcha_refresh',202)).answer,/личном чате.*разрешении/iu);assert.equal(refreshes,0);
   await worker.tick();await worker.tick();assert.equal(sends,1);
   const before=(await f.pool.query('SELECT count(*)::int n FROM messages')).rows[0].n;
   await messages.handle(reply('первое слово',202));await messages.handle(reply('первое слово',101,-101));assert.equal(answers,0);

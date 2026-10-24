@@ -343,6 +343,15 @@ expiry и deduplication прежние. Ответ владельца по-пр�
 
 ## Access control and time
 
+HH collection recovery, 24 October 2026: public search and CAPTCHA handover use
+current jobs permission for owner/admin/member and the user's own private chat;
+a connected HH account is not required for public collection. One durable
+`HH_COLLECTION_STATUS` notice per saved run explains incomplete collection and
+offers the existing `job:menu` button. Sending rechecks scope, active search and
+run identity. `sent`/`unknown` notices are not replayed. Callback grammar, guided
+kinds and CAPTCHA reply confirmation are unchanged. Owner approval is recorded
+in the current task. [Repair record](updates/2026-10-24-hh-complete-collection.md).
+
 При включении серверных прав нижняя клавиатура фильтруется ролью и личными
 allow/deny. Главная сохраняется; jobs показывается участнику с этим правом,
 но до его собственного HH подключения объясняет необходимость настройки.

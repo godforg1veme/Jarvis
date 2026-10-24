@@ -18,11 +18,22 @@ function validTarget(value) {
     const q = u.searchParams;
     if(u.pathname==='/applicant/negotiations')return q.size===2&&q.getAll('filter').length===1&&['active','archived'].includes(q.get('filter'))
       &&q.getAll('page').length===1&&/^(?:0|[1-9]\d{0,2})$/.test(q.get('page'));
-    return u.pathname === '/search/vacancy' && q.size === 5
-      && ['text', 'search_period', 'order_by', 'items_on_page', 'page'].every((n) => q.getAll(n).length === 1)
-      && q.get('text').trim().length > 0 && q.get('text').length <= 200
-      && /^(?:[1-9]|[12]\d|30)$/.test(q.get('search_period')) && q.get('order_by') === 'publication_time'
-      && q.get('items_on_page') === '20' && /^(?:0|[1-9]\d{0,2})$/.test(q.get('page'));
+    const common = q.getAll('text').length === 1 && q.get('text').trim().length > 0 && q.get('text').length <= 200
+      && ['order_by', 'items_on_page', 'page'].every((n) => q.getAll(n).length === 1)
+      && q.get('order_by') === 'publication_time' && q.get('items_on_page') === '20'
+      && /^(?:0|[1-9]\d{0,2})$/.test(q.get('page'));
+    const legacy = q.size === 5 && q.getAll('search_period').length === 1
+      && /^(?:[1-9]|[12]\d|30)$/.test(q.get('search_period'));
+    const date = (value) => {
+      if (!/^(?:0[1-9]|[12]\d|3[01])\.(?:0[1-9]|1[0-2])\.20\d\d$/.test(value || '')) return null;
+      const [day, month, year] = value.split('.').map(Number);
+      const utc = Date.UTC(year, month - 1, day);
+      const check = new Date(utc);
+      return check.getUTCFullYear() === year && check.getUTCMonth() === month - 1 && check.getUTCDate() === day ? utc : null;
+    };
+    const from = q.getAll('date_from').length === 1 ? date(q.get('date_from')) : null;
+    const to = q.getAll('date_to').length === 1 ? date(q.get('date_to')) : null;
+    return u.pathname === '/search/vacancy' && common && (legacy || (q.size === 6 && from !== null && to !== null && from <= to));
   } catch { return false; }
 }
 function initial(ownerId) {

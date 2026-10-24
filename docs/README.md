@@ -4,6 +4,11 @@
 
 ## Русский
 
+Подготовлен [общий ремонт HH CAPTCHA и полного сбора](updates/2026-10-24-hh-complete-collection.md):
+периоды по дням МСК, возобновление старого прогресса, одинаковая проверка доступа
+для owner/admin/member и уведомление о незавершённом сборе. Linux browser 103/103,
+PostgreSQL/RPC 16/16; установка и восстановление доставки выполняются.
+
 На DE выпущено [движение Mini App по умолчанию](updates/2026-10-23-mini-app-auto-motion.md) без кнопки паузы. GitHub, оба VPS source и Windows main синхронизированы в отдельной рабочей папке; активная работа HH CAPTCHA в основной папке сохранена.
 
 На DE выпущено [исправление движения](updates/2026-10-23-mini-app-motion-fix.md): возврат и touch-hover больше не удерживают паузу, «Продолжить» работает при reduced motion; настройки скорости/сброса удалены. Исходники Windows и обоих VPS синхронизированы.
@@ -67,6 +72,11 @@
 Архивы не заменяют действующие правила и новую проверку окружения.
 
 ## English
+
+The [shared HH CAPTCHA and complete collection repair](updates/2026-10-24-hh-complete-collection.md)
+is prepared: Moscow calendar windows, legacy progress migration, consistent
+owner/admin/member access checks and durable incomplete-run notices. Linux browser
+103/103 and PostgreSQL/RPC 16/16 passed; deployment and delivery recovery are in progress.
 
 [Mini App motion is enabled by default](updates/2026-10-23-mini-app-auto-motion.md) on DE without a pause button. GitHub, both VPS sources and Windows main match in the separate worktree; active HH CAPTCHA work in the primary checkout is preserved.
 

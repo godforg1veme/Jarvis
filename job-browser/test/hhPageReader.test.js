@@ -2,12 +2,22 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { hhId, readSalary, normalizeSearch, normalizeVacancy } = require('../src/hhPageReader');
 const card = (id) => [`https://hh.ru/vacancy/${id}`, `https://hh.ru/vacancy/${id}?from=search`];
+test('clipped pager still reports broad metadata; actual page and next query stay bound', () => {
+  const expected = 'https://hh.ru/search/vacancy?text=AI&date_from=20.10.2026&date_to=21.10.2026&order_by=publication_time&items_on_page=20&page=0';
+  const cards = Array.from({ length: 20 }, (_, i) => card(i + 1));
+  const raw = { url: expected, heading: '8953 вакансии', cards, pageLinks: ['https://hh.ru/search/vacancy?page=99'],
+    nextLinks: [expected.replace('page=0', 'page=1')] };
+  assert.deepEqual(normalizeSearch(raw, expected), { items: cards.map((_, i) => ({ id: String(i + 1) })), found: 8953, pages: 448 });
+  assert.throws(() => normalizeSearch({ ...raw, url: expected.replace('page=0', 'page=1') }, expected), { code: 'JOB_HH_DOM_CHANGED' });
+  assert.throws(() => normalizeSearch({ ...raw, nextLinks: [expected.replace('date_from=20.10.2026', 'date_from=19.10.2026').replace('page=0', 'page=1')] }, expected), { code: 'JOB_HH_DOM_CHANGED' });
+  assert.throws(() => normalizeSearch({ ...raw, nextLinks: [] }, expected), { code: 'JOB_HH_DOM_CHANGED' });
+});
 
 test('search counts and pagination agree; lazy or capped pagination cannot silently complete', () => {
   const cards = Array.from({ length: 20 }, (_, index) => card(123 + index));
   const raw = { heading: '513 вакансий «AI Engineer»', cards, pageLinks: ['https://hh.ru/search/vacancy?page=25'] };
   assert.deepEqual(normalizeSearch(raw), { items: cards.map((_, index) => ({ id: String(123 + index) })), found: 513, pages: 26 });
-  assert.throws(() => normalizeSearch({ ...raw, pageLinks: [] }), { code: 'JOB_COLLECTION_WINDOW_SATURATED' });
+  assert.equal(normalizeSearch({ ...raw, pageLinks: [] }).found, 513);
   assert.throws(() => normalizeSearch({ ...raw, cards: [] }), { code: 'JOB_HH_DOM_CHANGED' });
   assert.throws(() => normalizeSearch({ ...raw, cards: cards.slice(0, 19) }), { code: 'JOB_HH_DOM_CHANGED' });
   assert.throws(() => normalizeSearch({ ...raw, cards: [card(123), card(123)] }), { code: 'JOB_HH_DOM_CHANGED' });

@@ -118,15 +118,18 @@ test('bounded passes resume at the unfinished card rather than restarting an ove
   } finally { await f.close(); }
 });
 
-test('browser RPC + PostgreSQL: broad pagination is not split into ignored date windows; failure preserves progress', async () => {
+test('browser RPC + PostgreSQL: broad searches split at Moscow days and resume after CAPTCHA', async () => {
   const f = await collectorFixture();
   const token = randomBytes(32).toString('hex'), now = new Date('2026-10-15T12:00:00Z');
   const requests = []; let captcha = true;
   const rpc = createRpcServer({ ownerId: f.owner, token, browser: {
     async search(args) {
       requests.push(args);
-      if (captcha && args.page === 1) throw Object.assign(new Error('challenge'), { code: 'JOB_HH_CAPTCHA_REQUIRED' });
-      return { found: 2001, pages: 101, items: [{ id: '123' }] };
+      const firstDay = Math.floor((Date.parse(args.publishedFrom) + 10800000) / 86400000);
+      const lastDay = Math.floor((Date.parse(args.publishedTo) + 10800000) / 86400000);
+      if (firstDay !== lastDay) return { found: 2001, pages: 101, items: [{ id: '123' }] };
+      if (captcha) throw Object.assign(new Error('challenge'), { code: 'JOB_HH_CAPTCHA_REQUIRED' });
+      return { found: 1, pages: 1, items: [{ id: '123' }] };
     },
     async getVacancy({ externalId }) { return { externalId, title: 'Junior AI Engineer', company: 'Fixture',
       description: 'AI integration', city: 'Москва', workFormat: 'office', publishedAt: '2026-10-14T10:00:00Z' }; },
@@ -139,16 +142,16 @@ test('browser RPC + PostgreSQL: broad pagination is not split into ignored date 
       settings: { ...initial.settings, queries: ['AI Engineer'], activated: true } });
     const hh = new JobBrowserClient({ ownerId: f.owner, token, baseUrl: `http://127.0.0.1:${rpc.address().port}`, allowTestHttp: true });
     const run = () => new JobCollector({ searchRepository: search, deliveryRepository: delivery,
-      hhClient: hh, now: () => now, wait: async () => {} }).runOnce({ userId: f.owner, now, force: true });
+      hhClient: hh, now: () => now, wait: async () => {}, maxRequests: 500 }).runOnce({ userId: f.owner, now, force: true });
     assert.equal((await run()).outcome, 'JOB_HH_CAPTCHA_REQUIRED');
     let state = await search.getSettings({ userId: f.owner });
-    assert.equal(state.checkpoint, null); assert.equal(state.progress.windows.length, 1); assert.equal(state.progress.windows[0].page, 1);
+    assert.equal(state.checkpoint, null); assert.ok(state.progress.windows.length > 1);
     captcha = false;
     assert.equal((await run()).outcome, 'complete');
     state = await search.getSettings({ userId: f.owner });
     assert.equal(state.checkpoint.toISOString(), now.toISOString()); assert.equal(state.progress, null);
-    assert.ok(requests.some((request) => request.page === 100));
-    assert.equal(new Set(requests.map((request) => request.publishedFrom)).size, 1, 'browser source never uses API date splitting');
+    assert.ok(requests.every((request) => request.page === 0), 'broad page is split before details or pagination');
+    assert.ok(new Set(requests.map((request) => request.publishedFrom)).size > 1);
     assert.equal((await f.pool.query('SELECT count(*)::int AS n FROM job_deliveries')).rows[0].n, 1);
   } finally { await new Promise((resolve) => rpc.close(resolve)); await f.close(); }
 });

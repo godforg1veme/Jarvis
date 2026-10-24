@@ -22,8 +22,16 @@ function hhId(value, kind) {
   } catch { return null; }
 }
 
-function normalizeSearch(raw) {
+function normalizeSearch(raw, expectedUrl = null) {
   if (!raw || !Array.isArray(raw.cards) || !Array.isArray(raw.pageLinks)) fail();
+  if (expectedUrl) {
+    let actual, expected;
+    try { actual = new URL(raw.url); expected = new URL(expectedUrl); } catch { fail(); }
+    if (actual.origin !== 'https://hh.ru' || actual.pathname !== '/search/vacancy') fail();
+    for (const key of ['text', 'date_from', 'date_to', 'order_by', 'items_on_page', 'page']) {
+      if (actual.searchParams.getAll(key).length !== 1 || actual.searchParams.get(key) !== expected.searchParams.get(key)) fail();
+    }
+  }
   const heading = text(raw.heading, 1000).replace(/[\s\u00a0\u202f]/g, '');
   const foundText = /^(?:Найден[оаы]?)?(\d+)(?:ваканси|предложени)/iu.exec(heading);
   // Live HH uses a separate empty block rather than a numeric zero heading.
@@ -51,8 +59,20 @@ function normalizeSearch(raw) {
       return Number(value) + 1;
     } catch { fail(); }
   });
-  if (pages > 1 && !observedPages.includes(pages)) fail('JOB_COLLECTION_WINDOW_SATURATED');
   if (observedPages.some((n) => n > pages)) fail();
+  if (expectedUrl && pageIndex < Math.min(pages - 1, 99)) {
+    const next = raw.nextLinks;
+    if (!Array.isArray(next) || next.length !== 1) fail();
+    let link;
+    try { link = new URL(next[0], 'https://hh.ru'); } catch { fail(); }
+    if (link.origin !== 'https://hh.ru' || link.pathname !== '/search/vacancy'
+      || link.searchParams.getAll('page').length !== 1
+      || link.searchParams.get('page') !== String(pageIndex + 1)) fail();
+    const expected = new URL(expectedUrl);
+    for (const key of ['text', 'date_from', 'date_to', 'order_by', 'items_on_page']) {
+      if (link.searchParams.getAll(key).length !== 1 || link.searchParams.get(key) !== expected.searchParams.get(key)) fail();
+    }
+  }
   return { items: ids.map((id) => ({ id })), found, pages };
 }
 
@@ -89,8 +109,9 @@ function normalizeVacancy(raw, externalId) {
     archived: raw.archived === true, manualRequired: raw.manualRequired === true, experience: text(raw.experience, 150) };
 }
 
-async function readSearchPage(page) {
+async function readSearchPage(page, expectedUrl = null) {
   const raw = await page.evaluate(() => ({
+    url: location.href,
     heading: document.querySelector('h1')?.textContent?.slice(0, 1000) || '',
     emptyMarker: [...document.querySelectorAll('[data-qa="empty-vacancy-search-block"]')]
       .some((node) => node.getClientRects().length > 0 && /Ничего не нашлось/iu.test(node.textContent.replace(/\s+/gu, ' '))),
@@ -99,8 +120,10 @@ async function readSearchPage(page) {
       .map((card) => [...card.querySelectorAll('a[href]')].slice(0, 100).map((a) => a.href)),
     pageLinks: [...document.querySelectorAll('[data-qa="pager-page"] a[href], a[data-qa="pager-page"][href]')]
       .slice(0, 100).map((a) => a.href),
+    nextLinks: [...document.querySelectorAll('[data-qa="pager-next"] a[href], a[data-qa="pager-next"][href]')]
+      .slice(0, 2).map((a) => a.href),
   }));
-  return normalizeSearch(raw);
+  return normalizeSearch(raw, expectedUrl);
 }
 
 async function readVacancyPage(page, externalId) {

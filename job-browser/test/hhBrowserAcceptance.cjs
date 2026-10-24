@@ -16,14 +16,15 @@ test('real Chromium reads fixtures, rejects changed/security pages, and never ma
     let body, status = 200;
     if (url.pathname === '/search/vacancy') {
       assert.equal(url.searchParams.get('items_on_page'), '20');
-      assert.equal(url.searchParams.has('date_from'), false);
+      assert.equal(url.searchParams.get('date_from'), '01.10.2026');
+      assert.equal(url.searchParams.get('date_to'), '15.10.2026');
       const query = url.searchParams.get('text');
       const page = Number(url.searchParams.get('page'));
       const cards = Array.from({ length: page ? 1 : 20 }, (_, index) =>
         `<div data-qa="vacancy-serp__vacancy"><a href="/vacancy/${page ? 121 : 101 + index}">Fixture</a></div>`).join('');
       body = query === 'zero' ? '<h1>По запросу «Fixture» ничего не найдено</h1><div data-qa="empty-vacancy-search-block">Ничего не нашлось</div>' : query === 'captcha' ? '<h1>Подтвердите, что вы не робот</h1>'
         : query === 'changed' ? '<h1>Изменилась страница</h1>'
-          : `<h1>21 вакансия</h1>${cards}<a data-qa="pager-page" href="/search/vacancy?page=1">2</a>`;
+          : `<h1>21 вакансия</h1>${cards}${page ? '' : `<a data-qa="pager-next" href="/search/vacancy?${new URLSearchParams({ ...Object.fromEntries(url.searchParams), page: '1' })}">Следующая</a>`}`;
     } else if (url.pathname === '/vacancy/404') { status = 404; body = 'Не найдено'; }
     else if (url.pathname === '/applicant/vacancy_response') {
       body = `<div data-qa="resume-title">Первое резюме</div>

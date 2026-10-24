@@ -16,6 +16,14 @@ test('manual state: closed owner/shape/target, no public or secret-bearing navig
     assert.throws(() => validate({ ...state, ...patch }, owner), { code: 'JOB_MANUAL_STATE_DENIED' });
   }
   assert.equal(validTarget('https://hh.ru/vacancy/123'), true);
+  const common = 'text=AI&order_by=publication_time&items_on_page=20&page=0';
+  assert.equal(validTarget(`https://hh.ru/search/vacancy?${common}&search_period=7`), true);
+  assert.equal(validTarget(`https://hh.ru/search/vacancy?${common}&date_from=20.10.2026&date_to=21.10.2026`), true);
+  for (const dates of ['date_from=31.02.2026&date_to=21.10.2026',
+    'date_from=22.10.2026&date_to=21.10.2026',
+    'date_from=20.10.2026&date_to=21.10.2026&search_period=7']) {
+    assert.equal(validTarget(`https://hh.ru/search/vacancy?${common}&${dates}`), false);
+  }
   for (const target of ['https://evil.example/vacancy/123', 'https://hh.ru/account/captcha?state=secret',
     'https://hh.ru/vacancy/123?token=secret', 'https://user@hh.ru/vacancy/123', 'https://hh.ru/vacancy/123#fragment']) assert.equal(validTarget(target), false);
 });

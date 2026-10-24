@@ -11,6 +11,7 @@ const { JobCollector } = require('../src/jobs/jobCollector');
 const { JobSearchRepository } = require('../src/jobs/jobSearchRepository');
 const { JobDeliveryRepository } = require('../src/jobs/jobDeliveryRepository');
 const { createJobPostgresFixture } = require('./helpers/jobPostgresFixture');
+const { configuredOwnerJobAccess } = require('../src/jobs/configuredOwnerJobAccess');
 
 test('Chromium → authenticated RPC → collector → real PG: salary/location filters, interrupted progress and dedup', async () => {
   const f = await createJobPostgresFixture(); let browser, context, rpc;
@@ -50,10 +51,13 @@ test('Chromium → authenticated RPC → collector → real PG: salary/location 
     rpc = createRpcServer({ ownerId: f.owner, token, browser: new HhBrowser({ context, now: () => now }) });
     rpc.listen(0, '127.0.0.1'); await once(rpc, 'listening');
     const client = new JobBrowserClient({ ownerId: f.owner, token, baseUrl: `http://127.0.0.1:${rpc.address().port}`, allowTestHttp: true });
-    const search = new JobSearchRepository(f.pool), delivery = new JobDeliveryRepository(f.pool);
+    await f.pool.query("INSERT INTO user_identities(user_id,provider,external_id) VALUES($1,'telegram','101')", [f.owner]);
+    const accessService = configuredOwnerJobAccess(f.pool, '101');
+    const search = new JobSearchRepository(f.pool, { accessService }), delivery = new JobDeliveryRepository(f.pool, { accessService });
     const initial = await search.ensure({ scope: f.scope });
     await search.saveSettings({ scope: f.scope, expectedRevision: initial.revision,
-      settings: { ...initial.settings, queries: ['AI Engineer'], activated: true } });
+      settings: { ...initial.settings, queries: ['AI Engineer'], activated: true,
+        officeCity: 'Москва', remote: true, targetRub: 100000, exclusions: ['продаж'] } });
     const run = (maxRequests = 500) => new JobCollector({ searchRepository: search, deliveryRepository: delivery, hhClient: client,
       now: () => now, wait: async () => {}, maxRequests }).runOnce({ userId: f.owner, now, force: true });
     assert.equal((await run(3)).outcome, 'JOB_COLLECTION_LIMIT');

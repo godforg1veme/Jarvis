@@ -1,6 +1,7 @@
 const { trackWorker } = require('../lifecycle');
 const { cardView, attentionView } = require('./jobTelegramViews');
 const { captchaNoticeView } = require('./jobCaptchaNotices');
+const { collectionNoticeView } = require('./jobCollectionNotices');
 const { assertJobScope } = require('./jobSchemas');
 class JobDeliveryWorker {
   constructor({ pool, searchRepository, deliveryRepository, send, captchaEnabled = false, captchaAutomatic = false, intervalMs = 2000, accessService = null }) {
@@ -26,7 +27,24 @@ class JobDeliveryWorker {
         if (!vacancy || vacancy.hidden) { await this.deliveryRepository.finish({ deliveryId: delivery.id, outcome: 'failed' }); return; }
         view = cardView(vacancy);
       } else if (delivery.kind === 'attention') {
-        if (delivery.payload?.reason === 'HH_CAPTCHA_STATUS') {
+        if (delivery.payload?.reason === 'HH_COLLECTION_STATUS') {
+          view = collectionNoticeView(delivery.payload.code);
+          const scope = { userId: delivery.user_id, conversationId: delivery.payload.conversationId,
+            chatId: delivery.payload.chatId, channel: 'telegram' };
+          let denied = false;
+          try {
+            denied = !view || search.conversation_id !== scope.conversationId || search.chat_id !== scope.chatId
+              || search.settings?.activated !== true || search.settings?.paused !== false
+              || search.progress?.until !== delivery.payload.runUntil;
+            if (!denied) await assertJobScope(this.pool, scope, this.accessService);
+          } catch (error) {
+            if (error?.code !== 'JOB_SCOPE_DENIED' && error?.name !== 'ZodError' && delivery.attempts < 4) {
+              await this.deliveryRepository.finish({ deliveryId: delivery.id, outcome: 'queued' }); return;
+            }
+            denied = true;
+          }
+          if (denied) { await this.deliveryRepository.finish({ deliveryId: delivery.id, outcome: 'failed' }); return; }
+        } else if (delivery.payload?.reason === 'HH_CAPTCHA_STATUS') {
           view = captchaNoticeView(delivery.payload.code);
           const scope = { userId: delivery.user_id, conversationId: delivery.payload.conversationId, chatId: delivery.payload.chatId, channel: 'telegram' };
           const denied = () => Object.assign(new Error('JOB_SCOPE_DENIED'), { code: 'JOB_SCOPE_DENIED' });

@@ -1,5 +1,7 @@
 const { uuid, jobError, assertUserJobAccess } = require('./jobSchemas');
 const { jobTransaction } = require('./jobTransaction');
+const { createHash } = require('node:crypto');
+const { COLLECTION_FAILURE_CODES } = require('./jobCollectionNotices');
 
 class JobDeliveryRepository {
   constructor(pool, { accessService = null } = {}) { this.pool = pool; this.accessService = accessService; }
@@ -48,6 +50,24 @@ class JobDeliveryRepository {
         AND c.channel='telegram' AND c.external_chat_id=s.chat_id
       WHERE s.user_id=$1 ON CONFLICT(user_id,dedup_key) DO NOTHING RETURNING id`,
       [userId, `attention:captcha:${incidentId}`])).rows[0] || null;
+    });
+  }
+  async enqueueCollectionAttention({ userId, runUntil, code }) {
+    uuid.parse(userId);
+    if (typeof runUntil !== 'string' || runUntil.length > 40 || !Number.isFinite(Date.parse(runUntil))
+      || new Date(runUntil).toISOString() !== runUntil || !COLLECTION_FAILURE_CODES.has(code)) throw jobError('JOB_INVALID_DELIVERY_OUTCOME');
+    const key = `attention:collection:${createHash('sha256').update(JSON.stringify([userId, runUntil])).digest('hex')}`;
+    return jobTransaction(this.pool, async client => {
+      await assertUserJobAccess(client, this.accessService, userId);
+      return (await client.query(`INSERT INTO job_deliveries(user_id,kind,dedup_key,payload)
+        SELECT s.user_id,'attention',$3,jsonb_build_object('reason','HH_COLLECTION_STATUS','code','INCOMPLETE',
+          'conversationId',s.conversation_id::text,'chatId',s.chat_id,'runUntil',$2::text)
+        FROM job_searches s JOIN conversations c ON c.id=s.conversation_id AND c.user_id=s.user_id
+          AND c.channel='telegram' AND c.external_chat_id=s.chat_id
+        JOIN user_identities i ON i.user_id=s.user_id AND i.provider='telegram' AND i.external_id=s.chat_id
+        WHERE s.user_id=$1 AND s.settings->>'activated'='true' AND s.settings->>'paused'='false'
+          AND s.progress->>'until'=$2
+        ON CONFLICT(user_id,dedup_key) DO NOTHING RETURNING id`, [userId, runUntil, key])).rows[0] || null;
     });
   }
   async finish({ deliveryId, outcome, telegramMessageId = null, retryAfterMs = 30000 }) {

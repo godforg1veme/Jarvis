@@ -4,14 +4,24 @@ const { captchaNoticeView } = require('./jobCaptchaNotices');
 class JobCaptchaRepository {
   constructor(pool, { accessService = null } = {}) { this.pool = pool; this.accessService = accessService; }
   async activeUsers() {
-    const candidates = (await this.pool.query(`SELECT s.user_id FROM job_searches s
-      JOIN job_connections c ON c.user_id=s.user_id AND c.status='connected'
-      WHERE s.settings->>'activated'='true' AND s.settings->>'paused'='false'
-      ORDER BY s.updated_at,s.user_id LIMIT 100`)).rows;
     const allowed = [];
-    for (const row of candidates) {
-      try { await assertUserJobAccess(this.pool, this.accessService, row.user_id); allowed.push(row.user_id); }
-      catch { /* Revoked users have no CAPTCHA work. */ }
+    let cursor = null;
+    // Return the complete eligible set: the worker limits work per tick and
+    // rotates across this list. Truncating it would starve later users forever.
+    while (true) {
+      const candidates = (await this.pool.query(`SELECT s.user_id,s.updated_at::text AS updated_at FROM job_searches s
+        JOIN conversations c ON c.id=s.conversation_id AND c.user_id=s.user_id AND c.channel='telegram' AND c.external_chat_id=s.chat_id
+        JOIN user_identities ti ON ti.user_id=s.user_id AND ti.provider='telegram' AND ti.external_id=s.chat_id
+        WHERE s.settings->>'activated'='true' AND s.settings->>'paused'='false'
+        AND jsonb_array_length(CASE WHEN jsonb_typeof(s.settings->'queries')='array' THEN s.settings->'queries' ELSE '[]'::jsonb END)>0
+        AND ($1::timestamptz IS NULL OR (s.updated_at,s.user_id)>($1::timestamptz,$2::uuid))
+        ORDER BY s.updated_at,s.user_id LIMIT 100`, [cursor?.updated_at || null,cursor?.user_id || null])).rows;
+      for (const row of candidates) {
+        try { await assertUserJobAccess(this.pool, this.accessService, row.user_id); allowed.push(row.user_id); }
+        catch (error) { if (error.code !== 'JOB_SCOPE_DENIED') throw error; }
+      }
+      if (candidates.length < 100) break;
+      cursor = candidates[candidates.length - 1];
     }
     return allowed;
   }

@@ -45,9 +45,9 @@ test('collector client uses authenticated owner RPC and propagates closed browse
   server.listen(0, '127.0.0.1'); await once(server, 'listening');
   try {
     const client = new JobBrowserClient({ ownerId, token, baseUrl: `http://127.0.0.1:${server.address().port}`, allowTestHttp: true });
-    assert.equal(client.forUser(randomUUID()).capabilities.dateWindows, false); assert.equal(calls, 0);
+    assert.equal(client.forUser(randomUUID()).capabilities.dateWindows, true); assert.equal(calls, 0);
     const bound = client.forUser(ownerId);
-    assert.equal(bound.capabilities.dateWindows, false);
+    assert.deepEqual(bound.capabilities, { dateWindows: true, dateWindowGranularity: 'moscow_day', maxPages: 1000 });
     const result = await bound.search({ query: 'AI', publishedFrom: '2026-10-01T12:00:00Z', publishedTo: '2026-10-15T12:00:00Z' });
     assert.equal(result.items[0].id, '123');
     await assert.rejects(bound.getVacancy({ externalId: '123' }), { code: 'JOB_HH_CAPTCHA_REQUIRED' });
@@ -58,6 +58,19 @@ test('collector client uses authenticated owner RPC and propagates closed browse
     assert.equal(calls, 5);
     assert.throws(() => new JobBrowserClient({ ownerId, token, baseUrl: 'http://127.0.0.1:1234' }), { code: 'JOB_BROWSER_CONFIG_INVALID' });
   } finally { await new Promise((resolve) => server.close(resolve)); }
+});
+
+test('broad HH search metadata reaches collector so it can split before page traversal', async () => {
+  const ownerId = randomUUID(), token = randomBytes(32).toString('hex');
+  let value = { items: Array.from({ length: 20 }, (_, i) => ({ id: String(i + 1) })), found: 8953, pages: 448 };
+  const client = new JobBrowserClient({ ownerId, token,
+    fetchImpl: async () => new Response(JSON.stringify({ ok: true, value }), { status: 200 }) }).forUser(ownerId);
+  assert.equal((await client.search({ query: 'AI', publishedFrom: '2026-10-20T00:00:00Z', publishedTo: '2026-10-21T00:00:00Z' })).pages, 448);
+  value = { ...value, found: 1000000, pages: 50000 };
+  assert.equal((await client.search({ query: 'AI', publishedFrom: '2026-10-20T00:00:00Z', publishedTo: '2026-10-21T00:00:00Z' })).pages, 50000);
+  value = { ...value, pages: 50001 };
+  await assert.rejects(client.search({ query: 'AI', publishedFrom: '2026-10-20T00:00:00Z', publishedTo: '2026-10-21T00:00:00Z' }),
+    { code: 'JOB_HH_INVALID_RESPONSE' });
 });
 
 test('application adapter uses the isolated write credential and preserves original approved text during recovery', async () => {

@@ -73,6 +73,23 @@ deadline across metadata, fetch and body reads.
 
 ### Job search
 
+Публичный HH collector использует календарные окна DD.MM.YYYY по МСК и делит
+выдачу свыше 2000 результатов по дням. Страница/offset сохраняются между короткими
+проходами; checkpoint обновляется только после всех окон. `hh_calendar_v1`
+сбрасывает старые search_period курсоры один раз, сохраняя исходный период.
+Общие правила доступа действуют для сборщика, CAPTCHA и доставки без требования
+HH login для публичного поиска. Sent/unknown не повторяются. Насыщенный день
+остаётся незавершённым, с одним durable уведомлением на проход.
+[Результат ремонта](updates/2026-10-24-hh-complete-collection.md).
+
+The public HH collector uses Moscow calendar windows and splits searches above
+2000 results by day. Bounded passes persist page/offset; checkpoints advance only
+after every window completes. `hh_calendar_v1` resets legacy search_period cursors
+once while preserving the original range. Collection, CAPTCHA and delivery check
+the same current jobs access; public searches do not require HH login. Sent/unknown
+deliveries are never repeated. A saturated day remains incomplete and receives one
+durable notice per run. [Repair record](updates/2026-10-24-hh-complete-collection.md).
+
 <a id="hh-состояние-на-22-октября--state-on-october-22"></a>
 
 #### HH: состояние на 23 октября / State on October 23

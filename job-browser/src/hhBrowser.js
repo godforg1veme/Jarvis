@@ -10,8 +10,9 @@ const { readHistoryPage } = require('./hhHistoryReader');
 const { readLoginInputFields } = require('./loginInputFields');
 const { handleLoginCaptcha } = require('./loginCaptcha');
 const {readExistingApplication,visibleAppliedAction}=require('./existingApplication');
+const { hhDate } = require('./hhSearchDates');
 const failure = (code) => Object.assign(new Error(code), { code });
-const CAPABILITIES = Object.freeze({ dateWindows: false, maxPages: 1000 });
+const CAPABILITIES = Object.freeze({ dateWindows: true, dateWindowGranularity: 'moscow_day', maxPages: 1000 });
 
 class HhBrowser {
   constructor({ context, now = () => new Date(), primaryResumeId = null, captchaRecovery = null, captchaDispatch = dispatchCaptcha,
@@ -290,9 +291,9 @@ class HhBrowser {
     const age = this.now().getTime() - Date.parse(publishedFrom);
     if (age > 30 * 86400000 || age < 0) return Promise.reject(failure('JOB_COLLECTION_WINDOW_EXPIRED'));
     const url = new URL('https://hh.ru/search/vacancy');
-    url.search = new URLSearchParams({ text: query, search_period: String(Math.max(1, Math.ceil(age / 86400000))),
+    url.search = new URLSearchParams({ text: query, date_from: hhDate(publishedFrom), date_to: hhDate(publishedTo),
       order_by: 'publication_time', items_on_page: '20', page: String(page) }).toString();
-    return this.run(() => this.read(url.href, 'search', readSearchPage));
+    return this.run(() => this.read(url.href, 'search', (current) => readSearchPage(current, url.href)));
   }
   getVacancy({ externalId }) {
     if (!/^\d{1,20}$/.test(String(externalId))) return Promise.reject(failure('JOB_INVALID_VACANCY'));

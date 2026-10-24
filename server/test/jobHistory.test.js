@@ -19,7 +19,8 @@ test('history RPC uses only read auth, closed section/page and rejects malformed
  try{const client=new JobBrowserClient({ownerId,token,baseUrl:`http://127.0.0.1:${rpc.address().port}`,allowTestHttp:true});
  assert.deepEqual(await client.forUser(ownerId).history({section:'active',page:0}),{section:'active',page:0,pages:1,total:0,items:[]});
  for(const args of[{section:'all',page:0},{section:'active',page:-1},{section:'active',page:1000},{section:'active',page:0,url:'https://hh.ru'}])await assert.rejects(client.request(ownerId,'history',args));
- assert.equal(calls,1);assert.equal(client.forUser(randomUUID()).capabilities.dateWindows,false);
+ assert.equal(calls,1);assert.equal(client.forUser(randomUUID()).capabilities.dateWindows,true);
+ assert.equal(client.forUser(randomUUID()).capabilities.dateWindowGranularity,'moscow_day');
  extra=true;await assert.rejects(client.forUser(ownerId).history({section:'archived',page:0}),{code:'JOB_HH_INVALID_RESPONSE'});
  }finally{await new Promise(r=>rpc.close(r));}
 });

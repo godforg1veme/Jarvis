@@ -2,7 +2,7 @@ const { jobError } = require('./jobSchemas');
 const { readBoundedJson } = require('./boundedHttp');
 const { historySchema, itemSchema } = require('./jobHistorySchema');
 const UUID = /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i;
-const CAPABILITIES = Object.freeze({ dateWindows: false, maxPages: 1000 });
+const CAPABILITIES = Object.freeze({ dateWindows: true, dateWindowGranularity: 'moscow_day', maxPages: 1000 });
 function validInputFields(fields, width, height) {
   const keys = ['x', 'y', 'width', 'height', 'type', 'inputMode', 'multiline'];
   return Array.isArray(fields) && fields.length <= 20 && fields.every((field) =>
@@ -128,8 +128,10 @@ class JobBrowserClient {
       || (value.outcome !== 'unknown' && value.verified !== true)
       || (value.outcome === 'sent' && !/^[1-9]\d{0,19}$/.test(value.externalId || '')))) throw jobError('JOB_HH_INVALID_RESPONSE');
     if (operation === 'search' && (!Array.isArray(value?.items) || value.items.length > 20
-      || !Number.isInteger(value.pages) || value.pages < 0 || value.pages > 1000
-      || !Number.isInteger(value.found) || value.found < 0 || !value.items.every((item) => /^\d{1,20}$/.test(item?.id || '')))) throw jobError('JOB_HH_INVALID_RESPONSE');
+      || !Number.isInteger(value.pages) || value.pages < 0 || value.pages > 50000
+      || !Number.isInteger(value.found) || value.found < 0 || value.found > 1000000
+      || value.pages !== Math.ceil(value.found / 20)
+      || !value.items.every((item) => /^\d{1,20}$/.test(item?.id || '')))) throw jobError('JOB_HH_INVALID_RESPONSE');
     if (operation === 'vacancy' && (value?.externalId !== args.externalId || typeof value?.title !== 'string'
       || !Number.isFinite(Date.parse(value?.publishedAt)))) throw jobError('JOB_HH_INVALID_RESPONSE');
     if (operation === 'resumes' && (!Array.isArray(value) || value.length > 20
