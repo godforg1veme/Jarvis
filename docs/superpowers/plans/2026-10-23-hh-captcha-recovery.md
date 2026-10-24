@@ -10,6 +10,12 @@
 
 **Spec:** [Approved design](../specs/2026-10-23-hh-captcha-recovery-design.md).
 
+**Completed October 24:** published and deployed as part of the broader
+[complete-collection release](../../updates/2026-10-24-hh-complete-collection.md).
+The final scope included server, collector and browser. Both checked CAPTCHA
+pauses cleared. The approval-pending and browser-only statements below describe
+the earlier local stage; they are superseded by the approved combined release.
+
 ## Global constraints
 
 - No new production dependencies, raw errors, private URLs, answers or image keys in diagnostics.

@@ -60,11 +60,15 @@ Read-only проверка HH приняла дневную и широкую в
 Изолированные тестовые БД, сеть и временный source удалены.
 
 Read-only статус CAPTCHA владельца и участника — `idle`: прежняя пауза снята.
-Участнику фактически доставлены 11 новых карточек: количество `sent` выросло с 71
-до 82, столько же вакансий доступно в профиле. Ошибка насыщенной выдачи снята,
+При последней проверке этого выпуска участнику фактически доставлены 12 новых
+карточек: количество `sent` выросло с 71 до 83, столько же вакансий доступно
+в профиле. Ошибка насыщенной выдачи снята,
 `hh_calendar_v1` применён. Шесть оставшихся окон и исходный период сохранены;
 checkpoint остаётся пустым до полного обхода. Полная выгрузка ещё не завершена,
-сбор и доставка продолжаются штатным фоновым процессом. Живые нажатия телефона
+сбор и доставка продолжаются штатным фоновым процессом. Это контрольный срез
+выпуска, а не счётчик в реальном времени. GitHub main и оба VPS source после
+записи результата — `81b834d`; работающий runtime остаётся на `1ed9316`,
+поскольку следующий коммит менял только документацию. Живые нажатия телефона
 и следующий CAPTCHA-цикл отдельно не проверялись.
 
 Эта запись продолжает [локальный ремонт CAPTCHA](2026-10-23-hh-captcha-recovery-development.md).
@@ -128,11 +132,15 @@ The database schema did not change. Isolated test databases, network and tempora
 source were removed.
 
 Read-only CAPTCHA status is `idle` for owner and member: the previous pause cleared.
-The member actually received 11 new cards: `sent` increased from 71 to 82, with the
-same number available in the profile. The saturated-search failure cleared and
+At the final check of this rollout, the member actually received 12 new cards:
+`sent` increased from 71 to 83, with the same number available in the profile.
+The saturated-search failure cleared and
 `hh_calendar_v1` applied. Six unfinished windows and the original range are retained;
 the checkpoint stays empty until full traversal. Complete delivery is still pending;
-collection and delivery continue through the normal background worker. Physical
+collection and delivery continue through the normal background worker. This is a
+release snapshot rather than a live counter. GitHub main and both VPS sources
+after recording results were `81b834d`; runtime remains on `1ed9316` because the
+following commit changed documentation only. Physical
 phone actions and the next CAPTCHA cycle were not separately tested.
 
 This record follows the [local CAPTCHA repair](2026-10-23-hh-captcha-recovery-development.md).

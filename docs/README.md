@@ -8,7 +8,8 @@
 периоды по дням МСК, возобновление старого прогресса, одинаковая проверка доступа
 для owner/admin/member и уведомление о незавершённом сборе. Linux browser 103/103,
 PostgreSQL/RPC 16/16. Исходники синхронизированы; первая живая проверка подтвердила
-11 новых доставок участнику. Оставшийся объём собирается в фоне, полный обход ещё не завершён.
+12 новых доставок участнику (83 вместо 71). Оставшийся объём собирается в фоне,
+полный обход на момент этой проверки ещё не завершён.
 
 На DE выпущено [движение Mini App по умолчанию](updates/2026-10-23-mini-app-auto-motion.md) без кнопки паузы. GitHub, оба VPS source и Windows main синхронизированы в отдельной рабочей папке; активная работа HH CAPTCHA в основной папке сохранена.
 
@@ -16,7 +17,7 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 
 23 октября выпущен [орбитальный Mini App и единый дизайн всех внутренних экранов](updates/2026-10-23-mini-app-orbital-release.md). GitHub, Windows и оба VPS синхронизированы; новый DE server healthy. Живое принятие на телефоне остаётся.
 
-Статус на 23 октября 2026 года по записям выпусков. Новую сверку окружения
+Статус на 24 октября 2026 года по записям выпусков. Новую сверку окружения
 проводи по [руководству по выпуску](release-workflow.md).
 Результат переноса истории и проверки сохранности правил:
 [уплотнение документации](updates/2026-10-23-documentation-consolidation.md).
@@ -78,7 +79,8 @@ The [shared HH CAPTCHA and complete collection repair](updates/2026-10-24-hh-com
 is deployed to DE: Moscow calendar windows, legacy progress migration, consistent
 owner/admin/member access checks and durable incomplete-run notices. Linux browser
 103/103 and PostgreSQL/RPC 16/16 passed. Sources match; the first live check confirmed
-11 new member deliveries. Remaining collection continues in the background; full traversal is pending.
+12 new member deliveries (83 instead of 71). Remaining collection continues in the
+background; full traversal was still pending at that check.
 
 [Mini App motion is enabled by default](updates/2026-10-23-mini-app-auto-motion.md) on DE without a pause button. GitHub, both VPS sources and Windows main match in the separate worktree; active HH CAPTCHA work in the primary checkout is preserved.
 
@@ -86,7 +88,7 @@ The [motion repair](updates/2026-10-23-mini-app-motion-fix.md) is deployed to DE
 
 October 23: the [orbital Mini App and shared design of all interior screens](updates/2026-10-23-mini-app-orbital-release.md) are deployed. GitHub, Windows and both VPS sources match; the new DE server is healthy. Physical phone acceptance remains.
 
-Status as of October 23, 2026, based on release records. Use the
+Status as of October 24, 2026, based on release records. Use the
 [release guide](release-workflow.md) for a fresh environment comparison.
 For history preservation and rule-retention checks, see the
 [documentation consolidation record](updates/2026-10-23-documentation-consolidation.md).

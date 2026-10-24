@@ -92,7 +92,19 @@ durable notice per run. [Repair record](updates/2026-10-24-hh-complete-collectio
 
 <a id="hh-состояние-на-22-октября--state-on-october-22"></a>
 
-#### HH: состояние на 23 октября / State on October 23
+#### HH: состояние на 24 октября / State on October 24
+
+24 октября на DE выпущен [общий ремонт CAPTCHA и сбора](updates/2026-10-24-hh-complete-collection.md).
+Server/collector работают на `1ed9316`, browser на `9565e59`; source обоих VPS
+синхронизирован с GitHub. CAPTCHA status владельца и участника был `idle`;
+последний контрольный срез подтвердил 12 новых доставок участнику.
+Полный накопленный проход ещё не завершён; числа в записи выпуска исторические.
+
+October 24: the [shared CAPTCHA and collection repair](updates/2026-10-24-hh-complete-collection.md)
+is deployed to DE. Server/collector run `1ed9316`, browser runs `9565e59`; both VPS
+sources match GitHub. Owner and member CAPTCHA status was `idle`; the final
+rollout snapshot confirmed 12 new member deliveries. Full backlog traversal was
+still pending; counts in the release record are historical.
 
 23 октября выпущен [автоматический выбор модели писем](updates/2026-10-23-jobs-automatic-model-release.md).
 Ручная настройка и отдельная job-model переменная удалены; применяется общая

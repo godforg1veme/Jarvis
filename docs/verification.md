@@ -38,17 +38,23 @@ Run the seven PostgreSQL acceptance files above in a dedicated database and both
 browser acceptance files in Linux. They cover Moscow calendar splits, offsets,
 current roles and preservation of uncertain outcomes.
 
-Локальный [ремонт 23 октября](updates/2026-10-23-hh-captcha-recovery-development.md)
+Выпущенный [ремонт 24 октября](updates/2026-10-24-hh-complete-collection.md)
 проверяет чтение branded static markup, границы объёма/DOM, отсутствие повторного
 ответа после unknown/restart, точный target и закрытые причины ошибок.
+Итоговый прогон: server 802/802, Linux browser 103/103, PostgreSQL/RPC 16/16,
+Telegram gate 66/66. Проверка eligibility включает 104 активных пользователя;
+проверки лимита прохода включают медленный search и медленное чтение карточки.
 Linux-прогон выполняется в отдельном контейнере без сети и account volumes;
 HTTPS fixture требует только `--add-host hh.ru:127.0.0.1`.
 
-The [October 23 local repair](updates/2026-10-23-hh-captcha-recovery-development.md)
+The deployed [October 24 repair](updates/2026-10-24-hh-complete-collection.md)
 checks branded static markup, text/DOM bounds, no repeated answer after
 unknown/restart, exact target verification and closed error reasons. Linux tests
 use a separate networkless container without account volumes; the HTTPS fixture
 only needs `--add-host hh.ru:127.0.0.1`.
+Final results: server 802/802, Linux browser 103/103, PostgreSQL/RPC 16/16 and
+Telegram gate 66/66. Eligibility covers 104 active users; elapsed-time budget tests
+cover both a slow search and a slow detail read.
 
 ```powershell
 node --test job-browser/test/hhBrandedRecovery.test.js job-browser/test/captchaPreparation.test.js

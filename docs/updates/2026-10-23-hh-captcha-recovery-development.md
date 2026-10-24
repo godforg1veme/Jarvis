@@ -4,6 +4,10 @@
 
 ## Русский
 
+Обновление от 24 октября: этот этап выпущен вместе с общим ремонтом сборщика.
+[Итог установки, проверок и восстановления доставки](2026-10-24-hh-complete-collection.md).
+Ниже сохранён исторический статус локального этапа 23 октября.
+
 23 октября 2026 года. Локальный ремонт согласован владельцем и проверен в ветке
 `codex/hh-captcha-recovery`. В GitHub не опубликован, работающий browser на DE
 не обновлялся. Desktop и server runtime не менялись.
@@ -74,6 +78,10 @@ server/collector и сборка Desktop не требуются. После у�
 Основное руководство: [browser](../../job-browser/README.md#восстановление-после-captcha).
 
 ## English
+
+October 24 update: this stage was deployed with the shared collector repair.
+See [deployment, verification and delivery recovery](2026-10-24-hh-complete-collection.md).
+The local-stage status from October 23 is retained below as history.
 
 October 23, 2026. The owner approved the local repair, tested on branch
 `codex/hh-captcha-recovery`. It has not been published to GitHub or installed
