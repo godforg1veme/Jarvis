@@ -66,6 +66,46 @@ class ReleaseStatusTests(unittest.TestCase):
         for invalid in ['', 'deploy/docker-compose.yml', f'{base},', f'{base},{self.repo / "other.yml"}']:
             self.assertIsNone(status.release_config_source(invalid))
 
+    def test_nested_compose_overlay_is_checked_and_cannot_escape_deploy(self):
+        deploy = self.repo / 'deploy'
+        nested = deploy / 'overrides'
+        nested.mkdir(parents=True)
+        base = deploy / 'docker-compose.yml'
+        overlay = nested / 'job-image.yml'
+        base.write_text('services: {}\n')
+        overlay.write_text('services: {}\n')
+        outside = self.repo / 'other.yml'
+        outside.write_text('services: {}\n')
+        self.git('add', 'deploy', 'other.yml'); self.git('commit', '-m', 'compose inputs')
+        previous = self.git('rev-parse', 'HEAD')
+
+        release, inputs = status.release_config_source(f'{base},{overlay}')
+        self.assertEqual(release, self.repo)
+        self.assertEqual(inputs, ['deploy/docker-compose.yml', 'deploy/overrides/job-image.yml'])
+        overlay.write_text('services: {server: {read_only: true}}\n')
+        self.git('add', 'deploy'); self.git('commit', '-m', 'changed nested overlay')
+        self.assertEqual(status.release_input_delta(self.repo, previous, 'HEAD', inputs),
+                         'deploy/overrides/job-image.yml')
+        self.assertIsNone(status.release_config_source(f'{base},{outside}'))
+        self.assertIsNone(status.release_config_source(f'{base},{deploy / ".." / "other.yml"}'))
+
+    def test_compose_symlink_escape_is_rejected(self):
+        deploy = self.repo / 'deploy'
+        deploy.mkdir()
+        base = deploy / 'docker-compose.yml'
+        base.write_text('services: {}\n')
+        outside = self.repo / 'other.yml'
+        outside.write_text('services: {}\n')
+        overlay_link = deploy / 'external.yml'
+        base_link = deploy / 'external-base.yml'
+        try:
+            overlay_link.symlink_to(outside)
+            base_link.symlink_to(outside)
+        except OSError:
+            self.skipTest('symlinks are unavailable on this machine')
+        self.assertIsNone(status.release_config_source(f'{base},{overlay_link}'))
+        self.assertIsNone(status.release_config_source(str(base_link)))
+
     def test_unique_foreign_commit_is_reported_and_never_merged_or_deleted(self):
         self.git("checkout", "-b", "codex/another-agent")
         (self.repo / "other.js").write_text("other task\n", encoding="utf-8")

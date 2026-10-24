@@ -4,11 +4,13 @@
 
 ## Русский
 
-Локально подготовлены [общие инструкции моделей, Tavily MCP и правка сопроводительных](updates/2026-10-24-shared-instructions-and-search-development.md).
-Изменения ещё не выпущены. Ключ Tavily сохранён локально вне Git; клиент Jarvis
-получил пять источников в живой проверке через сеть DE VPS. Прямое подключение
-из Windows получает HTTP 403. Выбранное резюме и новый редактор проверены на
-локальных fixtures; реальные HH и нажатия Telegram остаются для приёмки.
+На DE выпущены [общие инструкции моделей, Tavily MCP и правка сопроводительных](updates/2026-10-24-shared-instructions-and-search-release.md).
+Server и HH-браузер healthy, миграция 046 применена. Поиск включён: установленный
+сервер получил пять источников за 1,1 секунды. В новых образах прошли 844 серверных
+и 103 браузерных теста; ещё 16 проверок прошли на изолированной PostgreSQL,
+включая два сценария, пропущенных без БД. Исходники обоих VPS обновлены,
+Desktop совпадает с принятой версией. Реальные HH, письма на моделях и нажатия
+Telegram остаются для приёмки; отключение PAYGO не подтверждено.
 
 На DE выпущено [обновление inline-сообщений Telegram](updates/2026-10-24-telegram-inline-edit-release.md):
 кнопки меняют исходное сообщение, длинный текст перелистывается в нём, возврат
@@ -88,12 +90,14 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 
 ## English
 
-[Shared model instructions, Tavily MCP and cover-letter editing](updates/2026-10-24-shared-instructions-and-search-development.md)
-are implemented locally and have not been deployed. The Tavily key is stored
-locally outside Git; the Jarvis client returned five sources in a live check
-through the DE VPS network. Direct Windows access returns HTTP 403.
-Selected-resume input and manual editing have local fixture coverage;
-actual HH and Telegram taps remain unverified.
+[Shared model instructions, Tavily MCP and cover-letter editing](updates/2026-10-24-shared-instructions-and-search-release.md)
+are deployed on DE. Server and HH browser are healthy; migration 046 is applied.
+Search is enabled: the installed server returned five sources in 1.1 seconds.
+The new images passed 844 server and 103 browser tests; another 16 checks passed
+on isolated PostgreSQL, including the two scenarios skipped without a database.
+Both VPS source checkouts are updated; Desktop matches the accepted version.
+Actual HH, model-generated letters and Telegram taps remain for acceptance;
+disabled PAYGO has not been confirmed.
 
 [In-place Telegram inline updates](updates/2026-10-24-telegram-inline-edit-release.md)
 are deployed on DE: buttons edit the original message, long text pages within

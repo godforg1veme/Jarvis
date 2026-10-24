@@ -28,6 +28,10 @@ Windows-приложение и облачный API для подключённ
   модели OpenRouter, затем платный резерв по оценке стоимости. Цены и доступность
   обновляются при использовании; список моделей остаётся фиксированным.
   [Результат выпуска и проверки](docs/updates/2026-10-19-free-first-routing-release.md).
+- Общий чат и подготовка сопроводительных используют единое ядро инструкций.
+  На DE включён поиск через Tavily MCP с источниками в контексте ответа;
+  история, память, документы и резюме не передаются планировщику поиска.
+  [Выпуск и ограничения](docs/updates/2026-10-24-shared-instructions-and-search-release.md).
 - Даты и часы показываются в МСК UTC+3; время напоминаний без пояса также
   вводится по Москве. [Выпуск и проверки](docs/updates/2026-10-19-moscow-time-release.md).
 - Telegram Mini App содержит 3D-ядро и движущиеся по орбитам планеты в стиле дашборда, личный чат и админку:
@@ -51,6 +55,11 @@ Windows-приложение и облачный API для подключённ
   фразе на строку, с подтверждением перед сохранением. Без запросов поиск не запускается.
   Модель запускается по запросу; отправка отклика требует одобрения точного текста
   письма. Живая отправка отклика ещё требует приёмки.
+- При подключённом HH сопроводительное учитывает выбранное личное резюме.
+  Инструкции требуют подчёркивать подтверждённые сильные стороны без выдуманных
+  достижений и оправданий нехваткой опыта. Кнопка «Редактировать текст» позволяет
+  заменить черновик целиком без AI; отправка требует отдельного подтверждения.
+  [Выпуск и оставшаяся приёмка](docs/updates/2026-10-24-shared-instructions-and-search-release.md).
 - Для капчи HH на DE включён дообученный OCR с выпрямлением изображения:
   до трёх автоматических попыток, затем фото владельцу в Telegram. Неизвестный
   результат останавливает автоматику раньше. Ответ на фото разрешает однократную
@@ -173,11 +182,13 @@ Telegram is Jarvis's first cloud client. The project also includes a Windows app
 - The Telegram bot supports allowlisted users, private conversations, guided forms, inline confirmations, memory, documents, devices, VPN, and Operations. The Life OS area includes Mission, Timeline, projects, commitments, people, reminders, preferences, and context recovery.
 - Text inline buttons update the original message; long text pages within it with return controls on every page. The bottom menu can be hidden with Telegram's icon; scroll behavior depends on the client. See the [release and acceptance limits](docs/updates/2026-10-24-telegram-inline-edit-release.md).
 - The main text assistant on DE prioritizes approved free OpenRouter models, then paid candidates by estimated cost. Prices and availability refresh on use; the model list remains fixed. See the [release and verification](docs/updates/2026-10-19-free-first-routing-release.md).
+- General chat and cover-letter generation share a core instruction set. DE has Tavily MCP search enabled, with sources supplied as answer context; stored history, memory, documents and resumes are not sent to the search planner. See the [release and limitations](docs/updates/2026-10-24-shared-instructions-and-search-release.md).
 - Dates and clocks use Moscow UTC+3; reminder input without a timezone also means Moscow. See the [release and checks](docs/updates/2026-10-19-moscow-time-release.md).
 - The Telegram Mini App includes a 3D core and orbiting planets styled after the dashboard, private chat and administration with Telegram IDs, roles and personal overrides. The owner appoints administrators. All interior screens share the dark theme. See the [release and client checks](docs/updates/2026-10-23-mini-app-orbital-release.md).
 - Members with current `jobs` permission can connect their own HH account through a temporary HTTPS link on a phone or PC, then confirm a resume in the originating Mini App. The link arrives as private Telegram message text and a button. The HH window supports taps and phone-keyboard input, with the bottom panel retained as fallback. Profiles are separate from the owner's; real sign-in still needs member acceptance. See the [current release](docs/updates/2026-10-21-hh-login-touch-release.md).
 - The personal HH profile and Telegram bot buttons offer a primary resume selector for applications. The catalog refreshes every 15 minutes and on request. Free automatic raising is on by default and runs at most once every four hours, preserving explicit off choices and unknown-result stops. See the [release and verification](docs/updates/2026-10-22-hh-resume-bot-defaults-release.md).
 - Job search collects HH vacancies in a separate background process on DE and sends filtered cards to the relevant user's private Telegram chat. Search controls, saved vacancies, and cover-letter preparation and editing are available in the bot. New filters are empty; queries and exclusions accept one phrase per line with confirmation before saving. Search requires at least one query. The model runs on request; submitting an application requires approval of the exact letter. Live application submission still needs acceptance.
+- For connected HH accounts, cover letters use the selected personal resume. Instructions require emphasizing supported strengths without invented achievements or apologies for missing experience. The direct text-edit button replaces an entire draft without AI; sending requires separate confirmation. See the [release and remaining acceptance](docs/updates/2026-10-24-shared-instructions-and-search-release.md).
 - DE uses the fine-tuned HH OCR with image rectification: up to three automatic attempts, then a photo for the owner in Telegram. An unknown result stops automation earlier. Replying to the photo authorizes one submission; verified access resumes the search from its saved position. The human flow passed on 16 October; the first live OCR attempt on 18 October did not confirm access and handed a photo to the owner. A later live OCR answer test, approved by the owner, returned solved and resumed collection; a fully autonomous cycle remains unconfirmed. This CAPTCHA flow needs no Tailscale connection or separate web screen. See the [release and verification limits](docs/updates/2026-10-18-hh-ocr-live-acceptance.md).
 - The knowledge service stores private document metadata and text for owner-scoped search. It supports text and office formats, plus page-linked PDF search. Uploaded content is treated as untrusted data.
 - The Windows Electron client provides cloud chat, local wake-word detection, speech, and bounded tools for apps and files. Device credentials are protected with Windows DPAPI.

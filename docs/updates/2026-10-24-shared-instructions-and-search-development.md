@@ -4,6 +4,10 @@
 
 ## Русский
 
+Этот локальный этап завершён. Более новый результат:
+[установка на VPS и живой поиск](2026-10-24-shared-instructions-and-search-release.md).
+Ниже сохранено состояние до выпуска.
+
 Реализовано локально 24 октября 2026 года в ветке `codex/shared-prompt-design`.
 GitHub, оба VPS и установленный Desktop этой задачей не обновлялись.
 Основа: [принятая спецификация](../superpowers/specs/2026-10-24-shared-model-instructions-design.md).
@@ -105,6 +109,10 @@ Researcher с лимитом 1 000 кредитов. Прямой запрос �
 порученного выпуска. Desktop не менялся и пересборки не требует.
 
 ## English
+
+This local stage is complete. The newer
+[VPS deployment and live search record](2026-10-24-shared-instructions-and-search-release.md)
+supersedes its status. The pre-release state is preserved below.
 
 Implemented locally on October 24, 2026, on `codex/shared-prompt-design`.
 This task has not updated GitHub, either VPS or the installed Desktop.

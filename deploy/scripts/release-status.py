@@ -28,10 +28,25 @@ def release_config_source(configs):
     paths = [Path(value) for value in configs.split(',')]
     if any(not path.is_absolute() for path in paths):
         return None
-    release = paths[0].parent.parent
-    if any(path.parent != paths[0].parent or not path.is_file() for path in paths):
+    try:
+        deploy_dir = paths[0].parent.resolve(strict=True)
+        release = deploy_dir.parent
+        inputs = []
+        for path in paths:
+            target = path.resolve(strict=True)
+            if not target.is_file():
+                return None
+            target.relative_to(deploy_dir)
+            logical = Path(os.path.normpath(str(path))).relative_to(release).as_posix()
+            inputs.append(logical)
+            # A symlink's target is also an input: changing either tracked path
+            # must invalidate the installed release comparison.
+            actual = target.relative_to(release).as_posix()
+            if actual != logical:
+                inputs.append(actual)
+    except (OSError, RuntimeError, ValueError):
         return None
-    return release, [path.relative_to(release).as_posix() for path in paths]
+    return release, list(dict.fromkeys(inputs))
 
 
 def release_input_delta(repo, revision, ref, compose_inputs):

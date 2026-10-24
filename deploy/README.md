@@ -84,6 +84,11 @@ pairing and smoke checks. Do not expose port 3210 or PostgreSQL directly.
 
 ### Tavily MCP search
 
+Enabled on DE on 24 October 2026 in the private server environment. A live
+request from the installed container returned five sources in 1,148 ms.
+The API reports a null PAYGO limit, which does not establish disabled billing.
+See the [release and remaining checks](../docs/updates/2026-10-24-shared-instructions-and-search-release.md).
+
 The server can use the official remote `https://mcp.tavily.com/mcp/` endpoint.
 Set `JARVIS_WEB_SEARCH_ENABLED=true`, `JARVIS_TAVILY_API_KEY` and optionally
 `JARVIS_WEB_SEARCH_TIMEOUT_MS` (default 15000) in the private server environment.

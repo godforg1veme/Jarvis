@@ -57,8 +57,11 @@ See `docs/README.md` for current implementation status and historical records.
 
 ### Shared instructions and Tavily MCP
 
-Local implementation, 24 October 2026; deployment and live Tavily/HH acceptance
-are separate checks. Shared text instructions live in
+Deployed on DE on 24 October 2026: server and job-browser are healthy, migration
+046 is applied, and live Tavily returned five sources from the installed server.
+Actual HH markup and Telegram acceptance remain separate checks. See the
+[release record](updates/2026-10-24-shared-instructions-and-search-release.md).
+Shared text instructions live in
 `server/src/prompts/instructions/core.ru.md`, with cover-letter and web-search
 blocks beside them. `instructionFiles.js` reads bounded, nonempty UTF-8 files
 at startup; edits require a server restart. Missing or invalid required files
