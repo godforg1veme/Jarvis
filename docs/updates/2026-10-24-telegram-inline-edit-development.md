@@ -4,6 +4,10 @@
 
 ## Русский
 
+Исторический локальный этап. Позднее обе правки опубликованы и установлены на DE:
+[выпуск 24 октября](2026-10-24-telegram-inline-edit-release.md). Статус ниже описывает
+состояние до этого выпуска.
+
 24 октября 2026 года. Изменения подготовлены локально в
 `codex/telegram-inline-edit`. GitHub, VPS и установленное приложение этим этапом
 не обновлялись.
@@ -55,6 +59,10 @@ fixtures не подтверждают настоящую доставку Teleg
 [решение](../superpowers/specs/2026-10-24-telegram-inline-edit-design.md).
 
 ## English
+
+Historical local stage. Both changes were subsequently published and installed on
+DE in the [October 24 release](2026-10-24-telegram-inline-edit-release.md). The status
+below describes the state before that release.
 
 October 24, 2026. Changes are prepared locally on `codex/telegram-inline-edit`.
 This stage did not update GitHub, either VPS or the installed application.

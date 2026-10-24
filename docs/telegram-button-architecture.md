@@ -28,7 +28,7 @@ before reading a page. It bypasses domain action dispatch and conversation
 history writes. The bounded, expiring in-memory snapshot is presentation state,
 not durable authorization. Existing domain callbacks continue to enforce their
 own revision and confirmation checks. Callback processing and delivery are serialized
-per chat/message, with completed queue entries removed. The [menu contract](telegram-menu-contract.md#in-place-text-navigation-local-change-october-24-2026)
+per chat/message, with completed queue entries removed. The [menu contract](telegram-menu-contract.md#in-place-text-navigation-october-24-2026)
 owns visible labels, pagination and media/error exceptions. Identical-content
 Bot API responses count as successful edits; other callback transport errors
 attempt a safe alert instead of sending a message. Diagnostics keep the existing

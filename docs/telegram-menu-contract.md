@@ -22,7 +22,7 @@ the complete release chronology; dated wording there can be superseded.
 
 ## Collapsible bottom keyboard
 
-The keyboard is resizeable and exact-text matched. The local October 24 change,
+The keyboard is resizeable and exact-text matched. The October 24 release on DE,
 requested by the owner, sets `is_persistent: false` and `one_time_keyboard: false`
 for every layout and in outbound validation. Telegram is no longer asked to show
 the menu whenever the regular keyboard is hidden. The user can hide and reopen
@@ -67,7 +67,7 @@ authorization even if a user types a label or submits callback data directly.
 
 ## Inline controls
 
-### In-place text navigation (local change, October 24, 2026)
+### In-place text navigation (October 24, 2026)
 
 At the owner's request, a text inline-button result replaces the text and
 keyboard of the message that was clicked. A vacancy received at 10:00 stays
@@ -104,9 +104,10 @@ Domain buttons still recheck resource revisions, expiry and original-client
 confirmation through their existing handlers. No guided-input kind, database
 migration, action permission or send-confirmation boundary changes.
 
-Local automated coverage: `test/telegramCallbackPresentation.test.js`; real
-Telegram tap-through and production installation remain pending. This section
-records the requested local behavior, not a deployed release.
+Automated coverage: `test/telegramCallbackPresentation.test.js`. Installed on DE
+as `jarvis-telegram:e857122`; server healthy and 75 Telegram checks passed inside
+the new image. Real Telegram tap-through remains pending.
+[Release and verification](updates/2026-10-24-telegram-inline-edit-release.md).
 
 Callback data uses a closed grammar and at most 64 UTF-8 bytes. No bodies,
 paths, storage keys, tokens, credentials, or unchecked user text may appear.

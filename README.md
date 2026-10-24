@@ -20,6 +20,10 @@ Windows-приложение и облачный API для подключённ
   ввод, подтверждения кнопками, память, документы, устройства, VPN и Operations.
   В Life OS доступны Миссия, Хронология, проекты, обязательства, люди,
   напоминания, предпочтения и восстановление контекста.
+- Текстовые inline-кнопки обновляют исходное сообщение; длинные тексты
+  перелистываются в нём, с возвратом на каждой странице. Нижнее меню можно
+  сворачивать значком Telegram; поведение прокрутки зависит от клиента.
+  [Выпуск и ограничения проверки](docs/updates/2026-10-24-telegram-inline-edit-release.md).
 - Основной текстовый ассистент на DE сначала выбирает согласованные бесплатные
   модели OpenRouter, затем платный резерв по оценке стоимости. Цены и доступность
   обновляются при использовании; список моделей остаётся фиксированным.
@@ -167,6 +171,7 @@ Telegram is Jarvis's first cloud client. The project also includes a Windows app
 
 - The cloud service uses Node.js, Fastify, PostgreSQL, and pgvector. Model providers are configured outside product logic.
 - The Telegram bot supports allowlisted users, private conversations, guided forms, inline confirmations, memory, documents, devices, VPN, and Operations. The Life OS area includes Mission, Timeline, projects, commitments, people, reminders, preferences, and context recovery.
+- Text inline buttons update the original message; long text pages within it with return controls on every page. The bottom menu can be hidden with Telegram's icon; scroll behavior depends on the client. See the [release and acceptance limits](docs/updates/2026-10-24-telegram-inline-edit-release.md).
 - The main text assistant on DE prioritizes approved free OpenRouter models, then paid candidates by estimated cost. Prices and availability refresh on use; the model list remains fixed. See the [release and verification](docs/updates/2026-10-19-free-first-routing-release.md).
 - Dates and clocks use Moscow UTC+3; reminder input without a timezone also means Moscow. See the [release and checks](docs/updates/2026-10-19-moscow-time-release.md).
 - The Telegram Mini App includes a 3D core and orbiting planets styled after the dashboard, private chat and administration with Telegram IDs, roles and personal overrides. The owner appoints administrators. All interior screens share the dark theme. See the [release and client checks](docs/updates/2026-10-23-mini-app-orbital-release.md).
