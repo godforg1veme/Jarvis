@@ -54,6 +54,8 @@ test('migration files are ordered and narrowly named', () => {
     '044_job_history_freshness.sql',
     '045_job_automatic_model.sql',
     '046_job_manual_draft_edit.sql',
+    '047_job_fresh_collection.sql',
+    '048_job_reconciliation.sql',
   ]);
 });
 

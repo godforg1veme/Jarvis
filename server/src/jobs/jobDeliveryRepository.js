@@ -5,13 +5,16 @@ const { COLLECTION_FAILURE_CODES } = require('./jobCollectionNotices');
 
 class JobDeliveryRepository {
   constructor(pool, { accessService = null } = {}) { this.pool = pool; this.accessService = accessService; }
-  async enqueue({ userId, vacancyId }) {
+  async enqueue({ userId, vacancyId, priority = 0 }) {
+    if (![0, 1].includes(priority)) throw jobError('JOB_INVALID_DELIVERY_OUTCOME');
     return jobTransaction(this.pool, async (client) => {
       await assertUserJobAccess(client, this.accessService, userId);
-      return (await client.query(`INSERT INTO job_deliveries(user_id,vacancy_id,dedup_key)
-        SELECT $1,$2,$3 WHERE EXISTS(SELECT 1 FROM job_matches WHERE user_id=$1 AND vacancy_id=$2 AND NOT hidden)
-        ON CONFLICT(user_id,dedup_key) DO NOTHING RETURNING id`,
-      [uuid.parse(userId), uuid.parse(vacancyId), `card:${vacancyId}`])).rows[0] || null;
+      return (await client.query(`INSERT INTO job_deliveries(user_id,vacancy_id,dedup_key,priority)
+        SELECT $1,$2,$3,$4 WHERE EXISTS(SELECT 1 FROM job_matches WHERE user_id=$1 AND vacancy_id=$2 AND NOT hidden)
+        ON CONFLICT(user_id,dedup_key) DO UPDATE SET priority=excluded.priority
+          WHERE job_deliveries.status='queued' AND job_deliveries.kind='card'
+            AND job_deliveries.priority<excluded.priority RETURNING id`,
+      [uuid.parse(userId), uuid.parse(vacancyId), `card:${vacancyId}`, priority])).rows[0] || null;
     });
   }
   async claim() {
@@ -25,7 +28,7 @@ class JobDeliveryRepository {
         JOIN user_identities i ON i.user_id=d.user_id AND i.provider='telegram' AND i.external_id=s.chat_id
         WHERE d.status='queued' AND d.available_at<=now() AND (d.kind IN ('budget','attention') OR s.settings->>'paused'='false')
         AND (d.kind<>'card' OR EXISTS(SELECT 1 FROM job_matches m WHERE m.user_id=d.user_id AND m.vacancy_id=d.vacancy_id AND NOT m.hidden))
-        ORDER BY CASE WHEN d.kind='attention' THEN 0 ELSE 1 END,d.created_at,d.id
+        ORDER BY CASE WHEN d.kind='attention' THEN 0 ELSE 1 END,d.priority DESC,d.created_at,d.id
         FOR UPDATE OF d SKIP LOCKED LIMIT 50`)).rows;
       for (const candidate of candidates) {
         try { await assertUserJobAccess(client, this.accessService, candidate.user_id); }
@@ -52,22 +55,25 @@ class JobDeliveryRepository {
       [userId, `attention:captcha:${incidentId}`])).rows[0] || null;
     });
   }
-  async enqueueCollectionAttention({ userId, runUntil, code }) {
+  async enqueueCollectionAttention({ userId, runUntil, code, lane = 'history' }) {
     uuid.parse(userId);
+    if (!['history', 'fresh', 'reconcile'].includes(lane)) throw jobError('JOB_INVALID_DELIVERY_OUTCOME');
+    const progressColumn = lane === 'fresh' ? 'fresh_progress' : lane === 'reconcile' ? 'reconciliation_progress' : 'progress';
     if (typeof runUntil !== 'string' || runUntil.length > 40 || !Number.isFinite(Date.parse(runUntil))
       || new Date(runUntil).toISOString() !== runUntil || !COLLECTION_FAILURE_CODES.has(code)) throw jobError('JOB_INVALID_DELIVERY_OUTCOME');
-    const key = `attention:collection:${createHash('sha256').update(JSON.stringify([userId, runUntil])).digest('hex')}`;
+    const key = `attention:collection:${createHash('sha256').update(JSON.stringify(lane === 'history'
+      ? [userId, runUntil] : [userId, runUntil, lane])).digest('hex')}`;
     return jobTransaction(this.pool, async client => {
       await assertUserJobAccess(client, this.accessService, userId);
       return (await client.query(`INSERT INTO job_deliveries(user_id,kind,dedup_key,payload)
         SELECT s.user_id,'attention',$3,jsonb_build_object('reason','HH_COLLECTION_STATUS','code','INCOMPLETE',
-          'conversationId',s.conversation_id::text,'chatId',s.chat_id,'runUntil',$2::text)
+          'conversationId',s.conversation_id::text,'chatId',s.chat_id,'runUntil',$2::text,'lane',$4::text)
         FROM job_searches s JOIN conversations c ON c.id=s.conversation_id AND c.user_id=s.user_id
           AND c.channel='telegram' AND c.external_chat_id=s.chat_id
         JOIN user_identities i ON i.user_id=s.user_id AND i.provider='telegram' AND i.external_id=s.chat_id
         WHERE s.user_id=$1 AND s.settings->>'activated'='true' AND s.settings->>'paused'='false'
-          AND s.progress->>'until'=$2
-        ON CONFLICT(user_id,dedup_key) DO NOTHING RETURNING id`, [userId, runUntil, key])).rows[0] || null;
+          AND s.${progressColumn}->>'until'=$2
+        ON CONFLICT(user_id,dedup_key) DO NOTHING RETURNING id`, [userId, runUntil, key, lane])).rows[0] || null;
     });
   }
   async finish({ deliveryId, outcome, telegramMessageId = null, retryAfterMs = 30000 }) {

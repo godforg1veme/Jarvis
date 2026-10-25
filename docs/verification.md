@@ -55,6 +55,33 @@ Electron, устройств или VPS; эти результаты запис�
 
 ## Восстановление HH CAPTCHA / HH CAPTCHA recovery
 
+Свежий сбор 25 октября: [локальная реализация и ограничения](updates/2026-10-25-hh-fresh-vacancies-development.md).
+Миграции 047/048 входят в job fixture. Проверяй все три прохода, общий lease, pause/revision,
+отзыв jobs, приоритет queued карточек, неизменность sent/unknown и сохранность
+периодов при head refresh/уплотнении. Chromium/RPC тесты используют локальные
+HTML fixtures и отдельную PostgreSQL; они не измеряют нагрузку настоящей HH/VPS.
+Ежедневная сверка должна находить старую поздно проиндексированную вакансию,
+повторять всю глубину на следующий цикл и сохранять пробелы без успешного checkpoint.
+
+Fresh collection, October 25: [local implementation and limitations](updates/2026-10-25-hh-fresh-vacancies-development.md).
+The job fixture includes migrations 047/048. Verify all three lanes, shared leases,
+pause/revision, current jobs access, queued-card priority, sent/unknown preservation
+and retained ranges during head refresh/compaction. Chromium/RPC tests use local
+HTML fixtures and disposable PostgreSQL; they do not measure live HH/VPS load.
+Daily reconciliation must find late-indexed old listings, repeat the full range
+on the next cycle and preserve gaps without advancing a successful checkpoint.
+
+```powershell
+node --test server/test/jobFreshProgress.test.js server/test/jobCollectionScheduler.test.js
+node --test server/test/jobReconciliationProgress.test.js
+# JARVIS_JOB_TEST_DATABASE_URL: isolated test database only.
+node --test server/test/jobFreshRepositoryAcceptance.cjs server/test/jobFreshCollectionAcceptance.cjs server/test/jobCollectorAcceptance.cjs server/test/jobCollectorAccessPostgresAcceptance.cjs server/test/jobCollectionNoticeAcceptance.cjs
+node --test server/test/jobReconciliationRepositoryAcceptance.cjs server/test/jobReconciliationAcceptance.cjs
+# Requires job-browser Playwright and installed Chromium or PLAYWRIGHT_CHANNEL=msedge.
+node --test server/test/jobFreshBrowserAcceptance.cjs server/test/jobBrowserCollectorAcceptance.cjs
+node --test server/test/jobReconciliationBrowserAcceptance.cjs
+```
+
 Общий сбор и переход старых курсоров: [ремонт 24 октября](updates/2026-10-24-hh-complete-collection.md).
 В отдельной PostgreSQL выполняй `jobCollectorAcceptance.cjs`,
 `jobBrowserCollectorAcceptance.cjs`, `jobCaptchaEligibilityAcceptance.cjs`,

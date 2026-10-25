@@ -33,9 +33,12 @@ class JobDeliveryWorker {
             chatId: delivery.payload.chatId, channel: 'telegram' };
           let denied = false;
           try {
+            const lane = delivery.payload.lane || 'history';
+            const progress = lane === 'fresh' ? search.fresh_progress
+              : lane === 'reconcile' ? search.reconciliation_progress : search.progress;
             denied = !view || search.conversation_id !== scope.conversationId || search.chat_id !== scope.chatId
               || search.settings?.activated !== true || search.settings?.paused !== false
-              || search.progress?.until !== delivery.payload.runUntil;
+              || !['history', 'fresh', 'reconcile'].includes(lane) || progress?.until !== delivery.payload.runUntil;
             if (!denied) await assertJobScope(this.pool, scope, this.accessService);
           } catch (error) {
             if (error?.code !== 'JOB_SCOPE_DENIED' && error?.name !== 'ZodError' && delivery.attempts < 4) {

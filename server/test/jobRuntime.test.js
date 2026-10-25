@@ -36,8 +36,10 @@ test('collector has independent configuration and never requires a Telegram or m
   const runtime = createCollectorRuntime({ env: { JARVIS_JOB_SEARCH_ENABLED: 'true', JARVIS_OPERATIONS_OWNER_TELEGRAM_ID: '101' }, pool, hhClient: {} });
   assert.equal(runtime.enabled, true);
   await runtime.start(); await runtime.close();
-  assert.equal(queries.length, 2);
+  assert.equal(queries.length, 4);
   assert.match(queries[0], /job_searches/);
+  assert.ok(queries.some(sql => /fresh_next_check_at/.test(sql)), 'fresh collection has its own schedule');
+  assert.ok(queries.some(sql => /reconciliation_next_check_at/.test(sql)), 'daily reconciliation has its own schedule');
   assert.ok(!queries.some((sql) => /telegram_updates|job_usage/.test(sql)));
 });
 

@@ -17,7 +17,7 @@ test('collector uses current roles and personal grants for separate users, and s
   const pool = new Pool({ connectionString: process.env.JARVIS_JOB_TEST_DATABASE_URL, options: `-c search_path=${schema}`, max: 8 });
   let runtime;
   try {
-    for (const name of ['001_identity_and_conversations.sql', '029_job_search.sql', '037_access_mini_app.sql']) {
+    for (const name of ['001_identity_and_conversations.sql', '029_job_search.sql', '037_access_mini_app.sql', '047_job_fresh_collection.sql', '048_job_reconciliation.sql']) {
       const source = await fs.readFile(path.join(__dirname, '../src/db/migrations', name), 'utf8');
       await pool.query(source.replace(/^CREATE EXTENSION[^;]+;\s*/gm, ''));
     }
@@ -70,7 +70,8 @@ test('collector uses current roles and personal grants for separate users, and s
       } }; } },
     });
     await runtime.tick();
-    assert.deepEqual(scopes.map(s => s.userId).sort(), people.filter(p => p.expected).map(p => p.userId).sort());
+    assert.deepEqual(scopes.map(s => s.userId).sort(), people.filter(p => p.expected).flatMap(p => [p.userId, p.userId]).sort(),
+      'fresh and history both use current personal access');
     for (const scope of scopes) assert.equal(scope.query, `fixture ${people.find(p => p.userId === scope.userId).telegramId}`);
     const roleMember = await access.getAccessForTelegram('202');
     await access.mutate(owner.userId, 'role.update', {

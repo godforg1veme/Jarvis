@@ -6,6 +6,7 @@ const { JobCollector } = require('./jobCollector');
 const { JobBrowserClient } = require('./jobBrowserClient');
 const { CurrencyRates } = require('./currencyRates');
 const { configuredOwnerJobAccess } = require('./configuredOwnerJobAccess');
+const { JobCollectionScheduler } = require('./jobCollectionScheduler');
 
 function createCollectorRuntime({ env = process.env, pool, hhClient, currencyRates, clock = () => new Date(), wait } = {}) {
   const config = loadJobConfig(env);
@@ -19,17 +20,27 @@ function createCollectorRuntime({ env = process.env, pool, hhClient, currencyRat
   const database = pool || new Pool({ connectionString: env.DATABASE_URL });
   const accessService = configuredOwnerJobAccess(database, env.JARVIS_OPERATIONS_OWNER_TELEGRAM_ID);
   const searchRepository = new JobSearchRepository(database, { accessService });
+  const freshRepository = new JobSearchRepository(database, { accessService, lane: 'fresh' });
+  const reconcileRepository = new JobSearchRepository(database, { accessService, lane: 'reconcile' });
   let stopping = false, timer = null, running = null;
   const collector = new JobCollector({ searchRepository, deliveryRepository: new JobDeliveryRepository(database, { accessService }),
     hhClient: source,
     currencyRates: currencyRates || new CurrencyRates(), now: clock, wait, shouldStop: () => stopping,
-    captchaEnabled: config.jobCaptchaTelegram });
+    maxRunMs: 15000, maxRequests: 20, captchaEnabled: config.jobCaptchaTelegram });
+  const freshCollector = new JobCollector({ searchRepository: freshRepository,
+    deliveryRepository: new JobDeliveryRepository(database, { accessService }), hhClient: source,
+    currencyRates: collector.currencyRates, now: clock, wait, shouldStop: () => stopping,
+    lane: 'fresh', captchaEnabled: config.jobCaptchaTelegram });
+  const reconcileCollector = new JobCollector({ searchRepository: reconcileRepository,
+    deliveryRepository: new JobDeliveryRepository(database, { accessService }), hhClient: source,
+    currencyRates: collector.currencyRates, now: clock, wait, shouldStop: () => stopping,
+    lane: 'reconcile', captchaEnabled: config.jobCaptchaTelegram });
+  const scheduler = new JobCollectionScheduler({ freshRepository, historyRepository: searchRepository,
+    reconcileRepository, freshCollector, historyCollector: collector, reconcileCollector,
+    now: clock, shouldStop: () => stopping });
   const tick = () => {
     if (stopping || running) return running;
-    running = (async () => {
-      const users = await searchRepository.dueUsers({ now: clock() });
-      for (const row of users) { if (stopping) break; await collector.runOnce({ userId: row.user_id }); }
-    })().finally(() => { running = null; });
+    running = scheduler.tick().finally(() => { running = null; });
     return running;
   };
   return { enabled: true, tick,

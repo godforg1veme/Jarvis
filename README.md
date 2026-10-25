@@ -14,6 +14,12 @@ Windows-приложение и облачный API для подключённ
 
 ### Текущие возможности
 
+Локально подготовлен дополнительный поиск свежих вакансий раз в пять минут
+по тем же фильтрам, с приоритетом доставки и отдельным прогрессом от старого
+обхода. Ежедневная сверка заново обходит всю выбранную глубину истории и ищет
+пропущенные объявления. Интерфейс бота прежний; обновление ещё не установлено на VPS.
+[Проверки и ограничения](docs/updates/2026-10-25-hh-fresh-vacancies-development.md).
+
 - Облачный сервис построен на Node.js, Fastify, PostgreSQL и pgvector.
   Провайдеры моделей настраиваются отдельно от логики продукта.
 - Telegram-бот поддерживает допущенных пользователей, личные диалоги, пошаговый
@@ -177,6 +183,12 @@ Jarvis is a personal and family assistant with an always-on cloud service and a 
 Telegram is Jarvis's first cloud client. The project also includes a Windows app and a cloud API used by paired devices.
 
 ### Current capabilities
+
+An additional fresh-vacancy search is ready locally, using the same filters every
+five minutes, independent backlog progress and prioritized delivery. Daily
+reconciliation rescans the entire selected history range to find missed listings. The bot
+interface is unchanged; this update is not deployed to the VPS yet.
+[Checks and limitations](docs/updates/2026-10-25-hh-fresh-vacancies-development.md).
 
 - The cloud service uses Node.js, Fastify, PostgreSQL, and pgvector. Model providers are configured outside product logic.
 - The Telegram bot supports allowlisted users, private conversations, guided forms, inline confirmations, memory, documents, devices, VPN, and Operations. The Life OS area includes Mission, Timeline, projects, commitments, people, reminders, preferences, and context recovery.

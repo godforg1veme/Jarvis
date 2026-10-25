@@ -22,4 +22,14 @@ function splitWindow(window, granularity) {
   ];
 }
 
-module.exports = { splitWindow };
+function calendarSearchFrom(window, now) {
+  const from = Date.parse(window.from);
+  if (now.getTime() - from < 29 * DAY_MS) return window.from;
+  // HH search uses calendar dates. Use a later instant on the SAME Moscow day
+  // to avoid the browser's 30-day age guard expiring during RPC/queue latency.
+  // Exact filtering still uses the original saved bounds, never this transport value.
+  const endOfDay = (Math.floor((from + MOSCOW_OFFSET_MS) / DAY_MS) + 1) * DAY_MS - MOSCOW_OFFSET_MS - 1;
+  return new Date(Math.min(endOfDay, Date.parse(window.to))).toISOString();
+}
+
+module.exports = { splitWindow, calendarSearchFrom };

@@ -4,6 +4,13 @@
 
 ## Русский
 
+Локально реализован [поиск свежих вакансий HH](updates/2026-10-25-hh-fresh-vacancies-development.md)
+раз в пять минут по существующим фильтрам. Он работает отдельно от накопленного
+обхода, использует тот же браузер и ставит свежие карточки первыми в очереди.
+Добавлена ежедневная полная сверка выбранной глубины истории для поиска пропусков.
+Telegram-интерфейс прежний. Миграции 047/048 и обновление server/collector ещё не
+установлены на VPS; реальная задержка и прибавка нагрузки пока не измерены.
+
 На DE выпущены [общие инструкции моделей, Tavily MCP и правка сопроводительных](updates/2026-10-24-shared-instructions-and-search-release.md).
 Server и HH-браузер healthy, миграция 046 применена. Поиск включён: установленный
 сервер получил пять источников за 1,1 секунды. В новых образах прошли 844 серверных
@@ -89,6 +96,13 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 Архивы не заменяют действующие правила и новую проверку окружения.
 
 ## English
+
+[Fresh HH vacancy collection](updates/2026-10-25-hh-fresh-vacancies-development.md)
+is implemented locally, with five-minute checks using existing filters. It runs
+independently of backlog collection, shares the browser and prioritizes fresh
+queued cards. Daily reconciliation scans the whole selected history range for misses.
+The Telegram interface is unchanged. Migrations 047/048 and the updated
+server/collector are not deployed; live latency and additional load are unmeasured.
 
 [Shared model instructions, Tavily MCP and cover-letter editing](updates/2026-10-24-shared-instructions-and-search-release.md)
 are deployed on DE. Server and HH browser are healthy; migration 046 is applied.
