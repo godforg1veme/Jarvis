@@ -189,22 +189,22 @@ the affected path. Keep those manual outcomes separate from fixture results.
 
 ## Job search: model and history
 
-Локальная реализация 25 октября добавляет фоновую проверку свежих вакансий по
+Выпуск на DE 25 октября добавляет фоновую проверку свежих вакансий по
 тем же запросам и фильтрам каждые пять минут. Новых меню, кнопок, callbacks,
 guided kinds и подтверждений нет. Ежедневная сверка повторяет весь выбранный период
 по тем же фильтрам. Включение/выключение поиска действует на все три прохода.
 Свежие карточки получают приоритет в существующей outbox, прежние
 sent/unknown не повторяются. Уведомление о неполном сборе проверяет свой проход;
-обновление верхней границы не создаёт новое уведомление. На VPS ещё не установлено.
-[Локальные проверки](updates/2026-10-25-hh-fresh-vacancies-development.md).
+обновление верхней границы не создаёт новое уведомление. Миграции 047/048 применены.
+[Выпуск и проверки](updates/2026-10-25-hh-three-lane-release.md).
 
-The October 25 local implementation adds five-minute background fresh searches
+The October 25 DE release adds five-minute background fresh searches
 with the same queries and filters. Menus, buttons, callbacks, guided kinds and
 confirmations stay unchanged. Daily reconciliation rescans the entire selected
 history range using the same filters. The existing on/off control applies to all three lanes.
 Fresh cards receive outbox priority; sent/unknown cards are not replayed. Incomplete
 notices validate their own lane and retain one identity across head refreshes.
-Not deployed yet. [Local checks](updates/2026-10-25-hh-fresh-vacancies-development.md).
+Migrations 047/048 are applied. [Release and checks](updates/2026-10-25-hh-three-lane-release.md).
 
 23 октября 2026, по поручению владельца выпущено на DE: пункт «Модель AI»
 полностью удалён из настроек поиска работы. Ручной ID, пресеты, старый текстовый

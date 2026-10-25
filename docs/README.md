@@ -4,12 +4,13 @@
 
 ## Русский
 
-Локально реализован [поиск свежих вакансий HH](updates/2026-10-25-hh-fresh-vacancies-development.md)
-раз в пять минут по существующим фильтрам. Он работает отдельно от накопленного
-обхода, использует тот же браузер и ставит свежие карточки первыми в очереди.
-Добавлена ежедневная полная сверка выбранной глубины истории для поиска пропусков.
-Telegram-интерфейс прежний. Миграции 047/048 и обновление server/collector ещё не
-установлены на VPS; реальная задержка и прибавка нагрузки пока не измерены.
+На DE выпущены [три прохода HH](updates/2026-10-25-hh-three-lane-release.md): свежие
+вакансии раз в пять минут, накопленный сбор и ежедневная сверка всей выбранной
+глубины истории. Фильтры и Telegram-интерфейс прежние. Server healthy, collector
+running, миграции 047/048 применены; оба VPS source синхронизированы. Первые две
+свежие карточки доставлены, прежние 7345 сохранены. Локальные тесты 862/39/75 и
+изолированные Linux-проверки прошли. Полный свежий и первый суточный циклы,
+а также длительная прибавка нагрузки ещё не подтверждены.
 
 На DE выпущены [общие инструкции моделей, Tavily MCP и правка сопроводительных](updates/2026-10-24-shared-instructions-and-search-release.md).
 Server и HH-браузер healthy, миграция 046 применена. Поиск включён: установленный
@@ -97,12 +98,13 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 
 ## English
 
-[Fresh HH vacancy collection](updates/2026-10-25-hh-fresh-vacancies-development.md)
-is implemented locally, with five-minute checks using existing filters. It runs
-independently of backlog collection, shares the browser and prioritizes fresh
-queued cards. Daily reconciliation scans the whole selected history range for misses.
-The Telegram interface is unchanged. Migrations 047/048 and the updated
-server/collector are not deployed; live latency and additional load are unmeasured.
+[Three HH collection lanes](updates/2026-10-25-hh-three-lane-release.md) are deployed
+on DE: five-minute fresh checks, historical collection and daily full-range
+reconciliation. Filters and the Telegram interface are unchanged. Server is
+healthy, collector running, migrations 047/048 applied and both VPS sources
+synchronized. Two fresh cards were delivered and the original 7345 retained.
+Local 862/39/75 tests and isolated Linux checks passed. Full fresh and first daily
+cycles and sustained additional resource use remain unverified.
 
 [Shared model instructions, Tavily MCP and cover-letter editing](updates/2026-10-24-shared-instructions-and-search-release.md)
 are deployed on DE. Server and HH browser are healthy; migration 046 is applied.

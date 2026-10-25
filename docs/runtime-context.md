@@ -124,20 +124,21 @@ deadline across metadata, fetch and body reads.
 
 ### Job search
 
-Локально подготовлен [второй проход для свежих вакансий](updates/2026-10-25-hh-fresh-vacancies-development.md):
+На DE выпущены [три прохода HH](updates/2026-10-25-hh-three-lane-release.md):
 каждые пять минут по общим фильтрам, отдельный прогресс, общий браузер и lease,
 приоритет queued карточек после повторного чтения HH. Длительный свежий обход
 проверяет новую верхнюю часть выдачи, сохраняя старые периоды. Третий проход ежедневно
 сверяет всю выбранную глубину истории, хранит независимый прогресс и сводки пробелов.
-Migrations 047/048 ещё не применены на VPS; выпуск 24 октября остаётся установленным.
+Миграции 047/048 применены; server/collector работают на `20b7a16`. Описание
+выпуска 24 октября ниже сохранено как история.
 
-A [second lane for fresh vacancies](updates/2026-10-25-hh-fresh-vacancies-development.md)
-is ready locally: five-minute checks with shared filters, independent progress,
+[Three HH lanes](updates/2026-10-25-hh-three-lane-release.md)
+are deployed on DE: five-minute checks with shared filters, independent progress,
 one browser/user lease and queued-card priority after rereading HH. Long fresh
 runs check new heads while retaining older ranges. A third lane reconciles the
 entire selected history range daily with independent progress and gap summaries.
-Migrations 047/048 are not deployed;
-the October 24 release below remains the installed collection behavior.
+Migrations 047/048 are applied; server/collector run `20b7a16`.
+The October 24 release below remains as history.
 
 Публичный HH collector использует календарные окна DD.MM.YYYY по МСК и делит
 выдачу свыше 2000 результатов по дням. Страница/offset сохраняются между короткими

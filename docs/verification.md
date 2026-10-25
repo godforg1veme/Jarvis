@@ -55,7 +55,7 @@ Electron, устройств или VPS; эти результаты запис�
 
 ## Восстановление HH CAPTCHA / HH CAPTCHA recovery
 
-Свежий сбор 25 октября: [локальная реализация и ограничения](updates/2026-10-25-hh-fresh-vacancies-development.md).
+Свежий сбор и ежедневная сверка 25 октября: [выпуск и ограничения](updates/2026-10-25-hh-three-lane-release.md).
 Миграции 047/048 входят в job fixture. Проверяй все три прохода, общий lease, pause/revision,
 отзыв jobs, приоритет queued карточек, неизменность sent/unknown и сохранность
 периодов при head refresh/уплотнении. Chromium/RPC тесты используют локальные
@@ -63,7 +63,7 @@ HTML fixtures и отдельную PostgreSQL; они не измеряют н�
 Ежедневная сверка должна находить старую поздно проиндексированную вакансию,
 повторять всю глубину на следующий цикл и сохранять пробелы без успешного checkpoint.
 
-Fresh collection, October 25: [local implementation and limitations](updates/2026-10-25-hh-fresh-vacancies-development.md).
+Fresh collection and daily reconciliation, October 25: [release and limitations](updates/2026-10-25-hh-three-lane-release.md).
 The job fixture includes migrations 047/048. Verify all three lanes, shared leases,
 pause/revision, current jobs access, queued-card priority, sent/unknown preservation
 and retained ranges during head refresh/compaction. Chromium/RPC tests use local

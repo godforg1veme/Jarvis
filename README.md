@@ -14,11 +14,10 @@ Windows-приложение и облачный API для подключённ
 
 ### Текущие возможности
 
-Локально подготовлен дополнительный поиск свежих вакансий раз в пять минут
-по тем же фильтрам, с приоритетом доставки и отдельным прогрессом от старого
-обхода. Ежедневная сверка заново обходит всю выбранную глубину истории и ищет
-пропущенные объявления. Интерфейс бота прежний; обновление ещё не установлено на VPS.
-[Проверки и ограничения](docs/updates/2026-10-25-hh-fresh-vacancies-development.md).
+На DE работают свежий поиск вакансий раз в пять минут, накопленный сбор и
+ежедневная сверка всей выбранной глубины истории для поиска пропусков. Фильтры
+общие, прогресс раздельный, свежие карточки получают приоритет доставки.
+Интерфейс бота прежний. [Выпуск и ограничения](docs/updates/2026-10-25-hh-three-lane-release.md).
 
 - Облачный сервис построен на Node.js, Fastify, PostgreSQL и pgvector.
   Провайдеры моделей настраиваются отдельно от логики продукта.
@@ -184,11 +183,10 @@ Telegram is Jarvis's first cloud client. The project also includes a Windows app
 
 ### Current capabilities
 
-An additional fresh-vacancy search is ready locally, using the same filters every
-five minutes, independent backlog progress and prioritized delivery. Daily
-reconciliation rescans the entire selected history range to find missed listings. The bot
-interface is unchanged; this update is not deployed to the VPS yet.
-[Checks and limitations](docs/updates/2026-10-25-hh-fresh-vacancies-development.md).
+DE runs five-minute fresh vacancy checks, historical collection and daily
+reconciliation of the entire selected history range to find missed listings.
+Filters are shared, progress is independent and fresh cards receive priority.
+The bot interface is unchanged. [Release and limitations](docs/updates/2026-10-25-hh-three-lane-release.md).
 
 - The cloud service uses Node.js, Fastify, PostgreSQL, and pgvector. Model providers are configured outside product logic.
 - The Telegram bot supports allowlisted users, private conversations, guided forms, inline confirmations, memory, documents, devices, VPN, and Operations. The Life OS area includes Mission, Timeline, projects, commitments, people, reminders, preferences, and context recovery.

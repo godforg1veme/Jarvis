@@ -4,6 +4,10 @@
 
 ## Русский
 
+Позднее 25 октября весь подготовленный результат выпущен на DE. Этот документ
+сохраняет проверки локального этапа; установленное состояние и первые доставки
+описаны в [результате выпуска](2026-10-25-hh-three-lane-release.md).
+
 25 октября локально реализованы поиск свежих вакансий HH и ежедневная полная
 сверка выбранного периода. Изменения находятся в `codex/hh-fresh-vacancies`.
 Публикация в GitHub и обновление VPS не выполнялись; миграции 047/048 применялись
@@ -105,6 +109,10 @@ CPU/RAM/трафика на VPS ещё не измерены. Пять мину�
 Команды: [проверки HH](../verification.md#восстановление-hh-captcha--hh-captcha-recovery).
 
 ## English
+
+Later on October 25 the complete result was deployed on DE. This document
+preserves the local preparation record; installed state and initial deliveries
+are in the [release record](2026-10-25-hh-three-lane-release.md).
 
 On October 25 fresh HH search and daily full-range reconciliation were implemented
 locally. Changes are on `codex/hh-fresh-vacancies`. Nothing was published
