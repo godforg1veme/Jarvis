@@ -8,6 +8,7 @@ const { buildApp } = require('../src/app');
 const { AccessService } = require('../src/access/accessService');
 const { registerMiniAppRoutes } = require('../src/miniApp/routes');
 const { registerMiniAppSelfRoutes } = require('../src/miniAppSelfRoutes');
+const { completeReceipt, failReceipt } = require('../src/miniApp/assistantReceipts');
 const { UserRepository } = require('../src/users/userRepository');
 const {
   ConversationRepository,
@@ -68,6 +69,7 @@ async function fixture() {
       '025_telegram_update_kind.sql',
       '037_access_mini_app.sql',
       '038_mini_app_requests.sql',
+      '049_mini_app_request_outcomes.sql',
     ]) {
       await pool.query(
         (
@@ -169,6 +171,7 @@ async function fixture() {
       memoryService,
       knowledgeService,
       deviceService,
+      getTelegramBotUsername: () => 'IntegrationFixtureBot',
     };
     app = buildApp({
       config: {
@@ -295,6 +298,27 @@ async function fixture() {
     throw error;
   }
 }
+
+test('Mini App handoff reaches the personal Telegram menu and obeys live PostgreSQL access changes', { skip: !url }, async () => {
+  const f = await fixture();
+  try {
+    await f.patch({ overrides: { documents: 'allow' } });
+    const session = await f.login();
+    const section = await f.request(session, 'GET', '/sections/documents');
+    assert.equal(section.statusCode, 200);
+    const action = section.json().actions.find((item) => item.kind === 'telegram');
+    assert.equal(action.href, 'https://t.me/IntegrationFixtureBot?start=mini_documents');
+    const parameter = new URL(action.href).searchParams.get('start');
+    const reply = await f.msg(`/start ${parameter}`);
+    assert.ok(reply.answer.includes(`Document:${f.member.userId}`));
+    assert.equal(reply.answer.includes(f.owner.userId), false);
+    assert.equal(f.calls.models.length, 0, 'handoff never invokes the assistant');
+    await f.patch({ overrides: { documents: 'deny' } });
+    assert.equal((await f.request(session, 'GET', '/sections/documents')).statusCode, 403);
+    assert.equal((await f.msg(`/start ${parameter}`)).answer, DENIED_ANSWER);
+    assert.equal(f.calls.models.length, 0);
+  } finally { await f.close(); }
+});
 
 test('real runtime serves built Mini App and preserves stored blocks with UI disabled', { skip: !url }, async () => {
   const f = await fixture();
@@ -470,8 +494,8 @@ test(
       assert.equal(
         (
           await f.request(session, 'GET', `/assistant/requests/${waitingId}`)
-        ).json().code,
-        'operation_unknown',
+        ).json().failureCode,
+        'request_failed',
       );
       assert.equal(
         (
@@ -479,8 +503,8 @@ test(
             requestId: waitingId,
             text: 'Wait',
           })
-        ).json().code,
-        'operation_unknown',
+        ).json().failureCode,
+        'request_failed',
       );
       assert.equal(f.calls.models.length, 2);
       const messages = (
@@ -495,6 +519,103 @@ test(
     }
   },
 );
+
+test('failed Mini App model request resolves original UUID without a second model call', { skip: !url }, async () => {
+  const f = await fixture();
+  try {
+    const session = await f.login();
+    const id = randomUUID();
+    const body = { requestId: id, text: 'Fixture model failure' };
+    f.setAnswer(async () => { throw Error('synthetic model error'); });
+    const first = await f.request(session, 'POST', '/assistant/messages', body);
+    assert.equal(first.statusCode, 503);
+    assert.equal(first.json().code, 'unavailable');
+    const receipt = await f.request(session, 'GET', `/assistant/requests/${id}`);
+    assert.deepEqual(receipt.json(), { ok: true, status: 'failed', failureCode: 'request_failed' });
+    const duplicate = await f.request(session, 'POST', '/assistant/messages', body);
+    assert.deepEqual(duplicate.json(), receipt.json());
+    assert.equal(f.calls.models.length, 1);
+    const row = (await f.pool.query('SELECT status,answer,failure_code FROM mini_app_requests WHERE user_id=$1 AND request_id=$2',
+      [f.member.userId, id])).rows[0];
+    assert.deepEqual(row, { status: 'failed', answer: null, failure_code: 'request_failed' });
+    const constraints = (await f.pool.query(`SELECT conname FROM pg_constraint
+      WHERE conrelid='mini_app_requests'::regclass AND conname IN
+      ('mini_app_requests_check','mini_app_requests_status_check') ORDER BY conname`)).rows.map((item) => item.conname);
+    assert.deepEqual(constraints, ['mini_app_requests_check', 'mini_app_requests_status_check']);
+    await assert.rejects(f.pool.query(`UPDATE mini_app_requests SET status='processing',answer='invalid',failure_code=NULL
+      WHERE user_id=$1 AND request_id=$2`, [f.member.userId, id]), { code: '23514', constraint: 'mini_app_requests_check' });
+    await assert.rejects(f.pool.query(`UPDATE mini_app_requests SET status='other'
+      WHERE user_id=$1 AND request_id=$2`, [f.member.userId, id]), { code: '23514' });
+  } finally { await f.close(); }
+});
+
+test('stale Mini App receipt expires on real PostgreSQL and rejects a late answer', { skip: !url }, async () => {
+  const f = await fixture();
+  try {
+    const session = await f.login();
+    const id = randomUUID();
+    const conversation = await f.conversationRepository.getOrCreate({ userId: f.member.userId, channel: 'pwa', externalChatId: 'mini' });
+    await f.pool.query(`INSERT INTO mini_app_requests(user_id,request_id,request_hash,created_at)
+      VALUES($1,$2,$3,clock_timestamp()-interval '6 minutes')`, [f.member.userId, id, 'a'.repeat(64)]);
+    assert.deepEqual((await f.request(session, 'GET', `/assistant/requests/${id}`)).json(),
+      { ok: true, status: 'failed', failureCode: 'request_expired' });
+    assert.equal(await completeReceipt(f.pool, { userId: f.member.userId, requestId: id,
+      conversationId: conversation.id, answer: 'Must not be appended' }), false);
+    const messages = await f.pool.query('SELECT id FROM messages WHERE conversation_id=$1 AND external_message_id=$2',
+      [conversation.id, `mini:${id}:answer`]);
+    assert.equal(messages.rowCount, 0);
+  } finally { await f.close(); }
+});
+
+test('Mini App answer append rolls back when its receipt cannot complete', { skip: !url }, async () => {
+  const f = await fixture();
+  try {
+    const id = randomUUID();
+    const conversation = await f.conversationRepository.getOrCreate({ userId: f.member.userId, channel: 'pwa', externalChatId: 'mini' });
+    await f.pool.query(`INSERT INTO mini_app_requests(user_id,request_id,request_hash)
+      VALUES($1,$2,$3)`, [f.member.userId, id, 'a'.repeat(64)]);
+    await f.pool.query(`CREATE FUNCTION reject_fixture_completion() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN IF NEW.status='completed' THEN RAISE EXCEPTION 'synthetic completion rejection'; END IF;
+      RETURN NEW; END $$`);
+    await f.pool.query(`CREATE TRIGGER reject_fixture_completion BEFORE UPDATE ON mini_app_requests
+      FOR EACH ROW EXECUTE FUNCTION reject_fixture_completion()`);
+    await assert.rejects(completeReceipt(f.pool, { userId: f.member.userId, requestId: id,
+      conversationId: conversation.id, answer: 'Must be rolled back' }));
+    assert.equal((await f.pool.query('SELECT status FROM mini_app_requests WHERE user_id=$1 AND request_id=$2',
+      [f.member.userId, id])).rows[0].status, 'processing');
+    assert.equal((await f.pool.query('SELECT id FROM messages WHERE conversation_id=$1 AND external_message_id=$2',
+      [conversation.id, `mini:${id}:answer`])).rowCount, 0);
+    await failReceipt(f.pool, f.member.userId, id);
+    assert.equal((await f.pool.query('SELECT status FROM mini_app_requests WHERE user_id=$1 AND request_id=$2',
+      [f.member.userId, id])).rows[0].status, 'failed');
+  } finally { await f.close(); }
+});
+
+test('lost COMMIT acknowledgment reconciles one committed Mini App answer', { skip: !url }, async () => {
+  const f = await fixture();
+  try {
+    const session = await f.login();
+    const id = randomUUID();
+    const conversation = await f.conversationRepository.getOrCreate({ userId: f.member.userId, channel: 'pwa', externalChatId: 'mini' });
+    await f.pool.query(`INSERT INTO mini_app_requests(user_id,request_id,request_hash)
+      VALUES($1,$2,$3)`, [f.member.userId, id, 'a'.repeat(64)]);
+    const uncertainPool = { async connect() {
+      const client = await f.pool.connect();
+      return { release: () => client.release(), async query(sql, args) {
+        const result = await client.query(sql, args);
+        if (sql === 'COMMIT') throw Error('synthetic lost commit acknowledgment');
+        return result;
+      } };
+    } };
+    await assert.rejects(completeReceipt(uncertainPool, { userId: f.member.userId, requestId: id,
+      conversationId: conversation.id, answer: 'Committed once' }));
+    await failReceipt(f.pool, f.member.userId, id);
+    assert.deepEqual((await f.request(session, 'GET', `/assistant/requests/${id}`)).json(),
+      { ok: true, status: 'completed', answer: 'Committed once' });
+    assert.equal((await f.pool.query('SELECT id FROM messages WHERE conversation_id=$1 AND external_message_id=$2',
+      [conversation.id, `mini:${id}:answer`])).rowCount, 1);
+  } finally { await f.close(); }
+});
 
 test(
   'real bot search-only role filters menu, denies stale callbacks/commands/uploads and preserves revoked guided state',

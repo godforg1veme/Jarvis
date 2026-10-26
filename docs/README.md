@@ -14,6 +14,21 @@
 сбоя старого маршрута не установлена. Уже сохранённые в Happ адреса не меняются
 автоматически — общий генератор выдаёт новый origin для любого профиля.
 
+Локально готов [этап 4 Mini App](updates/2026-10-26-mini-app-lists-development.md):
+обновление и догрузка личных списков, раскрытие карточек и предыдущие сообщения
+отдельной истории. Server 874/874; новая PostgreSQL-проверка 7/7 с полным
+pipeline из 52 файлов по миграцию 050. Выпуск и независимая ревизия этого этапа не выполнены.
+
+Локально готов [этап 3 Mini App](updates/2026-10-26-mini-app-handoffs-development.md):
+переходы сразу к меню нужного раздела бота, пояснения возможностей и безопасная
+ссылка Operations для владельца. Server 874/874, Mini App PostgreSQL 13/13;
+на VPS изменения ещё не установлены.
+
+Локально подготовлены [исправления кнопок Mini App, этапы 1–2](updates/2026-10-26-mini-app-button-reliability-development.md):
+восстановление после ошибки диалога, гонки отмены HH, обновление списка доступа
+и проверка прав на сохранённый ответ. Server 866/866, Mini App PostgreSQL 12/12.
+Миграция 049 и код ещё не установлены на VPS; остальные этапы остаются в плане.
+
 На DE выпущены [три прохода HH](updates/2026-10-25-hh-three-lane-release.md): свежие
 вакансии раз в пять минут, накопленный сбор и ежедневная сверка всей выбранной
 глубины истории. Фильтры и Telegram-интерфейс прежние. Server healthy, collector
@@ -118,6 +133,23 @@ seven Caddy scenarios, DNS and strict TLS were verified. Other devices and
 long-term operation remain unverified; the original route's root cause is
 unknown. URLs already saved in Happ do not change automatically; the shared
 generator supplies the new origin for any profile.
+
+[Mini App stage 4](updates/2026-10-26-mini-app-lists-development.md) is ready
+locally: refreshing and loading personal lists, expanding cards and loading
+older messages in the separate history. Server 874/874; new PostgreSQL suite
+7/7 with all 52 migration files through 050. Release and independent stage review
+have not been performed.
+
+[Mini App stage 3](updates/2026-10-26-mini-app-handoffs-development.md) is ready
+locally: direct navigation to each bot section menu, capability descriptions
+and a safe owner-only Operations link. Server 874/874, Mini App PostgreSQL 13/13;
+these changes are not installed on either VPS.
+
+[Mini App button fixes, stages 1–2](updates/2026-10-26-mini-app-button-reliability-development.md)
+are ready locally: chat failure recovery, HH cancellation races, access-list
+refresh ordering and access checks on saved answers. Server 866/866, Mini App
+PostgreSQL 12/12. Migration 049 and code are not installed on either VPS;
+the remaining stages stay in the plan.
 
 [Three HH collection lanes](updates/2026-10-25-hh-three-lane-release.md) are deployed
 on DE: five-minute fresh checks, historical collection and daily full-range

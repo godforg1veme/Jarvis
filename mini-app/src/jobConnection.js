@@ -14,7 +14,8 @@ function safeSessionId(actor) {
 }
 
 export function createJobConnectionPanel({ api, actor, anchor }) {
-  let sessionId = safeSessionId(actor); let timer = null; let busy = false; let disposed = false;
+  let sessionId = safeSessionId(actor); let timer = null; let busy = false; let changing = false; let disposed = false;
+  let generation = 0; let loadSequence = 0; let pollSequence = 0;
   const panel = document.createElement('section'); panel.className = 'job-panel';
   const heading = document.createElement('h2'); heading.textContent = 'Личный профиль HH';
   const status = document.createElement('p'); status.className = 'muted job-status'; status.dataset.jobStatus = '';
@@ -61,6 +62,8 @@ export function createJobConnectionPanel({ api, actor, anchor }) {
   function clear(key) { try { sessionStorage.removeItem(sessionKey(actor, key)); } catch {} }
   function setSession(id) { sessionId = id; if (id) store('session', id); else clear('session'); }
   function clearTimer() { if (timer) clearTimeout(timer); timer = null; }
+  function invalidate() { generation++; loadSequence++; pollSequence++; clearTimer(); return generation; }
+  function current(token, id = sessionId) { return !disposed && token === generation && id === sessionId; }
   function showLink(ticket, delivery) {
     const target = new URL('/mini/job-connect/', location.origin);
     target.hash = new URLSearchParams({ ticket }).toString();
@@ -75,7 +78,8 @@ export function createJobConnectionPanel({ api, actor, anchor }) {
     message(`Открой окно HH на своём телефоне или ПК. ${notification} Ссылка действует 5 минут с создания; повторное нажатие не продлевает срок. Не пересылай её другим.`);
   }
   async function start() {
-    if (busy || disposed) return;
+    if (busy || changing || disposed) return;
+    const token = invalidate();
     busy = true; refreshLink.disabled = true; connectButton.disabled = true; panel.setAttribute('aria-busy', 'true'); message('Готовим временную ссылку для входа…');
     try {
       let requestId;
@@ -83,6 +87,7 @@ export function createJobConnectionPanel({ api, actor, anchor }) {
       if (!UUID.test(requestId || '')) requestId = crypto.randomUUID();
       store('request', requestId);
       const created = await api.request('/jobs/login', 'POST', { requestId });
+      if (!current(token)) return;
       if (created.status === 'connected') {
         setSession(null); clear('request');
         await load(); return;
@@ -96,10 +101,28 @@ export function createJobConnectionPanel({ api, actor, anchor }) {
       if (created.ticket) showLink(created.ticket, created.telegramDelivery);
       else { linkBox.hidden = true; cancel.hidden = false; message('Вход уже открыт. Продолжи в этом окне или отмени подключение, чтобы создать новую ссылку.'); }
       void poll();
-    } finally { busy = false; refreshLink.disabled = false; connectButton.disabled = false; panel.setAttribute('aria-busy', 'false'); }
+    } catch (error) {
+      if (!current(token)) return;
+      if (sessionId) void poll();
+      throw error;
+    } finally {
+      busy = false;
+      if (current(token)) {
+        refreshLink.disabled = false; connectButton.disabled = false; panel.setAttribute('aria-busy', 'false');
+      }
+    }
   }
   async function load() {
-    const data = await api.request('/jobs/connection');
+    if (disposed) return;
+    const token = generation;
+    const sequence = ++loadSequence;
+    let data;
+    try { data = await api.request('/jobs/connection'); }
+    catch (error) {
+      if (!current(token) || sequence !== loadSequence) return;
+      throw error;
+    }
+    if (!current(token) || sequence !== loadSequence) return;
     if (!data.available) { message('Личное подключение HH временно не настроено.'); controls.hidden = true; linkBox.hidden = true; return; }
     if (data.connected) {
       setSession(null); clear('request'); clearTimer();
@@ -116,9 +139,13 @@ export function createJobConnectionPanel({ api, actor, anchor }) {
   }
   async function poll() {
     clearTimer(); if (!sessionId || disposed) return;
+    const token = generation;
+    const id = sessionId;
+    const sequence = ++pollSequence;
     try {
-      const state = await api.request(`/jobs/login/owned/status/${encodeURIComponent(sessionId)}`);
-      if (state.status === 'confirmed') { setSession(null); clear('request'); await load(); return; }
+      const state = await api.request(`/jobs/login/owned/status/${encodeURIComponent(id)}`);
+      if (!current(token, id) || sequence !== pollSequence) return;
+      if (state.status === 'confirmed') { invalidate(); setSession(null); clear('request'); await load(); return; }
       if (state.status === 'authenticated') {
         select.replaceChildren();
         const choices = state.resumes || [];
@@ -132,6 +159,7 @@ export function createJobConnectionPanel({ api, actor, anchor }) {
         message('Вход HH подтверждён. Выбери основное резюме, чтобы завершить подключение.'); return;
       }
       if (['cancelled','expired','revoked','failed'].includes(state.status) || ['expired','closed'].includes(state.state)) {
+        invalidate();
         setSession(null); clear('request'); linkBox.hidden = true; resumes.hidden = true; cancel.hidden = true;
         connectButton.hidden = false; connectButton.textContent = 'Подключить HH';
         message('Сессия входа завершилась. Нажми «Подключить HH», чтобы начать заново.'); return;
@@ -142,7 +170,9 @@ export function createJobConnectionPanel({ api, actor, anchor }) {
         : 'Ожидаем вход в HH. Вернись сюда после завершения, затем выбери резюме.');
       timer = setTimeout(() => { void poll(); }, 2000);
     } catch (error) {
+      if (!current(token, id) || sequence !== pollSequence) return;
       if (['unauthorized','forbidden','JOB_ACCESS_REVOKED','JOB_LOGIN_SESSION_INVALID','JOB_LOGIN_SESSION_EXPIRED'].includes(error.code)) {
+        invalidate();
         setSession(null); clear('request'); linkBox.hidden = true; resumes.hidden = true; cancel.hidden = true;
         connectButton.hidden = false; connectButton.textContent = 'Подключить HH';
         message(error.message || 'Сессия входа недоступна. Запусти подключение снова.'); return;
@@ -152,25 +182,51 @@ export function createJobConnectionPanel({ api, actor, anchor }) {
     }
   }
   async function finish() {
-    if (!sessionId || !select.value) return;
+    if (!sessionId || !select.value || busy || changing || disposed) return;
+    const id = sessionId;
+    const token = invalidate();
+    changing = true;
     confirm.disabled = true;
     try {
-      await api.request('/jobs/login/confirm', 'POST', { sessionId, resumeId: select.value });
+      await api.request('/jobs/login/confirm', 'POST', { sessionId: id, resumeId: select.value });
+      if (!current(token, id)) return;
       setSession(null); clear('request'); clearTimer(); resumes.hidden = true; controls.hidden = true; linkBox.hidden = true;
       message('Профиль HH подключён.'); await load();
-    } finally { confirm.disabled = false; }
+    } catch (error) {
+      if (!current(token)) return;
+      throw error;
+    } finally {
+      changing = false;
+      if (!disposed && token === generation) {
+        confirm.disabled = false;
+        if (sessionId === id) void poll();
+      }
+    }
   }
   async function cancelLogin() {
-    if (!sessionId) return;
+    if (!sessionId || busy || changing || disposed) return;
+    const id = sessionId;
+    const token = invalidate();
+    changing = true;
     cancel.disabled = true;
     try {
-      const result = await api.request('/jobs/login/cancel', 'POST', { sessionId });
+      const result = await api.request('/jobs/login/cancel', 'POST', { sessionId: id });
+      if (!current(token, id)) return;
       setSession(null); clear('request'); clearTimer(); linkBox.hidden = true; resumes.hidden = true; cancel.hidden = true;
       connectButton.hidden = false; connectButton.textContent = 'Подключить HH';
       if (result.status === 'connected') { clear('request'); message('Профиль HH уже подключён.'); await load(); }
       else message('Подключение отменено.');
-    } finally { cancel.disabled = false; }
+    } catch (error) {
+      if (!current(token)) return;
+      throw error;
+    } finally {
+      changing = false;
+      if (!disposed && token === generation) {
+        cancel.disabled = false;
+        if (sessionId === id) void poll();
+      }
+    }
   }
   void load().catch((error) => message(error.message || 'Не удалось загрузить состояние HH.'));
-  return { dispose() { disposed = true; clearTimer(); resumeManager.dispose(); panel.remove(); } };
+  return { dispose() { disposed = true; invalidate(); resumeManager.dispose(); panel.remove(); } };
 }

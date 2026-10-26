@@ -96,6 +96,17 @@ again.
 
 ## Failure and diagnostic contract
 
+Mini App section handoff uses a closed startup navigation grammar owned by the
+[menu contract](telegram-menu-contract.md#mini-app-section-navigation-local-october-26-2026).
+`miniStartAction` maps only declared section parameters to existing menu actions;
+`messagePermissions` classifies them as navigation before checking guided input.
+`messageService` checks private user/chat binding and current permissions before
+calling the existing menu service. The startup parameter never authorizes a
+domain mutation, grants access, or consumes an action confirmation.
+Server-built links come from `miniApp/sectionNavigation.js`; the shared strict
+Operations URL validator is `operations/operationsUrl.js`. Neither helper makes
+an outbound request or creates an Operations session.
+
 Distinguish denied, ignored, duplicate, invalid/expired, backend unavailable,
 domain failure, successful domain result, Telegram send failure, and fallback
 send failure. A public answer is safe and actionable, without SQL, exception

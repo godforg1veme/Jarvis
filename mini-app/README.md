@@ -4,6 +4,20 @@
 
 ## Русский
 
+26 октября локально добавлены обновление и догрузка личных списков, раскрытие
+карточек и предыдущие сообщения отдельной истории Mini App. Нужна миграция 050;
+на VPS не установлено. [Этап 4 и ограничения](../docs/updates/2026-10-26-mini-app-lists-development.md).
+
+26 октября локально добавлены переходы к нужному меню бота из личных разделов
+и безопасная ссылка Operations для владельца. Пояснения показывают, какие
+действия доступны в каждом клиенте. На VPS ещё не установлено.
+[Этап 3 и проверки](../docs/updates/2026-10-26-mini-app-handoffs-development.md).
+
+26 октября локально исправлены зависание диалога после ошибки, отмена HH при
+запоздавшем ответе, порядок обновления списка доступа и повторная проверка прав
+при чтении квитанций. Нужна миграция 049; на VPS этот этап ещё не установлен.
+[Результат и оставшиеся этапы](../docs/updates/2026-10-26-mini-app-button-reliability-development.md).
+
 23 октября выпущено [движение по умолчанию](../docs/updates/2026-10-23-mini-app-auto-motion.md): кнопка паузы удалена, орбиты и фон запускаются автоматически, включая системный reduced motion и перезагрузку.
 
 23 октября на DE выпущены орбитальное оформление и единый дизайн внутренних
@@ -135,6 +149,20 @@ Mini App build и Edge fixtures. Команды и границы проверо
 [результат](../docs/updates/2026-10-18-telegram-mini-app-release.md).
 
 ## English
+
+On October 26, local changes added personal-list refresh/paging, expandable
+cards and older messages in the separate Mini App history. Migration 050 is
+required; this is not deployed. [Stage 4 and limitations](../docs/updates/2026-10-26-mini-app-lists-development.md).
+
+On October 26, local changes added direct bot-section menu links and a safe
+owner-only Operations link. Capability descriptions explain what each client
+supports. These changes are not deployed to either VPS.
+[Stage 3 and verification](../docs/updates/2026-10-26-mini-app-handoffs-development.md).
+
+On October 26, local fixes addressed chat failure recovery, HH cancellation with
+delayed replies, access-list refresh ordering and access checks on saved receipts.
+Migration 049 is required; this stage is not deployed to either VPS.
+[Results and remaining stages](../docs/updates/2026-10-26-mini-app-button-reliability-development.md).
 
 On October 23, [automatic motion](../docs/updates/2026-10-23-mini-app-auto-motion.md) was deployed: the pause button is removed, and orbits and sky start automatically, including under system reduced motion and after reload.
 

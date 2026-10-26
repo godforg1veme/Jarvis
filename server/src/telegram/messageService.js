@@ -8,7 +8,7 @@ const { attachmentFromTelegramMessage } = require('../knowledge/fileTypes');
 const { publicDocumentStatus, renderDocumentCitations } = require('../knowledge/knowledgeService');
 const { parseRemoteCommand, remoteCommandReply } = require('../commands/commandText');
 const { recordMessageEvent } = require('../life/lifeSourceEvents');
-const { menuAction } = require('./telegramMenu');
+const { menuAction, miniStartAction } = require('./telegramMenu');
 const { classifyTelegramFailure, telegramFailureReply } = require('./telegramFailure');
 const { DENIED_ANSWER, callbackPermissions, messagePermissions, textPermissions, permits } = require('./telegramPermissionPolicy');
 const { PAGE_CALLBACK_RE, EXPIRED_PAGE, TelegramCallbackPages } = require('./telegramCallbackPages');
@@ -581,6 +581,10 @@ class TelegramMessageService {
       externalChatId: input.chatId,
     });
     const menuContext = telegramMenuContext({ user, conversation, input });
+    const deepLinkAction = miniStartAction(input.text);
+    if (deepLinkAction && (input.chatType !== 'private' || input.chatId !== input.telegramUserId)) {
+      return { status: 'answered', answer: DENIED_ANSWER };
+    }
 
     if (this.accessService) {
       menuContext.access = await this.accessService.getAccessForUser(user.id);
@@ -588,6 +592,8 @@ class TelegramMessageService {
       input.accessPermissions = required;
       if (!permits(menuContext.access, required)) return { status: 'answered', answer: DENIED_ANSWER };
     }
+    if (deepLinkAction && ['vpn', 'operations'].includes(deepLinkAction)
+      && !this.menuService?.owner?.(menuContext)) return { status: 'answered', answer: DENIED_ANSWER };
 
     if (input.replyMessageId) {
       if (this.jobCaptchaService) {
@@ -600,7 +606,7 @@ class TelegramMessageService {
     if (this.menuService && !input.attachment && !input.voice) {
       const legacyNavigation = /^\/start(?:@\w+)?$/i.test(input.text)
         ? 'home' : null;
-      const action = menuAction(input.text) || legacyNavigation;
+      const action = menuAction(input.text) || deepLinkAction || legacyNavigation;
       if (action) {
         const menuResult = await this.menuService.handleMenuAction(action, menuContext);
         const answer = String(menuResult?.answer || '').trim();

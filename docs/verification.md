@@ -306,6 +306,65 @@ npm test --prefix server
 
 ## Mini App
 
+Локальный этап 4: [списки, карточки и история](updates/2026-10-26-mini-app-lists-development.md).
+Новый acceptance использует весь pipeline migrations, настоящую PostgreSQL с
+pgvector и отдельную временную схему. Указатели страниц привязаны к actor/section/
+conversation; проверки покрывают 65 записей, точность timestamp, отзыв доступа,
+добавление/удаление, порядок Life OS и старую историю. Browser fixture проверяет
+фильтр, refresh, ошибки, гонки, детали карточки и сохранение черновика.
+
+Local stage 4: [lists, cards and history](updates/2026-10-26-mini-app-lists-development.md).
+New acceptance runs the full migration pipeline on real PostgreSQL with pgvector
+in an isolated temporary schema. Coverage includes scoped cursors, 65 records,
+timestamp precision, revoked access, added/hidden records, Life OS ordering and
+older history. Browser fixtures cover filtering, refresh, errors, races, card
+details and retained drafts.
+
+```powershell
+npm run build --prefix mini-app
+node scripts/testMiniAppSectionLists.cjs
+# JARVIS_MINI_TEST_DATABASE_URL: isolated PostgreSQL with pgvector only.
+node --test server/test/miniAppSectionPagingAcceptance.cjs
+```
+
+Надёжность кнопок, локальный этап 26 октября:
+[результат и ограничения](updates/2026-10-26-mini-app-button-reliability-development.md).
+`testMiniAppReliability.cjs` проверяет failed/expired квитанции, reload,
+отсутствующий результат и обратный порядок обновления доступа.
+`testMiniAppJobConnectionRaces.cjs` проверяет поздние успехи и ошибки HH после
+отмены, новой сессии и dispose. PostgreSQL acceptance применяет migration 049
+и проверяет атомарность ответа/квитанции и потерю COMMIT ack.
+
+Button reliability, local October 26 stage:
+[results and limitations](updates/2026-10-26-mini-app-button-reliability-development.md).
+The reliability fixture checks failed/expired receipts, reload, missing results
+and out-of-order access refreshes. The HH race fixture checks late success and
+errors after cancellation, a new session and disposal. PostgreSQL acceptance
+applies migration 049 and verifies atomic answer/receipt writes and lost COMMIT
+acknowledgment.
+
+```powershell
+npm run build --prefix mini-app
+node scripts/testMiniAppReliability.cjs
+node scripts/testMiniAppJobConnectionRaces.cjs
+node --test server/test/miniAppAssistantReceipts.test.js
+```
+
+Переходы Mini App → нужное меню бота/Operations, локальный этап 3:
+проверять закрытый start-параметр, доступ после отзыва права, чужой/group scope,
+дедупликацию update и безопасный configured origin. Браузерный набор перехватывает
+все ссылки и проверяет SDK/fallback без отправки в настоящего бота.
+
+Mini App section → bot/Operations handoffs, local stage 3: check closed startup
+parameters, revoked access, foreign/group scope, update deduplication and safe
+configured origins. Browser fixtures intercept all links and test native SDK
+and anchor fallback without contacting the real bot.
+
+```powershell
+node --test server/test/miniAppSectionNavigation.test.js server/test/telegramMessageService.test.js server/test/telegramMenuService.test.js
+node scripts/testMiniAppSectionHandoffs.cjs
+```
+
 Подпись/TTL/membership, отсутствие SDK, успешный fixture-вход и отказ сервера;
 [контракт и ограничения](../mini-app/README.md). PostgreSQL tests создают только
 свои временные схемы и не обращаются к HH или Bot API. Проверка целевых migrations

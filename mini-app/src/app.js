@@ -1,8 +1,8 @@
 
-import { createApi, readPending, savePending, clearPending } from './api.js';
+import { ApiError, createApi, readPending, savePending, clearPending } from './api.js';
 import { createAdmin } from './admin.js';
 import { createJobConnectionPanel } from './jobConnection.js';
-import { renderSectionView } from './sectionViews.js';
+import { renderSectionView, renderSectionActions } from './sectionViews.js';
 const $ = (selector) => document.querySelector(selector);
 const api = createApi();
 let actor; let core; let admin; let chatPending; let chatBusy = false;
@@ -14,6 +14,7 @@ let sessionActive = false;
 let modulesOpen = false;
 let lastSection = '';
 let sceneMoving = true;
+let sectionState = null;
 const labels = { assistant: 'Ассистент', jobs: 'Поиск работы', life: 'Life OS', memory: 'Память', documents: 'Документы', devices: 'Устройства', vpn: 'VPN', operations: 'Панель управления' };
 function status(message) { $('#session-state').textContent = message; $('#session-state').hidden = !message; }
 function fail(error) {
@@ -40,46 +41,73 @@ function setExpanded(expanded) {
   $('#workspace-expand').setAttribute('aria-pressed', String(expanded));
   $('#workspace-expand').setAttribute('aria-label', expanded ? 'Свернуть раздел' : 'Развернуть раздел');
 }
-function makeJobPanel() {
+function makeJobPanel(anchor = $('#assistant .muted')) {
   jobConnectionPanel?.dispose();
-  jobConnectionPanel = createJobConnectionPanel({ api, actor, anchor: $('#assistant .muted') });
+  jobConnectionPanel = createJobConnectionPanel({ api, actor, anchor });
 }
 function disposeJobPanel() { jobConnectionPanel?.dispose(); jobConnectionPanel = null; }
 const chat = document.createElement('div'); chat.id = 'chat';
 const history = document.createElement('div'); history.className = 'chat-history'; history.setAttribute('aria-label', 'Личный диалог');
 const chatLoadStatus = document.createElement('p'); chatLoadStatus.setAttribute('role', 'status'); chatLoadStatus.className = 'muted';
+const chatOlder = document.createElement('button'); chatOlder.type = 'button'; chatOlder.className = 'secondary'; chatOlder.textContent = 'Загрузить предыдущие сообщения'; chatOlder.hidden = true;
+const chatOlderStatus = document.createElement('p'); chatOlderStatus.className = 'muted'; chatOlderStatus.setAttribute('role', 'status');
+let chatMessages = []; let chatCursor = null; let chatOlderBusy = false;
 const chatForm = document.createElement('form'); chatForm.className = 'chat-form';
 const chatLabel = document.createElement('label'); chatLabel.htmlFor = 'chat-input'; chatLabel.textContent = 'Сообщение Jarvis';
 const chatInput = document.createElement('textarea'); chatInput.id = 'chat-input'; chatInput.maxLength = 10000; chatInput.required = true; chatInput.rows = 3;
 const chatStatus = document.createElement('p'); chatStatus.setAttribute('role', 'status'); chatStatus.className = 'muted chat-state';
 const chatSend = document.createElement('button'); chatSend.type = 'submit'; chatSend.className = 'primary'; chatSend.textContent = 'Отправить';
-chatForm.append(chatLabel, chatInput, chatStatus, chatSend); chat.append(history, chatLoadStatus, chatForm); $('#assistant > a[href="#home"]').before(chat);
+chatForm.append(chatLabel, chatInput, chatStatus, chatSend); chat.append(chatOlder, chatOlderStatus, history, chatLoadStatus, chatForm); $('#assistant > a[href="#home"]').before(chat);
+function renderChatMessages() {
+  history.replaceChildren();
+  for (const message of chatMessages) {
+    const row = document.createElement('article'); row.className = `chat-message ${message.role === 'user' ? 'mine' : ''}`;
+    const author = document.createElement('strong'); author.textContent = message.role === 'user' ? 'Ты' : 'Jarvis';
+    const header = document.createElement('div'); header.className = 'chat-message__header';
+    const avatar = document.createElement('span'); avatar.className = 'chat-message__avatar'; avatar.setAttribute('aria-hidden', 'true'); avatar.textContent = message.role === 'user' ? 'Т' : 'J';
+    header.append(avatar, author);
+    const content = document.createElement('p'); content.textContent = message.content; row.append(header, content); history.append(row);
+  }
+  if (!history.children.length) {
+    const empty = document.createElement('div'); empty.className = 'chat-empty';
+    const title = document.createElement('h2'); title.textContent = 'Начни новый разговор.';
+    const hint = document.createElement('p'); hint.textContent = 'Напиши вопрос или расскажи, с чем нужна помощь.';
+    empty.append(title, hint); history.append(empty);
+  }
+  chatOlder.hidden = !chatCursor;
+}
+chatOlder.addEventListener('click', async () => {
+  if (!chatCursor || chatOlderBusy || currentPage !== 'assistant') return;
+  const version = navigationVersion; const loadVersion = chatLoadVersion;
+  chatOlderBusy = true; chatOlder.disabled = true; chatOlderStatus.textContent = 'Загружаем предыдущие сообщения…';
+  try {
+    const data = await api.request(`/assistant/messages/page/${encodeURIComponent(chatCursor)}`);
+    if (version !== navigationVersion || loadVersion !== chatLoadVersion || currentPage !== 'assistant') return;
+    chatMessages = mergedItems(data.messages || [], chatMessages); chatCursor = data.paging?.nextCursor || null;
+    renderChatMessages(); chatOlderStatus.textContent = 'Предыдущие сообщения загружены.';
+  } catch (problem) {
+    if (version !== navigationVersion || loadVersion !== chatLoadVersion || currentPage !== 'assistant') return;
+    chatOlderStatus.textContent = 'Не удалось загрузить предыдущие сообщения. Показанная история сохранена. Повтори запрос или открой диалог заново.';
+    if (['unauthorized', 'forbidden'].includes(problem.code)) fail(problem);
+  } finally {
+    if (version === navigationVersion && loadVersion === chatLoadVersion) { chatOlderBusy = false; chatOlder.disabled = false; }
+  }
+});
 async function loadChat() {
   if (!actor?.permissions.includes('assistant')) return;
   $('#assistant').dataset.state = 'ready';
   const version = navigationVersion;
   const loadVersion = ++chatLoadVersion;
+  chatOlderBusy = false; chatOlder.disabled = true; chatOlder.hidden = true; chatOlderStatus.textContent = '';
   chat.hidden = false; $('#section-items')?.remove(); $('#section-retry')?.remove(); $('#chat-retry')?.remove(); $('#assistant h1').textContent = 'Диалог'; $('#assistant .eyebrow').textContent = 'ЛИЧНЫЙ АССИСТЕНТ';
-  $('#assistant .muted').textContent = 'Твой личный диалог. Действия с подтверждением выполняются через Telegram.';
+  $('#assistant .muted').textContent = 'Это отдельная история Mini App; переписка с ботом остаётся в Telegram. Действия с подтверждением выполняются через Telegram.';
   chatLoadStatus.textContent = 'Загружаем диалог…'; chatLoadStatus.dataset.state = 'loading'; history.setAttribute('aria-busy', 'true');
   try {
     const data = await api.request('/assistant/messages');
     if (version !== navigationVersion || loadVersion !== chatLoadVersion || currentPage !== 'assistant') return;
-    chatLoadStatus.textContent = ''; chatLoadStatus.dataset.state = ''; history.setAttribute('aria-busy', 'false'); history.replaceChildren();
-    for (const message of data.messages || []) {
-      const row = document.createElement('article'); row.className = `chat-message ${message.role === 'user' ? 'mine' : ''}`;
-      const author = document.createElement('strong'); author.textContent = message.role === 'user' ? 'Ты' : 'Jarvis';
-      const header = document.createElement('div'); header.className = 'chat-message__header';
-      const avatar = document.createElement('span'); avatar.className = 'chat-message__avatar'; avatar.setAttribute('aria-hidden', 'true'); avatar.textContent = message.role === 'user' ? 'Т' : 'J';
-      header.append(avatar, author);
-      const content = document.createElement('p'); content.textContent = message.content; row.append(header, content); history.append(row);
-    }
-    if (!history.children.length) {
-      const empty = document.createElement('div'); empty.className = 'chat-empty';
-      const title = document.createElement('h2'); title.textContent = 'Начни новый разговор.';
-      const hint = document.createElement('p'); hint.textContent = 'Напиши вопрос или расскажи, с чем нужна помощь.';
-      empty.append(title, hint); history.append(empty);
-    }
+    chatLoadStatus.textContent = ''; chatLoadStatus.dataset.state = ''; history.setAttribute('aria-busy', 'false');
+    chatMessages = data.messages || []; chatCursor = data.paging?.nextCursor || null;
+    chatOlder.disabled = false; renderChatMessages();
   } catch (problem) {
     if (version !== navigationVersion || loadVersion !== chatLoadVersion || currentPage !== 'assistant') return;
     chatLoadStatus.textContent = problem.code === 'unavailable' ? 'Не удалось загрузить историю. Проверь соединение и повтори.' : problem.message || 'Не удалось загрузить диалог.';
@@ -99,25 +127,83 @@ chatForm.addEventListener('submit', async (event) => {
   chatInput.disabled = true; chatStatus.textContent = reconciling ? 'Проверяем исходный запрос…' : 'Jarvis отвечает…';
   chatStatus.dataset.state = 'pending';
   try {
-    if (reconciling) await api.request(`/assistant/requests/${encodeURIComponent(chatPending.requestId)}`);
-    else { savePending(actor, 'chat', chatPending.requestId); await api.request('/assistant/messages', 'POST', chatPending); }
-    clearPending(actor, 'chat', chatPending.requestId); chatPending = null; chatInput.disabled = false; chatInput.required = true; chatInput.value = ''; chatStatus.textContent = ''; chatStatus.dataset.state = ''; chatSend.textContent = 'Отправить'; if (currentPage === 'assistant') await loadChat();
+    let outcome;
+    if (reconciling) outcome = await api.request(`/assistant/requests/${encodeURIComponent(chatPending.requestId)}`);
+    else { savePending(actor, 'chat', chatPending.requestId); outcome = await api.request('/assistant/messages', 'POST', chatPending); }
+    // Only a durable terminal receipt releases an uncertain request. A missing
+    // receipt or an unfamiliar status must never trigger another POST.
+    const failed = outcome.status === 'failed';
+    if (!failed && ((outcome.status && outcome.status !== 'completed') || typeof outcome.answer !== 'string')) throw new ApiError('unknown', true);
+    clearPending(actor, 'chat', chatPending.requestId); chatPending = null;
+    chatInput.disabled = false; chatInput.required = true; chatSend.textContent = 'Отправить';
+    if (failed) {
+      chatStatus.dataset.state = 'error';
+      chatStatus.textContent = outcome.failureCode === 'request_expired'
+        ? 'Обработка запроса завершена без ответа. Сообщение повторно не отправлялось. Можно написать новое.'
+        : 'Не удалось получить ответ. Сообщение повторно не отправлялось. Можно написать новое.';
+    } else { chatInput.value = ''; chatStatus.textContent = ''; chatStatus.dataset.state = ''; }
+    if (currentPage === 'assistant') await loadChat();
   } catch (problem) {
     if (reconciling || problem.uncertain) { chatStatus.dataset.state = 'unknown'; chatStatus.textContent = `Результат пока неизвестен. Проверяй исходный запрос: ${chatPending.requestId}`; chatSend.textContent = 'Проверить исходный запрос'; }
     else { chatStatus.dataset.state = 'error'; clearPending(actor, 'chat', chatPending.requestId); chatPending = null; chatInput.disabled = false; chatStatus.textContent = problem.message; }
     if (['unauthorized', 'forbidden'].includes(problem.code)) fail(problem);
   } finally { chatBusy = false; chatSend.disabled = false; }
 });
+function mergedItems(previous, incoming) {
+  const result = []; const seen = new Map();
+  for (const item of [...previous, ...incoming]) {
+    if (item?.id != null) {
+      const key = String(item.id);
+      if (seen.has(key)) { result[seen.get(key)] = item; continue; }
+      seen.set(key, result.length);
+    }
+    result.push(item);
+  }
+  return result;
+}
+function renderPersonalSection(state) {
+  const active = () => sectionState === state && currentPage === `section/${state.permission}` && sessionActive;
+  const read = async (cursor = null) => {
+    const sequence = ++state.sequence;
+    try {
+      const data = await api.request(`/sections/${state.permission}${cursor ? `/page/${encodeURIComponent(cursor)}` : ''}`);
+      if (!active() || sequence !== state.sequence) return;
+      state.data = { ...data, items: cursor ? mergedItems(state.data.items || [], data.items || []) : data.items || [] };
+      $('#assistant .muted').textContent = data.notice || 'Твои данные и состояние раздела.';
+      renderPersonalSection(state);
+    } catch (error) {
+      if (!active() || sequence !== state.sequence) return;
+      if (['unauthorized', 'forbidden'].includes(error.code)) fail(error);
+      throw error;
+    }
+  };
+  const view = renderSectionView(state.permission, state.data, {
+    filterQuery: state.filterQuery,
+    onFilterChange(value) { if (active()) state.filterQuery = value; },
+    onRefresh: () => read(),
+    onLoadMore: (cursor) => cursor === state.data.paging?.nextCursor ? read(cursor) : Promise.resolve(),
+  });
+  const old = $('#section-items');
+  if (old) old.replaceWith(view); else $('#assistant .muted').after(view);
+}
 async function loadSection(permission, version) {
   try {
     const section = await api.request(`/sections/${encodeURIComponent(permission)}`);
     if (version !== navigationVersion || currentPage !== `section/${permission}`) return;
     $('#assistant .muted').textContent = section.notice || 'Твои данные и состояние раздела.';
     $('#assistant').dataset.state = 'ready';
-    if (permission === 'jobs') { makeJobPanel(); return; }
-    const items = renderSectionView(permission, section);
-    if (['vpn', 'operations'].includes(permission)) $('#assistant .muted').textContent = 'Доступ и порядок подтверждения';
-    $('#assistant .muted').after(items);
+    if (permission === 'jobs') {
+      const actions = renderSectionActions(permission, section.actions); actions.id = 'section-items';
+      $('#assistant .muted').after(actions); makeJobPanel(actions); return;
+    }
+    if (['memory', 'documents', 'devices', 'life'].includes(permission)) {
+      sectionState = { permission, data: section, sequence: 0, filterQuery: '' };
+      renderPersonalSection(sectionState);
+    } else {
+      const items = renderSectionView(permission, section);
+      if (['vpn', 'operations'].includes(permission)) $('#assistant .muted').textContent = 'Доступ и порядок подтверждения';
+      $('#assistant .muted').after(items);
+    }
   } catch (error) {
     if (version !== navigationVersion || currentPage !== `section/${permission}`) return;
     $('#assistant .muted').textContent = error.code === 'unavailable' ? 'Не удалось загрузить раздел. Проверь соединение и повтори.' : error.message || 'Не удалось загрузить раздел.';
@@ -145,6 +231,7 @@ function navigate() {
   if (!['home', 'assistant', 'admin'].includes(page) && !page.startsWith('section/')) page = 'home';
   if (page === currentPage) return;
   const version = ++navigationVersion; currentPage = page;
+  sectionState = null;
   disposeJobPanel();
   const workspaceOpen = page !== 'home';
   $('#workspace').hidden = !workspaceOpen;

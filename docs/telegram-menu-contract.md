@@ -67,6 +67,42 @@ authorization even if a user types a label or submits callback data directly.
 
 ## Inline controls
 
+### Mini App section navigation (local, October 26, 2026)
+
+At the owner's request to resolve the Mini App audit in stages, personal Mini App
+sections offer a link to the corresponding existing bot menu. The closed startup
+parameters are `mini_memory`, `mini_documents`, `mini_devices`, `mini_life`,
+`mini_jobs`, `mini_vpn`, and `mini_operations`. They contain no resource IDs,
+credentials, user text or confirmation identifiers. This work is local and has
+not been deployed.
+
+The link yields `/start mini_<section>` in a private chat. The normal update claim,
+current section permissions and user/chat binding apply before menu navigation.
+VPN and Operations also require the main owner. A denied link cannot cancel an
+active guided interaction. An allowed link opens the same menu and cancels guided
+input as its existing bottom-keyboard equivalent. Unknown startup parameters
+keep their prior handling. Plain `/start`, keyboard rows, inline callback grammar
+and action confirmations are unchanged.
+
+`GET /mini/api/sections/:permission` provides server-built navigation after its
+final access check. Bot links use the initialized bot's own username; if it is
+unavailable, the client explains how to open the bot manually. Operations offers
+an additional `/ops/` HTTPS link only to the owner when configured. Both clients
+reject a configured Operations URL with credentials, a path, query or fragment.
+Opening the panel does not approve its login or a VPS operation.
+
+Mini App link labels identify the target section. They use Telegram's native link
+opening methods on a click when available, with an ordinary HTTPS anchor as
+fallback. The helper description distinguishes read-only Mini App data and HH
+resume management from bot actions. Existing action confirmations stay in the
+client where the action was requested.
+
+Focused coverage: `test/miniAppSectionNavigation.test.js`, deep-link scenarios in
+`test/telegramMessageService.test.js`, PostgreSQL handoff acceptance in
+`test/miniAppIntegrationAcceptance.cjs`, and
+`scripts/testMiniAppSectionHandoffs.cjs` at 390/1280 px. Real Telegram WebView,
+owner/member taps and panel login remain separate acceptance checks.
+
 ### In-place text navigation (October 24, 2026)
 
 At the owner's request, a text inline-button result replaces the text and

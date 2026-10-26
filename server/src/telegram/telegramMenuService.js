@@ -4,6 +4,7 @@ const { containsSensitiveMemoryData, normalizeMemoryContent } = require('../memo
 const { normalizeDeviceName } = require('../devices/deviceService');
 const { validateAction: validateVpnAction, normalizeSubscriptionLabel } = require('../vpn/vpnCommandService');
 const { MENU, isOwner, replyKeyboard } = require('./telegramMenu');
+const { operationsPanelUrl } = require('../operations/operationsUrl');
 const { ACTION_PERMISSION, DENIED_ANSWER, callbackPermissions, interactionPermissions, permits } = require('./telegramPermissionPolicy');
 
 function memoryMenu() {
@@ -46,10 +47,7 @@ class TelegramMenuService {
     this.accessService = options.accessService || null;
     this.ownerTelegramId = String(options.ownerTelegramId || '0');
     this.operationsEnabled = options.operationsEnabled === true;
-    const configuredOperationsUrl = this.operationsEnabled && options.operationsPublicOrigin
-      ? new URL('/ops/', options.operationsPublicOrigin)
-      : null;
-    this.operationsPanelUrl = configuredOperationsUrl?.protocol === 'https:' ? configuredOperationsUrl.toString() : null;
+    this.operationsPanelUrl = operationsPanelUrl(this.operationsEnabled, options.operationsPublicOrigin);
   }
 
   owner(context) {

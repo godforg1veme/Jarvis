@@ -4,6 +4,8 @@ const { createHash } = require('node:crypto');
 const { PERMISSIONS } = require('./access/permissionCatalog');
 const { renderDocumentCitations, publicDocumentStatus } = require('./knowledge/knowledgeService');
 const { FixedWindowRateLimiter } = require('./http/rateLimiter');
+const { responseForReceipt, readReceipt, failReceipt, completeReceipt } = require('./miniApp/assistantReceipts');
+const { sectionNavigation } = require('./miniApp/sectionNavigation');
 
 const JOB_LOGIN_COOKIE = '__Secure-jarvis-job-login';
 const JOB_LOGIN_COOKIE_PATH = '/mini/api/jobs/login';
@@ -165,13 +167,24 @@ function registerMiniAppSelfRoutes({ route, authorize, requireOrigin }, services
     return { ok: true, ...result };
   });
 
-  route('GET', '/sections/:permission', async (request) => {
+  async function sectionResponse(request) {
     const permission = request.params.permission;
     if (!PERMISSIONS.includes(permission)) fail('invalid_request');
     const actor = await requirePermission(request, permission);
     const userId = actor.userId;
-    let items = [], notice = '';
-    if (permission === 'memory' && memoryService) items = (await memoryService.list({ userId, limit: 30 }))
+    let items = [], notice = '', paging = { pageSize: 30, nextCursor: null };
+    const cursor = request.params.cursor ?? null;
+    const sourceAvailable = ({ memory: memoryService, documents: knowledgeService, devices: deviceService, life: missionControlService })[permission];
+    if (cursor && (!services.sectionReader || !sourceAvailable)) fail('invalid_request');
+    if (services.sectionReader && sourceAvailable) {
+      const page = await services.sectionReader.read({ userId, section: permission, cursor });
+      items = page.items; paging = page.paging;
+      if (permission === 'life' && !cursor) {
+        const data = await missionControlService.get({ userId });
+        if (data.currentMission) items.unshift({ id: data.currentMission.id, title: data.currentMission.name, detail: 'Текущая миссия' });
+        if (data.partial) notice = 'Часть данных Life OS временно недоступна. Договорённости показаны ниже.';
+      }
+    } else if (permission === 'memory' && memoryService) items = (await memoryService.list({ userId, limit: 30 }))
       .map((item) => ({ id: item.id, title: item.content }));
     else if (permission === 'documents' && knowledgeService) items = (await knowledgeService.list({ userId }))
       .slice(0, 100).map((item) => ({ id: item.id, title: item.original_name, detail: publicDocumentStatus(item) }));
@@ -189,25 +202,37 @@ function registerMiniAppSelfRoutes({ route, authorize, requireOrigin }, services
     else if (permission === 'operations') notice = 'Управление пользователями и ролями доступно во вкладке «Управление». Закрытые операции VPS сохраняют подтверждение владельца.';
     else if (permission === 'assistant') notice = 'Открой вкладку «Ассистент» для личного диалога.';
     else notice = 'Этот раздел сейчас не подключён на сервере.';
-    await requirePermission(request, permission); // Revocation during a read must hide the result.
-    return { ok: true, section: permission, items, notice };
-  });
+    const currentActor = await requirePermission(request, permission); // Revocation during a read must hide the result.
+    return { ok: true, section: permission, items, notice, paging,
+      available: ['memory', 'documents', 'devices', 'life'].includes(permission) ? Boolean(sourceAvailable) : true,
+      actions: sectionNavigation(permission, currentActor, services) };
+  }
+  route('GET', '/sections/:permission', sectionResponse);
+  route('GET', '/sections/:permission/page/:cursor', sectionResponse);
 
-  route('GET', '/assistant/messages', async (request) => {
+  async function historyResponse(request) {
     const actor = await requirePermission(request, 'assistant');
     const conversation = await conversationRepository.getOrCreate({ userId: actor.userId, channel: 'pwa', externalChatId: 'mini' });
-    const messages = await conversationRepository.recentMessages({ userId: actor.userId, conversationId: conversation.id, limit: 30 });
+    const cursor = request.params?.cursor ?? null;
+    if (cursor && !services.sectionReader) fail('invalid_request');
+    const page = services.sectionReader
+      ? await services.sectionReader.read({ userId: actor.userId, section: 'assistant', conversationId: conversation.id, cursor })
+      : { messages: await conversationRepository.recentMessages({ userId: actor.userId, conversationId: conversation.id, limit: 30 }), paging: { pageSize: 30, nextCursor: null } };
     await requirePermission(request, 'assistant');
-    return { ok: true, messages: messages.filter((item) => ['user', 'assistant'].includes(item.role))
+    return { ok: true, paging: page.paging, messages: page.messages.filter((item) => ['user', 'assistant'].includes(item.role))
       .map((item) => ({ id: String(item.id), role: item.role, content: item.content })) };
-  });
+  }
+  route('GET', '/assistant/messages', historyResponse);
+  route('GET', '/assistant/messages/page/:cursor', historyResponse);
 
   route('GET', '/assistant/requests/:id', async (request) => {
     const actor = await requirePermission(request, 'assistant');
     if (!z.uuid().safeParse(request.params.id).success) fail('invalid_request');
-    const row = (await pool.query('SELECT status,answer FROM mini_app_requests WHERE user_id=$1 AND request_id=$2', [actor.userId, request.params.id])).rows[0];
-    if (!row || row.status !== 'completed') fail('operation_unknown');
-    return { ok: true, answer: row.answer };
+    const row = await readReceipt(pool, actor.userId, request.params.id);
+    await requirePermission(request, 'assistant');
+    const result = responseForReceipt(row);
+    if (!result) fail('operation_unknown');
+    return result;
   });
 
   route('POST', '/assistant/messages', async (request) => {
@@ -221,28 +246,37 @@ function registerMiniAppSelfRoutes({ route, authorize, requireOrigin }, services
     const claim = await pool.query(`INSERT INTO mini_app_requests(user_id,request_id,request_hash)
       VALUES($1,$2,$3) ON CONFLICT DO NOTHING RETURNING request_id`, [userId, requestId, requestHash]);
     if (!claim.rowCount) {
-      const original = (await pool.query('SELECT request_hash,status,answer FROM mini_app_requests WHERE user_id=$1 AND request_id=$2', [userId, requestId])).rows[0];
+      const original = await readReceipt(pool, userId, requestId);
+      if (!original) fail('operation_unknown');
       if (original.request_hash !== requestHash) fail('operation_conflict');
-      if (original.status !== 'completed') fail('operation_unknown');
-      return { ok: true, answer: original.answer };
+      await requirePermission(request, 'assistant');
+      const result = responseForReceipt(original);
+      if (!result) fail('operation_unknown');
+      return result;
     }
     // Processing records are intentionally not retried after uncertain results.
     // Only text is supported here; actions retain their original client confirmations.
-    const conversation = await conversationRepository.getOrCreate({ userId, channel: 'pwa', externalChatId: 'mini' });
-    await conversationRepository.appendMessage({ userId, conversationId: conversation.id, role: 'user', content: text, externalMessageId: `mini:${requestId}` });
-    const history = await conversationRepository.recentMessages({ userId, conversationId: conversation.id, limit: 30 });
-    const has = (permission) => accessService.allows(userId, permission);
-    const memories = memoryService && await has('memory') ? await memoryService.memoriesForPrompt({ userId }) : [];
-    const documents = knowledgeService && await has('documents') ? await knowledgeService.searchForPrompt({ userId, query: text }) : [];
-    const answer = renderDocumentCitations(String(await assistant.answer({ userId, conversationId: conversation.id,
-      currentRequest: text, history, memories, documents, devices: [],
-      runtimeContext: { channel: 'pwa', toolsAvailable: [], verifiedToolResults: [] } })).trim(), documents).slice(0, 10000);
-    if (!answer) fail('unavailable');
-    await requirePermission(request, 'assistant');
-    if ((memories.length && !await has('memory')) || (documents.length && !await has('documents'))) fail('forbidden');
-    await conversationRepository.appendMessage({ userId, conversationId: conversation.id, role: 'assistant', content: answer, externalMessageId: `mini:${requestId}:answer` });
-    await pool.query("UPDATE mini_app_requests SET status='completed',answer=$1 WHERE user_id=$2 AND request_id=$3", [answer, userId, requestId]);
-    return { ok: true, answer };
+    try {
+      const conversation = await conversationRepository.getOrCreate({ userId, channel: 'pwa', externalChatId: 'mini' });
+      await conversationRepository.appendMessage({ userId, conversationId: conversation.id, role: 'user', content: text, externalMessageId: `mini:${requestId}` });
+      const history = await conversationRepository.recentMessages({ userId, conversationId: conversation.id, limit: 30 });
+      const has = (permission) => accessService.allows(userId, permission);
+      const memories = memoryService && await has('memory') ? await memoryService.memoriesForPrompt({ userId }) : [];
+      const documents = knowledgeService && await has('documents') ? await knowledgeService.searchForPrompt({ userId, query: text }) : [];
+      const answer = renderDocumentCitations(String(await assistant.answer({ userId, conversationId: conversation.id,
+        currentRequest: text, history, memories, documents, devices: [],
+        runtimeContext: { channel: 'pwa', toolsAvailable: [], verifiedToolResults: [] } })).trim(), documents).slice(0, 10000);
+      if (!answer) fail('unavailable');
+      await requirePermission(request, 'assistant');
+      if ((memories.length && !await has('memory')) || (documents.length && !await has('documents'))) fail('forbidden');
+      const completed = await completeReceipt(pool, { userId, requestId, conversationId: conversation.id, answer });
+      if (!completed) fail('operation_unknown');
+      return { ok: true, status: 'completed', answer };
+    } catch (error) {
+      // A receipt may already be committed when the connection fails. Preserve that result.
+      try { await failReceipt(pool, userId, requestId); } catch {}
+      throw error;
+    }
   });
 }
 

@@ -1,30 +1,35 @@
 const sectionInfo = {
   memory: {
     label: 'Память',
+    capabilities: 'Здесь можно просматривать память. Добавление, исправление и удаление записей доступны в боте.',
     empty: 'В памяти пока нет записей.',
     hint: 'Здесь появятся твои сохранённые записи.',
     icon: 'memory',
   },
   documents: {
     label: 'Документы',
+    capabilities: 'Здесь показаны твои документы и их состояние. Добавление и удаление документов доступны в боте.',
     empty: 'Документов пока нет.',
     hint: 'Здесь появятся твои документы.',
     icon: 'documents',
   },
   devices: {
     label: 'Устройства',
+    capabilities: 'Здесь показаны подключённые устройства. Подключение компьютера и команды доступны в боте.',
     empty: 'Устройств пока нет.',
     hint: 'Здесь появятся твои подключённые устройства.',
     icon: 'devices',
   },
   life: {
     label: 'Life OS',
+    capabilities: 'Здесь показаны миссия и договорённости. Напоминания и другие действия Life OS доступны в боте.',
     empty: 'В Life OS пока нет записей.',
     hint: 'Здесь появятся твои миссии и договорённости.',
     icon: 'life',
   },
-  vpn: { label: 'VPN', icon: 'vpn' },
-  operations: { label: 'Панель управления', icon: 'operations' },
+  jobs: { label: 'Поиск работы', capabilities: 'Здесь можно подключить HH и настроить резюме. Вакансии, фильтры, письма и отклики доступны в боте.' },
+  vpn: { label: 'VPN', icon: 'vpn', capabilities: 'Подписки и действия VPN доступны владельцу в личном чате с ботом. Изменения требуют подтверждения.' },
+  operations: { label: 'Панель управления', icon: 'operations', capabilities: 'Мониторинг доступен владельцу в Operations. Вход нужно отдельно подтвердить в боте. Пользователи и роли находятся во вкладке «Управление».' },
 };
 
 const iconPaths = {
@@ -66,8 +71,14 @@ function sectionCard(kind, title, detail) {
   const card = element('li', 'section-card');
   const symbol = element('span', 'section-card__icon');
   symbol.append(icon(kind));
-  const content = element('div', 'section-card__content');
-  content.append(element('strong', 'section-card__title', title));
+  const personal = ['memory', 'documents', 'devices', 'life'].includes(kind);
+  const content = element(personal ? 'details' : 'div', 'section-card__content');
+  const titleNode = element('strong', 'section-card__title', title);
+  if (personal) {
+    const summary = element('summary', 'section-card__summary');
+    summary.append(titleNode, element('span', 'section-card__toggle', 'Подробнее'));
+    content.append(summary);
+  } else content.append(titleNode);
   if (detail) content.append(element('p', 'section-card__detail', detail));
   card.append(symbol, content);
   return card;
@@ -79,12 +90,85 @@ function emptyState(message, hint) {
   return empty;
 }
 
-export function renderSectionView(permission, { items = [], notice = '' } = {}) {
+function navigationUrl(permission, action) {
+  try {
+    const url = new URL(action.href);
+    if (url.protocol !== 'https:' || url.username || url.password || url.hash) return null;
+    if (action.kind === 'telegram') {
+      if (url.origin !== 'https://t.me' || !/^\/[A-Za-z][A-Za-z0-9_]{4,31}$/.test(url.pathname)
+        || [...url.searchParams].length !== 1 || url.searchParams.get('start') !== `mini_${permission}`) return null;
+    } else if (action.kind === 'operations') {
+      if (permission !== 'operations' || url.pathname !== '/ops/' || url.search) return null;
+    } else return null;
+    return url.href;
+  } catch { return null; }
+}
+
+export function renderSectionActions(permission, actions = []) {
+  const info = sectionInfo[permission];
+  const root = element('div', 'section-handoff');
+  if (!info) return root;
+  root.append(element('p', 'section-handoff__hint', info.capabilities));
+  const links = element('nav', 'section-handoff__links');
+  links.setAttribute('aria-label', `Действия раздела: ${info.label}`);
+  const emitted = new Set();
+  for (const action of Array.isArray(actions) ? actions : []) {
+    if (!action || emitted.has(action.kind)) continue;
+    const href = navigationUrl(permission, action);
+    if (!href) continue;
+    emitted.add(action.kind);
+    const link = element('a', 'secondary', action.kind === 'operations' ? 'Открыть Operations' : `Открыть «${info.label}» в боте`);
+    link.href = href; link.target = '_blank'; link.rel = 'noopener noreferrer';
+    link.dataset.destination = action.kind;
+    link.addEventListener('click', (event) => {
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const sdk = window.Telegram?.WebApp;
+      const method = action.kind === 'telegram' ? sdk?.openTelegramLink : sdk?.openLink;
+      if (typeof method !== 'function') return;
+      try { method.call(sdk, href); event.preventDefault(); } catch { /* The HTTPS anchor remains available. */ }
+    });
+    links.append(link);
+  }
+  if (links.children.length) root.append(links);
+  else root.append(element('p', 'section-handoff__hint', 'Открой личный чат с ботом и выбери нужный раздел в меню.'));
+  return root;
+}
+
+export function renderSectionView(permission, { items = [], notice = '', actions = [], paging = {}, available = true } = {}, options = {}) {
   const info = sectionInfo[permission] || { label: 'Раздел', icon: 'documents' };
   const root = element('div', 'section-browser');
   root.id = 'section-items';
   root.dataset.section = permission;
+  root.append(renderSectionActions(permission, actions));
   const rows = Array.isArray(items) ? items : [];
+
+  if (['memory', 'documents', 'devices', 'life'].includes(permission)) {
+    const tools = element('div', 'section-list-tools');
+    const refresh = element('button', 'secondary', 'Обновить список'); refresh.type = 'button';
+    const more = element('button', 'secondary', 'Загрузить ещё'); more.type = 'button';
+    more.hidden = !paging.nextCursor;
+    const feedback = element('p', 'section-list-feedback'); feedback.setAttribute('role', 'status');
+    let refreshing = false; let loadingMore = false; let actionVersion = 0;
+    function controls() { refresh.disabled = refreshing; more.disabled = refreshing || loadingMore; }
+    async function run(kind) {
+      if (refreshing || (kind === 'more' && loadingMore)) return;
+      const version = ++actionVersion;
+      if (kind === 'refresh') refreshing = true; else loadingMore = true;
+      controls(); feedback.textContent = kind === 'refresh' ? 'Обновляем список…' : 'Загружаем следующие записи…';
+      try {
+        if (kind === 'refresh') await options.onRefresh?.();
+        else await options.onLoadMore?.(paging.nextCursor);
+        if (version === actionVersion) feedback.textContent = '';
+      } catch {
+        if (version === actionVersion) feedback.textContent = 'Не удалось загрузить записи. Показанный список сохранён. Повтори запрос или обнови список.';
+      } finally { if (kind === 'refresh') refreshing = false; else loadingMore = false; controls(); }
+    }
+    refresh.disabled = typeof options.onRefresh !== 'function';
+    more.disabled = typeof options.onLoadMore !== 'function';
+    refresh.addEventListener('click', () => { void run('refresh'); });
+    more.addEventListener('click', () => { void run('more'); });
+    tools.append(refresh, more, feedback); root.append(tools);
+  }
 
   if ((permission === 'vpn' || permission === 'operations') && rows.length === 0) {
     const list = element('ul', 'section-cards');
@@ -94,7 +178,8 @@ export function renderSectionView(permission, { items = [], notice = '' } = {}) 
   }
 
   if (rows.length === 0) {
-    root.append(emptyState(info.empty || 'В этом разделе пока нет данных.', info.hint || 'Данные появятся здесь, когда раздел будет доступен.'));
+    root.append(emptyState(available ? info.empty || 'В этом разделе пока нет данных.' : 'Раздел временно недоступен.',
+      available ? info.hint || 'Данные появятся здесь, когда раздел будет доступен.' : notice || 'Обнови список позже.'));
     return root;
   }
 
@@ -119,7 +204,8 @@ export function renderSectionView(permission, { items = [], notice = '' } = {}) 
     input.id = `section-filter-${permission}`;
     label.htmlFor = input.id;
     input.setAttribute('aria-label', label.textContent);
-    input.placeholder = 'Найти в загруженном списке';
+    input.placeholder = 'Найти в загруженных записях';
+    input.value = options.filterQuery || '';
     const status = element('p', 'section-filter__status');
     status.setAttribute('role', 'status');
     status.setAttribute('aria-live', 'polite');
@@ -127,12 +213,13 @@ export function renderSectionView(permission, { items = [], notice = '' } = {}) 
     noResults.hidden = true;
     function updateFilter() {
       const query = input.value.trim().toLocaleLowerCase('ru');
+      options.onFilterChange?.(input.value);
       let visible = 0;
       for (const row of searchRows) {
         row.card.hidden = Boolean(query) && !row.text.includes(query);
         if (!row.card.hidden) visible++;
       }
-      status.textContent = `Показано ${visible} из ${searchRows.length}`;
+      status.textContent = `Показано ${visible} из ${searchRows.length}. Поиск в загруженных записях.${paging.nextCursor ? ' Доступны следующие записи.' : ''}`;
       noResults.hidden = visible !== 0;
     }
     input.addEventListener('input', updateFilter);

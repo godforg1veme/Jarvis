@@ -2,7 +2,7 @@ import { readPending, savePending, clearPending } from './api.js';
 const $ = (selector) => document.querySelector(selector);
 const make = (tag, text, className) => { const element = document.createElement(tag); if (text !== undefined) element.textContent = text; if (className) element.className = className; return element; };
 export function createAdmin({ api, actor, labels, onSessionError }) {
-  let users = []; let roles = []; let edit; let busy = false;
+  let users = []; let roles = []; let edit; let busy = false; let loadVersion = 0;
   const dialog = $('#editor'); const form = $('#editor-form'); const body = $('#editor-body');
   const submit = form.querySelector('[type="submit"]');
   const error = $('#editor-error');
@@ -94,12 +94,14 @@ export function createAdmin({ api, actor, labels, onSessionError }) {
   }
   async function load() {
     if (!['owner', 'admin'].includes(actor.level)) return;
+    const version = ++loadVersion;
     $('#admin').dataset.state = 'loading'; $('#admin').setAttribute('aria-busy', 'true'); $('#admin-feedback')?.remove();
     $('#admin-loading')?.remove();
     const loading = make('p', 'Загружаем людей и роли…', 'interior-loading'); loading.id = 'admin-loading'; loading.setAttribute('role', 'status'); $('#admin .tabs').before(loading);
     let data;
     try { data = await api.request('/admin'); }
     catch (problem) {
+      if (version !== loadVersion) return;
       loading.remove();
       $('#admin').dataset.state = 'error'; $('#admin').setAttribute('aria-busy', 'false');
       if (['unauthorized', 'forbidden'].includes(problem.code)) throw problem;
@@ -107,6 +109,7 @@ export function createAdmin({ api, actor, labels, onSessionError }) {
       feedback.append(make('p', 'Не удалось обновить список доступа. Проверь соединение и повтори.'), button('Повторить', () => load().catch(onSessionError)));
       $('#admin .tabs').before(feedback); return;
     }
+    if (version !== loadVersion) return;
     loading.remove(); $('#admin').dataset.state = 'ready'; $('#admin').setAttribute('aria-busy', 'false'); users = data.users; roles = data.roles; render();
     $('#audit').replaceChildren(make('h2', 'История доступа'));
     const actions = { 'user.create': 'Добавлен пользователь', 'user.update': 'Изменены права пользователя', 'role.create': 'Создана роль', 'role.update': 'Изменена роль' };

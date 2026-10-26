@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 const { createTelegramAccessPolicy } = require('../src/telegram/accessPolicy');
 const { FixedWindowRateLimiter } = require('../src/http/rateLimiter');
+const { TelegramMenuService } = require('../src/telegram/telegramMenuService');
 const { TELEGRAM_FAILURE_CODES } = require('../src/telegram/telegramFailure');
 const {
   MAX_TELEGRAM_VOICE_BYTES,
@@ -141,6 +142,7 @@ function harness(allowedIds = ['101', '202'], devices = null, commandService = n
     ...(options.vpnSupervisorService ? { vpnSupervisorService: options.vpnSupervisorService } : {}),
     ...(options.vpnSupervisorCallbackRouter ? { vpnSupervisorCallbackRouter: options.vpnSupervisorCallbackRouter } : {}),
     ...(options.menuService ? { menuService: options.menuService } : {}),
+    ...(options.accessService ? { accessService: options.accessService } : {}),
     ...(options.orchestrator ? { orchestrator: options.orchestrator } : {}),
     ...(options.lifeReminderService ? { lifeReminderService: options.lifeReminderService } : {}),
     ...(options.logger ? { logger: options.logger } : {}),
@@ -395,6 +397,47 @@ test('routes start and exact bottom-menu labels without storing presentation tex
   assert.equal(menuCalls[0].conversationId, 'conversation-user-101:101');
   assert.equal(state.messages.some((message) => message.role === 'user'), false);
   assert.equal(assistantCalls.length, 0);
+});
+
+test('Mini App deep links use current menu permissions and deduplicate the Telegram update', async () => {
+  let allowed = true;
+  let cancels = 0;
+  let lists = 0;
+  const accessService = {
+    async getAccessForUser() { return { blocked: !allowed, level: 'member', permissions: allowed ? ['memory'] : [] }; },
+    async getAccessForTelegram() { return { blocked: !allowed, permissions: allowed ? ['memory'] : [] }; },
+  };
+  const menuService = new TelegramMenuService({ accessService, ownerTelegramId: '101',
+    interactions: { async cancel() { cancels++; }, async getActive() { return { interaction: { kind: 'job_search' } }; } },
+    memoryService: { async list() { lists++; return []; } } });
+  const { service, assistantCalls } = harness(['101'], null, null, { menuService, accessService });
+  const first = update(701, 101, 101, '/start mini_memory'); first.message.chat.type = 'private';
+  assert.match((await service.handle(first)).answer, /Управление памятью/);
+  assert.equal((await service.handle(first)).status, 'duplicate');
+  allowed = false;
+  const revoked = update(702, 101, 101, '/start mini_memory'); revoked.message.chat.type = 'private';
+  assert.match((await service.handle(revoked)).answer, /недоступен/);
+  assert.equal(cancels, 1);
+  assert.equal(lists, 0);
+  assert.equal(assistantCalls.length, 0);
+});
+
+test('Mini App deep links deny group, mismatched private chat and member owner-only actions before menu mutation', async () => {
+  let cancels = 0;
+  const accessService = {
+    async getAccessForUser() { return { blocked: false, level: 'member', permissions: ['memory', 'vpn', 'operations'] }; },
+    async getAccessForTelegram() { return { blocked: false, permissions: ['memory', 'vpn', 'operations'] }; },
+  };
+  const menuService = new TelegramMenuService({ accessService, ownerTelegramId: '101',
+    interactions: { async cancel() { cancels++; } },
+    memoryService: { async list() { throw Error('should not read'); } } });
+  const { service } = harness(['101'], null, null, { menuService, accessService });
+  const group = update(703, 101, -101, '/start mini_memory'); group.message.chat.type = 'group';
+  const spoof = update(704, 101, 202, '/start mini_memory'); spoof.message.chat.type = 'private';
+  const vpn = update(705, 101, 101, '/start mini_vpn'); vpn.message.chat.type = 'private';
+  const ops = update(706, 101, 101, '/start mini_operations'); ops.message.chat.type = 'private';
+  for (const input of [group, spoof, vpn, ops]) assert.match((await service.handle(input)).answer, /недоступен/);
+  assert.equal(cancels, 0);
 });
 
 test('removed Help label and command no longer route to a help section', async () => {

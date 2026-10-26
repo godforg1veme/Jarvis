@@ -19,6 +19,10 @@ function menuAction(value) {
   return ACTION_BY_LABEL.get(String(value || '')) || null;
 }
 
+function miniStartAction(value) {
+  return /^\/start mini_(memory|documents|devices|life|jobs|vpn|operations)$/.exec(String(value || ''))?.[1] || null;
+}
+
 function replyKeyboard(owner, { jobSearchEnabled = false, permissions = null } = {}) {
   const keyboard = [
     [{ text: MENU.HOME }, { text: MENU.LIFE }],
@@ -43,4 +47,4 @@ function isOwner(user, telegramUserId, ownerTelegramId) {
     && String(telegramUserId || '') === configuredOwnerId;
 }
 
-module.exports = { MENU, isOwner, menuAction, replyKeyboard };
+module.exports = { MENU, isOwner, menuAction, miniStartAction, replyKeyboard };

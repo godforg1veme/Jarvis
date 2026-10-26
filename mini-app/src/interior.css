@@ -280,3 +280,19 @@ body.orbital-mini.orbital-theme .core-caption,
 body.orbital-mini.orbital-theme .workspace-label { display: none; }
 body.orbital-mini.orbital-theme #session-state[hidden] { display: none; }
 body.orbital-mini.orbital-theme .topbar > button { min-height: 44px; margin: 0; padding: 8px 12px; font-size: 11px; }
+
+body.orbital-mini.orbital-theme .section-handoff { display: grid; gap: 12px; margin-block: 14px 20px; }
+body.orbital-mini.orbital-theme .section-handoff__hint { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+body.orbital-mini.orbital-theme .section-handoff__links { display: flex; flex-wrap: wrap; gap: 10px; }
+body.orbital-mini.orbital-theme .section-handoff__links a { display: inline-flex; align-items: center; min-height: 44px; max-width: 100%; padding: 10px 14px; text-decoration: none; white-space: normal; overflow-wrap: anywhere; }
+body.orbital-mini.orbital-theme .section-list-tools { display: flex; flex-wrap: wrap; gap: 10px; margin-block: 14px; }
+body.orbital-mini.orbital-theme .section-list-feedback { flex-basis: 100%; margin: 0; color: var(--muted); font-size: 13px; }
+body.orbital-mini.orbital-theme .section-card__summary { cursor: pointer; min-height: 44px; list-style: none; display: grid; grid-template-columns: minmax(0,1fr) 12px; column-gap: 8px; }
+body.orbital-mini.orbital-theme .section-card__summary::-webkit-details-marker { display: none; }
+body.orbital-mini.orbital-theme .section-card__summary::after { content: ''; grid-column: 2; grid-row: 1; align-self: center; width: 7px; height: 7px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(45deg); }
+body.orbital-mini.orbital-theme details[open] .section-card__summary::after { transform: rotate(225deg); }
+body.orbital-mini.orbital-theme .section-card__toggle { display: block; grid-column: 1; color: var(--muted); font-size: 12px; margin-top: 8px; }
+body.orbital-mini.orbital-theme details:not([open]) .section-card__title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+body.orbital-mini.orbital-theme details[open] .section-card__toggle { display: none; }
+body.orbital-mini.orbital-theme .workspace { scroll-margin-bottom: 110px; }
+body.orbital-mini.orbital-theme .workspace :is(button,summary,a,input,textarea) { scroll-margin-block: 20px 110px; }

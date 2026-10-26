@@ -116,6 +116,7 @@ const { AccessService } = require('./access/accessService');
 const { registerMiniAppRoutes } = require('./miniApp/routes');
 const { registerMiniAppAssets } = require('./miniAppAssets');
 const { registerMiniAppSelfRoutes } = require('./miniAppSelfRoutes');
+const { SectionReader } = require('./miniApp/sectionReader');
 const { protectService, registerDesktopPermissionBoundary } = require('./userPermissionBoundary');
 
 async function createRuntime(config, overrides = {}) {
@@ -622,10 +623,14 @@ async function createRuntime(config, overrides = {}) {
         config.nodeEnv === 'production' ? '../public/mini' : '../../mini-app/dist') });
       registerMiniAppRoutes(app, { config, accessService, pool,
         registerUserRoutes: (routes) => registerMiniAppSelfRoutes(routes, { accessService, pool,
+          sectionReader: new SectionReader({ pool }),
           memoryService, knowledgeService, deviceService, missionControlService, assistant, conversationRepository,
           getJobConnectionSessionService: () => jobRuntime?.connectionSessionService,
           getJobResumeService: () => jobRuntime?.resumeService,
-          getJobLoginLinkDelivery: () => jobRuntime?.loginLinkDelivery }) });
+          getJobLoginLinkDelivery: () => jobRuntime?.loginLinkDelivery,
+          getTelegramBotUsername: () => bot?.botInfo?.username,
+          operationsEnabled: config.operationsEnabled,
+          operationsPublicOrigin: config.operationsPublicOrigin }) });
     }
     if (!bot && config.telegramBotToken) {
       const memoryGalleryService = new TelegramMemoryGalleryService({

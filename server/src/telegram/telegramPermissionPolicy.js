@@ -1,4 +1,4 @@
-const { menuAction } = require('./telegramMenu');
+const { menuAction, miniStartAction } = require('./telegramMenu');
 const { parseMemoryCommand } = require('../memory/memoryService');
 
 const ACTION_PERMISSION = Object.freeze({ life: 'life', memory: 'memory', documents: 'documents',
@@ -15,7 +15,7 @@ function callbackPermissions(data) {
 }
 
 function textPermissions(text) {
-  const action = menuAction(text);
+  const action = menuAction(text) || miniStartAction(text);
   if (action) return ACTION_PERMISSION[action] ? [ACTION_PERMISSION[action]] : [];
   const command = /^\/(\w+)(?:@\w+)?(?:\s|$)/.exec(String(text || '').trim())?.[1]?.toLowerCase();
   if (command === 'start') return [];
@@ -41,7 +41,7 @@ async function messagePermissions(input, context, interactions) {
   if (input.replyMessageId && input.captchaReplyHint) return ['jobs'];
   if (input.attachment) return ['documents'];
   if (input.voice) return ['assistant'];
-  if (!menuAction(input.text) && !/^\/start(?:@\w+)?$/i.test(input.text) && interactions) {
+  if (!menuAction(input.text) && !miniStartAction(input.text) && !/^\/start(?:@\w+)?$/i.test(input.text) && interactions) {
     const active = await interactions.getActive({ userId: context.user.id,
       conversationId: context.conversation.id, chatId: context.chatId });
     if (active.interaction) return interactionPermissions(active.interaction.kind);
