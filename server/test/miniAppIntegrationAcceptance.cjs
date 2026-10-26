@@ -520,6 +520,59 @@ test(
   },
 );
 
+test('source revocation between the final route check and receipt commit leaves no derived answer', { skip: !url }, async () => {
+  const f = await fixture();
+  try {
+    const session = await f.login();
+    const requestId = randomUUID();
+    const privateAnswer = 'DERIVED ANSWER AFTER FINAL CHECK';
+    f.setAnswer(async () => privateAnswer);
+    const entered = deferred();
+    const release = deferred();
+    const originalTransaction = f.accessService.transaction.bind(f.accessService);
+    let gateOpen = true;
+    f.accessService.transaction = async (work) => {
+      if (gateOpen) {
+        gateOpen = false;
+        entered.resolve();
+        await release.promise;
+      }
+      return originalTransaction(work);
+    };
+    const pending = f.request(session, 'POST', '/assistant/messages', {
+      requestId, text: 'Use my memory',
+    });
+    await entered.promise;
+    try {
+      await f.patch({ overrides: { memory: 'deny' } });
+    } finally {
+      release.resolve();
+    }
+    const denied = await pending;
+    assert.equal(denied.json().code, 'forbidden');
+    assert.equal(denied.body.includes(privateAnswer), false);
+    assert.ok(f.calls.memory.includes(f.member.userId));
+    const savedReceipt = (await f.pool.query(
+      'SELECT status,answer FROM mini_app_requests WHERE user_id=$1 AND request_id=$2',
+      [f.member.userId, requestId],
+    )).rows[0];
+    assert.equal(savedReceipt.status, 'failed');
+    assert.equal(savedReceipt.answer, null);
+    const receipt = (await f.request(session, 'GET', `/assistant/requests/${requestId}`)).json();
+    assert.equal(receipt.status, 'failed');
+    assert.equal(receipt.failureCode, 'request_failed');
+    const duplicate = (await f.request(session, 'POST', '/assistant/messages', {
+      requestId, text: 'Use my memory',
+    })).json();
+    assert.equal(duplicate.failureCode, 'request_failed');
+    assert.equal(f.calls.models.length, 1);
+    const history = (await f.request(session, 'GET', '/assistant/messages')).json().messages;
+    assert.equal(history.some((message) => message.content.includes(privateAnswer)), false);
+  } finally {
+    await f.close();
+  }
+});
+
 test('failed Mini App model request resolves original UUID without a second model call', { skip: !url }, async () => {
   const f = await fixture();
   try {

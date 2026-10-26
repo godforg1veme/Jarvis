@@ -139,6 +139,22 @@ async function staleInitialLoadError(browser) {
   } finally { await page.close(); }
 }
 
+async function unavailableRequestStorage(browser) {
+  for (const mode of ['read', 'write', 'silent']) {
+    const page = await setup(browser, 390, { delayLogin: true });
+    try {
+      await page.evaluate((mode) => {
+        const method = mode === 'read' ? 'getItem' : 'setItem';
+        Storage.prototype[method] = () => { if (mode !== 'silent') throw new Error('fixture-storage-unavailable'); };
+      }, mode);
+      await page.getByRole('button', { name: 'Подключить HH', exact: true }).click();
+      await page.getByText(/Запрос входа HH не отправлен/).waitFor();
+      assert.equal(await page.evaluate(() => window.fixture.login.length), 0, 'no POST without recoverable original UUID');
+      assert.equal(await page.getByRole('button', { name: 'Подключить HH', exact: true }).isEnabled(), true);
+    } finally { await page.close(); }
+  }
+}
+
 (async () => {
   const browser = await chromium.launch({ channel: 'msedge', headless: true });
   try {
@@ -147,6 +163,7 @@ async function staleInitialLoadError(browser) {
     await oldStatusAfterNewConnection(browser, true);
     await disposedDuringReplies(browser);
     await staleInitialLoadError(browser);
-    console.log('PASS: delayed HH success/error after cancel, new session, and dispose; stale initial load error; 390/1280 px.');
+    await unavailableRequestStorage(browser);
+    console.log('PASS: delayed HH success/error after cancel, new session, and dispose; stale initial load error; unavailable request storage; 390/1280 px.');
   } finally { await browser.close(); }
 })().catch((error) => { console.error(error); process.exitCode = 1; });

@@ -41,7 +41,10 @@ Windows-приложение и облачный API для подключённ
   вводится по Москве. [Выпуск и проверки](docs/updates/2026-10-19-moscow-time-release.md).
 - Telegram Mini App содержит 3D-ядро и движущиеся по орбитам планеты в стиле дашборда, личный чат и админку:
   пользователи по Telegram ID, роли и личные разрешения. Владелец назначает
-  администраторов. Все внутренние экраны оформлены в едином тёмном стиле. [Выпуск и клиентские проверки](docs/updates/2026-10-23-mini-app-orbital-release.md).
+  администраторов. Все внутренние экраны оформлены в едином тёмном стиле.
+  Личные списки обновляются и догружаются; память можно добавлять, исправлять
+  и удалять после подтверждения в Mini App.
+  [Выпуск кнопок и памяти](docs/updates/2026-10-27-mini-app-buttons-release.md).
 - Участники с актуальным правом `jobs` могут подключить собственный аккаунт HH
   через временную HTTPS-ссылку с телефона или ПК, затем подтвердить резюме в
   исходной Mini App. Ссылка приходит личным сообщением Telegram и кнопкой;
@@ -194,7 +197,7 @@ The bot interface is unchanged. [Release and limitations](docs/updates/2026-10-2
 - The main text assistant on DE prioritizes approved free OpenRouter models, then paid candidates by estimated cost. Prices and availability refresh on use; the model list remains fixed. See the [release and verification](docs/updates/2026-10-19-free-first-routing-release.md).
 - General chat and cover-letter generation share a core instruction set. DE has Tavily MCP search enabled, with sources supplied as answer context; stored history, memory, documents and resumes are not sent to the search planner. See the [release and limitations](docs/updates/2026-10-24-shared-instructions-and-search-release.md).
 - Dates and clocks use Moscow UTC+3; reminder input without a timezone also means Moscow. See the [release and checks](docs/updates/2026-10-19-moscow-time-release.md).
-- The Telegram Mini App includes a 3D core and orbiting planets styled after the dashboard, private chat and administration with Telegram IDs, roles and personal overrides. The owner appoints administrators. All interior screens share the dark theme. See the [release and client checks](docs/updates/2026-10-23-mini-app-orbital-release.md).
+- The Telegram Mini App includes a 3D core and orbiting planets styled after the dashboard, private chat and administration with Telegram IDs, roles and personal overrides. The owner appoints administrators. All interior screens share the dark theme. Personal lists support refresh and pagination; memories can be added, corrected and forgotten after confirmation in Mini App. See the [buttons and memory release](docs/updates/2026-10-27-mini-app-buttons-release.md).
 - Members with current `jobs` permission can connect their own HH account through a temporary HTTPS link on a phone or PC, then confirm a resume in the originating Mini App. The link arrives as private Telegram message text and a button. The HH window supports taps and phone-keyboard input, with the bottom panel retained as fallback. Profiles are separate from the owner's; real sign-in still needs member acceptance. See the [current release](docs/updates/2026-10-21-hh-login-touch-release.md).
 - The personal HH profile and Telegram bot buttons offer a primary resume selector for applications. The catalog refreshes every 15 minutes and on request. Free automatic raising is on by default and runs at most once every four hours, preserving explicit off choices and unknown-result stops. See the [release and verification](docs/updates/2026-10-22-hh-resume-bot-defaults-release.md).
 - Job search collects HH vacancies in a separate background process on DE and sends filtered cards to the relevant user's private Telegram chat. Search controls, saved vacancies, and cover-letter preparation and editing are available in the bot. New filters are empty; queries and exclusions accept one phrase per line with confirmation before saving. Search requires at least one query. The model runs on request; submitting an application requires approval of the exact letter. Live application submission still needs acceptance.

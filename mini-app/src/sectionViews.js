@@ -104,11 +104,12 @@ function navigationUrl(permission, action) {
   } catch { return null; }
 }
 
-export function renderSectionActions(permission, actions = []) {
+export function renderSectionActions(permission, actions = [], { memoryActionsAvailable = false } = {}) {
   const info = sectionInfo[permission];
   const root = element('div', 'section-handoff');
   if (!info) return root;
-  root.append(element('p', 'section-handoff__hint', info.capabilities));
+  root.append(element('p', 'section-handoff__hint', permission === 'memory' && memoryActionsAvailable
+    ? 'Добавляй, исправляй и удаляй записи здесь. Перед сохранением приложение покажет изменение и попросит подтверждение.' : info.capabilities));
   const links = element('nav', 'section-handoff__links');
   links.setAttribute('aria-label', `Действия раздела: ${info.label}`);
   const emitted = new Set();
@@ -130,7 +131,7 @@ export function renderSectionActions(permission, actions = []) {
     links.append(link);
   }
   if (links.children.length) root.append(links);
-  else root.append(element('p', 'section-handoff__hint', 'Открой личный чат с ботом и выбери нужный раздел в меню.'));
+  else if (!memoryActionsAvailable) root.append(element('p', 'section-handoff__hint', 'Открой личный чат с ботом и выбери нужный раздел в меню.'));
   return root;
 }
 
@@ -139,7 +140,8 @@ export function renderSectionView(permission, { items = [], notice = '', actions
   const root = element('div', 'section-browser');
   root.id = 'section-items';
   root.dataset.section = permission;
-  root.append(renderSectionActions(permission, actions));
+  root.append(renderSectionActions(permission, actions, { memoryActionsAvailable: Boolean(options.memoryActions) }));
+  if (permission === 'memory' && options.memoryActions) root.append(options.memoryActions.element);
   const rows = Array.isArray(items) ? items : [];
 
   if (['memory', 'documents', 'devices', 'life'].includes(permission)) {
@@ -192,6 +194,11 @@ export function renderSectionView(permission, { items = [], notice = '', actions
     const deviceStates = { online: 'В сети', connected: 'Подключено', healthy: 'Работает', offline: 'Не в сети', disconnected: 'Нет связи', paired: 'Связано с Jarvis', error: 'Ошибка подключения', unknown: 'Состояние неизвестно' };
     const safeDetail = permission === 'devices' && Object.hasOwn(deviceStates, detail) ? deviceStates[detail] : detail == null ? '' : String(detail);
     const card = sectionCard(info.icon, safeTitle, safeDetail);
+    if (permission === 'memory' && options.memoryActions) {
+      const controls = element('div', 'memory-actions__controls');
+      controls.append(options.memoryActions.actionButton('correct', item), options.memoryActions.actionButton('forget', item));
+      card.querySelector('.section-card__content').append(controls);
+    }
     cards.append(card);
     searchRows.push({ card, text: `${safeTitle} ${safeDetail}`.toLocaleLowerCase('ru') });
   }
@@ -229,6 +236,6 @@ export function renderSectionView(permission, { items = [], notice = '', actions
   } else {
     root.append(cards);
   }
-  root.append(element('p', 'section-readonly', 'Здесь данные доступны для просмотра. Действия с подтверждением выполняются через Telegram или Desktop.'));
+  if (permission !== 'memory' || !options.memoryActions) root.append(element('p', 'section-readonly', 'Здесь данные доступны для просмотра. Действия с подтверждением выполняются через Telegram или Desktop.'));
   return root;
 }

@@ -3,6 +3,7 @@ import { ApiError, createApi, readPending, savePending, clearPending } from './a
 import { createAdmin } from './admin.js';
 import { createJobConnectionPanel } from './jobConnection.js';
 import { renderSectionView, renderSectionActions } from './sectionViews.js';
+import { createMemoryActions } from './memoryActions.js';
 const $ = (selector) => document.querySelector(selector);
 const api = createApi();
 let actor; let core; let admin; let chatPending; let chatBusy = false;
@@ -177,7 +178,12 @@ function renderPersonalSection(state) {
       throw error;
     }
   };
+  if (state.permission === 'memory' && state.data.memoryActionsAvailable === true && !state.memoryActions) state.memoryActions = createMemoryActions({
+    api, actor, isActive: active, onChanged: () => read(), onFatal: fail,
+  });
+  state.memoryActions?.resetButtons();
   const view = renderSectionView(state.permission, state.data, {
+    memoryActions: state.data.memoryActionsAvailable === true ? state.memoryActions : null,
     filterQuery: state.filterQuery,
     onFilterChange(value) { if (active()) state.filterQuery = value; },
     onRefresh: () => read(),

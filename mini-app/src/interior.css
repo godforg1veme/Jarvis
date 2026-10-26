@@ -296,3 +296,14 @@ body.orbital-mini.orbital-theme details:not([open]) .section-card__title { displ
 body.orbital-mini.orbital-theme details[open] .section-card__toggle { display: none; }
 body.orbital-mini.orbital-theme .workspace { scroll-margin-bottom: 110px; }
 body.orbital-mini.orbital-theme .workspace :is(button,summary,a,input,textarea) { scroll-margin-block: 20px 110px; }
+
+body.orbital-mini.orbital-theme .memory-actions { display: grid; gap: 12px; margin-block: 16px; }
+body.orbital-mini.orbital-theme .memory-actions__form { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel-raised); }
+body.orbital-mini.orbital-theme .memory-actions__form[hidden],
+body.orbital-mini.orbital-theme .memory-actions [hidden] { display: none; }
+body.orbital-mini.orbital-theme .memory-actions__form h2 { margin: 0; font-size: 18px; }
+body.orbital-mini.orbital-theme .memory-actions__form textarea { width: 100%; min-height: 110px; font-size: 16px; }
+body.orbital-mini.orbital-theme .memory-actions__preview { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
+body.orbital-mini.orbital-theme .memory-actions__controls { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+body.orbital-mini.orbital-theme .memory-actions__controls button { min-height: 44px; white-space: normal; overflow-wrap: anywhere; }
+body.orbital-mini.orbital-theme .memory-actions__status { margin: 0; color: var(--muted); line-height: 1.6; overflow-wrap: anywhere; }

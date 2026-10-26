@@ -6,6 +6,8 @@ const { renderDocumentCitations, publicDocumentStatus } = require('./knowledge/k
 const { FixedWindowRateLimiter } = require('./http/rateLimiter');
 const { responseForReceipt, readReceipt, failReceipt, completeReceipt } = require('./miniApp/assistantReceipts');
 const { sectionNavigation } = require('./miniApp/sectionNavigation');
+const { MemoryActions } = require('./miniApp/memoryActions');
+const { readToken, hash: hashSession } = require('./miniApp/sessionService');
 
 const JOB_LOGIN_COOKIE = '__Secure-jarvis-job-login';
 const JOB_LOGIN_COOKIE_PATH = '/mini/api/jobs/login';
@@ -23,14 +25,36 @@ const messageSchema = z.object({ requestId: z.uuid(), text: z.string().trim().mi
 const fail = (code) => { throw Object.assign(new Error(code), { code }); };
 
 function registerMiniAppSelfRoutes({ route, authorize, requireOrigin }, services) {
-  const { accessService, memoryService, knowledgeService, deviceService, missionControlService,
+  const { accessService, memoryService, memoryActionService, knowledgeService, deviceService, missionControlService,
     assistant, conversationRepository, pool, getJobConnectionSessionService, getJobLoginLinkDelivery, getJobResumeService } = services;
   const chatLimiter = new FixedWindowRateLimiter();
+  const memoryActions = memoryActionService
+    ? new MemoryActions({ accessService, memoryService: memoryActionService }) : null;
   const requirePermission = async (request, permission, mutation = false) => {
     const session = await authorize(request, { mutation });
     if (!session.actor.permissions.includes(permission)) fail('forbidden');
     return session.actor;
   };
+
+  const memorySession = async (request, mutation = false) => {
+    const session = await authorize(request, { mutation });
+    if (!session.actor.permissions.includes('memory')) fail('forbidden');
+    if (!memoryActions) fail('unavailable');
+    return session;
+  };
+  route('POST', '/memory/operations', async (request) => {
+    const session = await memorySession(request, true);
+    return { ok: true, ...(await memoryActions.execute(session, request.body)) };
+  });
+  route('GET', '/memory/operations/:id', async (request) => {
+    const session = await memorySession(request);
+    return { ok: true, ...(await memoryActions.operation(session, request.params.id)) };
+  });
+  route('POST', '/memory/operations/:id/cancel', async (request) => {
+    const session = await memorySession(request, true);
+    if (request.body !== undefined && (!request.body || Object.keys(request.body).length)) fail('invalid_request');
+    return { ok: true, ...(await memoryActions.cancel(session, request.params.id)) };
+  });
 
   const jobSessions = () => {
     const service = getJobConnectionSessionService?.();
@@ -185,7 +209,8 @@ function registerMiniAppSelfRoutes({ route, authorize, requireOrigin }, services
         if (data.partial) notice = 'Часть данных Life OS временно недоступна. Договорённости показаны ниже.';
       }
     } else if (permission === 'memory' && memoryService) items = (await memoryService.list({ userId, limit: 30 }))
-      .map((item) => ({ id: item.id, title: item.content }));
+      .map((item) => ({ id: item.id, title: item.content,
+        expectedDigest: createHash('sha256').update(item.content, 'utf8').digest('hex') }));
     else if (permission === 'documents' && knowledgeService) items = (await knowledgeService.list({ userId }))
       .slice(0, 100).map((item) => ({ id: item.id, title: item.original_name, detail: publicDocumentStatus(item) }));
     else if (permission === 'devices' && deviceService) items = (await deviceService.list({ userId }))
@@ -204,6 +229,7 @@ function registerMiniAppSelfRoutes({ route, authorize, requireOrigin }, services
     else notice = 'Этот раздел сейчас не подключён на сервере.';
     const currentActor = await requirePermission(request, permission); // Revocation during a read must hide the result.
     return { ok: true, section: permission, items, notice, paging,
+      ...(permission === 'memory' ? { memoryActionsAvailable: Boolean(memoryActions) } : {}),
       available: ['memory', 'documents', 'devices', 'life'].includes(permission) ? Boolean(sourceAvailable) : true,
       actions: sectionNavigation(permission, currentActor, services) };
   }
@@ -269,7 +295,18 @@ function registerMiniAppSelfRoutes({ route, authorize, requireOrigin }, services
       if (!answer) fail('unavailable');
       await requirePermission(request, 'assistant');
       if ((memories.length && !await has('memory')) || (documents.length && !await has('documents'))) fail('forbidden');
-      const completed = await completeReceipt(pool, { userId, requestId, conversationId: conversation.id, answer });
+      const requiredPermissions = ['assistant', ...(memories.length ? ['memory'] : []),
+        ...(documents.length ? ['documents'] : [])];
+      const token = readToken(request);
+      const completed = await completeReceipt(pool, { userId, requestId, conversationId: conversation.id, answer,
+        accessService, authorize: async (db) => {
+          const current = await accessService.repository.get(db, 'user', userId);
+          if (!current || current.blocked || requiredPermissions.some((permission) => !current.permissions.includes(permission)))
+            fail('forbidden');
+          if (!token || !(await db.query(`SELECT 1 FROM mini_app_sessions
+            WHERE token_hash=$1 AND user_id=$2 AND expires_at>now() FOR SHARE`,
+          [hashSession(token), userId])).rowCount) fail('unauthorized');
+        } });
       if (!completed) fail('operation_unknown');
       return { ok: true, status: 'completed', answer };
     } catch (error) {

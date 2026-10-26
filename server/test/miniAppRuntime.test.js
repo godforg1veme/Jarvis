@@ -45,7 +45,7 @@ test('production Mini App serves resume and orbital modules and stylesheets', as
   const app = buildApp({ config: { logLevel: 'silent', miniAppEnabled: true } });
   registerMiniAppAssets(app, { root });
   try {
-    for (const name of ['jobConnection.js', 'jobResumes.js', 'jobResumes.css', 'core.js', 'orbitalBodies.js', 'orbitMotion.js', 'orbital.css', 'interior.css', 'sectionViews.js']) {
+    for (const name of ['jobConnection.js', 'jobResumes.js', 'jobResumes.css', 'core.js', 'orbitalBodies.js', 'orbitMotion.js', 'orbital.css', 'interior.css', 'sectionViews.js', 'memoryActions.js']) {
       const response = await app.inject(`/mini/${name}`);
       assert.equal(response.statusCode, 200, name);
       assert.equal(response.body, await fs.readFile(path.join(root, name), 'utf8'));

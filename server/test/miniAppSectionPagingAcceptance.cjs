@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { randomBytes } = require('node:crypto');
+const { randomBytes, createHash } = require('node:crypto');
 const { Pool } = require('pg');
 const { runMigrations } = require('../src/db/migrate');
 const { SectionReader } = require('../src/miniApp/sectionReader');
@@ -49,7 +49,10 @@ test('Mini App paging uses real migrated PostgreSQL, exact timestamps and owner 
         } while (cursor);
         assert.deepEqual(lengths, [30, 30, 5]);
         assert.equal(new Set(rows.map((row) => row.id)).size, 65);
-        for (const row of rows) assert.ok(Object.keys(row).every((key) => ['id', 'title', 'detail'].includes(key)));
+        for (const row of rows) {
+          assert.ok(Object.keys(row).every((key) => ['id', 'title', 'detail', ...(section === 'memory' ? ['expectedDigest'] : [])].includes(key)));
+          if (section === 'memory') assert.equal(row.expectedDigest, createHash('sha256').update(row.title, 'utf8').digest('hex'));
+        }
         const ownerRows = (await pool.query(`SELECT id FROM ${section === 'memory' ? 'memories' : section === 'life' ? 'life_commitments' : section} WHERE user_id=$1`, [userId])).rows;
         const ownerIds = new Set(ownerRows.map((row) => row.id));
         assert.ok(rows.every((row) => ownerIds.has(row.id)), 'no foreign records');

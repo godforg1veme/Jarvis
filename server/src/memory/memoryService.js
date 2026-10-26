@@ -4,6 +4,10 @@ const SENSITIVE_MEMORY_PATTERNS = [
   /(?:password|passphrase|token|api[ _-]?key|secret|парол[ья]?|токен|секрет|ключ)/i,
   /(?:cvv|cvc|iban|card number|номер карты|банковск\S* карт\S*)/i,
   /\b\d[\d -]{11,22}\d\b/,
+  /\bsk-[a-z0-9_-]{16,}\b/i,
+  /\bBearer\s+[a-z0-9._~+/-]{20,}=?\b/i,
+  /-----BEGIN\s+(?:[A-Z0-9]+\s+)*PRIVATE KEY-----/i,
+  /\b(?:vless|vmess|trojan|ss|ssr|hysteria2):\/\//i,
 ];
 
 function normalizeMemoryContent(value) {
@@ -58,27 +62,27 @@ class MemoryService {
     return this.repository.listActive({ userId, limit });
   }
 
-  async remember({ userId, content, sourceConversationId = null }) {
+  async remember({ userId, content, sourceConversationId = null, db = null }) {
     const normalized = normalizeMemoryContent(content);
     if (!normalized) return { ok: false, code: 'MEMORY_EMPTY' };
     if (containsSensitiveMemoryData(normalized)) return { ok: false, code: 'MEMORY_SENSITIVE' };
     const memory = await this.repository.create({
-      userId, kind: 'fact', content: normalized, sourceConversationId, changeReason: 'user_remember',
+      userId, kind: 'fact', content: normalized, sourceConversationId, changeReason: 'user_remember', db,
     });
     return { ok: true, memory };
   }
 
-  async forgetById({ userId, memoryId }) {
-    const memory = await this.repository.deactivateById({ userId, memoryId, changeReason: 'user_forget' });
+  async forgetById({ userId, memoryId, db = null }) {
+    const memory = await this.repository.deactivateById({ userId, memoryId, changeReason: 'user_forget', db });
     return { ok: Boolean(memory), memory };
   }
 
-  async correctById({ userId, memoryId, content, sourceConversationId = null }) {
+  async correctById({ userId, memoryId, content, sourceConversationId = null, db = null }) {
     const normalized = normalizeMemoryContent(content);
     if (!normalized) return { ok: false, code: 'MEMORY_EMPTY' };
     if (containsSensitiveMemoryData(normalized)) return { ok: false, code: 'MEMORY_SENSITIVE' };
     const memory = await this.repository.replaceById({
-      userId, memoryId, kind: 'fact', content: normalized, sourceConversationId, changeReason: 'user_correction',
+      userId, memoryId, kind: 'fact', content: normalized, sourceConversationId, changeReason: 'user_correction', db,
     });
     return { ok: Boolean(memory), memory, ...(!memory ? { code: 'MEMORY_NOT_FOUND' } : {}) };
   }

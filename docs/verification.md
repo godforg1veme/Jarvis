@@ -306,6 +306,38 @@ npm test --prefix server
 
 ## Mini App
 
+Выпускная проверка 27 октября: [результат всей ветки](updates/2026-10-27-mini-app-buttons-release.md).
+877 server tests, 24 PostgreSQL-сценария и девять браузерных наборов, включая
+дизайн-превью с запущенным loopback preview-server. Оба прежних дополнительных
+теста исправлены; full-runtime HH требует канонических ролей и живого worker.
+Добавлен отзыв source permission между предварительной проверкой и транзакцией
+завершения ответа; ответ и receipt не сохраняются после отзыва.
+
+October 27 release validation: 877 server tests, 24 PostgreSQL scenarios and nine
+browser suites, including the design preview with its loopback server running.
+Both former additional failures were repaired. Full-runtime HH uses canonical
+memberships and a live worker. A new race scenario revokes source permission
+between preliminary checks and answer completion; no answer is committed after revocation.
+
+Операции памяти, первый раздел этапа 5:
+[результат и ограничения](updates/2026-10-27-mini-app-memory-development.md).
+Проверяются atomic rollback/receipt, повтор UUID, отмена позднего запроса,
+актуальные права/сессия, чужие записи, ревизия и same-owner recovery после входа.
+Браузер проверяет подтверждение, двойной клик, потерю ответа/reload,
+недоступные sessionStorage/сервис и экраны 390/1280 px.
+
+Memory actions, the first stage-5 section: atomic rollback/receipts, UUID replay,
+late-request cancellation, live access/session, foreign records, revision and
+same-owner recovery after login. Browser checks confirmation, double clicks,
+lost replies/reload, unavailable sessionStorage/service and 390/1280 px layouts.
+
+```powershell
+npm run build --prefix mini-app
+node scripts/testMiniAppMemory.cjs
+# Explicit isolated local PostgreSQL only; run these schema fixtures sequentially.
+node --test --test-concurrency=1 server/test/miniAppMemoryOperationsAcceptance.cjs server/test/miniAppSectionPagingAcceptance.cjs server/test/miniAppPostgresAcceptance.cjs server/test/miniAppIntegrationAcceptance.cjs
+```
+
 Локальный этап 4: [списки, карточки и история](updates/2026-10-26-mini-app-lists-development.md).
 Новый acceptance использует весь pipeline migrations, настоящую PostgreSQL с
 pgvector и отдельную временную схему. Указатели страниц привязаны к actor/section/

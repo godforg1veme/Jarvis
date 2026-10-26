@@ -8,7 +8,7 @@ await rm(dist, { recursive: true, force: true });
 await mkdir(path.join(dist, 'vendor'), { recursive: true });
 await mkdir(path.join(dist, 'assets'), { recursive: true });
 for (const name of ['index.html', 'job-connect.html']) await copyFile(path.join(root, name), path.join(dist, name));
-for (const name of ['app.js', 'api.js', 'admin.js', 'core.js', 'orbitalBodies.js', 'orbitMotion.js', 'sectionViews.js', 'jobConnection.js', 'jobConnect.js', 'jobResumes.js', 'jobResumes.css', 'style.css', 'orbital.css', 'interior.css']) {
+for (const name of ['app.js', 'api.js', 'admin.js', 'core.js', 'orbitalBodies.js', 'orbitMotion.js', 'sectionViews.js', 'memoryActions.js', 'jobConnection.js', 'jobConnect.js', 'jobResumes.js', 'jobResumes.css', 'style.css', 'orbital.css', 'interior.css']) {
   let source = await readFile(path.join(root, 'src', name), 'utf8');
   if (name.endsWith('.js')) source = source.replaceAll("from 'three'", "from './vendor/three.module.js'");
   await writeFile(path.join(dist, name), source);

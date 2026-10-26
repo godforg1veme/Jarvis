@@ -21,21 +21,17 @@ async function failReceipt(pool, userId, requestId) {
     WHERE user_id=$1 AND request_id=$2 AND status='processing'`, [userId, requestId]);
 }
 
-async function completeReceipt(pool, { userId, requestId, conversationId, answer }) {
-  const client = await pool.connect();
-  let begun = false;
-  try {
-    await client.query('BEGIN'); begun = true;
+async function completeReceipt(pool, { userId, requestId, conversationId, answer, accessService = null, authorize = null }) {
+  const complete = async (client) => {
+    if (authorize) await authorize(client);
     const receipt = (await client.query(`SELECT status, ${MAX_PROCESSING_AGE_SQL} AS expired
       FROM mini_app_requests WHERE user_id=$1 AND request_id=$2 FOR UPDATE`, [userId, requestId])).rows[0];
     if (!receipt || receipt.status !== 'processing') {
-      await client.query('COMMIT'); begun = false;
       return false;
     }
     if (receipt.expired) {
       await client.query(`UPDATE mini_app_requests SET status='failed',failure_code='request_expired'
         WHERE user_id=$1 AND request_id=$2`, [userId, requestId]);
-      await client.query('COMMIT'); begun = false;
       return false;
     }
     const message = await client.query(`INSERT INTO messages
@@ -46,10 +42,21 @@ async function completeReceipt(pool, { userId, requestId, conversationId, answer
     if (message.rowCount !== 1) throw new Error('conversation is unavailable');
     await client.query(`UPDATE mini_app_requests SET status='completed',answer=$3
       WHERE user_id=$1 AND request_id=$2`, [userId, requestId, answer]);
-    await client.query('COMMIT'); begun = false;
     return true;
+  };
+  if (accessService) {
+    if (typeof authorize !== 'function') throw new Error('Final authorization is required');
+    return accessService.transaction(complete);
+  }
+  if (authorize) throw new Error('Access transaction is required for final authorization');
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await complete(client);
+    await client.query('COMMIT');
+    return result;
   } catch (error) {
-    if (begun) await client.query('ROLLBACK');
+    await client.query('ROLLBACK');
     throw error;
   } finally {
     client.release();

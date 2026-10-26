@@ -4,6 +4,17 @@
 
 ## Русский
 
+27 октября подготовлен [выпуск кнопок и памяти Mini App](updates/2026-10-27-mini-app-buttons-release.md):
+877 server tests, 24 PostgreSQL-сценария, девять браузерных наборов и независимая
+ревизия всей ветки. Прежние два падающих теста и найденные ревизией гонки исправлены.
+Установка и проверка DE/NL выполняются в рамках порученного выпуска.
+
+27 октября локально готовы [операции памяти Mini App](updates/2026-10-27-mini-app-memory-development.md):
+добавление, исправление и удаление с подтверждением, квитанцией и безопасной отменой
+исходного запроса. Server 877/877, PostgreSQL 22/22, восемь браузерных наборов;
+независимая security-ревизия выполнена. Нужна миграция 051; выпуск не выполнен.
+Этапы 5–6 и ограничения дополнительных fixtures описаны в записи результата.
+
 На DE работает [прямая выдача подписок Happ](updates/2026-10-26-subscription-generated-links-release.md)
 без Cloudflare, включая новые ссылки и кнопку импорта для всех профилей.
 Все пять активных подписок текущего владельца формируют по четыре подключения;
@@ -122,6 +133,17 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 Архивы не заменяют действующие правила и новую проверку окружения.
 
 ## English
+
+The [October 27 Mini App buttons and memory release](updates/2026-10-27-mini-app-buttons-release.md)
+is prepared: 877 server tests, 24 PostgreSQL scenarios, nine browser suites and
+independent full-branch review. Both previously failing tests and the reviewed
+races were fixed. DE/NL installation and verification are in progress under the authorized release.
+
+On October 27, [Mini App memory actions](updates/2026-10-27-mini-app-memory-development.md)
+are ready locally: add, correct and forget with confirmation, a receipt and safe
+cancellation of the original request. Server 877/877, PostgreSQL 22/22 and eight
+browser suites passed; independent security review completed. Migration 051 is
+required; unpublished. Stages 5–6 and additional fixture limitations remain documented.
 
 [Direct Happ subscription delivery](updates/2026-10-26-subscription-generated-links-release.md)
 is enabled on DE without Cloudflare, including new links and import buttons

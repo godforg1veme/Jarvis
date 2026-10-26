@@ -83,9 +83,15 @@ export function createJobConnectionPanel({ api, actor, anchor }) {
     busy = true; refreshLink.disabled = true; connectButton.disabled = true; panel.setAttribute('aria-busy', 'true'); message('Готовим временную ссылку для входа…');
     try {
       let requestId;
-      try { requestId = sessionStorage.getItem(sessionKey(actor, 'request')); } catch {}
-      if (!UUID.test(requestId || '')) requestId = crypto.randomUUID();
-      store('request', requestId);
+      try {
+        const key = sessionKey(actor, 'request');
+        requestId = sessionStorage.getItem(key);
+        if (!UUID.test(requestId || '')) requestId = crypto.randomUUID();
+        sessionStorage.setItem(key, requestId);
+        if (sessionStorage.getItem(key) !== requestId) throw new Error('storage unavailable');
+      } catch {
+        throw new Error('Не удалось сохранить ID запроса в браузере. Запрос входа HH не отправлен. Проверь настройки хранилища и попробуй снова.');
+      }
       const created = await api.request('/jobs/login', 'POST', { requestId });
       if (!current(token)) return;
       if (created.status === 'connected') {

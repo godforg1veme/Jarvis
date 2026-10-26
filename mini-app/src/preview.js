@@ -168,16 +168,8 @@ try {
   const { createCore } = await import('/core.js');
   core = createCore($('#core-stage'), { onStatus: (text) => { $('#core-status').textContent = text; } });
   if (!core.available) throw new Error('WEBGL_UNAVAILABLE');
-  const pause = $('#pause');
-  const sync = () => { pause.textContent = core.paused ? 'Продолжить' : 'Пауза'; pause.setAttribute('aria-pressed', String(core.paused)); };
-  pause.addEventListener('click', () => { core.setPaused(!core.paused); sync(); });
-  $('#speed').addEventListener('input', (event) => core.setSpeed(Number(event.target.value)));
-  $('#reset-core').addEventListener('click', () => core.reset());
-  matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', sync);
-  sync();
   window.addEventListener('pagehide', () => core.dispose(), { once: true });
   window.addEventListener('pageshow', (event) => { if (event.persisted) location.reload(); });
 } catch {
   $('#core-stage').dataset.render = 'fallback'; $('#core-status').textContent = 'СТАТИЧНЫЙ ВИД · 3D НЕДОСТУПНО';
-  for (const element of document.querySelectorAll('.motion-controls button,.motion-controls input')) element.disabled = true;
 } finally { $('#core-loading').hidden = true; }

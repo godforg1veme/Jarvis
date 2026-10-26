@@ -4,6 +4,15 @@
 
 ## Русский
 
+27 октября подготовлен [выпуск кнопок и памяти](../docs/updates/2026-10-27-mini-app-buttons-release.md):
+этапы 1–4 и первый раздел этапа 5 прошли общий набор проверок и независимую ревизию.
+Текущий статус установки приведён в записи выпуска; исторические результаты ниже.
+
+27 октября локально добавлены запись, исправление и удаление памяти с подтверждением
+в Mini App, атомарной квитанцией и восстановлением исходного UUID после потери ответа.
+Нужна миграция 051; на VPS не установлено.
+[Результат первого раздела этапа 5 и ограничения](../docs/updates/2026-10-27-mini-app-memory-development.md).
+
 26 октября локально добавлены обновление и догрузка личных списков, раскрытие
 карточек и предыдущие сообщения отдельной истории Mini App. Нужна миграция 050;
 на VPS не установлено. [Этап 4 и ограничения](../docs/updates/2026-10-26-mini-app-lists-development.md).
@@ -149,6 +158,15 @@ Mini App build и Edge fixtures. Команды и границы проверо
 [результат](../docs/updates/2026-10-18-telegram-mini-app-release.md).
 
 ## English
+
+The [October 27 buttons and memory release](../docs/updates/2026-10-27-mini-app-buttons-release.md)
+is prepared: stages 1–4 and the first stage-5 section passed full validation and
+independent review. The release record tracks installation; historical results follow.
+
+On October 27, adding, correcting and forgetting memories were added locally,
+with confirmation in Mini App, atomic receipts and original-UUID recovery after
+lost replies. Migration 051 is required; not installed on VPS.
+[First stage-5 section and limitations](../docs/updates/2026-10-27-mini-app-memory-development.md).
 
 On October 26, local changes added personal-list refresh/paging, expandable
 cards and older messages in the separate Mini App history. Migration 050 is

@@ -3,6 +3,22 @@ class MemoryRepository {
     this.pool = pool;
   }
 
+  async transaction(db, run) {
+    if (db) return run(db);
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await run(client);
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async listActive({ userId, limit = 30 }) {
     const boundedLimit = Math.min(Math.max(Number(limit) || 30, 1), 100);
     const result = await this.pool.query(`
@@ -15,10 +31,8 @@ class MemoryRepository {
     return result.rows;
   }
 
-  async create({ userId, kind, content, sourceConversationId = null, changeReason = '' }) {
-    const client = await this.pool.connect();
-    try {
-      await client.query('BEGIN');
+  async create({ userId, kind, content, sourceConversationId = null, changeReason = '', db = null }) {
+    return this.transaction(db, async (client) => {
       const inserted = await client.query(`
         INSERT INTO memories (user_id, kind, content, source_conversation_id)
         VALUES ($1, $2, $3, $4)
@@ -29,14 +43,8 @@ class MemoryRepository {
         INSERT INTO memory_versions (user_id, memory_id, content, change_reason)
         VALUES ($1, $2, $3, $4)
       `, [userId, memory.id, memory.content, changeReason]);
-      await client.query('COMMIT');
       return memory;
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+    });
   }
 
   async deactivateMatching({ userId, query, changeReason = '' }) {
@@ -57,10 +65,8 @@ class MemoryRepository {
     return result.rows;
   }
 
-  async deactivateById({ userId, memoryId, changeReason = '' }) {
-    const client = await this.pool.connect();
-    try {
-      await client.query('BEGIN');
+  async deactivateById({ userId, memoryId, changeReason = '', db = null }) {
+    return this.transaction(db, async (client) => {
       const result = await client.query(`
         UPDATE memories SET active=false,updated_at=now()
         WHERE id=$1 AND user_id=$2 AND active=true
@@ -71,27 +77,18 @@ class MemoryRepository {
         INSERT INTO memory_versions (user_id,memory_id,content,change_reason)
         VALUES ($1,$2,$3,$4)
       `, [userId, memory.id, memory.content, changeReason]);
-      await client.query('COMMIT');
       return memory;
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+    });
   }
 
-  async replaceById({ userId, memoryId, kind, content, sourceConversationId = null, changeReason = '' }) {
-    const client = await this.pool.connect();
-    try {
-      await client.query('BEGIN');
+  async replaceById({ userId, memoryId, kind, content, sourceConversationId = null, changeReason = '', db = null }) {
+    return this.transaction(db, async (client) => {
       const previous = await client.query(`
         UPDATE memories SET active=false,updated_at=now()
         WHERE id=$1 AND user_id=$2 AND active=true
         RETURNING id,content
       `, [memoryId, userId]);
       if (!previous.rows[0]) {
-        await client.query('ROLLBACK');
         return null;
       }
       await client.query(`
@@ -107,14 +104,8 @@ class MemoryRepository {
         INSERT INTO memory_versions (user_id,memory_id,content,change_reason)
         VALUES ($1,$2,$3,$4)
       `, [userId, inserted.rows[0].id, content, changeReason]);
-      await client.query('COMMIT');
       return inserted.rows[0];
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+    });
   }
 }
 

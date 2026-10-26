@@ -41,6 +41,18 @@ test('never stores passwords, tokens, or payment data', async () => {
   assert.match(result.answer, /не сохраняю/i);
   assert.equal(state.memories.length, 0);
   assert.equal(containsSensitiveMemoryData('карта 4111 1111 1111 1111'), true);
+  for (const value of [
+    'sk-fixture-abcdefghijklmnopqrstuvwxyz123456',
+    'Bearer fixture_abcdefghijklmnopqrstuvwxyz123456',
+    '-----BEGIN PRIVATE KEY-----',
+    '-----BEGIN EC PRIVATE KEY-----',
+    'vless://fixture', 'vmess://fixture', 'trojan://fixture',
+    'ss://fixture', 'ssr://fixture', 'hysteria2://fixture',
+  ]) {
+    assert.equal(containsSensitiveMemoryData(value), true);
+    assert.equal((await service.remember({ userId: 'user-a', content: value })).ok, false);
+  }
+  assert.equal(containsSensitiveMemoryData('Я люблю чай и прогулки'), false);
 });
 
 test('manual correction deactivates old facts before adding the new one', async () => {

@@ -20,13 +20,10 @@ const { chromium } = require('../job-browser/node_modules/playwright');
     const frame = () => page.locator('#core-stage').getAttribute('data-frames').then(Number);
     const first = await frame();
     await page.waitForFunction((previous) => Number(document.querySelector('#core-stage').dataset.frames) > previous + 3, first);
-    await page.getByRole('button', { name: 'Пауза', exact: true }).click();
-    const paused = await frame();
-    await page.waitForTimeout(200);
-    assert.equal(await frame(), paused, 'pause stops animation frames');
+    assert.equal(await page.locator('.motion-controls').count(), 0, 'preview exposes only current automatic motion');
     await page.screenshot({ path: path.join(output, 'desktop.png'), fullPage: true });
-    await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
-    await page.waitForFunction((previous) => Number(document.querySelector('#core-stage').dataset.frames) > previous, paused);
+    const beforeNavigation = await frame();
+    await page.waitForFunction((previous) => Number(document.querySelector('#core-stage').dataset.frames) > previous, beforeNavigation);
     await page.getByRole('link', { name: 'Управление', exact: true }).click();
     await page.waitForTimeout(100);
     const hidden = await frame();
@@ -67,7 +64,6 @@ const { chromium } = require('../job-browser/node_modules/playwright');
       await page.waitForFunction(() => document.documentElement.scrollWidth <= innerWidth);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `home fits ${width}px`);
       if (width === 390) {
-        await page.getByRole('button', { name: 'Пауза', exact: true }).click();
         await page.screenshot({ path: path.join(output, 'mobile.png'), fullPage: true });
       }
       await page.getByRole('link', { name: 'Управление', exact: true }).click();
@@ -87,11 +83,8 @@ const { chromium } = require('../job-browser/node_modules/playwright');
     const reducedPage = await reducedContext.newPage();
     await reducedPage.goto((process.env.MINI_PREVIEW_URL || 'http://127.0.0.1:5187/'));
     await reducedPage.waitForFunction(() => document.querySelector('#core-loading').hidden);
-    assert.equal(await reducedPage.getByRole('button', { name: 'Продолжить', exact: true }).getAttribute('aria-pressed'), 'true');
-    await reducedPage.waitForTimeout(100);
-    const reducedFrames = await reducedPage.locator('#core-stage').getAttribute('data-frames');
-    await reducedPage.waitForTimeout(200);
-    assert.equal(await reducedPage.locator('#core-stage').getAttribute('data-frames'), reducedFrames, 'reduced motion defaults to static');
+    assert.equal(await reducedPage.locator('#core-stage').getAttribute('data-render'), 'webgl');
+    assert.equal(await reducedPage.locator('.motion-controls').count(), 0);
     await reducedContext.close();
 
     const fallback = await browser.newPage();
@@ -108,7 +101,7 @@ const { chromium } = require('../job-browser/node_modules/playwright');
     await fallback.getByRole('button', { name: /Анна/ }).click();
     assert.equal(await fallback.getByRole('dialog').isVisible(), true, 'admin UI survives missing WebGL');
     await fallback.close();
-    console.log('PASS: WebGL motion/pause/offscreen, personal overrides, Telegram ID uniqueness, XSS text rendering, role creation, 320/390/844px, ephemeral edits, reduced motion, WebGL fallback, no CSP errors.');
+    console.log('PASS: WebGL automatic motion/offscreen, personal overrides, Telegram ID uniqueness, XSS text rendering, role creation, 320/390/844px, ephemeral edits, reduced-motion context, WebGL fallback, no CSP errors.');
     console.log(`Screenshots: ${output}`);
   } finally { await browser.close(); }
 })().catch((error) => { console.error(error); process.exitCode = 1; });

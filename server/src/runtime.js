@@ -548,6 +548,7 @@ async function createRuntime(config, overrides = {}) {
       logger: app.log,
     }));
     if (visualMemoryService) visualMemoryWorker = overrides.visualMemoryWorker || new VisualMemoryWorker({ service: visualMemoryService, logger: app.log });
+    const miniAppMemoryService = memoryService;
     memoryService = protectService(memoryService, accessService, 'memory');
     knowledgeService = protectService(knowledgeService, accessService, 'documents');
     deviceService = protectService(deviceService, accessService, 'devices');
@@ -624,7 +625,8 @@ async function createRuntime(config, overrides = {}) {
       registerMiniAppRoutes(app, { config, accessService, pool,
         registerUserRoutes: (routes) => registerMiniAppSelfRoutes(routes, { accessService, pool,
           sectionReader: new SectionReader({ pool }),
-          memoryService, knowledgeService, deviceService, missionControlService, assistant, conversationRepository,
+          memoryService, memoryActionService: miniAppMemoryService,
+          knowledgeService, deviceService, missionControlService, assistant, conversationRepository,
           getJobConnectionSessionService: () => jobRuntime?.connectionSessionService,
           getJobResumeService: () => jobRuntime?.resumeService,
           getJobLoginLinkDelivery: () => jobRuntime?.loginLinkDelivery,

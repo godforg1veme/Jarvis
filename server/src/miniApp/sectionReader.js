@@ -1,4 +1,4 @@
-const { randomBytes } = require('node:crypto');
+const { randomBytes, createHash } = require('node:crypto');
 const { publicDocumentStatus } = require('../knowledge/knowledgeService');
 const { formatMoscowDateTime } = require('../../../shared/time');
 
@@ -64,7 +64,8 @@ class SectionReader {
     const paging = { pageSize: PAGE_SIZE, nextCursor };
     if (section === 'assistant') return { messages: rows.reverse().map((row) => ({ id: String(row.id), role: row.role, content: row.content })), paging };
     return { items: rows.map((row) => ({ id: String(row.id), title: row.title,
-      ...(section === 'documents' ? { detail: publicDocumentStatus(row) }
+      ...(section === 'memory' ? { expectedDigest: createHash('sha256').update(row.title, 'utf8').digest('hex') }
+        : section === 'documents' ? { detail: publicDocumentStatus(row) }
         : section === 'devices' ? { detail: row.status }
           : section === 'life' ? { detail: row.due_at ? `Договорённость · ${formatMoscowDateTime(row.due_at)}` : 'Договорённость' } : {}) })), paging };
   }
