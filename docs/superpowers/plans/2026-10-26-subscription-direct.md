@@ -17,6 +17,20 @@ Spec: [design](../specs/2026-10-26-subscription-direct-design.md).
   DNS-only hostname and TCP 80/9443, install the gateway, verify TLS and scope.
 - [ ] Confirm successful import and refresh on the affected iPhone.
 
+## Follow-up: generated Telegram links
+
+Owner requested that "get a new link" return the working direct origin.
+Required path notice delivered before edits. Change the single service default,
+runtime fallback, exact outbound URL validation and direct landing route.
+Keep confirmation, owner/private scope and delivery-only credentials unchanged.
+
+- [x] Test default creation, rotation, landing HTML, accepted legacy/direct
+  buttons and rejected foreign/scheme/port/credential URLs.
+- [x] Run Telegram gate (76 pass), full server (863 pass, 2 DB skips),
+  and actual Caddy route fixture (7 pass).
+- [ ] Publish and install both changed components; verify origin in installed
+  code, strict TLS and denied routes without rotating a live profile.
+
 Русский: выпуск согласован и выполнен 26 октября; DNS и TLS проверены.
 Прежние сервисы, подписки и токены сохранены. До проверки на iPhone
 исправление на телефоне не считается подтверждённым.

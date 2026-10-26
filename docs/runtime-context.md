@@ -712,6 +712,11 @@ direct Windows HTTPS/WSS connectivity remains unavailable, as recorded in the re
   Sing-box JSON (or Base64 for legacy clients) demoting probe-degraded nodes via `ExternalProbeMonitor`.
   `GET /happ-sub/:token` provides a 1-click HTML landing bridge to the Happ
   subscription deeplink for that same URL.
+  The October 26 direct-ingress follow-up uses `https://sub.rilora.ru:9443`
+  as the default origin for new/rotated subscription URLs and their HTML import
+  buttons. The direct ingress accepts both exact subscription and landing paths;
+  old Cloudflare URLs remain usable. Owner/private scope and token-rotation
+  confirmation are unchanged; no profile is rotated merely by deployment.
   As of 2026-09-29, a fully bound subscription serves its available endpoints
   when some bound exports fail; incomplete bindings remain blocked. If no VPN
   endpoint can be serialized, it returns `SUBSCRIPTION_ENDPOINTS_UNAVAILABLE`

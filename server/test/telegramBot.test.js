@@ -112,6 +112,28 @@ test('allows only the exact configured Operations panel URL or public routing UR
   assert.throws(() => vpnReplyMarkup([[{ text: 'JS', url: 'javascript:alert(1)' }]], { operationsPanelUrl: expected }), /invalid VPN button/);
 });
 
+test('subscription buttons accept the direct origin and legacy links with bounded tokens', () => {
+  const token = `sub_${'a'.repeat(64)}`;
+  for (const origin of ['https://jarvis.rilora.ru', 'https://sub.rilora.ru:9443']) {
+    const url = `${origin}/happ-sub/${token}`;
+    assert.deepEqual(vpnReplyMarkup([[{ text: 'Открыть', url }]]), {
+      inline_keyboard: [[{ text: 'Открыть', url }]],
+    });
+  }
+  for (const url of [
+    `http://sub.rilora.ru:9443/happ-sub/${token}`,
+    `https://evil.example:9443/happ-sub/${token}`,
+    `https://sub.rilora.ru/happ-sub/${token}`,
+    `https://sub.rilora.ru:9444/happ-sub/${token}`,
+    `https://user@sub.rilora.ru:9443/happ-sub/${token}`,
+    `https://sub.rilora.ru:9443/sub/${token}`,
+    `https://sub.rilora.ru:9443/happ-sub/${token}/extra`,
+    `https://sub.rilora.ru:9443/happ-sub/${token}?next=evil`,
+  ]) {
+    assert.throws(() => vpnReplyMarkup([[{ text: 'Открыть', url }]]), /invalid VPN button/);
+  }
+});
+
 test('Telegram attachment download bounds bytes and never exposes the bot token in errors', async () => {
   const ctx = { async getFile() { return { file_path: 'documents/private.txt' }; } };
   const buffer = await downloadTelegramAttachment(ctx, 'token-must-not-leak', 10, async () => new Response('hello', { status: 200 }));

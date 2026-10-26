@@ -3,7 +3,7 @@ const { URL, unquote } = require('node:url');
 const { publicPool } = require('./hysteriaPortPoolService');
 
 const DEFAULT_TEST_URL = 'http://cp.cloudflare.com/generate_204';
-const DEFAULT_PUBLIC_URL = 'https://jarvis.rilora.ru';
+const DEFAULT_PUBLIC_URL = 'https://sub.rilora.ru:9443';
 
 function happProfileTitle(label) {
   return Buffer.from(Array.from(String(label || 'Устройство')).slice(0, 25).join(''), 'utf8').toString('base64');
@@ -855,6 +855,7 @@ class VpnSubscriptionService {
 }
 
 module.exports = {
+  DEFAULT_PUBLIC_URL,
   VpnSubscriptionService,
   generateToken,
   hashToken,

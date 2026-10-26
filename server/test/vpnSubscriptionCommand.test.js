@@ -35,12 +35,13 @@ test('parseVpnCommand and parseVpnCallback handle subscription commands', () => 
 });
 
 test('vpnReplyMarkup accepts happ-sub URL buttons', () => {
+  const url = `https://jarvis.rilora.ru/happ-sub/sub_${'a'.repeat(64)}`;
   const buttons = [
-    [{ text: '🚀 Активировать в Happ', url: 'https://jarvis.rilora.ru/happ-sub/sub_1234567890abcdef1234567890abcdef' }],
+    [{ text: '🚀 Активировать в Happ', url }],
     [{ text: '« К подпискам', data: 'vpn:sub:menu' }],
   ];
   const markup = vpnReplyMarkup(buttons);
-  assert.equal(markup.inline_keyboard[0][0].url, 'https://jarvis.rilora.ru/happ-sub/sub_1234567890abcdef1234567890abcdef');
+  assert.equal(markup.inline_keyboard[0][0].url, url);
   assert.equal(markup.inline_keyboard[1][0].callback_data, 'vpn:sub:menu');
 });
 

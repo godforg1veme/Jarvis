@@ -4,10 +4,28 @@ const { PAGE_CALLBACK_RE } = require('./telegramCallbackPages');
 const { isLifeCallback } = require('./telegramLifeOsService');
 const { isJobCallback, isJobVacancyUrl } = require('../jobs/jobTelegramCallbacks');
 const { isVpnCallback } = require('../vpn/vpnCommandService');
+const { DEFAULT_PUBLIC_URL } = require('../vpn/vpnSubscriptionService');
 const { TELEGRAM_FAILURE_CODES, classifyTelegramFailure, telegramFailureReply } = require('./telegramFailure');
 
 const VPN_CALLBACK_RE = /^vpn:(?:menu|status|health|clients|new|restart|routing|pc|sub:(?:menu|new|(?:view|rotate|revoke|repair):[a-f0-9-]{36})|probe:(?:menu|enable|disable|(?:install|rotate|recheck):(?:de|nl):[vh])|c:(?:de|nl)|p:[vh]|(?:(?:de|nl):)?[vh]:(?:menu|status|clients|new|restart|routing|pc|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12})|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12}|(?:confirm|reject):[a-f0-9-]{36})$/i;
 const TELEGRAM_CALLBACK_RE = /^(?:vpn:(?:menu|status|health|clients|new|restart|routing|pc|sub:(?:menu|new|(?:view|rotate|revoke|repair):[a-f0-9-]{36})|probe:(?:menu|enable|disable|(?:install|rotate|recheck):(?:de|nl):[vh])|c:(?:de|nl)|p:[vh]|(?:(?:de|nl):)?[vh]:(?:menu|status|clients|new|restart|routing|pc|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12})|(?:client|export|rotate|revoke):vpn-[a-f0-9]{12}|(?:confirm|reject):[a-f0-9-]{36})|vpsup:(?:allow|reject|details):[a-f0-9-]{36}|cmd:(?:confirm|reject):[a-f0-9-]{36}|life:(?:confirm|dismiss):[a-f0-9-]{36}|mem:(?:menu|list|add|correct|forget|(?:edit|forget_prompt|forget_confirm):[a-f0-9-]{36})|doc:(?:menu|add|cancel|(?:del_prompt|delete):[a-f0-9-]{36})|dev:(?:menu|list|pair|cancel|(?:(?:select|task|revoke_prompt|revoke):[a-f0-9-]{36}))|flow:cancel:[a-f0-9-]{36}|gallery:(?:(?:page|keep):[0-9]{1,4}|(?:open|delete):[dv]:[a-f0-9-]{36}:[0-9]{1,4}))$/i;
+
+function isSubscriptionUrl(value, configuredOrigin) {
+  try {
+    const candidate = new URL(value);
+    const allowed = ['https://jarvis.rilora.ru', DEFAULT_PUBLIC_URL];
+    if (configuredOrigin) {
+      const configured = new URL(configuredOrigin);
+      if (configured.protocol === 'https:' && configured.pathname === '/' && !configured.search && !configured.hash
+        && !configured.username && !configured.password) allowed.push(configured.origin);
+    }
+    return candidate.protocol === 'https:' && !candidate.username && !candidate.password
+      && !candidate.search && !candidate.hash && allowed.includes(candidate.origin)
+      && /^\/happ-sub\/sub_[a-f0-9]{64}$/.test(candidate.pathname);
+  } catch {
+    return false;
+  }
+}
 
 function vpnReplyMarkup(buttons, options = {}) {
   if (buttons === undefined) return undefined;
@@ -23,10 +41,7 @@ function vpnReplyMarkup(buttons, options = {}) {
         const validCallback = data && !url && Buffer.byteLength(data, 'utf8') <= 64 && (TELEGRAM_CALLBACK_RE.test(data) || PAGE_CALLBACK_RE.test(data) || isLifeCallback(data) || isVpnCallback(data) || isJobCallback(data));
         const validOperationsUrl = url && !data && options.operationsPanelUrl && url === options.operationsPanelUrl;
         const validRoutingUrl = url && !data && (url === 'https://jarvis.rilora.ru/happ-routing' || (options.routingUrl && url === options.routingUrl));
-        const validSubscriptionUrl = url && !data && (
-          url.startsWith('https://jarvis.rilora.ru/happ-sub/') ||
-          (options.publicUrl && url.startsWith(`${options.publicUrl}/happ-sub/`))
-        );
+        const validSubscriptionUrl = url && !data && isSubscriptionUrl(url, options.publicUrl);
         const validMiniAppUrl = webApp && !data && !url && options.miniAppUrl && webApp === options.miniAppUrl;
         let validJobLoginUrl = false;
         if (url && !data && !webApp && options.jobLoginOrigin) {

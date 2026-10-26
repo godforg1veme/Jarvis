@@ -31,7 +31,7 @@ CALLS = []
 class Upstream(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         CALLS.append((self.path, dict(self.headers)))
-        active = self.path.split('?')[0] == '/sub/' + TOKEN
+        active = self.path.split('?')[0] in ['/sub/' + TOKEN, '/happ-sub/' + TOKEN]
         payload = base64.b64encode(b'vless://fixture@fixture.invalid:8443') if active else b'not found'
         self.send_response(200 if active else 404)
         self.send_header('Content-Type', 'text/plain')
@@ -131,6 +131,11 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(self.request('/sub/' + REVOKED)[0], 404)
         self.assertEqual(CALLS[-1][0], '/sub/' + REVOKED)
 
+    def test_landing_route_is_forwarded(self):
+        self.assertEqual(self.request('/happ-sub/' + TOKEN)[0], 200)
+        self.assertEqual(CALLS[-1][0], '/happ-sub/' + TOKEN)
+        self.assertEqual(self.request('/happ-sub/' + REVOKED)[0], 404)
+
     def test_head_preserves_status_without_body(self):
         status, headers, body = self.request('/sub/' + TOKEN, method='HEAD')
         self.assertEqual(status, 200)
@@ -146,7 +151,7 @@ class GatewayTests(unittest.TestCase):
 
     def test_private_and_malformed_routes_never_reach_backend(self):
         before = len(CALLS)
-        for path in ['/mini/', '/api/users', '/health/ready', '/happ-sub/' + TOKEN,
+        for path in ['/mini/', '/api/users', '/health/ready', '/happ-sub/short',
                      '/sub/short', '/sub/' + TOKEN + '/extra', '/sub/../mini/',
                      '/sub/%2e%2e/mini/', '/sub/' + TOKEN + '%2fextra']:
             with self.subTest(path=path):

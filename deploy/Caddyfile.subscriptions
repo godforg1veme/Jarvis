@@ -27,7 +27,7 @@ https://{$JARVIS_SUBSCRIPTION_DOMAIN}:9443 {
 
 	@subscription {
 		method GET HEAD
-		path_regexp subscription ^/sub/sub_[a-f0-9]{64}$
+		path_regexp subscription ^/(sub|happ-sub)/sub_[a-f0-9]{64}$
 	}
 	handle @subscription {
 		reverse_proxy server:3210 {

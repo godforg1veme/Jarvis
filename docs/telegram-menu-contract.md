@@ -114,6 +114,12 @@ paths, storage keys, tokens, credentials, or unchecked user text may appear.
 
 - `life:*`: Life OS hierarchy and proposals; mutable values use scoped guided input.
 - `vpn:*`: country/protocol menus, subscriptions, and origin-bound confirmation.
+  После подтверждённого создания или «Получить новую ссылку» VPN-подписка
+  выдаётся через `https://sub.rilora.ru:9443`: текст содержит `/sub/`, кнопка
+  импорта открывает `/happ-sub/` того же origin. Старые URL-кнопки на
+  `https://jarvis.rilora.ru/happ-sub/` остаются допустимыми. Меню, callbacks,
+  owner/private scope, подтверждение ротации и доставка без записи URL
+  в историю сохраняются. Изменение запрошено владельцем 26 октября 2026.
   Bound subscription profiles offer «🔧 Восстановить подключения» through
   the existing `vpn:sub:repair:<uuid>` callback. In the owner's private chat,
   only explicit `VPN_CLIENT_NOT_FOUND` export results qualify for replacement.

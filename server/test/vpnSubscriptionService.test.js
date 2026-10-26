@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
+  DEFAULT_PUBLIC_URL,
   VpnSubscriptionService,
   generateToken,
   hashToken,
@@ -242,6 +243,14 @@ test('renderHappLandingHtml produces the documented Happ deeplink and manual URL
   assert.equal(html.includes('Активировать в Happ'), true);
 });
 
+test('default subscription origin uses the direct endpoint for new links and Happ landing', () => {
+  const service = new VpnSubscriptionService();
+  assert.equal(DEFAULT_PUBLIC_URL, 'https://sub.rilora.ru:9443');
+  const html = service.renderHappLandingHtml({ token: 'sub_fixture', label: 'iPhone' });
+  assert.ok(html.includes('https%3A%2F%2Fsub.rilora.ru%3A9443%2Fsub%2Fsub_fixture'));
+  assert.ok(html.includes('value="https://sub.rilora.ru:9443/sub/sub_fixture"'));
+});
+
 test('resolveSubscription uses an explicit format and handles invalid tokens', async () => {
   let touchedId = null;
   const mockRepo = {
@@ -347,4 +356,31 @@ test('createSubscription creates db record and returns valid URLs', async () => 
   assert.equal(created.token.startsWith('sub_'), true);
   assert.equal(created.url, `https://jarvis.rilora.ru/sub/${created.token}`);
   assert.equal(created.happUrl, `https://jarvis.rilora.ru/happ-sub/${created.token}`);
+
+  const direct = await new VpnSubscriptionService({ repository: mockRepo }).createSubscription({
+    userId: 'owner-1',
+    label: 'iPhone',
+    createdBy: 'owner-1',
+    clientIdDe: 'c-de',
+  });
+  assert.equal(direct.url, `${DEFAULT_PUBLIC_URL}/sub/${direct.token}`);
+  assert.equal(direct.happUrl, `${DEFAULT_PUBLIC_URL}/happ-sub/${direct.token}`);
+});
+
+test('rotateSubscription returns the direct origin after the stored token is replaced', async () => {
+  let rotatedHash;
+  const repository = {
+    async rotate({ id, userId, tokenHash }) {
+      assert.equal(id, 'sub-id');
+      assert.equal(userId, 'owner-1');
+      rotatedHash = tokenHash;
+      return { id, label: 'iPhone' };
+    },
+  };
+  const rotated = await new VpnSubscriptionService({ repository }).rotateSubscription({
+    id: 'sub-id', userId: 'owner-1',
+  });
+  assert.equal(rotatedHash, hashToken(rotated.token));
+  assert.equal(rotated.url, `${DEFAULT_PUBLIC_URL}/sub/${rotated.token}`);
+  assert.equal(rotated.happUrl, `${DEFAULT_PUBLIC_URL}/happ-sub/${rotated.token}`);
 });

@@ -63,7 +63,7 @@ const { VpnCommandService } = require('./vpn/vpnCommandService');
 const { VpnRecoveryWorker } = require('./vpn/vpnRecoveryWorker');
 const { ExternalProbeMonitor } = require('./operations/vpnSupervisor/externalProbeMonitor');
 const { VpnSubscriptionRepository } = require('./vpn/vpnSubscriptionRepository');
-const { VpnSubscriptionService } = require('./vpn/vpnSubscriptionService');
+const { DEFAULT_PUBLIC_URL, VpnSubscriptionService } = require('./vpn/vpnSubscriptionService');
 const { VpnPortPoolRepository } = require('./vpn/vpnPortPoolRepository');
 const { HysteriaPortPoolService } = require('./vpn/hysteriaPortPoolService');
 const { VisionLeaseStore } = require('./vision/visionLeaseStore');
@@ -461,7 +461,7 @@ async function createRuntime(config, overrides = {}) {
         clients: vpnClients,
         externalProbeMonitor,
         portPoolService: vpnPortPoolService,
-        publicUrl: config.publicUrl || 'https://jarvis.rilora.ru',
+        publicUrl: config.publicUrl || DEFAULT_PUBLIC_URL,
       });
       app.vpnSubscriptionService = vpnSubscriptionService;
       vpnService = overrides.vpnService || new VpnCommandService({
