@@ -1,0 +1,47 @@
+{
+	admin off
+	persist_config off
+	auto_https disable_redirects
+	# URLs are bearer credentials. Caddy error logs can include request URIs,
+	# even with access logging disabled. Keep both out of this ingress.
+	log default {
+		output discard
+	}
+}
+
+https://{$JARVIS_SUBSCRIPTION_DOMAIN}:9443 {
+	tls {
+		issuer acme {
+			# Xray owns host TCP 443. Certificate issuance uses HTTP-01 on TCP 80.
+			disable_tlsalpn_challenge
+		}
+	}
+
+	header {
+		-Server
+		>Cache-Control "private, no-store"
+		Referrer-Policy "no-referrer"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+	}
+
+	@subscription {
+		method GET HEAD
+		path_regexp subscription ^/sub/sub_[a-f0-9]{64}$
+	}
+	handle @subscription {
+		reverse_proxy server:3210 {
+			# Let Fastify apply its own private scope and token validation. There is
+			# no credential cache and no Cloudflare dependency on this path.
+			header_up -Cookie
+			header_up -Authorization
+			header_up -Forwarded
+			transport http {
+				dial_timeout 2s
+			}
+		}
+	}
+	handle {
+		respond 404
+	}
+}

@@ -76,6 +76,11 @@ automatically without a user request. `AGENTS.md` is authoritative for this rule
 
 ### Current public endpoint
 
+An optional [direct Happ subscription ingress](subscription-direct.md) is
+prepared for timeout diagnosis independently of Cloudflare. It is not enabled.
+Its separate overlay publishes TCP 80/9443 for ACME/HTTPS and proxies only
+subscription GET/HEAD requests; it does not bind Xray TCP 443/8443.
+
 `jarvis.rilora.ru` routes through Cloudflare Tunnel to `http://server:3210` and
 its `/health/ready` endpoint was verified on 2026-09-01. Use it for Desktop
 pairing and smoke checks. Do not expose port 3210 or PostgreSQL directly.

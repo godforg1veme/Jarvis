@@ -1,0 +1,36 @@
+# Explicit opt-in overlay, combined with docker-compose.yml after owner approval.
+# Do not enable the existing "direct" profile: it binds Xray's TCP 443.
+services:
+  subscription-direct:
+    image: caddy:2.10-alpine
+    profiles: [subscription-direct]
+    restart: unless-stopped
+    environment:
+      JARVIS_SUBSCRIPTION_DOMAIN: ${JARVIS_SUBSCRIPTION_DOMAIN:?Set a DNS-only subscription hostname before enabling this overlay}
+    ports:
+      # Keep Hysteria2's other address free for its own HTTP-01 renewal.
+      - "${JARVIS_SUBSCRIPTION_BIND_ADDRESS:?Set the dedicated ingress IPv4}:80:80"
+      - "${JARVIS_SUBSCRIPTION_BIND_ADDRESS:?Set the dedicated ingress IPv4}:9443:9443"
+    volumes:
+      - ./Caddyfile.subscriptions:/etc/caddy/Caddyfile:ro
+      - subscription-caddy-data:/data
+      - subscription-caddy-config:/config
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    depends_on:
+      server:
+        condition: service_healthy
+    networks: [backend]
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
+          pids: 64
+
+volumes:
+  subscription-caddy-data:
+  subscription-caddy-config:

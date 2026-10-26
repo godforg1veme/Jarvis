@@ -4,6 +4,11 @@
 
 ## Русский
 
+Для таймаутов подписок Happ подготовлен [прямой HTTPS-вход](../deploy/subscription-direct.md)
+в обход Cloudflare. Шесть проверок на настоящем Caddy и проверка Compose
+прошли. Вход на VPS не включён; DNS, сертификат и обновление на проблемном
+iPhone ещё не проверены. Первопричина таймаута не установлена.
+
 На DE выпущены [три прохода HH](updates/2026-10-25-hh-three-lane-release.md): свежие
 вакансии раз в пять минут, накопленный сбор и ежедневная сверка всей выбранной
 глубины истории. Фильтры и Telegram-интерфейс прежние. Server healthy, collector
@@ -97,6 +102,12 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 Архивы не заменяют действующие правила и новую проверку окружения.
 
 ## English
+
+A [direct HTTPS subscription ingress](../deploy/subscription-direct.md) is
+prepared for Happ timeouts independently of Cloudflare. Six real-Caddy checks
+and Compose validation passed. It is not enabled on the VPS; DNS, certificates
+and refresh on the affected iPhone remain unverified. The timeout's root cause
+has not been established.
 
 [Three HH collection lanes](updates/2026-10-25-hh-three-lane-release.md) are deployed
 on DE: five-minute fresh checks, historical collection and daily full-range
