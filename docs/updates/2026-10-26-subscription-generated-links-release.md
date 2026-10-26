@@ -33,6 +33,16 @@ credentials прежние. Ротация по подтверждению де�
 при установке токены не ротировались. Реальная выдача через Telegram и импорт
 на проблемном iPhone остаются для приёмки владельцем.
 
+Итоговая проверка 26 октября, после подтверждения результата владельцем:
+все пять его активных профилей формируют по четыре подключения без частичных
+или полных ошибок. До и после read-only выгрузки сверены token hashes и
+привязки; они не менялись. Общий генератор применяется ко всем профилям,
+отдельного адреса для Максимки в коде или БД нет. Уже сохранённые на других
+устройствах URL нужно перевести на новый origin на самом устройстве; сервер
+не редактирует настройки Happ дистанционно. Для этого можно сохранить текущий
+токен и поменять только origin, либо подтвердить обычную выдачу новой ссылки.
+Остальные устройства и длительная работа отдельно не проверялись.
+
 ## English
 
 This fixes an omission in the [first stage](2026-10-26-subscription-direct-release.md):
@@ -64,3 +74,12 @@ Callback grammar, owner/private scope, rotation confirmation and delivery-only
 credentials remain unchanged. Confirmed rotation invalidates the previous URL;
 deployment itself rotated no tokens. Actual Telegram delivery and import on
 the affected iPhone remain owner acceptance steps.
+
+Final October 26 audit after the owner's confirmation: all five active profiles
+belonging to the owner produce four entries each, without partial or total
+export failures. Token hashes and bindings matched before and after the read-only
+exports. The generator is shared by every profile; there is no separate Maximka
+origin in code or the database. URLs already saved on other devices must be
+changed to the new origin on those devices; the server cannot edit Happ remotely.
+Either retain the current token and replace only the origin, or confirm the
+normal new-link operation. Other devices and long-term operation were not tested.

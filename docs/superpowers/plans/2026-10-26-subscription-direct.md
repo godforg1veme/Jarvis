@@ -15,7 +15,9 @@ Spec: [design](../specs/2026-10-26-subscription-direct-design.md).
   [deployment instructions](../../../deploy/subscription-direct.md).
 - [x] After owner authorization: publish and synchronize sources, configure
   DNS-only hostname and TCP 80/9443, install the gateway, verify TLS and scope.
-- [ ] Confirm successful import and refresh on the affected iPhone.
+- [x] Owner confirmed the result after release. Other devices and long-term
+  operation remain unverified. All five active owner profiles export four
+  endpoints each without changing tokens or bindings.
 
 ## Follow-up: generated Telegram links
 

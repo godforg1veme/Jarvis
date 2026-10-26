@@ -4,13 +4,15 @@
 
 ## Русский
 
-На DE включён [прямой HTTPS-вход подписок Happ](updates/2026-10-26-subscription-direct-release.md)
-в обход Cloudflare. Шесть проверок на настоящем Caddy, проверка Compose,
-DNS и строгий TLS прошли. Прежний server healthy, VPN не перезапускался.
-Обновление на проблемном iPhone и первопричина таймаута ещё не подтверждены.
-В [дополнении выпуска](updates/2026-10-26-subscription-generated-links-release.md)
-новые ссылки и кнопка импорта переключены на прямой адрес. Server healthy;
-863 проверки прошли локально и в Linux-образе, по две с БД пропущены.
+На DE работает [прямая выдача подписок Happ](updates/2026-10-26-subscription-generated-links-release.md)
+без Cloudflare, включая новые ссылки и кнопку импорта для всех профилей.
+Все пять активных подписок текущего владельца формируют по четыре подключения;
+токены и привязки при итоговой проверке сохранены. Владелец подтвердил результат
+после выпуска. Server healthy; 863 проверки прошли локально и в Linux-образе
+(по две с БД пропущены), семь сценариев Caddy, DNS и строгий TLS проверены.
+Остальные устройства и длительная работа ещё не проверены; первопричина
+сбоя старого маршрута не установлена. Уже сохранённые в Happ адреса не меняются
+автоматически — общий генератор выдаёт новый origin для любого профиля.
 
 На DE выпущены [три прохода HH](updates/2026-10-25-hh-three-lane-release.md): свежие
 вакансии раз в пять минут, накопленный сбор и ежедневная сверка всей выбранной
@@ -106,15 +108,16 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 
 ## English
 
-A [direct HTTPS Happ subscription ingress](updates/2026-10-26-subscription-direct-release.md)
-is enabled on DE independently of Cloudflare. Six real-Caddy checks, Compose
-validation, DNS and strict TLS passed. The existing server is healthy and VPN
-services were not restarted. Refresh on the affected iPhone and the timeout's
-root cause remain unverified.
-The [follow-up release](updates/2026-10-26-subscription-generated-links-release.md)
-switches new links and import buttons to the direct origin. The server is
-healthy; 863 checks passed locally and in the Linux image, with two database
-checks skipped in each run.
+[Direct Happ subscription delivery](updates/2026-10-26-subscription-generated-links-release.md)
+is enabled on DE without Cloudflare, including new links and import buttons
+for every profile. All five active profiles belonging to the current owner
+produce four entries each; final checks preserved tokens and bindings. The owner
+confirmed the result after release. The server is healthy; 863 checks passed
+locally and in the Linux image (two database checks skipped in each run), and
+seven Caddy scenarios, DNS and strict TLS were verified. Other devices and
+long-term operation remain unverified; the original route's root cause is
+unknown. URLs already saved in Happ do not change automatically; the shared
+generator supplies the new origin for any profile.
 
 [Three HH collection lanes](updates/2026-10-25-hh-three-lane-release.md) are deployed
 on DE: five-minute fresh checks, historical collection and daily full-range
