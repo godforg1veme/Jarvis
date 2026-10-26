@@ -4,27 +4,27 @@
 
 ## Русский
 
-27 октября подготовлен [выпуск кнопок и памяти](../docs/updates/2026-10-27-mini-app-buttons-release.md):
+27 октября на DE установлен [выпуск кнопок и памяти](../docs/updates/2026-10-27-mini-app-buttons-release.md):
 этапы 1–4 и первый раздел этапа 5 прошли общий набор проверок и независимую ревизию.
 Текущий статус установки приведён в записи выпуска; исторические результаты ниже.
 
 27 октября локально добавлены запись, исправление и удаление памяти с подтверждением
 в Mini App, атомарной квитанцией и восстановлением исходного UUID после потери ответа.
-Нужна миграция 051; на VPS не установлено.
+Миграция 051 установлена в выпуске 27 октября.
 [Результат первого раздела этапа 5 и ограничения](../docs/updates/2026-10-27-mini-app-memory-development.md).
 
 26 октября локально добавлены обновление и догрузка личных списков, раскрытие
-карточек и предыдущие сообщения отдельной истории Mini App. Нужна миграция 050;
-на VPS не установлено. [Этап 4 и ограничения](../docs/updates/2026-10-26-mini-app-lists-development.md).
+карточек и предыдущие сообщения отдельной истории Mini App. Миграция 050
+установлена 27 октября. [Этап 4 и ограничения](../docs/updates/2026-10-26-mini-app-lists-development.md).
 
 26 октября локально добавлены переходы к нужному меню бота из личных разделов
 и безопасная ссылка Operations для владельца. Пояснения показывают, какие
-действия доступны в каждом клиенте. На VPS ещё не установлено.
+действия доступны в каждом клиенте. Установлены на DE 27 октября.
 [Этап 3 и проверки](../docs/updates/2026-10-26-mini-app-handoffs-development.md).
 
 26 октября локально исправлены зависание диалога после ошибки, отмена HH при
 запоздавшем ответе, порядок обновления списка доступа и повторная проверка прав
-при чтении квитанций. Нужна миграция 049; на VPS этот этап ещё не установлен.
+при чтении квитанций. Миграция 049 и этот этап установлены 27 октября.
 [Результат и оставшиеся этапы](../docs/updates/2026-10-26-mini-app-button-reliability-development.md).
 
 23 октября выпущено [движение по умолчанию](../docs/updates/2026-10-23-mini-app-auto-motion.md): кнопка паузы удалена, орбиты и фон запускаются автоматически, включая системный reduced motion и перезагрузку.
@@ -80,8 +80,9 @@ Telegram initData; личность определяется числовым Te
 вход загружает официальный Telegram Web App SDK.
 
 Доступны личный текстовый диалог и чтение своих памяти, документов, устройств
-и Life OS, если эти серверные сервисы включены. Действия с подтверждением
-остаются в Telegram/Desktop. Для второго поиска HH нужно собственное подключение:
+и Life OS, если эти серверные сервисы включены. Добавление, исправление и удаление
+памяти подтверждаются в Mini App; другие действия разделов остаются в Telegram/Desktop.
+Для второго поиска HH нужно собственное подключение:
 одна галочка не открывает браузер владельца. Общие VPN/Operations/Supervisor
 сохраняют отдельные owner-bound ограничения.
 
@@ -160,26 +161,26 @@ Mini App build и Edge fixtures. Команды и границы проверо
 ## English
 
 The [October 27 buttons and memory release](../docs/updates/2026-10-27-mini-app-buttons-release.md)
-is prepared: stages 1–4 and the first stage-5 section passed full validation and
+is installed on DE: stages 1–4 and the first stage-5 section passed full validation and
 independent review. The release record tracks installation; historical results follow.
 
 On October 27, adding, correcting and forgetting memories were added locally,
 with confirmation in Mini App, atomic receipts and original-UUID recovery after
-lost replies. Migration 051 is required; not installed on VPS.
+lost replies. Migration 051 was applied in the October 27 release.
 [First stage-5 section and limitations](../docs/updates/2026-10-27-mini-app-memory-development.md).
 
 On October 26, local changes added personal-list refresh/paging, expandable
-cards and older messages in the separate Mini App history. Migration 050 is
-required; this is not deployed. [Stage 4 and limitations](../docs/updates/2026-10-26-mini-app-lists-development.md).
+cards and older messages in the separate Mini App history. Migration 050 was
+applied on October 27. [Stage 4 and limitations](../docs/updates/2026-10-26-mini-app-lists-development.md).
 
 On October 26, local changes added direct bot-section menu links and a safe
 owner-only Operations link. Capability descriptions explain what each client
-supports. These changes are not deployed to either VPS.
+supports. These changes were installed on DE on October 27.
 [Stage 3 and verification](../docs/updates/2026-10-26-mini-app-handoffs-development.md).
 
 On October 26, local fixes addressed chat failure recovery, HH cancellation with
 delayed replies, access-list refresh ordering and access checks on saved receipts.
-Migration 049 is required; this stage is not deployed to either VPS.
+Migration 049 and this stage were installed on October 27.
 [Results and remaining stages](../docs/updates/2026-10-26-mini-app-button-reliability-development.md).
 
 On October 23, [automatic motion](../docs/updates/2026-10-23-mini-app-auto-motion.md) was deployed: the pause button is removed, and orbits and sky start automatically, including under system reduced motion and after reload.
@@ -235,8 +236,9 @@ Hidden scenes stop rendering. Animation uses no external API/CDN;
 authentication loads the official Telegram Web App SDK.
 
 Private text conversation and own memory, document, device and Life OS reads
-are available when their server services are enabled. Confirmed actions remain
-in Telegram/Desktop. A second HH search needs a personal connection: a checkbox
+are available when their server services are enabled. Adding, correcting and
+forgetting memories are confirmed in Mini App; other section actions remain in
+Telegram/Desktop. A second HH search needs a personal connection: a checkbox
 never opens the owner's browser. Shared VPN/Operations/Supervisor retains
 separate owner-bound limits.
 

@@ -4,16 +4,17 @@
 
 ## Русский
 
-27 октября подготовлен [выпуск кнопок и памяти Mini App](updates/2026-10-27-mini-app-buttons-release.md):
+27 октября на DE установлен [выпуск кнопок и памяти Mini App](updates/2026-10-27-mini-app-buttons-release.md):
 877 server tests, 24 PostgreSQL-сценария, девять браузерных наборов и независимая
 ревизия всей ветки. Прежние два падающих теста и найденные ревизией гонки исправлены.
-Установка и проверка DE/NL выполняются в рамках порученного выпуска.
+Миграции 049–051 установлены, server healthy; оба VPS source и Windows совпадают
+с GitHub main. Проверены 366 server files и 23 Mini App assets. Живая приёмка Telegram открыта.
 
-27 октября локально готовы [операции памяти Mini App](updates/2026-10-27-mini-app-memory-development.md):
+27 октября выпущены [операции памяти Mini App](updates/2026-10-27-mini-app-memory-development.md):
 добавление, исправление и удаление с подтверждением, квитанцией и безопасной отменой
 исходного запроса. Server 877/877, PostgreSQL 22/22, восемь браузерных наборов;
-независимая security-ревизия выполнена. Нужна миграция 051; выпуск не выполнен.
-Этапы 5–6 и ограничения дополнительных fixtures описаны в записи результата.
+независимая security-ревизия выполнена. Миграция 051 установлена в новом выпуске.
+Остальная часть этапа 5 и живая приёмка этапа 6 остаются открытыми.
 
 На DE работает [прямая выдача подписок Happ](updates/2026-10-26-subscription-generated-links-release.md)
 без Cloudflare, включая новые ссылки и кнопку импорта для всех профилей.
@@ -25,20 +26,20 @@
 сбоя старого маршрута не установлена. Уже сохранённые в Happ адреса не меняются
 автоматически — общий генератор выдаёт новый origin для любого профиля.
 
-Локально готов [этап 4 Mini App](updates/2026-10-26-mini-app-lists-development.md):
+27 октября выпущен [этап 4 Mini App](updates/2026-10-26-mini-app-lists-development.md):
 обновление и догрузка личных списков, раскрытие карточек и предыдущие сообщения
 отдельной истории. Server 874/874; новая PostgreSQL-проверка 7/7 с полным
-pipeline из 52 файлов по миграцию 050. Выпуск и независимая ревизия этого этапа не выполнены.
+pipeline из 52 файлов по миграцию 050. Более новый общий результат указан в записи выпуска выше.
 
-Локально готов [этап 3 Mini App](updates/2026-10-26-mini-app-handoffs-development.md):
+27 октября выпущен [этап 3 Mini App](updates/2026-10-26-mini-app-handoffs-development.md):
 переходы сразу к меню нужного раздела бота, пояснения возможностей и безопасная
 ссылка Operations для владельца. Server 874/874, Mini App PostgreSQL 13/13;
-на VPS изменения ещё не установлены.
+установлен вместе с остальными исправлениями Mini App.
 
-Локально подготовлены [исправления кнопок Mini App, этапы 1–2](updates/2026-10-26-mini-app-button-reliability-development.md):
+27 октября выпущены [исправления кнопок Mini App, этапы 1–2](updates/2026-10-26-mini-app-button-reliability-development.md):
 восстановление после ошибки диалога, гонки отмены HH, обновление списка доступа
 и проверка прав на сохранённый ответ. Server 866/866, Mini App PostgreSQL 12/12.
-Миграция 049 и код ещё не установлены на VPS; остальные этапы остаются в плане.
+Миграция 049 и код установлены; оставшаяся работа указана в плане.
 
 На DE выпущены [три прохода HH](updates/2026-10-25-hh-three-lane-release.md): свежие
 вакансии раз в пять минут, накопленный сбор и ежедневная сверка всей выбранной
@@ -135,15 +136,17 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 ## English
 
 The [October 27 Mini App buttons and memory release](updates/2026-10-27-mini-app-buttons-release.md)
-is prepared: 877 server tests, 24 PostgreSQL scenarios, nine browser suites and
+is installed on DE: 877 server tests, 24 PostgreSQL scenarios, nine browser suites and
 independent full-branch review. Both previously failing tests and the reviewed
-races were fixed. DE/NL installation and verification are in progress under the authorized release.
+races were fixed. Migrations 049–051 are applied and server is healthy; both VPS
+source checkouts and Windows match GitHub main. All 366 server files and 23 Mini
+App assets were checked. Live Telegram acceptance remains open.
 
 On October 27, [Mini App memory actions](updates/2026-10-27-mini-app-memory-development.md)
-are ready locally: add, correct and forget with confirmation, a receipt and safe
+were released: add, correct and forget with confirmation, a receipt and safe
 cancellation of the original request. Server 877/877, PostgreSQL 22/22 and eight
-browser suites passed; independent security review completed. Migration 051 is
-required; unpublished. Stages 5–6 and additional fixture limitations remain documented.
+browser suites passed; independent security review completed. Migration 051 was
+applied in the new release. Other stage-5 actions and live stage-6 acceptance remain open.
 
 [Direct Happ subscription delivery](updates/2026-10-26-subscription-generated-links-release.md)
 is enabled on DE without Cloudflare, including new links and import buttons
@@ -156,22 +159,21 @@ long-term operation remain unverified; the original route's root cause is
 unknown. URLs already saved in Happ do not change automatically; the shared
 generator supplies the new origin for any profile.
 
-[Mini App stage 4](updates/2026-10-26-mini-app-lists-development.md) is ready
-locally: refreshing and loading personal lists, expanding cards and loading
+[Mini App stage 4](updates/2026-10-26-mini-app-lists-development.md) was released
+on October 27: refreshing and loading personal lists, expanding cards and loading
 older messages in the separate history. Server 874/874; new PostgreSQL suite
-7/7 with all 52 migration files through 050. Release and independent stage review
-have not been performed.
+7/7 with all 52 migration files through 050. The newer full-branch result appears
+in the release record above.
 
 [Mini App stage 3](updates/2026-10-26-mini-app-handoffs-development.md) is ready
 locally: direct navigation to each bot section menu, capability descriptions
 and a safe owner-only Operations link. Server 874/874, Mini App PostgreSQL 13/13;
-these changes are not installed on either VPS.
+these changes were installed with the other Mini App fixes on October 27.
 
 [Mini App button fixes, stages 1–2](updates/2026-10-26-mini-app-button-reliability-development.md)
-are ready locally: chat failure recovery, HH cancellation races, access-list
+were released on October 27: chat failure recovery, HH cancellation races, access-list
 refresh ordering and access checks on saved answers. Server 866/866, Mini App
-PostgreSQL 12/12. Migration 049 and code are not installed on either VPS;
-the remaining stages stay in the plan.
+PostgreSQL 12/12. Migration 049 and code are installed; remaining work stays in the plan.
 
 [Three HH collection lanes](updates/2026-10-25-hh-three-lane-release.md) are deployed
 on DE: five-minute fresh checks, historical collection and daily full-range

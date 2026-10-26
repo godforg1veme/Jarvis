@@ -30,10 +30,24 @@
 049–051. Эвристический фильтр памяти распознаёт известные секретные форматы,
 но не обещает распознавание произвольного неизвестного секрета.
 
-Статус установки: ожидает публикации и проверки DE/NL. Обновляется server/Mini App
-на DE и исходники на обоих VPS; отдельного server runtime на NL нет.
+Выпуск установлен на DE: image `jarvis-mini-app:e84d759b3515`, immutable release
+`/home/deploy/releases/jarvis-mini-e84d759b3515`, SHA
+`e84d759b3515b65d7c12e315efe8c109d68333e8`. Исходники обоих VPS и Windows
+синхронизированы с GitHub main; отдельного server runtime на NL нет.
+В образе прошли 875 тестов, два теста с отдельной БД пропущены; локально
+они прошли в полном наборе. На установленном сервере подтверждены 53 миграции,
+в том числе 049–051, healthy и совпадение 366 серверных файлов с main.
+Все 23 собранных Mini App assets совпали с локальной сборкой с нормализацией EOL.
+Публичные live/ready, `/mini/` и `memoryActions.js` возвращают 200;
+личное `/mini/api/me` без сессии возвращает 401.
+Окружение и секреты сохранены, значения не выводились. Заменён только server:
+прочие container IDs прежние, PID Xray/Hysteria2 прежние. Host Agent на DE/NL
+совпадает по всем 17 модулям; службы active.
 Активный worktree `codex/hh-resume-diagnostics` сохранён отдельно; его изменения
 в этот выпуск не входят. Desktop-компоненты данной веткой не меняются.
+Общий inventory не получил нулевой код из-за сохранённых локальных веток/worktrees
+и недоступного manifest установленного Desktop; проверки DE и NL имеют `issues: []`.
+Desktop не устанавливался и его целостность данным выпуском не подтверждена.
 
 Живой Telegram WebView, клавиатура телефона и owner/member приёмка ещё не
 подтверждены. Остальные пользовательские операции этапа 5 и ручная сверка HH
@@ -69,10 +83,23 @@ review found no blocking defects. Migrations 049–051 are required. The heurist
 memory filter recognizes known secret formats; it cannot promise detection of
 arbitrary unknown secrets.
 
-Installation status: awaiting publication and DE/NL verification. DE server/Mini
-App and source checkouts on both VPS nodes are in scope; NL has no server runtime.
+Installed on DE: image `jarvis-mini-app:e84d759b3515`, immutable release
+`/home/deploy/releases/jarvis-mini-e84d759b3515`, SHA
+`e84d759b3515b65d7c12e315efe8c109d68333e8`. Both VPS source checkouts and Windows
+sources match GitHub main; NL has no separate server runtime. Image tests passed
+875 checks with two isolated-database tests skipped; those passed locally.
+The installed server has all 53 migrations, including 049–051, healthy status,
+and all 366 server files match main. All 23 built Mini App assets match the
+local build with normalized line endings. Public live/ready, `/mini/` and
+`memoryActions.js` return 200; private `/mini/api/me` returns 401 without a session.
+Environment and secrets were preserved without printing values. Only server
+was replaced: other container IDs and Xray/Hysteria2 PIDs are unchanged.
+Host Agent matches all 17 modules on DE/NL; services are active.
 The active `codex/hh-resume-diagnostics` worktree is preserved separately and its
-changes are excluded. This branch changes no Desktop components.
+changes are excluded. This branch changes no Desktop components. Overall
+inventory returned nonzero because local branches/worktrees were preserved and
+the installed Desktop manifest was unavailable; DE and NL each have `issues: []`.
+Desktop was not installed and its integrity was not established by this release.
 
 Actual Telegram WebView, phone keyboard and owner/member acceptance remain
 unverified. Other stage-5 user actions and manual HH unknown reconciliation remain
