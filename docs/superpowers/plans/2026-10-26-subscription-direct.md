@@ -28,7 +28,7 @@ Keep confirmation, owner/private scope and delivery-only credentials unchanged.
   buttons and rejected foreign/scheme/port/credential URLs.
 - [x] Run Telegram gate (76 pass), full server (863 pass, 2 DB skips),
   and actual Caddy route fixture (7 pass).
-- [ ] Publish and install both changed components; verify origin in installed
+- [x] Publish and install both changed components; verify origin in installed
   code, strict TLS and denied routes without rotating a live profile.
 
 Русский: выпуск согласован и выполнен 26 октября; DNS и TLS проверены.

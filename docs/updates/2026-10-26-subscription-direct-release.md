@@ -4,6 +4,9 @@
 
 ## Русский
 
+Позднее 26 октября установлен [дополнительный выпуск генерации ссылок](2026-10-26-subscription-generated-links-release.md).
+Ниже сохранён результат первого этапа, когда Telegram ещё выдавал прежний origin.
+
 На DE включён отдельный HTTPS-вход `https://sub.rilora.ru:9443`, который
 передаёт только GET/HEAD существующих подписок напрямую в Jarvis, без Cloudflare.
 Исходная причина таймаута Happ iOS 6.1 не установлена. Этот выпуск предоставляет
@@ -52,6 +55,10 @@ origin. EXE не менялся и не пересобирался.
 Приватные настройки запуска сохранены в `/home/deploy/.config/jarvis/`.
 
 ## English
+
+A [link-generation follow-up](2026-10-26-subscription-generated-links-release.md)
+was installed later on October 26. The first-stage record below is preserved;
+Telegram still generated the original origin at that stage.
 
 DE now has a separate HTTPS ingress at `https://sub.rilora.ru:9443`. It forwards
 only existing subscription GET/HEAD requests directly to Jarvis, without

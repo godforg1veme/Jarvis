@@ -50,11 +50,12 @@ docker compose --env-file /home/deploy/apps/jarvis/deploy/.env \
 получить 404; `/mini/`, `/api/`, `/health/ready`, неверный `/happ-sub/` и POST не должны
 попадать в backend. Проверить прежние server health и VPN без их перезапусков.
 
-Установленный release DE: `/home/deploy/releases/jarvis-subscription-47618d5`.
+Установленный release DE: `/home/deploy/releases/jarvis-subscription-e56340f`.
 Его приватные переменные хранятся в
 `/home/deploy/.config/jarvis/subscription-direct.env`; перед обслуживанием
-загрузить их в shell без вывода содержимого. Не заменять main server Compose
-этим release: он предназначен только для `subscription-direct --no-deps`.
+загрузить их в shell без вывода содержимого. Server использует также сохранённые
+overlays из `deploy/.deploy-stage-config/`. Для обслуживания ingress применять
+только `subscription-direct --no-deps`; не пересоздавать server неполным Compose.
 
 ## Проверка на iPhone и откат
 

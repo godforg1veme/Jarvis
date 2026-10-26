@@ -8,6 +8,9 @@
 в обход Cloudflare. Шесть проверок на настоящем Caddy, проверка Compose,
 DNS и строгий TLS прошли. Прежний server healthy, VPN не перезапускался.
 Обновление на проблемном iPhone и первопричина таймаута ещё не подтверждены.
+В [дополнении выпуска](updates/2026-10-26-subscription-generated-links-release.md)
+новые ссылки и кнопка импорта переключены на прямой адрес. Server healthy;
+863 проверки прошли локально и в Linux-образе, по две с БД пропущены.
 
 На DE выпущены [три прохода HH](updates/2026-10-25-hh-three-lane-release.md): свежие
 вакансии раз в пять минут, накопленный сбор и ежедневная сверка всей выбранной
@@ -108,6 +111,10 @@ is enabled on DE independently of Cloudflare. Six real-Caddy checks, Compose
 validation, DNS and strict TLS passed. The existing server is healthy and VPN
 services were not restarted. Refresh on the affected iPhone and the timeout's
 root cause remain unverified.
+The [follow-up release](updates/2026-10-26-subscription-generated-links-release.md)
+switches new links and import buttons to the direct origin. The server is
+healthy; 863 checks passed locally and in the Linux image, with two database
+checks skipped in each run.
 
 [Three HH collection lanes](updates/2026-10-25-hh-three-lane-release.md) are deployed
 on DE: five-minute fresh checks, historical collection and daily full-range
