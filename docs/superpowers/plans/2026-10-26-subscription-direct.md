@@ -13,9 +13,10 @@ Spec: [design](../specs/2026-10-26-subscription-direct-design.md).
   response-header deadline. Deployment and phone acceptance remain pending.
 - [x] Record checks and prepare the concrete release proposal in
   [deployment instructions](../../../deploy/subscription-direct.md).
-- [ ] After owner authorization: publish and synchronize sources, configure
+- [x] After owner authorization: publish and synchronize sources, configure
   DNS-only hostname and TCP 80/9443, install the gateway, verify TLS and scope.
 - [ ] Confirm successful import and refresh on the affected iPhone.
 
-Русский: до согласованного выпуска существующие сервисы, DNS, firewall,
-подписки и токены не меняются. Подготовка не считается исправлением на телефоне.
+Русский: выпуск согласован и выполнен 26 октября; DNS и TLS проверены.
+Прежние сервисы, подписки и токены сохранены. До проверки на iPhone
+исправление на телефоне не считается подтверждённым.

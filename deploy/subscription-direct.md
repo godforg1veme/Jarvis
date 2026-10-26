@@ -1,6 +1,7 @@
 # Прямой HTTPS-вход для подписок Happ
 
-Статус 26 октября 2026: подготовлен и проверен локально, на VPS не включён.
+Статус 26 октября 2026: [включён на DE](../docs/updates/2026-10-26-subscription-direct-release.md),
+DNS и строгий TLS проверены; приёмка на проблемном iPhone ещё не выполнена.
 Это независимый путь через DNS-only имя и TCP 9443. Он позволяет проверить
 обход Cloudflare; исходная причина таймаута пока не установлена.
 
@@ -46,6 +47,12 @@ docker compose --env-file /home/deploy/apps/jarvis/deploy/.env \
 сертификат со строгим TLS, без `-k`. Неизвестный искусственный токен должен
 получить 404; `/mini/`, `/api/`, `/health/ready`, `/happ-sub/` и POST не должны
 попадать в backend. Проверить прежние server health и VPN без их перезапусков.
+
+Установленный release DE: `/home/deploy/releases/jarvis-subscription-47618d5`.
+Его приватные переменные хранятся в
+`/home/deploy/.config/jarvis/subscription-direct.env`; перед обслуживанием
+загрузить их в shell без вывода содержимого. Не заменять main server Compose
+этим release: он предназначен только для `subscription-direct --no-deps`.
 
 ## Проверка на iPhone и откат
 

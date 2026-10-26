@@ -77,7 +77,8 @@ automatically without a user request. `AGENTS.md` is authoritative for this rule
 ### Current public endpoint
 
 An optional [direct Happ subscription ingress](subscription-direct.md) is
-prepared for timeout diagnosis independently of Cloudflare. It is not enabled.
+enabled on DE for timeout diagnosis independently of Cloudflare. DNS and strict
+TLS passed; acceptance on the affected iPhone is pending.
 Its separate overlay publishes TCP 80/9443 for ACME/HTTPS and proxies only
 subscription GET/HEAD requests; it does not bind Xray TCP 443/8443.
 
