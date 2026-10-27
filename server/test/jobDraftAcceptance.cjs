@@ -10,6 +10,7 @@ const { JobModelAdapter } = require('../src/jobs/jobModelAdapter');
 const { JobDraftService } = require('../src/jobs/jobDraftService');
 const { recoverJobGenerations } = require('../src/jobs/jobRecovery');
 const { configuredOwnerJobAccess } = require('../src/jobs/configuredOwnerJobAccess');
+const { JobResumeContextService } = require('../src/jobs/jobResumeContextService');
 const { FREE_MODELS } = require('../src/providers/freeFirstProvider');
 
 test('real PostgreSQL: automatic model routing, duplicate request, revisions and failure retention', async () => {
@@ -25,6 +26,15 @@ test('real PostgreSQL: automatic model routing, duplicate request, revisions and
     await search.recordMatch({ userId: f.owner, vacancyId: vacancy.id, filterRevision: 1 });
     await profile.replace({ scope: f.scope, expectedRevision: 0, profile: { confirmed: true,
       facts: [{ id: 'automation', text: 'Confirmed automation fixture', confirmed: true }], examples: [] } });
+    await f.pool.query("INSERT INTO job_connections(user_id,resume_id,status) VALUES($1,'fixtureResume','connected')", [f.owner]);
+    const resumeContextService = new JobResumeContextService({ pool: f.pool, accessService,
+      browserClient: { forUser(userId) {
+        assert.equal(userId, f.owner);
+        return { async readResume({ resumeId }) {
+          return { resumeId, title: 'Fixture engineer', experience: 'Built automation', skills: '',
+            education: '', summary: '', grammaticalGender: 'unknown' };
+        } };
+      } } });
     const modelId = FREE_MODELS[0];
     const adapter = new JobModelAdapter({ config: { openrouterApiKey: crypto.randomUUID() }, fetchImpl: async (url, init) => {
       if (url.endsWith('/models/user')) return Response.json({ data: [{ id: modelId, context_length: 100000,
@@ -38,7 +48,7 @@ test('real PostgreSQL: automatic model routing, duplicate request, revisions and
         content: JSON.stringify({ text: `Letter version ${calls}`, factIds: ['automation'] }) } }] });
     } });
     const service = new JobDraftService({ pool: f.pool, searchRepository: search, profileRepository: profile,
-      draftRepository: drafts, usageRepository: usage, modelAdapter: adapter, accessService });
+      draftRepository: drafts, usageRepository: usage, modelAdapter: adapter, accessService, resumeContextService });
     assert.equal(calls, 0);
     const requestId = crypto.randomUUID();
     const first = await service.generate({ scope: f.scope, vacancyId: vacancy.id, requestId });
@@ -63,7 +73,7 @@ test('real PostgreSQL: automatic model routing, duplicate request, revisions and
     const interruptedId = crypto.randomUUID();
     await f.pool.query(`INSERT INTO job_tasks(user_id,request_id,kind,payload,status,created_at)
       VALUES($1,$2,'generate',$3,'running',now()-interval '4 minutes')`, [f.owner, interruptedId,
-      { vacancyId: vacancy.id, parentDraftId: null, invoked: true }]);
+      { vacancyId: vacancy.id, parentDraftId: null, resumeId: 'fixtureResume', connectionRevision: 1, invoked: true }]);
     assert.equal(await recoverJobGenerations(f.pool), 1);
     assert.equal(await recoverJobGenerations(f.pool), 0);
     await assert.rejects(service.generate({ scope: f.scope, vacancyId: vacancy.id, requestId: interruptedId }), { code: 'JOB_GENERATION_OUTCOME_UNKNOWN' });

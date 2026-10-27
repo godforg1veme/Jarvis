@@ -2,6 +2,14 @@
 
 ## Русский
 
+Обновление 28 октября: reader исправлен и установлен на DE, образ
+`jarvis-hh-browser:ee29c85`. Все 108 Linux-тестов прошли без пропусков.
+Штатный серверный запрос подтвердил чтение выбранного резюме: название,
+опыт и навыки получены без вывода содержимого. Reader проверяет точный адрес,
+единственность источника HH, объём и формат данных; временная подробная
+диагностика удалена. Проверка самого создания письма в Telegram ещё открыта.
+Защита связи старых писем с резюме и migration 053 пока локальные.
+
 27 октября 2026 года по поручению владельца на DE установлена диагностика
 чтения резюме для сопроводительных писем. Проверка выбранного профиля показала:
 резюме присутствует в списке HH, но существующий reader не распознаёт его
@@ -17,6 +25,14 @@
 Продолжение диагностики и живая проверка создания письма остаются открытыми.
 
 ## English
+
+October 28 update: the reader fix is deployed on DE as
+`jarvis-hh-browser:ee29c85`. All 108 Linux tests passed without skips.
+A normal server request successfully read the selected resume's title,
+experience and skills without printing their contents. The reader checks the
+exact URL, unique HH source, size and data shape; detailed temporary diagnostics
+were removed. Live letter creation in Telegram remains open. Draft provenance
+guards and migration 053 remain local.
 
 On October 27, 2026, the owner authorized deployment of diagnostics for HH resume
 reading during cover-letter preparation. A check of the selected profile showed

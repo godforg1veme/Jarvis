@@ -77,6 +77,13 @@ test('E2E local HTTP + actual bot + PG: configure, collect, letter, approval, lo
         return fetch(`${origin}/model`, init);
       }, applicationAdapter,
       send: ({ chatId, answer, buttons }) => bot.api.sendMessage(chatId, answer, buttons?.length ? { reply_markup: telegramReplyMarkup(buttons) } : {}) });
+    jobs.telegramService.draftService.resumeContextService.browserClient = { forUser(userId) {
+      assert.equal(userId, fixture.owner);
+      return { async readResume({ resumeId }) {
+        return { resumeId, title: 'Fixture engineer', experience: 'Built API integrations', skills: '',
+          education: '', summary: '', grammaticalGender: 'unknown' };
+      } };
+    } };
     const menu = new TelegramMenuService({ interactions, jobSearchService: jobs.telegramService });
     const messages = new TelegramMessageService({ accessPolicy: createTelegramAccessPolicy(['101']),
       updateRepository: new TelegramUpdateRepository(fixture.pool), userRepository: new UserRepository(fixture.pool),
@@ -131,6 +138,7 @@ test('E2E local HTTP + actual bot + PG: configure, collect, letter, approval, lo
     assert.equal(card.parse_mode, undefined);
     const chooser = await callback(findButton(card, 'Подготовить отклик'));
     assert.equal(modelCalls, 0);
+    await fixture.pool.query("INSERT INTO job_connections(user_id,resume_id,status) VALUES($1,'fixtureResume','connected')", [fixture.owner]);
     const prepared = await callback(findButton(chooser.reply, 'Улучшенное'));
     assert.equal(modelCalls, 1); assert.match(prepared.reply.text, /Fixture cover letter 1/);
     await bot.handleUpdate(prepared.update); assert.equal(modelCalls, 1);
@@ -143,7 +151,6 @@ test('E2E local HTTP + actual bot + PG: configure, collect, letter, approval, lo
     assert.ok(!upstreamCalls.some((path) => /negotiations/.test(path)), 'preparation must never submit an application');
     assert.equal((await fixture.pool.query('SELECT count(*)::int AS n FROM job_drafts')).rows[0].n, 3);
     await jobs.deliveryWorker.tick(); assert.equal(sent.at(-1), translated, 'no duplicate card after worker restart');
-    await fixture.pool.query("INSERT INTO job_connections(user_id,resume_id,status) VALUES($1,'fixture-resume','connected')", [fixture.owner]);
     const applicationPreview = await callback(findButton(translated, 'Отправить отклик'));
     assert.match(applicationPreview.reply.text, /Fixture cover letter 3/); assert.equal(submitCalls, 0);
     const unknown = await callback(findButton(applicationPreview.reply, 'Подтвердить отправку'));

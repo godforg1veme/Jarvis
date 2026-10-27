@@ -25,7 +25,8 @@ async function applicationFixture() {
   const vacancy = await search.upsertVacancy({ externalId: '123', snapshot });
   await search.recordMatch({ userId: f.owner, vacancyId: vacancy.id, filterRevision: 1 });
   await f.pool.query("INSERT INTO job_connections(user_id,resume_id,status) VALUES($1,'fixture-resume','connected')", [f.owner]);
-  const draft = await drafts.append({ scope: f.scope, vacancyId: vacancy.id, profileRevision: 1, vacancyRevision: 1, text: 'Approved fixture letter', facts: ['fixture'] });
+  const draft = await drafts.append({ scope: f.scope, vacancyId: vacancy.id, profileRevision: 1, vacancyRevision: 1,
+    text: 'Approved fixture letter', facts: ['fixture'], resumeId: 'fixture-resume', connectionRevision: 1 });
   const adapter = { capabilities: { applicantApply: true },
     async inspect() { return { resumeAvailable: !rejectedResume, manualRequired: manual,
       existingApplicationId: existing, vacancy: changed ? { ...snapshot, description: 'Changed tasks' } : snapshot }; },
@@ -97,6 +98,88 @@ test('real PG: resume/profile/source changes, removed resume and external form p
   }
 });
 
+test('real PG: a draft cannot be prepared after its selected resume or connection revision changes', async () => {
+  for (const change of ['resume', 'revision']) {
+    const f = await applicationFixture();
+    try {
+      assert.equal(f.draft.resume_id, 'fixture-resume');
+      assert.equal(f.draft.connection_revision, 1);
+      await f.pool.query(change === 'resume'
+        ? "UPDATE job_connections SET resume_id='other-fixture-resume',revision=revision+1 WHERE user_id=$1"
+        : 'UPDATE job_connections SET revision=revision+1 WHERE user_id=$1', [f.owner]);
+      await assert.rejects(f.prepare(), { code: 'JOB_DRAFT_RESUME_STALE' });
+      assert.equal((await f.pool.query("SELECT count(*)::int AS n FROM job_confirmations WHERE kind='apply'")).rows[0].n, 0);
+      assert.equal(f.submits, 0);
+    } finally { await f.close(); }
+  }
+});
+
+test('real PG: selection change between HH inspection and confirmation creation cannot freeze a different resume', async () => {
+  const f = await applicationFixture();
+  try {
+    const inspect = f.adapter.inspect.bind(f.adapter);
+    f.adapter.inspect = async (args) => {
+      const result = await inspect(args);
+      await f.pool.query("UPDATE job_connections SET resume_id='other-fixture-resume',revision=revision+1 WHERE user_id=$1", [f.owner]);
+      return result;
+    };
+    await assert.rejects(f.prepare(), { code: 'JOB_DRAFT_RESUME_STALE' });
+    assert.equal((await f.pool.query("SELECT count(*)::int AS n FROM job_confirmations WHERE kind='apply'")).rows[0].n, 0);
+    assert.equal(f.submits, 0);
+  } finally { await f.close(); }
+});
+
+test('real PG: foreign user and origin conversation cannot prepare or claim a draft', async () => {
+  const f = await applicationFixture();
+  try {
+    await assert.rejects(f.repository.prepare({ scope: { ...f.scope, userId: f.stranger }, draftId: f.draft.id }),
+      { code: 'JOB_SCOPE_DENIED' });
+    const { id } = await f.prepare();
+    const foreignConversation = crypto.randomUUID();
+    await assert.rejects(f.repository.claim({ scope: { ...f.scope, conversationId: foreignConversation }, confirmationId: id }),
+      { code: 'JOB_SCOPE_DENIED' });
+    await assert.rejects(f.repository.claim({ scope: { ...f.scope, chatId: '999' }, confirmationId: id }),
+      { code: 'JOB_SCOPE_DENIED' });
+    assert.equal(f.submits, 0);
+  } finally { await f.close(); }
+});
+
+test('real PG: pre-migration drafts have unknown resume provenance and cannot be sent', async () => {
+  const f = await applicationFixture();
+  try {
+    await f.pool.query("UPDATE job_drafts SET resume_id=NULL,connection_revision=NULL,letter_mode='custom' WHERE id=$1", [f.draft.id]);
+    await assert.rejects(f.prepare(), { code: 'JOB_DRAFT_RESUME_STALE' });
+    assert.equal(f.submits, 0);
+  } finally { await f.close(); }
+});
+
+test('real PG: manual replacement retains the parent resume provenance', async () => {
+  const f = await applicationFixture();
+  try {
+    const edited = await f.drafts.append({ scope: f.scope, vacancyId: f.vacancy.id, parentDraftId: f.draft.id,
+      profileRevision: 1, vacancyRevision: 1, text: 'Manually revised fixture letter', facts: ['fixture'], mode: 'custom' });
+    assert.equal(edited.resume_id, f.draft.resume_id);
+    assert.equal(edited.connection_revision, f.draft.connection_revision);
+    await f.pool.query("UPDATE job_connections SET resume_id='other-fixture-resume',revision=revision+1 WHERE user_id=$1", [f.owner]);
+    await assert.rejects(f.repository.prepare({ scope: f.scope, draftId: edited.id }), { code: 'JOB_DRAFT_RESUME_STALE' });
+    assert.equal(f.submits, 0);
+  } finally { await f.close(); }
+});
+
+test('real PG: a new independent manual letter records the currently selected resume', async () => {
+  const f = await applicationFixture();
+  try {
+    const vacancy = await f.search.upsertVacancy({ externalId: '124', snapshot: {
+      externalId: '124', title: 'Fixture manual role', company: 'Fixture', url: 'https://hh.ru/vacancy/124',
+      description: 'Manual fixture', publishedAt: '2026-10-15T00:00:00Z', archived: false, manualRequired: false } });
+    await f.search.recordMatch({ userId: f.owner, vacancyId: vacancy.id, filterRevision: 1 });
+    const manual = await f.drafts.append({ scope: f.scope, vacancyId: vacancy.id, profileRevision: 1,
+      vacancyRevision: 1, text: 'New independently written letter', facts: [], mode: 'custom' });
+    assert.equal(manual.resume_id, 'fixture-resume');
+    assert.equal(manual.connection_revision, 1);
+  } finally { await f.close(); }
+});
+
 test('real PG: unknown result never repeats POST; reconciliation keeps the original operation', async () => {
   const f = await applicationFixture();
   try {
@@ -110,9 +193,7 @@ test('real PG: unknown result never repeats POST; reconciliation keeps the origi
     const stillPending = await f.service.confirm({ scope: f.scope, confirmationId: newerConfirmation.id });
     assert.equal(stillPending.operationId, unknown.operationId); assert.equal(f.submits, 1);
     await f.pool.query("UPDATE job_connections SET resume_id='other-fixture-resume',revision=revision+1 WHERE user_id=$1", [f.owner]);
-    const anotherResume = await f.prepare();
-    const sameUnknown = await f.service.confirm({ scope: f.scope, confirmationId: anotherResume.id });
-    assert.equal(sameUnknown.operationId, unknown.operationId, 'changing the primary resume must not bypass an unknown submission');
+    await assert.rejects(f.prepare(), { code: 'JOB_DRAFT_RESUME_STALE' });
     assert.equal(f.submits, 1);
     const original = await f.repository.get({ scope: f.scope, operationId: unknown.operationId });
     f.adapter.reconcile = async ({ operationId, letter, resumeId }) => {

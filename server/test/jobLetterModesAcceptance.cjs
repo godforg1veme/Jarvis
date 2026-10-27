@@ -23,14 +23,23 @@ const { JobResumeContextService } = require('../src/jobs/jobResumeContextService
 async function harness() {
   const f = await createJobPostgresFixture();
   await f.pool.query("INSERT INTO user_identities(user_id,provider,external_id) VALUES($1,'telegram','101'),($2,'telegram','202')", [f.owner, f.stranger]);
-  await f.pool.query("INSERT INTO job_connections(user_id,resume_id,status) VALUES($1,'fixture-resume','connected')", [f.owner]);
+  await f.pool.query("INSERT INTO job_connections(user_id,resume_id,status) VALUES($1,'fixtureResume','connected')", [f.owner]);
   const accessService = configuredOwnerJobAccess(f.pool, '101');
   const search = new JobSearchRepository(f.pool, { accessService }), profiles = new JobProfileRepository(f.pool, { accessService });
   const drafts = new JobDraftRepository(f.pool, { accessService }), usage = new JobUsageRepository(f.pool);
   const interactions = new TelegramInteractionRepository(f.pool), prompts = [], submissions = [], snapshots = new Map();
   let updateId = 100, vacancyNumber = 100, failModel = false, unknown = false;
+  const resumeContextService = new JobResumeContextService({ pool: f.pool, accessService,
+    browserClient: { forUser(userId) {
+      assert.equal(userId, f.owner);
+      return { async readResume({ resumeId }) {
+        assert.equal(resumeId, 'fixtureResume');
+        return { resumeId, title: 'Fixture engineer', experience: 'Built fixture tools', skills: '',
+          education: '', summary: '', grammaticalGender: 'unknown' };
+      } };
+    } } });
   const draftService = new JobDraftService({ pool: f.pool, searchRepository: search, profileRepository: profiles,
-    draftRepository: drafts, usageRepository: usage, accessService, modelAdapter: { async generate({ messages }) {
+    draftRepository: drafts, usageRepository: usage, accessService, resumeContextService, modelAdapter: { async generate({ messages }) {
       prompts.push(messages);
       if (failModel) throw Object.assign(new Error('Fixture failure'), { code: 'JOB_MODEL_UNAVAILABLE' });
       const data = JSON.parse(messages[1].content);
@@ -222,6 +231,62 @@ test('AI uses the selected resume and rejects selection races before model or dr
       mode: 'improved', sourceText: 'Source', expectedVacancyRevision: v.revision }), { code: 'JOB_REVISION_CONFLICT' });
     assert.equal(f.prompts.length, beforeSaveRace + 1, 'the provider was called, then the stale selection was detected');
     assert.equal((await f.current(v)).id, grounded.id, 'a stale-resume result is not saved');
+  } finally { await f.close(); }
+});
+
+test('a stale A draft cannot be continued or edited, while an explicit mode choice starts a clean B draft', async () => {
+  const f = await harness();
+  try {
+    await f.base('Independent base source');
+    const v = await f.vacancy();
+    await f.cb(`job:improved:${v.id}`);
+    const original = await f.current(v);
+    const calls = f.prompts.length;
+    await f.pool.query("UPDATE job_connections SET resume_id='otherResume',revision=revision+1 WHERE user_id=$1", [f.owner]);
+    f.draftService.resumeContextService.browserClient = { forUser(userId) {
+      assert.equal(userId, f.owner);
+      return { async readResume({ resumeId }) {
+        return { resumeId, title: 'Another engineer', experience: 'Other experience', skills: '',
+          education: '', summary: '', grammaticalGender: 'unknown' };
+      } };
+    } };
+    await assert.rejects(f.draftService.generate({ scope: f.scope, vacancyId: v.id,
+      parentDraftId: original.id, requestId: 'stale-regenerate' }), { code: 'JOB_DRAFT_RESUME_STALE' });
+    await assert.rejects(f.drafts.append({ scope: f.scope, vacancyId: v.id, parentDraftId: original.id,
+      profileRevision: original.profile_revision, vacancyRevision: original.vacancy_revision,
+      mode: 'custom', text: 'Unsafe rewrite', facts: [], resumeId: 'otherResume', connectionRevision: 2 }),
+    { code: 'JOB_REVISION_CONFLICT' });
+    await f.cb(`job:manual_edit:${original.id}`);
+    await f.msg('Unsafe manual edit from A');
+    assert.equal((await f.current(v)).id, original.id, 'stale manual edit cannot replace the current draft');
+    assert.equal(f.prompts.length, calls, 'stale continuation cannot invoke the model');
+    const selected = await f.cb(`job:improved:${v.id}`);
+    assert.match(selected.answer, /Adapted/);
+    const fresh = await f.current(v);
+    assert.equal(fresh.parent_draft_id, null);
+    assert.equal(fresh.resume_id, 'otherResume');
+    assert.equal(fresh.connection_revision, 2);
+    assert.equal(original.current, true, 'the original snapshot is unchanged in memory');
+    assert.equal((await f.drafts.get({ userId: f.owner, draftId: original.id })).current, false);
+  } finally { await f.close(); }
+});
+
+test('explicit custom choice replaces a legacy draft without inheriting its text or provenance', async () => {
+  const f = await harness();
+  try {
+    const v = await f.vacancy();
+    await f.cb(`job:custom:${v.id}`);
+    await f.msg('Legacy private letter');
+    const legacy = await f.current(v);
+    await f.pool.query('UPDATE job_drafts SET resume_id=NULL,connection_revision=NULL WHERE id=$1', [legacy.id]);
+    await assert.rejects(f.applications.prepare({ scope: f.scope, draftId: legacy.id }), { code: 'JOB_DRAFT_RESUME_STALE' });
+    await f.cb(`job:custom:${v.id}`);
+    await f.msg('Fresh independent letter');
+    const fresh = await f.current(v);
+    assert.equal(fresh.parent_draft_id, null);
+    assert.equal(fresh.resume_id, 'fixtureResume');
+    assert.equal(fresh.text, 'Fresh independent letter');
+    assert.equal((await f.drafts.get({ userId: f.owner, draftId: legacy.id })).current, false);
   } finally { await f.close(); }
 });
 

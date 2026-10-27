@@ -7,7 +7,7 @@ class JobDraftService {
   constructor({ pool, searchRepository, profileRepository, draftRepository, usageRepository, modelAdapter, now = () => new Date(), accessService = null, resumeContextService = null }) {
     Object.assign(this, { pool, searchRepository, profileRepository, draftRepository, usageRepository, modelAdapter, now, accessService, resumeContextService });
   }
-  async createManual({ scope, vacancyId, mode, text, parentDraftId = null, expectedProfileRevision, expectedVacancyRevision }) {
+  async createManual({ scope, vacancyId, mode, text, parentDraftId = null, replaceCurrentDraftId = null, expectedProfileRevision, expectedVacancyRevision }) {
     await assertJobScope(this.pool, scope, this.accessService);
     if (!['base', 'custom'].includes(mode) || typeof text !== 'string' || !text.trim() || text.length > 10000) throw jobError('JOB_INVALID_DRAFT');
     const vacancy = await this.searchRepository.getVacancy({ userId: scope.userId, vacancyId });
@@ -16,7 +16,7 @@ class JobDraftService {
     this.checkRevisions(profile, vacancy, expectedProfileRevision, expectedVacancyRevision);
     if (mode === 'base' && text !== profile.profile.baseLetter) throw jobError('JOB_REVISION_CONFLICT');
     return this.draftRepository.append({ scope, vacancyId, parentDraftId, profileRevision: profile.revision,
-      vacancyRevision: vacancy.revision, text, facts: [], mode, sourceText: text });
+      vacancyRevision: vacancy.revision, text, facts: [], mode, sourceText: text, replaceCurrentDraftId });
   }
   checkRevisions(profile, vacancy, profileRevision, vacancyRevision) {
     if ((profileRevision != null && profile.revision !== profileRevision)
@@ -34,10 +34,11 @@ class JobDraftService {
         throw jobError('JOB_CONFIRMATION_UNAVAILABLE');
       return this.draftRepository.append({ scope, vacancyId: draft.vacancy_id, parentDraftId: draft.id,
         profileRevision: draft.profile_revision, vacancyRevision: draft.vacancy_revision,
-        text, facts: draft.fact_ids || [], mode: 'custom', sourceText: text, preserveText: true, client });
+        text, facts: draft.fact_ids || [], mode: 'custom', sourceText: text, preserveText: true, client,
+        resumeId: draft.resume_id, connectionRevision: draft.connection_revision });
     });
   }
-  async generate({ scope, vacancyId, requestId, parentDraftId = null, instruction = '', language = 'auto', mode, sourceText,
+  async generate({ scope, vacancyId, requestId, parentDraftId = null, replaceCurrentDraftId = null, instruction = '', language = 'auto', mode, sourceText,
     expectedProfileRevision, expectedVacancyRevision }) {
     await assertJobScope(this.pool, scope, this.accessService);
     uuid.parse(vacancyId);
@@ -49,6 +50,7 @@ class JobDraftService {
     this.checkRevisions(profile, vacancy, expectedProfileRevision, expectedVacancyRevision);
     const previous = parentDraftId ? await this.draftRepository.get({ userId: scope.userId, draftId: parentDraftId }) : null;
     if (parentDraftId && (!previous?.current || previous.vacancy_id !== vacancyId)) throw jobError('JOB_REVISION_CONFLICT');
+    if (replaceCurrentDraftId && parentDraftId) throw jobError('JOB_INVALID_DRAFT');
     const continuingDraft = mode == null;
     mode = mode || previous?.letter_mode || 'legacy_ai';
     if (mode === 'base') mode = 'improved';
@@ -56,9 +58,12 @@ class JobDraftService {
     if (!['legacy_ai', 'improved', 'custom_ai'].includes(mode)) throw jobError('JOB_INVALID_DRAFT');
     sourceText = sourceText ?? previous?.source_text ?? '';
     const resumeContext = this.resumeContextService ? await this.resumeContextService.getSelected({ scope }) : null;
+    if (previous && (!previous.resume_id || !previous.connection_revision
+      || previous.resume_id !== resumeContext?.resumeId || previous.connection_revision !== resumeContext?.connectionRevision))
+      throw jobError('JOB_DRAFT_RESUME_STALE');
     const messages = buildJobPrompt({ vacancy: vacancy.snapshot, profile: profile.profile, instruction, language, sourceText, resumeContext,
       previousText: continuingDraft ? previous?.text || '' : '' });
-    const inputHash = createHash('sha256').update(JSON.stringify({ mode, sourceText, instruction, language })).digest('hex');
+    const inputHash = createHash('sha256').update(JSON.stringify({ mode, sourceText, instruction, language, replaceCurrentDraftId })).digest('hex');
     const task = await jobTransaction(this.pool, async (client) => {
       await assertJobScope(client, scope, this.accessService);
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`job-generate:${scope.userId}:${vacancyId}`]);
@@ -68,10 +73,11 @@ class JobDraftService {
         AND payload->>'vacancyId'=$2`, [scope.userId, vacancyId]);
       if (running.rowCount) throw jobError('JOB_GENERATION_BUSY');
       return (await client.query(`INSERT INTO job_tasks(user_id,request_id,kind,payload,status)
-        VALUES($1,$2,'generate',$3,'running') RETURNING *`, [scope.userId, requestId, { vacancyId, parentDraftId, mode, inputHash,
+        VALUES($1,$2,'generate',$3,'running') RETURNING *`, [scope.userId, requestId, { vacancyId, parentDraftId, replaceCurrentDraftId, mode, inputHash,
           resumeId: resumeContext?.resumeId || null, connectionRevision: resumeContext?.connectionRevision || null }])).rows[0];
     });
-    if (task.payload.vacancyId !== vacancyId || task.payload.parentDraftId !== parentDraftId) throw jobError('JOB_INVALID_REQUEST');
+    if (task.payload.vacancyId !== vacancyId || task.payload.parentDraftId !== parentDraftId
+      || (task.payload.replaceCurrentDraftId || null) !== replaceCurrentDraftId) throw jobError('JOB_INVALID_REQUEST');
     if (task.payload.mode && task.payload.mode !== mode) throw jobError('JOB_INVALID_REQUEST');
     if (task.payload.inputHash && task.payload.inputHash !== inputHash) throw jobError('JOB_INVALID_REQUEST');
     if (resumeContext && (task.payload.resumeId !== resumeContext.resumeId || task.payload.connectionRevision !== resumeContext.connectionRevision))
@@ -94,7 +100,7 @@ class JobDraftService {
         connectionRevision: resumeContext.connectionRevision });
       const draft = await this.draftRepository.append({ scope, vacancyId, parentDraftId, profileRevision: profile.revision,
         vacancyRevision: vacancy.revision, text: letter.text, facts: letter.factIds, mode, sourceText,
-        resumeId: resumeContext?.resumeId || null, connectionRevision: resumeContext?.connectionRevision || null });
+        resumeId: resumeContext?.resumeId || null, connectionRevision: resumeContext?.connectionRevision || null, replaceCurrentDraftId });
       await this.pool.query("UPDATE job_tasks SET status='complete',result_id=$1 WHERE id=$2", [draft.id, task.id]);
       return draft;
     } catch (error) {

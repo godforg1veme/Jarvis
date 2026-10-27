@@ -30,7 +30,7 @@ class JobLetterFlow {
     const source = profile.profile.baseLetter;
     if (!source) return response('Базовое письмо ещё не задано. Добавь его или выбери кастомное письмо для этой вакансии.',
       [[button('Редактировать базовое сопроводительное', 'base_letter')], [button('Выбрать вариант', 'prepare', vacancy.id)]]);
-    const options = { scope, vacancyId: vacancy.id, parentDraftId: current?.id || null, mode: action,
+    const options = { scope, vacancyId: vacancy.id, replaceCurrentDraftId: current?.id || null, mode: action,
       expectedProfileRevision: profile.revision, expectedVacancyRevision: vacancy.revision };
     return draftView(action === 'base' ? await j.draftService.createManual({ ...options, text: source })
       : await j.draftService.generate({ ...options, sourceText: source, requestId: context.requestId }));
@@ -66,7 +66,7 @@ class JobLetterFlow {
         [[button('Подтвердить', 'approve', confirmation.id), button('Отмена', 'menu')]]);
     }
     const current = await j.draftRepository.current({ userId: scope.userId, vacancyId: targetId });
-    const options = { scope, vacancyId: targetId, parentDraftId: current?.id || null, expectedVacancyRevision: revision };
+    const options = { scope, vacancyId: targetId, replaceCurrentDraftId: current?.id || null, expectedVacancyRevision: revision };
     return draftView(interaction.kind === 'job_custom_letter'
       ? await j.draftService.createManual({ ...options, mode: 'custom', text: value })
       : await j.draftService.generate({ ...options, mode: 'custom_ai', sourceText: value, requestId: context.requestId }));
