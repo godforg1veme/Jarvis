@@ -1,7 +1,7 @@
 // Explicit opt-in, paid model evaluation. Profile and full letters stay in an ignored output file.
 const fs = require('node:fs/promises');
 const { performance } = require('node:perf_hooks');
-const { buildJobPrompt, parseJobLetter } = require('../src/jobs/jobPrompt');
+const { buildJobPrompt, parseJobLetter, JOB_LETTER_RESPONSE_FORMAT } = require('../src/jobs/jobPrompt');
 const { OpenAiCompatibleProvider } = require('../src/providers/openAiCompatibleProvider');
 const { JOB_MODEL_EVALUATION_CASES } = require('./fixtures/jobModelEvaluationCases');
 
@@ -11,16 +11,17 @@ async function evaluateJobModels({ apiKey, profile, models, cases = JOB_MODEL_EV
   for (const candidate of cases) {
     for (const model of models) {
       const provider = new OpenAiCompatibleProvider({ name: 'job-model-evaluation', baseUrl: 'https://openrouter.ai/api/v1',
-        apiKey, model, reasoning: { effort: 'low', exclude: true }, timeoutMs: 120000 });
+        apiKey, model, reasoning: { effort: 'low', exclude: true }, timeoutMs: 120000,
+        providerRouting: { require_parameters: true } });
       const started = performance.now();
       const row = { caseId: candidate.id, model, source: candidate.source || null, fixture: Boolean(candidate.fixture),
         occurredAt: new Date().toISOString(), schemaValid: false, costUsd: null };
       try {
         const result = await provider.answerWithUsage({ messages: buildJobPrompt({ vacancy: candidate, profile,
           language: candidate.language, instruction: candidate.instruction || '', previousText: candidate.previousText || '' }),
-        maxTokens: 3000, includeUsage: true });
+        maxTokens: 6000, includeUsage: true, responseFormat: JOB_LETTER_RESPONSE_FORMAT });
         row.providerRequestId = result.requestId; row.costUsd = result.usage.cost ?? null;
-        const letter = parseJobLetter(result.text, profile);
+        const letter = parseJobLetter(result.text, profile, { finishReason: result.finishReason });
         row.schemaValid = true; row.letter = letter.text; row.factIds = letter.factIds;
         row.wordCount = letter.text.trim().split(/\s+/u).length;
         row.expectedLanguage = candidate.language;

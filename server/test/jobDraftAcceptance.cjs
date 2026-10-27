@@ -42,14 +42,15 @@ test('real PostgreSQL: automatic model routing, duplicate request, revisions and
         supported_parameters: ['structured_outputs'] }] });
       if (url.endsWith('/key')) return Response.json({ data: { free_model_daily_requests: { remaining: 100 } } });
       calls++; const body = JSON.parse(init.body);
-      assert.equal(body.model, modelId); assert.equal(body.usage.include, true); assert.equal(body.max_tokens, 3000);
+      assert.equal(body.model, modelId); assert.equal(body.usage.include, true); assert.equal(body.max_tokens, 6000);
       assert.equal(body.response_format.json_schema.strict, true);
       assert.equal(body.provider.require_parameters, true);
       if (fail) throw new Error('Fixture disconnected');
       const letter = { text: `Letter version ${calls}`, factIds: responseMode === 'facts' ? ['invented'] : ['automation'] };
-      const content = responseMode === 'json' ? 'Private malformed response' : JSON.stringify(responseMode === 'schema' ? { text: 'Private invalid shape' } : letter);
+      const content = responseMode === 'emptyTruncated' ? null : responseMode === 'json' ? 'Private malformed response'
+        : JSON.stringify(responseMode === 'schema' ? { text: 'Private invalid shape' } : letter);
       return Response.json({ id: `fixture-${calls}`, usage: { cost: 0 }, choices: [{ message: { content },
-        finish_reason: responseMode === 'truncated' ? 'length' : 'stop' }] });
+        finish_reason: ['truncated', 'emptyTruncated'].includes(responseMode) ? 'length' : 'stop' }] });
     } });
     const service = new JobDraftService({ pool: f.pool, searchRepository: search, profileRepository: profile,
       draftRepository: drafts, usageRepository: usage, modelAdapter: adapter, accessService, resumeContextService });
@@ -75,8 +76,9 @@ test('real PostgreSQL: automatic model routing, duplicate request, revisions and
       requestId: crypto.randomUUID() }));
     assert.equal(calls, 4);
     const retained = await drafts.current({ userId: f.owner, vacancyId: vacancy.id });
-    for (const reason of ['json', 'schema', 'truncated', 'facts']) {
-      responseMode = reason;
+    for (const mode of ['json', 'schema', 'truncated', 'facts', 'emptyTruncated']) {
+      responseMode = mode;
+      const reason = mode === 'emptyTruncated' ? 'truncated' : mode;
       const invalidId = crypto.randomUUID();
       const beforeCalls = calls;
       await assert.rejects(service.generate({ scope: f.scope, vacancyId: vacancy.id,
@@ -102,7 +104,7 @@ test('real PostgreSQL: automatic model routing, duplicate request, revisions and
     assert.equal(await recoverJobGenerations(f.pool), 1);
     assert.equal(await recoverJobGenerations(f.pool), 0);
     await assert.rejects(service.generate({ scope: f.scope, vacancyId: vacancy.id, requestId: interruptedId }), { code: 'JOB_GENERATION_OUTCOME_UNKNOWN' });
-    assert.equal(calls, 8);
+    assert.equal(calls, 9);
     console.log('PASS generation acceptance: scoped facts, model calls, dedup, versions, failures and zero-cost usage');
   } finally { await f.close(); }
 });

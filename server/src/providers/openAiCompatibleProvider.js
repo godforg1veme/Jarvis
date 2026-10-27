@@ -73,14 +73,17 @@ class OpenAiCompatibleProvider {
       const raw = Buffer.concat(chunks, byteCount).toString('utf8');
       const data = JSON.parse(raw);
       const content = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
-      if (typeof content !== 'string' || !content.trim()) throw new Error(`${this.name} returned an invalid response`);
+      const reason = data?.choices?.[0]?.finish_reason;
+      const finishReason = ['stop', 'length', 'content_filter', 'tool_calls'].includes(reason) ? reason : null;
+      const incompleteStructured = responseFormat?.type === 'json_schema'
+        && ['length', 'content_filter'].includes(finishReason) && (content == null || typeof content === 'string');
+      if ((typeof content !== 'string' || !content.trim()) && !incompleteStructured)
+        throw new Error(`${this.name} returned an invalid response`);
       const usage = {};
       for (const key of ['cost', 'prompt_tokens', 'completion_tokens', 'total_tokens']) {
         if (typeof data.usage?.[key] === 'number' && Number.isFinite(data.usage[key]) && data.usage[key] >= 0) usage[key] = data.usage[key];
       }
-      const reason = data.choices[0].finish_reason;
-      const finishReason = ['stop', 'length', 'content_filter', 'tool_calls'].includes(reason) ? reason : null;
-      return { text: content.trim(), usage, finishReason,
+      return { text: typeof content === 'string' ? content.trim() : '', usage, finishReason,
         requestId: typeof data.id === 'string' && data.id.length <= 150 ? data.id : null };
     } catch (error) {
       if (error && error.name === 'AbortError') throw new Error(`${this.name} request timed out`);

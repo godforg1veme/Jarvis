@@ -30,7 +30,7 @@ const { FREE_MODELS } = require('../src/providers/freeFirstProvider');
 
 function catalogModel(id, prompt, completion) {
   return { id, context_length: 100000, pricing: { prompt, completion, request: '0' },
-    architecture: { input_modalities: ['text'], output_modalities: ['text'] }, supported_parameters: ['structured_outputs'] };
+    architecture: { input_modalities: ['text'], output_modalities: ['text'] }, supported_parameters: ['structured_outputs', 'reasoning'] };
 }
 
 test('job adapter selects verified free model, retries eligible failure, then uses priced backup with usage', async () => {
@@ -42,14 +42,18 @@ test('job adapter selects verified free model, retries eligible failure, then us
     if (url.endsWith('/key')) return Response.json({ data: { free_model_daily_requests: { remaining: 10 } } });
     const body = JSON.parse(init.body); requests.push(body.model);
     assert.equal(body.usage.include, true);
+    assert.equal(body.max_tokens, 6000);
     assert.equal(body.response_format.type, 'json_schema');
     assert.equal(body.response_format.json_schema.strict, true);
     assert.equal(body.response_format.json_schema.schema.additionalProperties, false);
     assert.equal(body.provider.require_parameters, true);
+    assert.deepEqual(body.reasoning, { effort: 'low', exclude: true });
     if (body.model !== paid) return Response.json({ error: { message: 'busy' } }, { status: 429 });
     return Response.json({ id: 'paid-request', usage: { cost: 0.002 }, choices: [{ message: { content: 'draft' } }] });
   };
-  const adapter = new JobModelAdapter({ config: { openrouterApiKey: 'fixture', openrouterModel: paid }, fetchImpl });
+  const adapter = new JobModelAdapter({ config: { openrouterApiKey: 'fixture', openrouterModel: paid,
+    openrouterReasoningEffort: 'xhigh', openrouterReasoningExclude: false }, fetchImpl });
+  assert.equal(adapter.provider.timeoutMs, 120000);
   const result = await adapter.generate({ messages: [{ role: 'user', content: 'draft' }] });
   assert.deepEqual(requests, [modelA, modelB, paid]);
   assert.equal(result.model, paid);
@@ -121,4 +125,17 @@ test('letter validation gives only closed reasons and rejects wrappers and inval
     ['x'.repeat(100001), 'size'],
   ]) assert.throws(() => parseJobLetter(raw, profile, options),
     (e) => e.code === 'JOB_MODEL_INVALID_OUTPUT' && e.validationReason === reason && !e.message.includes('Private'));
+});
+
+test('empty truncated structured output preserves billable usage while plain chat still rejects empty output', async () => {
+  const { JOB_LETTER_RESPONSE_FORMAT } = require('../src/jobs/jobPrompt');
+  const provider = new OpenAiCompatibleProvider({ name: 'fixture', model: 'fixture', baseUrl: 'https://example.test',
+    fetchImpl: async () => Response.json({ id: 'truncated-request', choices: [{ message: { content: null }, finish_reason: 'length' }],
+      usage: { cost: 0.003, completion_tokens: 3000 } }) });
+  const result = await provider.answerWithUsage({ text: 'fixture', responseFormat: JOB_LETTER_RESPONSE_FORMAT });
+  assert.equal(result.text, '');
+  assert.equal(result.usage.cost, 0.003);
+  assert.equal(result.requestId, 'truncated-request');
+  assert.throws(() => parseJobLetter(result.text, { facts: [] }, result), { code: 'JOB_MODEL_INVALID_OUTPUT' });
+  await assert.rejects(provider.answer({ text: 'fixture' }), /invalid response/);
 });
