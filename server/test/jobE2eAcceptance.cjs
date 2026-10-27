@@ -72,7 +72,7 @@ test('E2E local HTTP + actual bot + PG: configure, collect, letter, approval, lo
       openrouterApiKey: crypto.randomUUID(), modelTimeoutMs: 5000 }, pool: fixture.pool, interactions,
       fetchImpl: (url, init) => {
         if (url.endsWith('/models/user')) return Promise.resolve(Response.json({data:[{id:'fixture-model',context_length:100000,
-          pricing:{prompt:'0.000001',completion:'0.000002',request:'0'},architecture:{input_modalities:['text'],output_modalities:['text']},supported_parameters:[]}]}));
+          pricing:{prompt:'0.000001',completion:'0.000002',request:'0'},architecture:{input_modalities:['text'],output_modalities:['text']},supported_parameters:['structured_outputs']}]}));
         if (url.endsWith('/key')) return Promise.resolve(Response.json({data:{}}));
         return fetch(`${origin}/model`, init);
       }, applicationAdapter,

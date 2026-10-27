@@ -22,7 +22,7 @@ class OpenAiCompatibleProvider {
     return (await this.answerWithUsage(input)).text;
   }
 
-  async answerWithUsage({ text, messages, maxTokens, includeUsage = false }) {
+  async answerWithUsage({ text, messages, maxTokens, includeUsage = false, responseFormat }) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     const headers = { 'Content-Type': 'application/json' };
@@ -37,6 +37,7 @@ class OpenAiCompatibleProvider {
       };
       if (this.reasoning) body.reasoning = this.reasoning;
       if (this.providerRouting) body.provider = this.providerRouting;
+      if (responseFormat !== undefined) body.response_format = responseFormat;
       if (maxTokens !== undefined) {
         if (!Number.isInteger(maxTokens) || maxTokens < 1 || maxTokens > 16384) throw new Error('invalid provider token limit');
         body.max_tokens = maxTokens;
@@ -77,7 +78,10 @@ class OpenAiCompatibleProvider {
       for (const key of ['cost', 'prompt_tokens', 'completion_tokens', 'total_tokens']) {
         if (typeof data.usage?.[key] === 'number' && Number.isFinite(data.usage[key]) && data.usage[key] >= 0) usage[key] = data.usage[key];
       }
-      return { text: content.trim(), usage, requestId: typeof data.id === 'string' && data.id.length <= 150 ? data.id : null };
+      const reason = data.choices[0].finish_reason;
+      const finishReason = ['stop', 'length', 'content_filter', 'tool_calls'].includes(reason) ? reason : null;
+      return { text: content.trim(), usage, finishReason,
+        requestId: typeof data.id === 'string' && data.id.length <= 150 ? data.id : null };
     } catch (error) {
       if (error && error.name === 'AbortError') throw new Error(`${this.name} request timed out`);
       throw error;

@@ -34,8 +34,11 @@ class FreeFirstProvider {
     // UTF-8 byte count is a conservative token bound; no prompt text is cached.
     const inputSize = Buffer.byteLength(JSON.stringify(input.messages || [{ role: 'user', content: String(input.text || '') }]), 'utf8');
     const hasTools = Array.isArray(input.runtimeContext?.toolsAvailable) && input.runtimeContext.toolsAvailable.length > 0;
+    const structured = input.responseFormat?.type === 'json_schema';
     const usable = (m) => m.text && m.context >= inputSize + maxTokens
-      && (!hasTools || m.parameters.includes('tools')) && (this.cooldowns.get(m.id) || 0) <= this.now();
+      && (!hasTools || m.parameters.includes('tools'))
+      && (!structured || m.parameters.includes('structured_outputs'))
+      && (this.cooldowns.get(m.id) || 0) <= this.now();
     const free = [...new Set([...FREE_MODELS, ...this.paidIds])]
       .map((id) => models.find((m) => m.id === id && m.free)).filter((m) => m && usable(m));
     const paid = this.paidIds.map((id) => models.find((m) => m.id === id && !m.free)).filter((m) => m && usable(m))
@@ -51,6 +54,7 @@ class FreeFirstProvider {
         reasoning: model.parameters.includes('reasoning') ? this.reasoning : null,
         providerRouting: {
           sort: 'price', allow_fallbacks: false,
+          ...(structured ? { require_parameters: true } : {}),
           // OpenRouter prompt/completion caps use dollars per MILLION tokens.
           max_price: { prompt: Number((model.prompt * 1000000).toPrecision(15)),
             completion: Number((model.completion * 1000000).toPrecision(15)), request: model.request, image: 0, audio: 0 },

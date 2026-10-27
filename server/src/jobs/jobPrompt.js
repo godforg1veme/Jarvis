@@ -5,6 +5,12 @@ const { resumeSnapshotSchema } = require('./jobResumeContextService');
 
 const outputSchema = z.object({ text: z.string().trim().min(1).max(10000),
   factIds: z.array(z.string().max(40)).max(80) }).strict();
+const JOB_LETTER_RESPONSE_FORMAT = Object.freeze({ type: 'json_schema', json_schema: {
+  name: 'job_cover_letter', strict: true, schema: {
+    type: 'object', properties: { text: { type: 'string' }, factIds: { type: 'array', items: { type: 'string' } } },
+    required: ['text', 'factIds'], additionalProperties: false,
+  },
+} });
 
 function buildJobPrompt({ vacancy, profile, instruction = '', language = 'auto', previousText = '', sourceText = '', resumeContext = null }) {
   profileSchema.parse(profile);
@@ -35,11 +41,19 @@ Do not submit applications, invoke tools or claim that a letter was sent. Output
     approvedStyleExamples: profile.examples, sourceLetter: sourceText, previousText, ownerEditRequest: instruction }) }];
 }
 
-function parseJobLetter(raw, profile) {
+function invalidOutput(reason) {
+  return Object.assign(jobError('JOB_MODEL_INVALID_OUTPUT'), { validationReason: reason });
+}
+
+function parseJobLetter(raw, profile, { finishReason = null } = {}) {
+  if (finishReason === 'length') throw invalidOutput('truncated');
+  if (finishReason === 'content_filter') throw invalidOutput('filtered');
+  if (typeof raw !== 'string' || raw.length > 100000) throw invalidOutput('size');
   let data;
-  try { data = outputSchema.parse(JSON.parse(raw)); } catch { throw jobError('JOB_MODEL_INVALID_OUTPUT'); }
+  try { data = JSON.parse(raw); } catch { throw invalidOutput('json'); }
+  try { data = outputSchema.parse(data); } catch { throw invalidOutput('schema'); }
   const ids = new Set(profile.facts.map((f) => f.id));
   if (data.factIds.some((id) => !ids.has(id))) throw jobError('JOB_MODEL_INVALID_FACTS');
   return data;
 }
-module.exports = { buildJobPrompt, parseJobLetter };
+module.exports = { buildJobPrompt, parseJobLetter, JOB_LETTER_RESPONSE_FORMAT };

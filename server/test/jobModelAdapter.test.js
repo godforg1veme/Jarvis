@@ -30,7 +30,7 @@ const { FREE_MODELS } = require('../src/providers/freeFirstProvider');
 
 function catalogModel(id, prompt, completion) {
   return { id, context_length: 100000, pricing: { prompt, completion, request: '0' },
-    architecture: { input_modalities: ['text'], output_modalities: ['text'] }, supported_parameters: [] };
+    architecture: { input_modalities: ['text'], output_modalities: ['text'] }, supported_parameters: ['structured_outputs'] };
 }
 
 test('job adapter selects verified free model, retries eligible failure, then uses priced backup with usage', async () => {
@@ -42,6 +42,10 @@ test('job adapter selects verified free model, retries eligible failure, then us
     if (url.endsWith('/key')) return Response.json({ data: { free_model_daily_requests: { remaining: 10 } } });
     const body = JSON.parse(init.body); requests.push(body.model);
     assert.equal(body.usage.include, true);
+    assert.equal(body.response_format.type, 'json_schema');
+    assert.equal(body.response_format.json_schema.strict, true);
+    assert.equal(body.response_format.json_schema.schema.additionalProperties, false);
+    assert.equal(body.provider.require_parameters, true);
     if (body.model !== paid) return Response.json({ error: { message: 'busy' } }, { status: 429 });
     return Response.json({ id: 'paid-request', usage: { cost: 0.002 }, choices: [{ message: { content: 'draft' } }] });
   };
@@ -75,4 +79,46 @@ test('job adapter keeps a verified free model when generation reports zero cost'
   assert.deepEqual(requests, [modelId]);
   assert.equal(result.usage.cost, 0);
   assert.equal(result.model, modelId);
+});
+
+test('job adapter filters unsupported models before dispatch without weakening the contract', async () => {
+  const supported = catalogModel(FREE_MODELS[1], '0', '0');
+  const unsupported = { ...catalogModel(FREE_MODELS[0], '0', '0'), supported_parameters: [] };
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    if (url.endsWith('/models/user')) return Response.json({ data: [unsupported, supported] });
+    if (url.endsWith('/key')) return Response.json({ data: {} });
+    const body = JSON.parse(init.body); calls.push(body);
+    return Response.json({ choices: [{ message: { content: '{"text":"Letter","factIds":[]}' }, finish_reason: 'length' }] });
+  };
+  const adapter = new JobModelAdapter({ config: { openrouterApiKey: 'fixture' }, fetchImpl });
+  const result = await adapter.generate({ messages: [{ role: 'user', content: 'draft' }] });
+  assert.deepEqual(calls.map((x) => x.model), [FREE_MODELS[1]]);
+  assert.equal(result.finishReason, 'length');
+  assert.throws(() => parseJobLetter(result.text, { facts: [] }, result),
+    (e) => e.code === 'JOB_MODEL_INVALID_OUTPUT' && e.validationReason === 'truncated');
+});
+
+test('job adapter never dispatches without a schema-capable model', async () => {
+  let completions = 0;
+  const fetchImpl = async (url) => {
+    if (url.endsWith('/models/user')) return Response.json({ data: [{ ...catalogModel(FREE_MODELS[0], '0', '0'), supported_parameters: [] }] });
+    if (url.endsWith('/key')) return Response.json({ data: {} });
+    completions++; throw Error('must not call');
+  };
+  const adapter = new JobModelAdapter({ config: { openrouterApiKey: 'fixture' }, fetchImpl });
+  await assert.rejects(adapter.generate({ messages: [] }), { code: 'JOB_MODEL_UNAVAILABLE' });
+  assert.equal(completions, 0);
+});
+
+test('letter validation gives only closed reasons and rejects wrappers and invalid shapes', () => {
+  const profile = { facts: [] };
+  for (const [raw, reason, options] of [
+    ['```json\n{"text":"Private letter","factIds":[]}\n```', 'json'],
+    ['{"text":"Private letter"}', 'schema'],
+    ['{"text":"Private letter","factIds":[],"extra":true}', 'schema'],
+    ['{"text":"Private letter","factIds":[]}', 'filtered', { finishReason: 'content_filter' }],
+    ['x'.repeat(100001), 'size'],
+  ]) assert.throws(() => parseJobLetter(raw, profile, options),
+    (e) => e.code === 'JOB_MODEL_INVALID_OUTPUT' && e.validationReason === reason && !e.message.includes('Private'));
 });

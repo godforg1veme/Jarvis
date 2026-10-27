@@ -14,7 +14,7 @@ const { JobResumeContextService } = require('../src/jobs/jobResumeContextService
 const { FREE_MODELS } = require('../src/providers/freeFirstProvider');
 
 test('real PostgreSQL: automatic model routing, duplicate request, revisions and failure retention', async () => {
-  const f = await createJobPostgresFixture(); let calls = 0, fail = false;
+  const f = await createJobPostgresFixture(); let calls = 0, fail = false, responseMode = 'valid';
   const accessService = configuredOwnerJobAccess(f.pool, '101');
   try {
     await f.pool.query("INSERT INTO user_identities(user_id,provider,external_id) VALUES($1,'telegram','101')", [f.owner]);
@@ -39,13 +39,17 @@ test('real PostgreSQL: automatic model routing, duplicate request, revisions and
     const adapter = new JobModelAdapter({ config: { openrouterApiKey: crypto.randomUUID() }, fetchImpl: async (url, init) => {
       if (url.endsWith('/models/user')) return Response.json({ data: [{ id: modelId, context_length: 100000,
         pricing: { prompt: '0', completion: '0', request: '0' }, architecture: { input_modalities: ['text'], output_modalities: ['text'] },
-        supported_parameters: [] }] });
+        supported_parameters: ['structured_outputs'] }] });
       if (url.endsWith('/key')) return Response.json({ data: { free_model_daily_requests: { remaining: 100 } } });
       calls++; const body = JSON.parse(init.body);
       assert.equal(body.model, modelId); assert.equal(body.usage.include, true); assert.equal(body.max_tokens, 3000);
+      assert.equal(body.response_format.json_schema.strict, true);
+      assert.equal(body.provider.require_parameters, true);
       if (fail) throw new Error('Fixture disconnected');
-      return Response.json({ id: `fixture-${calls}`, usage: { cost: 0 }, choices: [{ message: {
-        content: JSON.stringify({ text: `Letter version ${calls}`, factIds: ['automation'] }) } }] });
+      const letter = { text: `Letter version ${calls}`, factIds: responseMode === 'facts' ? ['invented'] : ['automation'] };
+      const content = responseMode === 'json' ? 'Private malformed response' : JSON.stringify(responseMode === 'schema' ? { text: 'Private invalid shape' } : letter);
+      return Response.json({ id: `fixture-${calls}`, usage: { cost: 0 }, choices: [{ message: { content },
+        finish_reason: responseMode === 'truncated' ? 'length' : 'stop' }] });
     } });
     const service = new JobDraftService({ pool: f.pool, searchRepository: search, profileRepository: profile,
       draftRepository: drafts, usageRepository: usage, modelAdapter: adapter, accessService, resumeContextService });
@@ -70,6 +74,27 @@ test('real PostgreSQL: automatic model routing, duplicate request, revisions and
     await assert.rejects(service.generate({ scope: { ...f.scope, userId: f.stranger }, vacancyId: vacancy.id,
       requestId: crypto.randomUUID() }));
     assert.equal(calls, 4);
+    const retained = await drafts.current({ userId: f.owner, vacancyId: vacancy.id });
+    for (const reason of ['json', 'schema', 'truncated', 'facts']) {
+      responseMode = reason;
+      const invalidId = crypto.randomUUID();
+      const beforeCalls = calls;
+      await assert.rejects(service.generate({ scope: f.scope, vacancyId: vacancy.id,
+        requestId: invalidId, parentDraftId: retained.id }),
+      { code: reason === 'facts' ? 'JOB_MODEL_INVALID_FACTS' : 'JOB_MODEL_INVALID_OUTPUT' });
+      assert.equal(calls, beforeCalls + 1);
+      assert.equal((await drafts.current({ userId: f.owner, vacancyId: vacancy.id })).id, retained.id);
+      const failedTask = (await f.pool.query('SELECT status,payload FROM job_tasks WHERE request_id=$1', [invalidId])).rows[0];
+      assert.equal(failedTask.status, 'failed');
+      assert.equal(failedTask.payload.modelValidationFailure, reason);
+      assert.ok(!JSON.stringify(failedTask).includes('Private'));
+      const billed = (await f.pool.query('SELECT outcome,cost_usd FROM job_usage WHERE request_id=$1', [invalidId])).rows[0];
+      assert.equal(billed.outcome, 'success');
+      assert.equal(Number(billed.cost_usd), 0);
+      await assert.rejects(service.generate({ scope: f.scope, vacancyId: vacancy.id,
+        requestId: invalidId, parentDraftId: retained.id }), { code: 'JOB_GENERATION_FAILED' });
+      assert.equal(calls, beforeCalls + 1, 'failed request must never invoke the model again');
+    }
     const interruptedId = crypto.randomUUID();
     await f.pool.query(`INSERT INTO job_tasks(user_id,request_id,kind,payload,status,created_at)
       VALUES($1,$2,'generate',$3,'running',now()-interval '4 minutes')`, [f.owner, interruptedId,
@@ -77,7 +102,7 @@ test('real PostgreSQL: automatic model routing, duplicate request, revisions and
     assert.equal(await recoverJobGenerations(f.pool), 1);
     assert.equal(await recoverJobGenerations(f.pool), 0);
     await assert.rejects(service.generate({ scope: f.scope, vacancyId: vacancy.id, requestId: interruptedId }), { code: 'JOB_GENERATION_OUTCOME_UNKNOWN' });
-    assert.equal(calls, 4);
+    assert.equal(calls, 8);
     console.log('PASS generation acceptance: scoped facts, model calls, dedup, versions, failures and zero-cost usage');
   } finally { await f.close(); }
 });

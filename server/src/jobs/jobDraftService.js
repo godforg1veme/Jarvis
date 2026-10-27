@@ -95,7 +95,7 @@ class JobDraftService {
       const result = await this.modelAdapter.generate({ messages });
       await this.usageRepository.record({ userId: scope.userId, requestId, providerRequestId: result.requestId,
         costUsd: result.usage?.cost ?? null, outcome: 'success', occurredAt: this.now() });
-      const letter = parseJobLetter(result.text, profile.profile);
+      const letter = parseJobLetter(result.text, profile.profile, { finishReason: result.finishReason });
       if (resumeContext) await this.resumeContextService.assertCurrent({ scope, resumeId: resumeContext.resumeId,
         connectionRevision: resumeContext.connectionRevision });
       const draft = await this.draftRepository.append({ scope, vacancyId, parentDraftId, profileRevision: profile.revision,
@@ -104,7 +104,11 @@ class JobDraftService {
       await this.pool.query("UPDATE job_tasks SET status='complete',result_id=$1 WHERE id=$2", [draft.id, task.id]);
       return draft;
     } catch (error) {
-      await this.pool.query("UPDATE job_tasks SET status='failed' WHERE id=$1 AND status='running'", [task.id]);
+      const validationFailure = error.code === 'JOB_MODEL_INVALID_FACTS' ? 'facts'
+        : error.code === 'JOB_MODEL_INVALID_OUTPUT'
+          && ['truncated', 'filtered', 'size', 'json', 'schema'].includes(error.validationReason) ? error.validationReason : null;
+      await this.pool.query("UPDATE job_tasks SET status='failed',payload=payload||$2::jsonb WHERE id=$1 AND status='running'",
+        [task.id, validationFailure ? { modelValidationFailure: validationFailure } : {}]);
       throw error;
     } finally {
       await this.usageRepository.claimBudgetNotice({ userId: scope.userId, now: this.now(), thresholdUsd: settings.settings.budgetUsd });
