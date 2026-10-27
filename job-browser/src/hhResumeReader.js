@@ -9,6 +9,10 @@ const INITIAL_KEYS = ['id', 'resumeId', 'hash', 'experience', 'education', 'skil
   'text', 'value', 'label', 'skill', 'skillName', 'skill_name', 'displayName', 'display_name',
   'positionName', 'position_name', 'specialization', 'professions', 'items', 'valueText'];
 const INITIAL_TYPES = new Set(['U', 'Z', 'A', 'O', 'S', 'D', 'B']);
+const SCHEMA_KEYS = ['data', 'content', 'children', 'props', 'field', 'fields', 'key', 'code', 'type', 'kind',
+  'attributes', 'display', 'skill_id', 'skillId', 'skillText', 'skill_text', 'skillValue', 'skill_value',
+  'tag', 'typename', '__typename', 'id', 'items', 'valueText'];
+const SCHEMA_CHILDREN = ['data', 'content', 'children', 'props', 'fields'];
 const fail = (reason) => {
   process.stderr.write(`JOB_HH_RESUME_READ_FAILURE ${REASONS.has(reason) ? reason : 'invalid_shape'}\n`);
   throw Object.assign(new Error('JOB_HH_RESUME_UNAVAILABLE'), { code: 'JOB_HH_RESUME_UNAVAILABLE' });
@@ -36,8 +40,9 @@ async function readResumeContent(page, resumeId) {
   const raw = await page.evaluate((selectedId) => {
     const visible = node => node && node.getClientRects().length > 0 && getComputedStyle(node).visibility === 'visible';
     const pathname = new URL(location.href).pathname;
+    const originMatch = location.origin === 'https://hh.ru';
     const root = document.querySelector('main');
-    if (!root || !visible(root)) return { pathname, failure: 'main_missing' };
+    if (!root || !visible(root)) return { pathname, originMatch, failure: 'main_missing' };
     const title = [...root.querySelectorAll('h1')].filter(visible).map(n => n.innerText.trim());
     const labels = {
       experience: /^(?:Опыт работы|Опыт)$/iu,
@@ -48,15 +53,15 @@ async function readResumeContent(page, resumeId) {
     const blocks = {};
     for (const [key, pattern] of Object.entries(labels)) {
       const headings = [...root.querySelectorAll('h2,h3')].filter(n => visible(n) && pattern.test(n.textContent.trim()));
-      if (headings.length > 1) return { pathname, failure: 'duplicate_section' };
+      if (headings.length > 1) return { pathname, originMatch, failure: 'duplicate_section' };
       if (headings.length === 1) {
         const section = headings[0].closest('section,[data-qa^="resume-block-"]');
-        if (!section || !visible(section)) return { pathname, failure: 'section_container' };
+        if (!section || !visible(section)) return { pathname, originMatch, failure: 'section_container' };
         const value = section.innerText || '';
         blocks[key] = value.slice(0, 12001);
       }
     }
-    if (Object.values(blocks).some(value => value.trim())) return { pathname, title, blocks };
+    if (Object.values(blocks).some(value => value.trim())) return { pathname, originMatch, title, blocks };
     // Fixed booleans only: the page text and data-qa values never leave the browser.
     const qaNames = ['resume-block-experience', 'resume-block-skills', 'resume-block-education', 'resume-block-about'];
     const qa = qaNames.map(name => Boolean(root.querySelector(`[data-qa="${name}"]`)));
@@ -123,9 +128,16 @@ async function readResumeContent(page, resumeId) {
       'position', 'description', 'company', 'name', 'level', 'primary', 'additional', 'professionalRoles',
       'text', 'value', 'label', 'skill', 'skillName', 'skill_name', 'displayName', 'display_name',
       'positionName', 'position_name', 'specialization', 'professions', 'items', 'valueText'];
+    const schemaKeys = ['data', 'content', 'children', 'props', 'field', 'fields', 'key', 'code', 'type', 'kind',
+      'attributes', 'display', 'skill_id', 'skillId', 'skillText', 'skill_text', 'skillValue', 'skill_value',
+      'tag', 'typename', '__typename', 'id', 'items', 'valueText'];
+    const schemaChildren = ['data', 'content', 'children', 'props', 'fields'];
+    const unknownSchema = () => ({ count: 0, more: false, kinds: [0, 0, 0, 0], keys: Array(schemaKeys.length).fill('U'),
+      children: Array.from({ length: schemaChildren.length }, () => Array(schemaKeys.length).fill('U')) });
     const initialState = { template: false, parsed: false, bounded: true, applicantResume: false,
       fields: [false, false, false, false, false, false], matches: 0,
       types: ['U', 'U', 'U'], nested: Array.from({ length: 3 }, () => Array(safeKeys.length).fill('U')),
+      schema: [unknownSchema(), unknownSchema()],
       identity: { candidate: 'UUU', parent: 'UUU', skillsFirst: 'U', titleFirst: 'U', heading: 'U' } };
     const template = document.getElementById('HH-Lux-InitialState');
     if (template?.tagName === 'TEMPLATE') {
@@ -143,6 +155,24 @@ async function readResumeContent(page, resumeId) {
             const typeOf = value => value === undefined ? 'U' : value === null ? 'Z' : Array.isArray(value) ? 'A'
               : typeof value === 'object' ? 'O' : typeof value === 'string' ? 'S'
                 : typeof value === 'number' ? 'D' : typeof value === 'boolean' ? 'B' : 'U';
+            const schemaOf = entry => {
+              if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return unknownSchema();
+              const names = Object.keys(entry);
+              const kinds = [0, 0, 0, 0];
+              for (const name of names.slice(0, 32)) {
+                const kind = typeOf(entry[name]);
+                const index = ['A', 'O', 'S', 'D'].indexOf(kind);
+                if (index >= 0) kinds[index]++;
+              }
+              return { count: Math.min(names.length, 32), more: names.length > 32, kinds,
+                keys: schemaKeys.map(key => typeOf(entry[key])),
+                children: schemaChildren.map(key => {
+                  const child = entry[key];
+                  const object = Array.isArray(child) ? child[0] : child;
+                  return schemaKeys.map(name => object && typeof object === 'object' && !Array.isArray(object)
+                    ? typeOf(object[name]) : 'U');
+                }) };
+            };
             const queue = [{ value: parsed, depth: 0 }];
             let candidate = null;
             let examined = 0;
@@ -164,6 +194,10 @@ async function readResumeContent(page, resumeId) {
                   const entry = Array.isArray(direct) ? direct[0] : direct;
                   return safeKeys.map(key => entry && typeof entry === 'object' && !Array.isArray(entry)
                     ? typeOf(entry[key]) : 'U');
+                });
+                initialState.schema = ['skills', 'title'].map(name => {
+                  const direct = resume[name];
+                  return schemaOf(Array.isArray(direct) ? direct[0] : direct);
                 });
               }
               if (depth >= 64) {
@@ -198,10 +232,10 @@ async function readResumeContent(page, resumeId) {
         }
       }
     }
-    return { pathname, title, blocks, structure: { qa, headingsInAnyTag,
+    return { pathname, originMatch, title, blocks, structure: { qa, headingsInAnyTag,
       dom: { visited, visibleCount, visibleLeafCount, educationLeaf }, initialState } };
   }, resumeId);
-  if (raw?.pathname !== `/resume/${resumeId}`) fail('wrong_page');
+  if (raw?.pathname !== `/resume/${resumeId}` || raw?.originMatch !== true) fail('wrong_page');
   if (raw?.failure) fail(raw.failure);
   if (!Array.isArray(raw?.title) || raw.title.length !== 1) fail('title_count');
   if (!raw.blocks) fail('invalid_shape');
@@ -241,6 +275,19 @@ async function readResumeContent(page, resumeId) {
     const format = (type, row) => `${type}/${INITIAL_KEYS.map((key, index) => `${key}:${row[index]}`).join(',')}`;
     const unknown = Array(INITIAL_KEYS.length).fill('U');
     process.stderr.write(`JOB_HH_RESUME_INITIAL_SHAPE count=${shape?.matches || 0} experience=${format(shape?.types[0] || 'U', shape?.nested[0] || unknown)} skills=${format(shape?.types[1] || 'U', shape?.nested[1] || unknown)} title=${format(shape?.types[2] || 'U', shape?.nested[2] || unknown)}\n`);
+    const validSchema = item => item && Number.isInteger(item.count) && item.count >= 0 && item.count <= 32
+      && typeof item.more === 'boolean' && Array.isArray(item.kinds) && item.kinds.length === 4
+      && item.kinds.every(value => Number.isInteger(value) && value >= 0 && value <= 32)
+      && Array.isArray(item.keys) && item.keys.length === SCHEMA_KEYS.length && item.keys.every(code => INITIAL_TYPES.has(code))
+      && Array.isArray(item.children) && item.children.length === SCHEMA_CHILDREN.length
+      && item.children.every(row => Array.isArray(row) && row.length === SCHEMA_KEYS.length && row.every(code => INITIAL_TYPES.has(code)));
+    const formatSchema = item => {
+      const safe = validSchema(item) ? item : { count: 0, more: false, kinds: [0, 0, 0, 0],
+        keys: Array(SCHEMA_KEYS.length).fill('U'), children: SCHEMA_CHILDREN.map(() => Array(SCHEMA_KEYS.length).fill('U')) };
+      const fields = row => SCHEMA_KEYS.map((key, index) => `${key}:${row[index]}`).join(',');
+      return `${safe.count}:${safe.more ? 1 : 0}:${safe.kinds.join(',')}/${fields(safe.keys)}/${SCHEMA_CHILDREN.map((key, index) => `${key}{${fields(safe.children[index])}}`).join('/')}`;
+    };
+    process.stderr.write(`JOB_HH_RESUME_INITIAL_SCHEMA skills=${formatSchema(shape?.schema?.[0])} title=${formatSchema(shape?.schema?.[1])}\n`);
     const identity = shape?.identity;
     const safeIdentity = identity && /^[YNU]{3}$/.test(identity.candidate) && /^[YNU]{3}$/.test(identity.parent)
       && INITIAL_TYPES.has(identity.skillsFirst) && INITIAL_TYPES.has(identity.titleFirst) && /^[YNU]$/.test(identity.heading)

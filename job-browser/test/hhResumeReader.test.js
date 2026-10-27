@@ -59,6 +59,21 @@ test('failure diagnostics use closed reason codes without resume content', async
   }
 });
 
+test('resume reader rejects the same path on another origin before diagnostics', async t => {
+  let browser;
+  try { browser = await chromium.launch({ headless: true, ...(process.platform === 'win32' ? { channel: 'msedge' } : {}) }); }
+  catch { t.skip('Local Chromium is unavailable'); return; }
+  try {
+    const page = await browser.newPage();
+    await page.route('https://other.example/resume/fixture123', route => route.fulfill({ status: 200,
+      contentType: 'text/html; charset=utf-8', body: '<main><h1>Private title</h1></main>' }));
+    await page.goto('https://other.example/resume/fixture123');
+    const output = await captureFailure(() => readResumeContent(page, 'fixture123'));
+    assert.equal(output, 'JOB_HH_RESUME_READ_FAILURE wrong_page\n');
+    await page.close();
+  } finally { await browser.close(); }
+});
+
 test('page diagnostics distinguish missing structure without logging page text', async t => {
   let browser;
   try { browser = await chromium.launch({ headless: true, ...(process.platform === 'win32' ? { channel: 'msedge' } : {}) }); }
@@ -100,7 +115,7 @@ test('empty content reports only fixed structure booleans from alternate tags', 
         <div data-qa="untrusted-secret-attribute">secret@example.com</div></main>` }));
     await page.goto('https://hh.ru/resume/fixture123');
     const output = await captureFailure(() => readResumeContent(page, 'fixture123'));
-    assert.match(output, /^JOB_HH_RESUME_STRUCTURE 10101111\nJOB_HH_RESUME_DOM visited=7 visible=7 leaf=6 tags=P,MAIN,OTHER,OTHER,NONE,NONE qa=EDUCATION,NONE,NONE,NONE,NONE,NONE\nJOB_HH_RESUME_EDUCATION 6:1:111\|[0-9]+:[01]:111\|[0-9]+:[01]:111\|0:0:000\|0:0:000\nJOB_HH_RESUME_INITIAL_STATE 0010000000\nJOB_HH_RESUME_INITIAL_SHAPE count=0 [^\n]+\nJOB_HH_RESUME_INITIAL_IDENTITY seen=0 complete=0 candidate=UUU parent=UUU skillsFirst=U titleFirst=U heading=U\nJOB_HH_RESUME_READ_FAILURE empty_content\n$/);
+    assert.match(output, /^JOB_HH_RESUME_STRUCTURE 10101111\nJOB_HH_RESUME_DOM visited=7 visible=7 leaf=6 tags=P,MAIN,OTHER,OTHER,NONE,NONE qa=EDUCATION,NONE,NONE,NONE,NONE,NONE\nJOB_HH_RESUME_EDUCATION 6:1:111\|[0-9]+:[01]:111\|[0-9]+:[01]:111\|0:0:000\|0:0:000\nJOB_HH_RESUME_INITIAL_STATE 0010000000\nJOB_HH_RESUME_INITIAL_SHAPE count=0 [^\n]+\nJOB_HH_RESUME_INITIAL_SCHEMA [^\n]+\nJOB_HH_RESUME_INITIAL_IDENTITY seen=0 complete=0 candidate=UUU parent=UUU skillsFirst=U titleFirst=U heading=U\nJOB_HH_RESUME_READ_FAILURE empty_content\n$/);
     assert.doesNotMatch(output, /Secret Name|secret|fixture123|private text|sensitive detail|untrusted/);
     await page.close();
   } finally { await browser.close(); }
@@ -119,7 +134,7 @@ test('empty content maps unknown tags and data-qa values to closed types', async
         <div style="display:none">Private text after heading</div></section></article></main>` }));
     await page.goto('https://hh.ru/resume/fixture123');
     const output = await captureFailure(() => readResumeContent(page, 'fixture123'));
-    assert.match(output, /^JOB_HH_RESUME_STRUCTURE 00100010\nJOB_HH_RESUME_DOM visited=5 visible=4 leaf=2 tags=OTHER,SECTION,ARTICLE,MAIN,OTHER,OTHER qa=OTHER,EDUCATION,OTHER,NONE,NONE,NONE\nJOB_HH_RESUME_EDUCATION 1:0:000\|1:0:000\|2:0:000\|[0-9]+:0:000\|[0-9]+:0:000\nJOB_HH_RESUME_INITIAL_STATE 0010000000\nJOB_HH_RESUME_INITIAL_SHAPE count=0 [^\n]+\nJOB_HH_RESUME_INITIAL_IDENTITY seen=0 complete=0 candidate=UUU parent=UUU skillsFirst=U titleFirst=U heading=U\nJOB_HH_RESUME_READ_FAILURE empty_content\n$/);
+    assert.match(output, /^JOB_HH_RESUME_STRUCTURE 00100010\nJOB_HH_RESUME_DOM visited=5 visible=4 leaf=2 tags=OTHER,SECTION,ARTICLE,MAIN,OTHER,OTHER qa=OTHER,EDUCATION,OTHER,NONE,NONE,NONE\nJOB_HH_RESUME_EDUCATION 1:0:000\|1:0:000\|2:0:000\|[0-9]+:0:000\|[0-9]+:0:000\nJOB_HH_RESUME_INITIAL_STATE 0010000000\nJOB_HH_RESUME_INITIAL_SHAPE count=0 [^\n]+\nJOB_HH_RESUME_INITIAL_SCHEMA [^\n]+\nJOB_HH_RESUME_INITIAL_IDENTITY seen=0 complete=0 candidate=UUU parent=UUU skillsFirst=U titleFirst=U heading=U\nJOB_HH_RESUME_READ_FAILURE empty_content\n$/);
     assert.doesNotMatch(output, /Secret Name|secret|fixture123|private|token|custom-heading|example.com|VISIBILITY|ACCESS/);
     await page.close();
   } finally { await browser.close(); }
@@ -151,8 +166,8 @@ test('bounded initial state probe reports only allowlisted presence bits', async
       stateText = typeof value === 'string' ? value : JSON.stringify(value);
       await page.goto('https://hh.ru/resume/fixture123');
       const output = await captureFailure(() => readResumeContent(page, 'fixture123'));
-      assert.match(output, new RegExp(`^JOB_HH_RESUME_STRUCTURE [01]{8}\\nJOB_HH_RESUME_DOM [^\\n]+\\nJOB_HH_RESUME_EDUCATION [0-9:|]+\\nJOB_HH_RESUME_INITIAL_STATE ${expected}\\nJOB_HH_RESUME_INITIAL_SHAPE [^\\n]+\\nJOB_HH_RESUME_INITIAL_IDENTITY [^\\n]+\\nJOB_HH_RESUME_READ_FAILURE empty_content\\n$`));
-      assert.doesNotMatch(output, /secret|private-id|Private Title|Secret Name|nested|children/);
+      assert.match(output, new RegExp(`^JOB_HH_RESUME_STRUCTURE [01]{8}\\nJOB_HH_RESUME_DOM [^\\n]+\\nJOB_HH_RESUME_EDUCATION [0-9:|]+\\nJOB_HH_RESUME_INITIAL_STATE ${expected}\\nJOB_HH_RESUME_INITIAL_SHAPE [^\\n]+\\nJOB_HH_RESUME_INITIAL_SCHEMA [^\\n]+\\nJOB_HH_RESUME_INITIAL_IDENTITY [^\\n]+\\nJOB_HH_RESUME_READ_FAILURE empty_content\\n$`));
+      assert.doesNotMatch(output, /secret|private-id|Private Title|Secret Name|nested/);
       assert.equal(output.split('\n').find(line => line.startsWith('JOB_HH_RESUME_INITIAL_IDENTITY ')),
         'JOB_HH_RESUME_INITIAL_IDENTITY ' + identity);
     }
@@ -189,12 +204,18 @@ test('bounded initial state probe reports only allowlisted presence bits', async
     assert.match(incomplete, /JOB_HH_RESUME_INITIAL_IDENTITY seen=1 complete=0 candidate=NYN parent=NNY skillsFirst=S titleFirst=A heading=N\n/);
     assert.doesNotMatch(incomplete, /fixture123|private skill|private title|unrelated|branch/);
     stateText = JSON.stringify({ applicantResume: {
-      skills: [{ skillName: 'Private skill' }], title: [{ text: 'Secret Name', display_name: 'Private alternate' }],
+      skills: [{ skillName: 'Private skill', fields: [{ skillText: 'Private nested' }] }],
+      title: [{ text: 'Secret Name', display_name: 'Private alternate', data: { valueText: 'Private nested title' } }],
     } });
     await page.goto('https://hh.ru/resume/fixture123');
     const headingMatched = await captureFailure(() => readResumeContent(page, 'fixture123'));
     assert.match(headingMatched, /JOB_HH_RESUME_INITIAL_IDENTITY seen=1 complete=1 candidate=NNN parent=NNN skillsFirst=O titleFirst=O heading=Y\n/);
     assert.match(headingMatched, / skills=A\/[^\n]*skillName:S[^\n]* title=A\/[^\n]*text:S/);
+    const schemaLine = headingMatched.split('\n').find(line => line.startsWith('JOB_HH_RESUME_INITIAL_SCHEMA '));
+    assert.match(schemaLine, /skills=2:0:[0-9,]+\/[^ ]*fields:A/);
+    assert.match(schemaLine, /fields\{[^}]*skillText:S/);
+    assert.match(schemaLine, /title=3:0:[0-9,]+\/[^ ]*data:O/);
+    assert.match(schemaLine, /data\{[^}]*valueText:S/);
     assert.doesNotMatch(headingMatched, /Private|fixture123/);
     stateText = JSON.stringify({ applicantResume: { title: [{ text: 'Secret Name', value: 'Secret Name' }] } });
     await page.goto('https://hh.ru/resume/fixture123');
