@@ -100,7 +100,7 @@ test('empty content reports only fixed structure booleans from alternate tags', 
         <div data-qa="untrusted-secret-attribute">secret@example.com</div></main>` }));
     await page.goto('https://hh.ru/resume/fixture123');
     const output = await captureFailure(() => readResumeContent(page, 'fixture123'));
-    assert.match(output, /^JOB_HH_RESUME_STRUCTURE 10101111\nJOB_HH_RESUME_DOM visited=7 visible=7 leaf=6 tags=P,MAIN,OTHER,OTHER,NONE,NONE qa=EDUCATION,NONE,NONE,NONE,NONE,NONE\nJOB_HH_RESUME_EDUCATION 6:1:111\|[0-9]+:[01]:111\|[0-9]+:[01]:111\|0:0:000\|0:0:000\nJOB_HH_RESUME_READ_FAILURE empty_content\n$/);
+    assert.match(output, /^JOB_HH_RESUME_STRUCTURE 10101111\nJOB_HH_RESUME_DOM visited=7 visible=7 leaf=6 tags=P,MAIN,OTHER,OTHER,NONE,NONE qa=EDUCATION,NONE,NONE,NONE,NONE,NONE\nJOB_HH_RESUME_EDUCATION 6:1:111\|[0-9]+:[01]:111\|[0-9]+:[01]:111\|0:0:000\|0:0:000\nJOB_HH_RESUME_INITIAL_STATE 0010000000\nJOB_HH_RESUME_READ_FAILURE empty_content\n$/);
     assert.doesNotMatch(output, /Secret Name|secret|fixture123|private text|sensitive detail|untrusted/);
     await page.close();
   } finally { await browser.close(); }
@@ -119,8 +119,38 @@ test('empty content maps unknown tags and data-qa values to closed types', async
         <div style="display:none">Private text after heading</div></section></article></main>` }));
     await page.goto('https://hh.ru/resume/fixture123');
     const output = await captureFailure(() => readResumeContent(page, 'fixture123'));
-    assert.match(output, /^JOB_HH_RESUME_STRUCTURE 00100010\nJOB_HH_RESUME_DOM visited=5 visible=4 leaf=2 tags=OTHER,SECTION,ARTICLE,MAIN,OTHER,OTHER qa=OTHER,EDUCATION,OTHER,NONE,NONE,NONE\nJOB_HH_RESUME_EDUCATION 1:0:000\|1:0:000\|2:0:000\|[0-9]+:0:000\|[0-9]+:0:000\nJOB_HH_RESUME_READ_FAILURE empty_content\n$/);
+    assert.match(output, /^JOB_HH_RESUME_STRUCTURE 00100010\nJOB_HH_RESUME_DOM visited=5 visible=4 leaf=2 tags=OTHER,SECTION,ARTICLE,MAIN,OTHER,OTHER qa=OTHER,EDUCATION,OTHER,NONE,NONE,NONE\nJOB_HH_RESUME_EDUCATION 1:0:000\|1:0:000\|2:0:000\|[0-9]+:0:000\|[0-9]+:0:000\nJOB_HH_RESUME_INITIAL_STATE 0010000000\nJOB_HH_RESUME_READ_FAILURE empty_content\n$/);
     assert.doesNotMatch(output, /Secret Name|secret|fixture123|private|token|custom-heading|example.com|VISIBILITY|ACCESS/);
+    await page.close();
+  } finally { await browser.close(); }
+});
+
+test('bounded initial state probe reports only allowlisted presence bits', async t => {
+  let browser;
+  try { browser = await chromium.launch({ headless: true, ...(process.platform === 'win32' ? { channel: 'msedge' } : {}) }); }
+  catch { t.skip('Local Chromium is unavailable'); return; }
+  try {
+    const page = await browser.newPage();
+    let stateText = '';
+    await page.route('https://hh.ru/resume/fixture123', route => route.fulfill({ status: 200,
+      contentType: 'text/html; charset=utf-8', body: `<main><h1>Secret Name</h1></main>
+        <template id="HH-Lux-InitialState">${stateText}</template>` }));
+    const cases = [
+      [{ parent: { applicantResume: { experience: 'secret@example.com', education: 'private', skills: [],
+        skillSet: [], title: 'Private Title', id: 'private-id' } } }, '1111111111'],
+      [{ parent: { applicantResume: { education: 'secret@example.com', id: 'private-id' } } }, '1111010001'],
+      ['x'.repeat(1048577), '1000000000'],
+      [JSON.stringify('я'.repeat(600000)), '1000000000'],
+      [Array.from({ length: 9 }).reduceRight((child) => ({ nested: child }), { applicantResume: { id: 'private-id' } }), '1100000000'],
+      [{ children: Array.from({ length: 3001 }, () => ({})) }, '1100000000'],
+    ];
+    for (const [value, expected] of cases) {
+      stateText = typeof value === 'string' ? value : JSON.stringify(value);
+      await page.goto('https://hh.ru/resume/fixture123');
+      const output = await captureFailure(() => readResumeContent(page, 'fixture123'));
+      assert.match(output, new RegExp(`^JOB_HH_RESUME_STRUCTURE [01]{8}\\nJOB_HH_RESUME_DOM [^\\n]+\\nJOB_HH_RESUME_EDUCATION [0-9:|]+\\nJOB_HH_RESUME_INITIAL_STATE ${expected}\\nJOB_HH_RESUME_READ_FAILURE empty_content\\n$`));
+      assert.doesNotMatch(output, /secret|private-id|Private Title|Secret Name|nested|parent|children/);
+    }
     await page.close();
   } finally { await browser.close(); }
 });

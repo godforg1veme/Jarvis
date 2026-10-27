@@ -114,8 +114,51 @@ async function readResumeContent(page, resumeId) {
       }
       educationLeaf.ancestors = ancestors;
     }
+    const initialState = { template: false, parsed: false, bounded: true, applicantResume: false,
+      fields: [false, false, false, false, false, false] };
+    const template = document.getElementById('HH-Lux-InitialState');
+    if (template?.tagName === 'TEMPLATE') {
+      initialState.template = true;
+      const node = template.content?.firstChild;
+      if (template.content?.childNodes.length !== 1 || node?.nodeType !== Node.TEXT_NODE
+        || node.textContent.length > 1048576) initialState.bounded = false;
+      else {
+        const source = node.textContent;
+        if (new TextEncoder().encode(source).length > 1048576) initialState.bounded = false;
+        else {
+          let parsed;
+          try { parsed = JSON.parse(source); initialState.parsed = true; } catch {}
+          if (initialState.parsed) {
+            const queue = [{ value: parsed, depth: 0 }];
+            let examined = 0;
+            for (let index = 0; index < queue.length && examined < 3000; index++) {
+              const { value, depth } = queue[index];
+              if (!value || typeof value !== 'object') continue;
+              examined++;
+              const resume = !Array.isArray(value) && Object.hasOwn(value, 'applicantResume') ? value.applicantResume : null;
+              if (resume && typeof resume === 'object' && !Array.isArray(resume)) {
+                initialState.applicantResume = true;
+                initialState.fields = ['experience', 'education', 'skills', 'skillSet', 'title', 'id']
+                  .map(name => Object.hasOwn(resume, name));
+                break;
+              }
+              if (depth >= 8) {
+                if (Object.values(value).some(child => child && typeof child === 'object')) initialState.bounded = false;
+                continue;
+              }
+              for (const child of Object.values(value)) {
+                if (!child || typeof child !== 'object') continue;
+                if (queue.length >= 3001) { initialState.bounded = false; break; }
+                queue.push({ value: child, depth: depth + 1 });
+              }
+            }
+            if (!initialState.applicantResume && queue.length > 3000) initialState.bounded = false;
+          }
+        }
+      }
+    }
     return { pathname, title, blocks, structure: { qa, headingsInAnyTag,
-      dom: { visited, visibleCount, visibleLeafCount, educationLeaf } } };
+      dom: { visited, visibleCount, visibleLeafCount, educationLeaf }, initialState } };
   });
   if (raw?.pathname !== `/resume/${resumeId}`) fail('wrong_page');
   if (raw?.failure) fail(raw.failure);
@@ -143,6 +186,12 @@ async function readResumeContent(page, resumeId) {
     const safeAncestors = Array.isArray(ancestorData) && ancestorData.length === 5 && ancestorData.every(validAncestor)
       ? ancestorData : Array.from({ length: 5 }, () => ({ children: 0, after: false, sections: [false, false, false] }));
     process.stderr.write(`JOB_HH_RESUME_EDUCATION ${safeAncestors.map(item => `${item.children}:${item.after ? 1 : 0}:${item.sections.map(value => value ? 1 : 0).join('')}`).join('|')}\n`);
+    const state = raw.structure?.initialState;
+    const safeState = state && ['template', 'parsed', 'bounded', 'applicantResume'].every(key => typeof state[key] === 'boolean')
+      && Array.isArray(state.fields) && state.fields.length === 6 && state.fields.every(value => typeof value === 'boolean')
+      ? state : { template: false, parsed: false, bounded: false, applicantResume: false, fields: Array(6).fill(false) };
+    process.stderr.write(`JOB_HH_RESUME_INITIAL_STATE ${[safeState.template, safeState.parsed, safeState.bounded, safeState.applicantResume,
+      ...safeState.fields].map(value => value ? 1 : 0).join('')}\n`);
   }
   return resumeSnapshotSchema(snapshot, resumeId);
 }
