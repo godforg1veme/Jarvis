@@ -66,6 +66,24 @@ class CommitmentLifecycleService {
     }
     return this.repository.transition({ userId, commitmentId, revision: expectedRevision, status: 'completed' });
   }
+
+  async transitionFromUserAction({ userId, commitmentId, revision, status, db = null }) {
+    if (!['completed', 'dismissed'].includes(status)) throw new Error('invalid user commitment status');
+    return this.repository.transition({ userId, commitmentId, revision, status, db });
+  }
+
+  async recordUserTransition(userId, commitment, db = null) {
+    if (!this.gateway) return;
+    await this.gateway.record({
+      userId, eventType: commitment.status === 'completed' ? 'commitment.completed' : 'commitment.updated',
+      occurredAt: new Date(), sourceChannel: 'life_os',
+      sourceRef: `commitment:${commitment.id}:revision:${commitment.revision}`,
+      deduplicationKey: `commitment:${commitment.id}:revision:${commitment.revision}`,
+      summary: commitment.status === 'completed' ? 'Обязательство выполнено' : 'Обязательство скрыто',
+      structuredData: { commitmentId: commitment.id, action: commitment.status === 'completed' ? 'complete' : 'dismiss' },
+      trustLevel: 'user', privacyClass: 'personal',
+    }, { db });
+  }
 }
 
 module.exports = { CommitmentLifecycleService, overlap };

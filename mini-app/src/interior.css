@@ -307,3 +307,20 @@ body.orbital-mini.orbital-theme .memory-actions__preview { margin: 0; white-spac
 body.orbital-mini.orbital-theme .memory-actions__controls { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
 body.orbital-mini.orbital-theme .memory-actions__controls button { min-height: 44px; white-space: normal; overflow-wrap: anywhere; }
 body.orbital-mini.orbital-theme .memory-actions__status { margin: 0; color: var(--muted); line-height: 1.6; overflow-wrap: anywhere; }
+body.orbital-mini.orbital-theme .personal-actions { display: grid; gap: 12px; margin-block: 16px; min-width: 0; }
+body.orbital-mini.orbital-theme .personal-actions [hidden] { display: none; }
+body.orbital-mini.orbital-theme .personal-actions__form { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel-raised); min-width: 0; }
+body.orbital-mini.orbital-theme .personal-actions__form h2 { margin: 0; font-size: 18px; }
+body.orbital-mini.orbital-theme .personal-actions__fields { display: grid; gap: 8px; min-width: 0; }
+body.orbital-mini.orbital-theme .personal-actions__fields input { min-width: 0; max-width: 100%; font-size: 16px; }
+body.orbital-mini.orbital-theme .personal-actions__controls { display: flex; flex-wrap: wrap; gap: 10px; }
+body.orbital-mini.orbital-theme .personal-actions__controls button,
+body.orbital-mini.orbital-theme .personal-actions__choice button,
+body.orbital-mini.orbital-theme .personal-actions > button { min-height: 44px; white-space: normal; overflow-wrap: anywhere; }
+body.orbital-mini.orbital-theme .personal-actions__choices { display: grid; gap: 8px; }
+body.orbital-mini.orbital-theme .personal-actions__choice { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; min-width: 0; }
+body.orbital-mini.orbital-theme .personal-actions__choice span { overflow-wrap: anywhere; flex: 1 1 180px; }
+body.orbital-mini.orbital-theme .personal-actions__preview,
+body.orbital-mini.orbital-theme .personal-actions__status,
+body.orbital-mini.orbital-theme .personal-actions__result { margin: 0; line-height: 1.6; overflow-wrap: anywhere; white-space: pre-wrap; }
+body.orbital-mini.orbital-theme .personal-actions__status { color: var(--muted); }

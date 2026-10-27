@@ -67,7 +67,7 @@ class SectionReader {
       ...(section === 'memory' ? { expectedDigest: createHash('sha256').update(row.title, 'utf8').digest('hex') }
         : section === 'documents' ? { detail: publicDocumentStatus(row) }
         : section === 'devices' ? { detail: row.status }
-          : section === 'life' ? { detail: row.due_at ? `Договорённость · ${formatMoscowDateTime(row.due_at)}` : 'Договорённость' } : {}) })), paging };
+          : section === 'life' ? { resourceType: 'commitment', detail: row.due_at ? `Договорённость · ${formatMoscowDateTime(row.due_at)}` : 'Договорённость' } : {}) })), paging };
   }
 }
 

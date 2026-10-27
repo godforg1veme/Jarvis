@@ -10,7 +10,7 @@ const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
 const server = http.createServer(async (request, response) => {
   let relative = new URL(request.url, 'http://localhost').pathname.replace(/^\/mini\//, '') || 'index.html';
   if (relative === 'job-connect/') relative = 'job-connect.html';
-  if (relative.includes('..') || !/^(index\.html|job-connect\.html|(?:app|api|admin|core|orbitalBodies|orbitMotion|sectionViews|memoryActions|jobConnect|jobConnection|jobResumes)\.js|(?:style|orbital|interior|jobResumes)\.css|assets\/milky-way-gaia-4k\.webp|vendor\/(?:three\.module|three\.core|RoomEnvironment)\.js)$/.test(relative)) return response.writeHead(404).end();
+  if (relative.includes('..') || !/^(index\.html|job-connect\.html|(?:app|api|admin|core|orbitalBodies|orbitMotion|sectionViews|memoryActions|personalActions|jobConnect|jobConnection|jobResumes)\.js|(?:style|orbital|interior|jobResumes)\.css|assets\/milky-way-gaia-4k\.webp|vendor\/(?:three\.module|three\.core|RoomEnvironment)\.js)$/.test(relative)) return response.writeHead(404).end();
   try { const content = await fs.readFile(path.join(root, relative)); response.writeHead(200, { 'Content-Type': types[path.extname(relative)], 'Content-Security-Policy': "default-src 'self'; script-src 'self' https://telegram.org; connect-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'" }).end(content); }
   catch { response.writeHead(404).end(); }
 });

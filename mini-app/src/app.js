@@ -4,6 +4,7 @@ import { createAdmin } from './admin.js';
 import { createJobConnectionPanel } from './jobConnection.js';
 import { renderSectionView, renderSectionActions } from './sectionViews.js';
 import { createMemoryActions } from './memoryActions.js';
+import { createPersonalActions } from './personalActions.js';
 const $ = (selector) => document.querySelector(selector);
 const api = createApi();
 let actor; let core; let admin; let chatPending; let chatBusy = false;
@@ -181,12 +182,17 @@ function renderPersonalSection(state) {
   if (state.permission === 'memory' && state.data.memoryActionsAvailable === true && !state.memoryActions) state.memoryActions = createMemoryActions({
     api, actor, isActive: active, onChanged: () => read(), onFatal: fail,
   });
+  if (['documents', 'devices', 'life'].includes(state.permission) && state.data.personalActionsAvailable === true && !state.personalActions) state.personalActions = createPersonalActions({
+    api, actor, section: state.permission, isActive: active, onChanged: () => read(), onFatal: fail,
+  });
   state.memoryActions?.resetButtons();
+  state.personalActions?.resetButtons();
   const view = renderSectionView(state.permission, state.data, {
     memoryActions: state.data.memoryActionsAvailable === true ? state.memoryActions : null,
+    personalActions: state.data.personalActionsAvailable === true ? state.personalActions : null,
     filterQuery: state.filterQuery,
     onFilterChange(value) { if (active()) state.filterQuery = value; },
-    onRefresh: () => read(),
+    onRefresh: async () => { await read(); if (active()) await state.personalActions?.load(); },
     onLoadMore: (cursor) => cursor === state.data.paging?.nextCursor ? read(cursor) : Promise.resolve(),
   });
   const old = $('#section-items');
@@ -237,6 +243,7 @@ function navigate() {
   if (!['home', 'assistant', 'admin'].includes(page) && !page.startsWith('section/')) page = 'home';
   if (page === currentPage) return;
   const version = ++navigationVersion; currentPage = page;
+  sectionState?.personalActions?.dispose();
   sectionState = null;
   disposeJobPanel();
   const workspaceOpen = page !== 'home';

@@ -4,6 +4,11 @@
 
 ## Русский
 
+Mini App поддерживает подтверждённые личные операции с памятью, документами,
+устройствами, напоминаниями, договорённостями и проектами. Потерянный ответ
+восстанавливается по исходному запросу; результат HH можно сверить без повтора
+выбора резюме. [Этап 5 и проверки](docs/updates/2026-10-27-mini-app-stage-five-release.md).
+
 Jarvis помогает владельцу и семье через постоянно работающий облачный сервис
 и приложение для Windows. Облако хранит учётные записи, диалоги и память,
 предоставляет доступ к моделям, Telegram и связанным устройствам. Windows-клиент
@@ -179,6 +184,11 @@ py deploy/scripts/release-status.py --fetch --vps --desktop-app "C:/Program File
 [docs/README.md](docs/README.md) содержит текущий статус и карту записей проекта.
 
 ## English
+
+Mini App supports confirmed personal memory, document, device, reminder,
+commitment and project actions. Lost replies recover the original request;
+HH results can be verified without repeating resume selection.
+[Stage 5 and validation](docs/updates/2026-10-27-mini-app-stage-five-release.md).
 
 Jarvis is a personal and family assistant with an always-on cloud service and a Windows desktop client. The cloud service manages identity, conversations, memory, model access, Telegram, and device coordination. The desktop client handles approved work with local apps, files, windows, and voice.
 

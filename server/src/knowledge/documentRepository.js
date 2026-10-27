@@ -7,9 +7,10 @@ class DocumentRepository {
   }
 
   async createPending(input) {
-    const client = await this.pool.connect();
+    const externalDb = input.db || null;
+    const client = externalDb || await this.pool.connect();
     try {
-      await client.query('BEGIN');
+      if (!externalDb) await client.query('BEGIN');
       const maintenance = await client.query(`
         SELECT enabled FROM ops_maintenance_flags
         WHERE flag='knowledge_writes_paused'
@@ -34,18 +35,18 @@ class DocumentRepository {
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
         RETURNING id, user_id, original_name, media_type, storage_key, byte_size, category, metadata, status, extraction_mode, created_at
       `, [input.id, input.userId, input.originalName, input.mediaType, input.storageKey, input.byteSize, input.sha256, input.category, JSON.stringify(input.metadata || {})]);
-      await client.query('COMMIT');
+      if (!externalDb) await client.query('COMMIT');
       return result.rows[0];
     } catch (error) {
-      await client.query('ROLLBACK');
+      if (!externalDb) await client.query('ROLLBACK');
       throw error;
     } finally {
-      client.release();
+      if (!externalDb) client.release();
     }
   }
 
-  async enqueueIngest({ userId, documentId }) {
-    const result = await this.pool.query(`
+  async enqueueIngest({ userId, documentId, db = null }) {
+    const result = await (db || this.pool).query(`
       INSERT INTO jobs (user_id, kind, payload, max_attempts)
       VALUES ($1, 'document_ingest', jsonb_build_object('documentId', $2::text), 3)
       RETURNING id, user_id, kind, payload, status, attempts, max_attempts
@@ -130,11 +131,12 @@ class DocumentRepository {
     return result.rows;
   }
 
-  async getActiveForUser({ userId, documentId }) {
-    const result = await this.pool.query(`
+  async getActiveForUser({ userId, documentId, db = null, forUpdate = false }) {
+    const result = await (db || this.pool).query(`
       SELECT id,original_name,media_type,storage_key,byte_size,category,status
       FROM documents
       WHERE id=$1 AND user_id=$2 AND status<>'deleted'
+      ${forUpdate ? 'FOR UPDATE' : ''}
     `, [documentId, userId]);
     return result.rows[0] || null;
   }
@@ -333,12 +335,12 @@ class DocumentRepository {
     return reciprocalRankFusion([lexicalRows, semantic.rows], { limit: boundedLimit });
   }
 
-  async deleteForUser({ userId, documentId }) {
-    const result = await this.pool.query(`
-      DELETE FROM documents
-      WHERE id = $1 AND user_id = $2
-      RETURNING storage_key, original_name
-    `, [documentId, userId]);
+  async deleteForUser({ userId, documentId, db = null }) {
+    const result = await (db || this.pool).query(`
+        DELETE FROM documents
+        WHERE id = $1 AND user_id = $2
+        RETURNING id, storage_key, original_name
+      `, [documentId, userId]);
     return result.rows[0] || null;
   }
 }

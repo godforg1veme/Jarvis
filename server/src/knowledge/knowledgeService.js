@@ -57,41 +57,67 @@ class KnowledgeService {
     this.chunk = options.chunk || chunkText;
     this.embeddingProvider = options.embeddingProvider || null;
     this.lifeEventGateway = options.lifeEventGateway || null;
+    this.preparedIngests = new WeakMap();
   }
 
-  async ingest({ userId, attachment, data }) {
+  async prepareIngest({ userId, attachment, data, operationId = null }) {
     const normalized = normalizeAttachment(attachment);
     if (!Buffer.isBuffer(data) || data.length === 0) throw new Error('document download is empty');
     if (normalized.byteSize && normalized.byteSize !== data.length) throw new Error('document size changed during download');
     if (data.length > this.maxBytes) throw new Error('document is too large');
-
     const id = crypto.randomUUID();
     const storageKey = storageKeyForId(id);
     const sha256 = crypto.createHash('sha256').update(data).digest();
     await this.storage.write(storageKey, data);
+    const prepared = Object.freeze({
+      onRollback: async () => {
+        this.preparedIngests.delete(prepared);
+        await this.storage.remove(storageKey).catch(() => {});
+      },
+    });
+    this.preparedIngests.set(prepared, {
+      userId, operationId, attachment, normalized, id, storageKey, sha256,
+      byteSize: data.length, used: false,
+    });
+    return prepared;
+  }
+
+  async ingest({ userId, attachment, data, db = null, prepared = null, operationId = null, expectedSha256 = null }) {
+    const localPreparation = !prepared;
+    const handle = prepared || await this.prepareIngest({ userId, attachment, data, operationId });
+    const state = this.preparedIngests.get(handle);
+    if (!state || state.used || state.userId !== userId || state.operationId !== operationId
+      || (expectedSha256 && state.sha256.toString('hex') !== expectedSha256)
+      || (attachment && (state.normalized.name !== normalizeAttachment(attachment).name
+        || state.normalized.mediaType !== normalizeAttachment(attachment).mediaType
+        || (attachment.byteSize && Number(attachment.byteSize) !== state.byteSize)))) {
+      throw new Error('prepared document does not match request');
+    }
+    state.used = true;
     try {
       const document = await this.repository.createPending({
-        id,
+        db,
+        id: state.id,
         userId,
-        originalName: safeDisplayName(normalized.name),
-        mediaType: normalized.mediaType,
-        storageKey,
-        byteSize: data.length,
-        sha256,
-        category: normalized.category,
+        originalName: safeDisplayName(state.normalized.name),
+        mediaType: state.normalized.mediaType,
+        storageKey: state.storageKey,
+        byteSize: state.byteSize,
+        sha256: state.sha256,
+        category: state.normalized.category,
         userQuotaBytes: this.userQuotaBytes,
         metadata: {
-          durationSeconds: normalized.durationSeconds,
-          caption: normalized.caption,
-          performer: normalized.performer,
-          title: normalized.title,
-          telegramFileUniqueId: String(attachment.fileUniqueId || '').slice(0, 200),
+          durationSeconds: state.normalized.durationSeconds,
+          caption: state.normalized.caption,
+          performer: state.normalized.performer,
+          title: state.normalized.title,
+          telegramFileUniqueId: String(state.attachment.fileUniqueId || '').slice(0, 200),
         },
       });
-      await this.repository.enqueueIngest({ userId, documentId: id });
-      return { ...document, ...normalized, id };
+      await this.repository.enqueueIngest({ userId, documentId: state.id, db });
+      return { ...document, ...state.normalized, id: state.id };
     } catch (error) {
-      await this.storage.remove(storageKey).catch(() => {});
+      if (localPreparation) await handle.onRollback();
       throw error;
     }
   }
@@ -260,10 +286,10 @@ class KnowledgeService {
     };
   }
 
-  async remove({ userId, documentId }) {
-    const deleted = await this.repository.deleteForUser({ userId, documentId });
+  async remove({ userId, documentId, db = null, deferStorageRemoval = false }) {
+    const deleted = await this.repository.deleteForUser({ userId, documentId, db });
     if (!deleted) return null;
-    await this.storage.remove(deleted.storage_key).catch(() => {});
+    if (!deferStorageRemoval) await this.storage.remove(deleted.storage_key).catch(() => {});
     return deleted;
   }
 }

@@ -28,13 +28,13 @@ class CommitmentRepository {
     return result.rows[0] || null;
   }
 
-  async get({ userId, commitmentId }) {
-    const result = await this.pool.query('SELECT * FROM life_commitments WHERE id = $1 AND user_id = $2', [commitmentId, userId]);
+  async get({ userId, commitmentId, db = null }) {
+    const result = await (db || this.pool).query('SELECT * FROM life_commitments WHERE id = $1 AND user_id = $2', [commitmentId, userId]);
     return result.rows[0] || null;
   }
 
-  async listRecent({ userId, projectId = null, personId = null, limit = 30 }) {
-    const result = await this.pool.query(`
+  async listRecent({ userId, projectId = null, personId = null, limit = 30, db = null }) {
+    const result = await (db || this.pool).query(`
       SELECT * FROM life_commitments
       WHERE user_id = $1 AND status = 'open'
         AND ($2::uuid IS NULL OR project_id = $2)
@@ -44,9 +44,9 @@ class CommitmentRepository {
     return result.rows;
   }
 
-  async transition({ userId, commitmentId, revision, status, dueAt, dueWindowEndAt, recurrence, title }) {
+  async transition({ userId, commitmentId, revision, status, dueAt, dueWindowEndAt, recurrence, title, db = null }) {
     if (!['open', 'completed', 'dismissed', 'expired'].includes(status)) throw new Error('invalid commitment status');
-    const result = await this.pool.query(`
+    const result = await (db || this.pool).query(`
       UPDATE life_commitments SET
         status = $4, due_at = COALESCE($5, due_at),
         due_window_end_at = COALESCE($6, due_window_end_at),

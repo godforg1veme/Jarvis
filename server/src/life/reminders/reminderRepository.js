@@ -17,10 +17,10 @@ class ReminderRepository {
     this.pool = pool;
   }
 
-  async create({ userId, ...raw }) {
+  async create({ userId, db = null, ...raw }) {
     const input = createReminderSchema.parse(raw);
     const nextOccurrenceKey = occurrenceKey(input.idempotencyKey, input.triggerAt);
-    const result = await this.pool.query(`
+    const result = await (db || this.pool).query(`
       INSERT INTO life_reminders (
         user_id, commitment_id, project_id, person_id, title, trigger_at, timezone,
         recurrence, delivery_channels, origin_channel, origin_conversation_id,
@@ -53,19 +53,19 @@ class ReminderRepository {
     return result.rows[0] || null;
   }
 
-  async get({ userId, reminderId }) {
-    const result = await this.pool.query(`
+  async get({ userId, reminderId, db = null }) {
+    const result = await (db || this.pool).query(`
       SELECT * FROM life_reminders WHERE id = $1 AND user_id = $2
     `, [reminderId, userId]);
     return result.rows[0] || null;
   }
 
-  async list({ userId, states = ['scheduled', 'claimed', 'outcome_unknown'], limit = 50 }) {
+  async list({ userId, states = ['scheduled', 'claimed', 'outcome_unknown'], limit = 50, db = null }) {
     const allowed = states.filter((state) => [
       'scheduled', 'claimed', 'delivered', 'acknowledged', 'cancelled', 'expired', 'failed', 'outcome_unknown',
     ].includes(state)).slice(0, 8);
     if (!allowed.length) return [];
-    const result = await this.pool.query(`
+    const result = await (db || this.pool).query(`
       SELECT * FROM life_reminders
       WHERE user_id = $1 AND state = ANY($2::text[])
       ORDER BY trigger_at, id
@@ -74,7 +74,7 @@ class ReminderRepository {
     return result.rows;
   }
 
-  async update({ userId, reminderId, ...raw }) {
+  async update({ userId, reminderId, db = null, ...raw }) {
     const input = updateReminderSchema.parse(raw);
     const fields = [];
     const params = [reminderId, userId, input.revision];
@@ -85,7 +85,7 @@ class ReminderRepository {
     if (input.triggerAt !== undefined) {
       add('trigger_at', new Date(input.triggerAt));
       add('next_attempt_at', new Date(input.triggerAt));
-      const current = await this.get({ userId, reminderId });
+      const current = await this.get({ userId, reminderId, db });
       if (!current || current.revision !== input.revision) return null;
       add('occurrence_key', occurrenceKey(current.idempotency_key, input.triggerAt));
       add('attempt_count', 0);
@@ -95,7 +95,7 @@ class ReminderRepository {
     if (input.recurrence !== undefined) add('recurrence', input.recurrence ? JSON.stringify(input.recurrence) : null, '::jsonb');
     if (input.deliveryChannels !== undefined) add('delivery_channels', input.deliveryChannels, '::text[]');
     if (input.state !== undefined) add('state', input.state);
-    const result = await this.pool.query(`
+    const result = await (db || this.pool).query(`
       UPDATE life_reminders
       SET ${fields.join(', ')}, revision = revision + 1, updated_at = now()
       WHERE id = $1 AND user_id = $2 AND revision = $3

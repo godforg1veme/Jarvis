@@ -8,6 +8,7 @@ const { responseForReceipt, readReceipt, failReceipt, completeReceipt } = requir
 const { sectionNavigation } = require('./miniApp/sectionNavigation');
 const { MemoryActions } = require('./miniApp/memoryActions');
 const { readToken, hash: hashSession } = require('./miniApp/sessionService');
+const { registerPersonalRoutes } = require('./miniApp/personalRoutes');
 
 const JOB_LOGIN_COOKIE = '__Secure-jarvis-job-login';
 const JOB_LOGIN_COOKIE_PATH = '/mini/api/jobs/login';
@@ -28,6 +29,7 @@ function registerMiniAppSelfRoutes({ route, authorize, requireOrigin }, services
   const { accessService, memoryService, memoryActionService, knowledgeService, deviceService, missionControlService,
     assistant, conversationRepository, pool, getJobConnectionSessionService, getJobLoginLinkDelivery, getJobResumeService } = services;
   const chatLimiter = new FixedWindowRateLimiter();
+  const personalActions = registerPersonalRoutes({ route, authorize }, services);
   const memoryActions = memoryActionService
     ? new MemoryActions({ accessService, memoryService: memoryActionService }) : null;
   const requirePermission = async (request, permission, mutation = false) => {
@@ -81,6 +83,18 @@ function registerMiniAppSelfRoutes({ route, authorize, requireOrigin }, services
   route('GET','/jobs/resumes/operations/:requestId',async request=>{
     const actor=await requirePermission(request,'jobs');if(!z.uuid().safeParse(request.params.requestId).success)fail('invalid_request');
     const result=await jobResumes().operation(actor.userId,request.params.requestId);
+    await requirePermission(request,'jobs');return {ok:true,...result};
+  });
+  route('GET','/jobs/resumes/operations/:requestId/inspection',async request=>{
+    const actor=await requirePermission(request,'jobs');if(!z.uuid().safeParse(request.params.requestId).success)fail('invalid_request');
+    const result=await jobResumes().inspectOperation(actor.userId,request.params.requestId);
+    await requirePermission(request,'jobs');return {ok:true,...result};
+  });
+  route('POST','/jobs/resumes/operations/:requestId/confirm-inspection',async request=>{
+    const actor=await requirePermission(request,'jobs',true);if(!z.uuid().safeParse(request.params.requestId).success)fail('invalid_request');
+    const parsed=z.strictObject({confirmed:z.literal(true),confirmationRevision:z.string().regex(/^[a-f0-9]{64}$/)}).safeParse(request.body);
+    if(!parsed.success)fail('invalid_request');
+    const result=await jobResumes().confirmInspection(actor.userId,request.params.requestId,parsed.data);
     await requirePermission(request,'jobs');return {ok:true,...result};
   });
   const sessionIdFrom = (request) => {
@@ -205,7 +219,7 @@ function registerMiniAppSelfRoutes({ route, authorize, requireOrigin }, services
       items = page.items; paging = page.paging;
       if (permission === 'life' && !cursor) {
         const data = await missionControlService.get({ userId });
-        if (data.currentMission) items.unshift({ id: data.currentMission.id, title: data.currentMission.name, detail: 'Текущая миссия' });
+        if (data.currentMission) items.unshift({ id: data.currentMission.id, title: data.currentMission.name, detail: 'Текущая миссия', resourceType: 'project' });
         if (data.partial) notice = 'Часть данных Life OS временно недоступна. Договорённости показаны ниже.';
       }
     } else if (permission === 'memory' && memoryService) items = (await memoryService.list({ userId, limit: 30 }))
@@ -217,8 +231,8 @@ function registerMiniAppSelfRoutes({ route, authorize, requireOrigin }, services
       .slice(0, 100).map((item) => ({ id: item.id, title: item.name, detail: item.status }));
     else if (permission === 'life' && missionControlService) {
       const data = await missionControlService.get({ userId });
-      if (data.currentMission) items.push({ id: data.currentMission.id, title: data.currentMission.name, detail: 'Текущая миссия' });
-      items.push(...(data.commitments || []).slice(0, 30).map((item) => ({ id: item.id, title: item.title, detail: item.dueAt ? `Договорённость · ${formatMoscowDateTime(item.dueAt)}` : 'Договорённость' })));
+      if (data.currentMission) items.push({ id: data.currentMission.id, title: data.currentMission.name, detail: 'Текущая миссия', resourceType: 'project' });
+      items.push(...(data.commitments || []).slice(0, 30).map((item) => ({ id: item.id, title: item.title, resourceType: 'commitment', detail: item.dueAt ? `Договорённость · ${formatMoscowDateTime(item.dueAt)}` : 'Договорённость' })));
     } else if (permission === 'jobs') {
       notice = 'Поиск использует твой личный профиль HH. Для подключения понадобится войти в HH и выбрать основное резюме.';
     } else if (permission === 'vpn') notice = actor.level === 'owner'
@@ -229,6 +243,7 @@ function registerMiniAppSelfRoutes({ route, authorize, requireOrigin }, services
     else notice = 'Этот раздел сейчас не подключён на сервере.';
     const currentActor = await requirePermission(request, permission); // Revocation during a read must hide the result.
     return { ok: true, section: permission, items, notice, paging,
+      personalActionsAvailable: personalActions.available(permission),
       ...(permission === 'memory' ? { memoryActionsAvailable: Boolean(memoryActions) } : {}),
       available: ['memory', 'documents', 'devices', 'life'].includes(permission) ? Boolean(sourceAvailable) : true,
       actions: sectionNavigation(permission, currentActor, services) };

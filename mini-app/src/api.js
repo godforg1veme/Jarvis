@@ -56,5 +56,25 @@ export function createApi() {
     if (data.csrfToken) csrf = data.csrfToken;
     return data;
   }
-  return { request, clear() { csrf = ''; } };
+  async function requestBinary(path, file, name, type) {
+    let response;
+    try {
+      response = await fetch(`/mini/api${path}`, { method: 'POST', credentials: 'same-origin', redirect: 'error', cache: 'no-store',
+        headers: { 'Content-Type': 'application/octet-stream', 'X-Jarvis-CSRF': csrf,
+          'x-jarvis-file-name': encodeURIComponent(name), 'x-jarvis-file-type': type },
+        body: file, signal: AbortSignal.timeout(15000) });
+    } catch { throw new ApiError('unknown', true); }
+    let data;
+    try { data = await response.json(); } catch { throw new ApiError('unknown', true); }
+    if (!data || typeof data !== 'object') throw new ApiError('unknown', true);
+    if (!response.ok) {
+      const code = response.status === 401 ? 'unauthorized' : response.status === 403 ? 'forbidden'
+        : response.status === 409 ? 'conflict' : response.status === 429 ? 'rate_limited'
+          : response.status >= 500 ? 'unknown' : 'invalid';
+      throw new ApiError(code, code === 'unknown');
+    }
+    if (data.ok !== true) throw new ApiError('unknown', true);
+    return data;
+  }
+  return { request, requestBinary, clear() { csrf = ''; } };
 }

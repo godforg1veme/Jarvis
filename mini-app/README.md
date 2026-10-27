@@ -4,6 +4,14 @@
 
 ## Русский
 
+27 октября завершён [этап 5](../docs/updates/2026-10-27-mini-app-stage-five-release.md):
+подтверждённые загрузка/удаление документов, подключение/отключение устройств и
+отзыв кодов, напоминания, договорённости и проекты. Неизвестный результат HH
+можно сверить по исходному UUID и подтвердить без повторного select/raise.
+885 server tests, 32 PostgreSQL acceptance tests, десять браузерных fixtures и
+отдельный E2E с настоящими API/БД прошли. Установка отмечается в записи выпуска;
+живая приёмка Telegram остаётся открытой.
+
 27 октября на DE установлен [выпуск кнопок и памяти](../docs/updates/2026-10-27-mini-app-buttons-release.md):
 этапы 1–4 и первый раздел этапа 5 прошли общий набор проверок и независимую ревизию.
 Текущий статус установки приведён в записи выпуска; исторические результаты ниже.
@@ -81,7 +89,8 @@ Telegram initData; личность определяется числовым Te
 
 Доступны личный текстовый диалог и чтение своих памяти, документов, устройств
 и Life OS, если эти серверные сервисы включены. Добавление, исправление и удаление
-памяти подтверждаются в Mini App; другие действия разделов остаются в Telegram/Desktop.
+памяти, загрузка/удаление документов, подключение/отключение устройств и операции
+Life OS подтверждаются в Mini App. Команды компьютеру выполняются через Telegram/Desktop.
 Для второго поиска HH нужно собственное подключение:
 одна галочка не открывает браузер владельца. Общие VPN/Operations/Supervisor
 сохраняют отдельные owner-bound ограничения.
@@ -160,6 +169,14 @@ Mini App build и Edge fixtures. Команды и границы проверо
 
 ## English
 
+October 27: [stage 5](../docs/updates/2026-10-27-mini-app-stage-five-release.md)
+is complete: confirmed document upload/deletion, device pairing/revocation and
+code cancellation, reminders, commitments and projects. Unknown HH results can
+be inspected by original UUID and confirmed without another select/raise.
+885 server tests, 32 PostgreSQL acceptance tests, ten browser fixtures and a
+separate E2E with real APIs/database passed. Installation status is recorded in
+the release note; live Telegram acceptance remains open.
+
 The [October 27 buttons and memory release](../docs/updates/2026-10-27-mini-app-buttons-release.md)
 is installed on DE: stages 1–4 and the first stage-5 section passed full validation and
 independent review. The release record tracks installation; historical results follow.
@@ -237,7 +254,8 @@ authentication loads the official Telegram Web App SDK.
 
 Private text conversation and own memory, document, device and Life OS reads
 are available when their server services are enabled. Adding, correcting and
-forgetting memories are confirmed in Mini App; other section actions remain in
+forgetting memories, document upload/deletion, device pairing/revocation and
+Life OS actions require confirmation in Mini App. Computer commands use
 Telegram/Desktop. A second HH search needs a personal connection: a checkbox
 never opens the owner's browser. Shared VPN/Operations/Supervisor retains
 separate owner-bound limits.

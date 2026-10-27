@@ -117,22 +117,27 @@ class MissionControlService {
 
   restore(input) { return this._setIntent({ ...input, pinned: false, hiddenUntil: null, eventType: 'mission.restored' }); }
 
-  async _setIntent({ userId, projectId, revision = null, pinned, hiddenUntil, eventType, sourceDeviceId = null }) {
-    const states = await this.priorityRepository.list({ userId });
+  async _setIntent({ userId, projectId, revision = null, pinned, hiddenUntil, eventType, sourceDeviceId = null, db = null }) {
+    const states = await this.priorityRepository.list({ userId, db });
     const current = states.find((state) => state.project_id === projectId) || null;
     if (current && revision == null) return null;
     const row = await this.priorityRepository.setIntent({
-      userId, projectId, revision, pinned, hiddenUntil, userWeight: Number(current?.user_weight || 0),
+      userId, projectId, revision, pinned, hiddenUntil, userWeight: Number(current?.user_weight || 0), db,
     });
-    if (row && this.gateway) await this.gateway.record({
+    if (row) await this.recordIntent({ userId, row, pinned, hiddenUntil, eventType, sourceDeviceId, db });
+    return row;
+  }
+
+  async recordIntent({ userId, row, pinned, hiddenUntil, eventType, sourceDeviceId = null, db = null }) {
+    if (!this.gateway) return;
+    await this.gateway.record({
       userId, eventType, occurredAt: this.now(), sourceChannel: 'life_os',
       sourceRef: `${eventType}:${row.project_id}:revision:${row.revision}`, sourceDeviceId,
       deduplicationKey: `${eventType}:${row.project_id}:revision:${row.revision}`,
       summary: pinned ? 'Миссия закреплена пользователем' : hiddenUntil ? 'Миссия временно скрыта' : 'Миссия восстановлена',
       structuredData: { projectId: row.project_id, revision: row.revision },
       trustLevel: 'user', privacyClass: 'personal',
-    });
-    return row;
+    }, { db });
   }
 }
 

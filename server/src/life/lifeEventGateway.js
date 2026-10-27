@@ -6,10 +6,10 @@ class LifeEventGateway {
     this.logger = options.logger || null;
   }
 
-  async record(input) {
+  async record(input, { db = null } = {}) {
     if (!this.enabled) return null;
     try {
-      return await this.repository.create(input);
+      return await this.repository.create(input, db);
     } catch (error) {
       if (this.logger && typeof this.logger.warn === 'function') {
         this.logger.warn({

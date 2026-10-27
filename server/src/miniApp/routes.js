@@ -99,13 +99,46 @@ function registerMiniAppRoutes(
     if (mutation) sessions.requireCsrf(request, session);
     return session;
   }
-  const route = (method, url, fn) =>
+  const route = (method, url, fn, options = {}) => {
+    if (options.binary) {
+      app.register(async (scoped) => {
+        const uploads = new Map(); let activeUploads = 0;
+        const releaseUpload = (request) => {
+          const userId = request.miniUploadUser;
+          if (!userId) return;
+          request.miniUploadUser = null; activeUploads--;
+          const next = (uploads.get(userId) || 1) - 1;
+          if (next) uploads.set(userId, next); else uploads.delete(userId);
+        };
+        scoped.addHook('onResponse', async (request) => releaseUpload(request));
+        scoped.addHook('onError', async (request) => releaseUpload(request));
+        scoped.addHook('onRequestAbort', async (request) => releaseUpload(request));
+        if (scoped.hasContentTypeParser('application/octet-stream')) scoped.removeContentTypeParser('application/octet-stream');
+        scoped.addContentTypeParser('application/octet-stream', { parseAs: 'buffer', bodyLimit: options.bodyLimit },
+          (_request, body, done) => done(null, body));
+        scoped.route({ method, url: `/mini/api${url}`, bodyLimit: options.bodyLimit,
+          onRequest: async (request, reply) => {
+            // Authenticate before Fastify buffers file bytes.
+            try {
+              rate(request);
+              const session = await authorize(request, { mutation: true });
+              if (!session.actor.permissions.includes('documents')) throw accessError('forbidden');
+              if (request.headers['content-type'] !== 'application/octet-stream') throw accessError('invalid_request');
+              if (activeUploads >= 4 || (uploads.get(session.actor.userId) || 0) >= 2) throw accessError('rate_limited');
+              request.miniUploadUser = session.actor.userId;
+              activeUploads++; uploads.set(session.actor.userId, (uploads.get(session.actor.userId) || 0) + 1);
+            } catch (error) { return publicError(error, reply); }
+          }, handler: wrap(fn) });
+      });
+      return;
+    }
     app.route({
       method,
       url: `/mini/api${url}`,
       bodyLimit: 12288,
       handler: wrap(fn),
     });
+  };
   route('POST', '/session', async (req, reply) => {
     requireOrigin(req);
     const parsed = z

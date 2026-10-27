@@ -12,9 +12,9 @@ class LifeEventRepository {
     this.pool = pool;
   }
 
-  async create(input) {
+  async create(input, db = null) {
     const event = parseLifeEventInput(input);
-    const result = await this.pool.query(`
+    const result = await (db || this.pool).query(`
       INSERT INTO life_events (
         user_id, event_type, occurred_at, source_channel, source_ref,
         source_device_id, deduplication_key, summary, structured_data,

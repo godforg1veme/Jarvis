@@ -5,8 +5,8 @@ class PriorityRepository {
     this.pool = pool;
   }
 
-  async list({ userId }) {
-    const result = await this.pool.query(`
+  async list({ userId, db = null }) {
+    const result = await (db || this.pool).query(`
       SELECT * FROM life_project_priority_state
       WHERE user_id = $1
       ORDER BY pinned DESC, calculated_score DESC, project_id
@@ -14,9 +14,9 @@ class PriorityRepository {
     return result.rows;
   }
 
-  async setIntent({ userId, ...raw }) {
+  async setIntent({ userId, db = null, ...raw }) {
     const input = priorityIntentSchema.parse(raw);
-    const result = await this.pool.query(`
+    const result = await (db || this.pool).query(`
       WITH eligible AS (
         SELECT project.id
         FROM life_projects project

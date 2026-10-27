@@ -8,6 +8,24 @@
 
 ## Выбор проверок
 
+### Mini App: личные операции этапа 5
+
+`node scripts/testMiniAppPersonalActions.cjs` проверяет UI с ответами-fixtures.
+`node scripts/testMiniAppPersonalE2e.cjs` проверяет собранный UI через настоящий
+Fastify API, временное файловое хранилище и отдельную PostgreSQL database.
+Telegram SDK и внешний HH transport тестовые; API не подменяются. Задай
+`JARVIS_MINI_TEST_DATABASE_URL` только для локального изолированного кластера;
+новые fixtures допускают loopback URL без query overrides, создают собственную
+database и удаляют её после проверки. Нужны права CREATE DATABASE и pgvector.
+
+Backend acceptance: `node --test server/test/miniAppPersonalActionsAcceptance.cjs`.
+Соседние проверки HH: `node --test server/test/jobResumesAcceptance.cjs` с
+`JARVIS_JOB_TEST_DATABASE_URL` того же тестового кластера. Старые acceptance
+файлы с общей schema/extension запускай последовательно (`--test-concurrency=1`).
+Проверки хранения: `node --test server/test/documentMiniActions.test.js server/test/miniAppLifeDeviceActions.test.js`. После изменения UI выполни
+`npm run build --prefix mini-app`. Физический Telegram/WebView этим не проверяется.
+Результат выпуска: [этап 5](updates/2026-10-27-mini-app-stage-five-release.md).
+
 ### Shared instructions and Tavily MCP
 
 Проверки новой функциональности запускаются без настоящих ключей и отправки

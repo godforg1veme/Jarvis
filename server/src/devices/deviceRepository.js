@@ -9,8 +9,16 @@ class DeviceRepository {
     this.pool = pool;
   }
 
-  async createPairingCode({ userId, code, deviceName, expiresAt }) {
-    const result = await this.pool.query(`
+  async createPairingCode({ userId, code, deviceName, expiresAt, db = null }) {
+    if (db) {
+      // Preserve reassignment history; only discard expired, unreferenced codes.
+      await db.query(`DELETE FROM device_pairing_codes p WHERE p.user_id=$1 AND p.expires_at<=now()
+        AND NOT EXISTS(SELECT 1 FROM device_reassignments r WHERE r.pairing_code_id=p.id)`, [userId]);
+      const count = (await db.query(`SELECT count(*)::int AS n FROM device_pairing_codes
+        WHERE user_id=$1 AND consumed_at IS NULL AND expires_at>now()`, [userId])).rows[0];
+      if (count?.n >= 10) throw require('../access/accessPolicy').accessError('limit_reached');
+    }
+    const result = await (db || this.pool).query(`
       INSERT INTO device_pairing_codes (user_id, code_hash, device_name, expires_at)
       VALUES ($1, $2, $3, $4)
       RETURNING id, expires_at
@@ -54,8 +62,8 @@ class DeviceRepository {
     return result.rows[0] || null;
   }
 
-  async listForUser(userId) {
-    const result = await this.pool.query(`
+  async listForUser(userId, db = null) {
+    const result = await (db || this.pool).query(`
       SELECT id, name, status, capabilities, last_seen_at, created_at, updated_at
       FROM devices
       WHERE user_id = $1
@@ -95,13 +103,37 @@ class DeviceRepository {
     return result.rows[0] || null;
   }
 
-  async revokeForUser({ userId, deviceId }) {
-    const result = await this.pool.query(`
+  async revokeForUser({ userId, deviceId, db = null }) {
+    const result = await (db || this.pool).query(`
       UPDATE devices
       SET status = 'revoked', updated_at = now()
       WHERE id = $1 AND user_id = $2 AND status <> 'revoked'
       RETURNING id, name, status
     `, [deviceId, userId]);
+    return result.rows[0] || null;
+  }
+
+  async getForUser({ userId, deviceId, db = null }) {
+    const result = await (db || this.pool).query(`
+      SELECT id, name, status FROM devices WHERE id = $1 AND user_id = $2
+    `, [deviceId, userId]);
+    return result.rows[0] || null;
+  }
+
+  async getPairingCodeForUser({ userId, pairingId, db = null }) {
+    const result = await (db || this.pool).query(`
+      SELECT id, device_name, expires_at, consumed_at
+      FROM device_pairing_codes WHERE id = $1 AND user_id = $2
+    `, [pairingId, userId]);
+    return result.rows[0] || null;
+  }
+
+  async cancelPairingCode({ userId, pairingId, db = null }) {
+    const result = await (db || this.pool).query(`
+      UPDATE device_pairing_codes SET consumed_at = now()
+      WHERE id = $1 AND user_id = $2 AND consumed_at IS NULL AND expires_at > now()
+      RETURNING id, device_name, expires_at
+    `, [pairingId, userId]);
     return result.rows[0] || null;
   }
 }

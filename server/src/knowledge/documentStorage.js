@@ -1,5 +1,6 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
+const { randomUUID } = require('node:crypto');
 
 const STORAGE_KEY_PATTERN = /^[a-f0-9]{2}\/[a-f0-9-]{36}$/;
 
@@ -12,6 +13,7 @@ function storageKeyForId(documentId) {
 class DocumentStorage {
   constructor(options = {}) {
     this.root = path.resolve(options.root || '/srv/jarvis/documents');
+    this.fs = options.fs || fs;
   }
 
   pathFor(storageKey) {
@@ -25,22 +27,29 @@ class DocumentStorage {
   async write(storageKey, data) {
     if (!Buffer.isBuffer(data) || data.length === 0) throw new Error('document data is required');
     const target = this.pathFor(storageKey);
-    await fs.mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
-    const handle = await fs.open(target, 'wx', 0o600);
+    const temporary = `${target}.tmp-${randomUUID()}`;
+    await this.fs.mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
     try {
-      await handle.writeFile(data);
+      const handle = await this.fs.open(temporary, 'wx', 0o600);
+      try {
+        await handle.writeFile(data);
+      } finally {
+        await handle.close();
+      }
+      // Hard-link promotion is atomic and cannot replace an existing document.
+      await this.fs.link(temporary, target);
     } finally {
-      await handle.close();
+      await this.fs.rm(temporary, { force: true }).catch(() => {});
     }
     return target;
   }
 
   async read(storageKey) {
-    return fs.readFile(this.pathFor(storageKey));
+    return this.fs.readFile(this.pathFor(storageKey));
   }
 
   async remove(storageKey) {
-    await fs.rm(this.pathFor(storageKey), { force: true });
+    await this.fs.rm(this.pathFor(storageKey), { force: true });
   }
 }
 

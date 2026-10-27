@@ -59,6 +59,7 @@ test('migration files are ordered and narrowly named', () => {
     '049_mini_app_request_outcomes.sql',
     '050_mini_app_paging_indexes.sql',
     '051_mini_app_memory_operations.sql',
+    '052_mini_app_personal_operations.sql',
   ]);
 });
 

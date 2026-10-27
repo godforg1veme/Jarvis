@@ -20,6 +20,7 @@ const ASSETS = Object.freeze({
   'interior.css': 'text/css; charset=utf-8',
   'sectionViews.js': 'text/javascript; charset=utf-8',
   'memoryActions.js': 'text/javascript; charset=utf-8',
+  'personalActions.js': 'text/javascript; charset=utf-8',
   'assets/milky-way-gaia-4k.webp': 'image/webp',
   'assets/SKY-CREDITS.md': 'text/markdown; charset=utf-8',
   'style.css': 'text/css; charset=utf-8',

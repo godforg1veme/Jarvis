@@ -1,9 +1,11 @@
-const { randomUUID } = require('node:crypto');
+const { randomUUID, createHash } = require('node:crypto');
 const { z } = require('zod');
 const { jobError } = require('./jobSchemas');
 const { resumeSchema,settingsInput,stamp } = require('./jobResumeRepository');
 const INTERVAL=4*60*60*1000, REFRESH=15*60*1000;
 const publicOperation=op=>({requestId:op.request_id,status:op.status,kind:op.kind,...(op.result?{result:op.result}:{})});
+const inspectionInput=z.object({confirmed:z.literal(true),confirmationRevision:z.string().regex(/^[a-f0-9]{64}$/)}).strict();
+const inspectionRevision=(op,access)=>createHash('sha256').update(JSON.stringify([op.request_id,op.payload,stamp(access)])).digest('hex');
 class JobResumeService {
   constructor({repository,browserClient,now=Date.now}) {this.repository=repository;this.browserClient=browserClient;this.now=now;}
   async get(userId) {
@@ -83,6 +85,7 @@ class JobResumeService {
       const fresh=(await c.query('SELECT status FROM job_resume_operations WHERE user_id=$1 AND request_id=$2',[userId,op.request_id])).rows[0];
       if(fresh?.status==='complete')return;
       if(connection?.revision!==input.connectionRevision||manager.revision!==input.expectedRevision)throw jobError('revision_conflict');
+      if(input.autoRaiseEnabled&&manager.last_outcome==='unknown')throw jobError('operation_unknown');
       if(connection.resume_id!==input.resumeId) {
         await c.query(`UPDATE job_connections SET resume_id=$2,revision=revision+1,updated_at=now() WHERE user_id=$1`,[userId,input.resumeId]);
         await c.query("UPDATE job_confirmations SET status='stale' WHERE user_id=$1 AND kind='apply' AND status='pending'",[userId]);
@@ -100,7 +103,12 @@ class JobResumeService {
     }
     if(op.kind==='settings'&&(op.status==='unknown'||op.status==='working'&&this.now()-new Date(op.created_at).getTime()>120000)) {
       const changed=await this.repository.transaction(userId,async(_c,a)=>stamp(a)!==op.payload.stamp);
-      if(changed){await this.repository.finish(userId,requestId,'failed');return publicOperation(await this.repository.status(userId,requestId));}
+      // A role revision is not evidence that HH rejected the original write.
+      // Keep the original request blocked until its target is verified.
+      if(changed){
+        if(op.status==='working'){await this.repository.finish(userId,requestId,'unknown');op=await this.repository.status(userId,requestId);}
+        return publicOperation(op);
+      }
     }
     if(op.kind==='settings'&&(op.status==='unknown'||op.status==='working'&&this.now()-new Date(op.created_at).getTime()>120000)) {
       const localOff=await this.repository.transaction(userId,async c=>{
@@ -129,6 +137,52 @@ class JobResumeService {
       }
     }
     return publicOperation(op);
+  }
+  async inspectOperation(userId, requestId) {
+    // Reconcile only the original operation. This never dispatches select/raise.
+    await this.operation(userId, requestId);
+    return this.repository.transaction(userId, async (db, access) => {
+      const op = (await db.query('SELECT * FROM job_resume_operations WHERE user_id=$1 AND request_id=$2', [userId, requestId])).rows[0];
+      if (!op) throw jobError('operation_unknown');
+      const input = op.payload?.input || {};
+      const {connection,manager} = await this.repository.current(db,userId);
+      const target = Array.isArray(manager?.resumes) ? manager.resumes.find((r) => r.id === input.resumeId) : null;
+      const accessChanged=op.kind==='settings'&&stamp(access)!==op.payload?.stamp;
+      let selectionVerified=false;
+      if(accessChanged&&op.status==='unknown'&&connection?.status==='connected'
+        &&connection.revision===input.connectionRevision&&manager.revision===input.expectedRevision) {
+        const selected=await this.browserClient.forUser(userId).connection().catch(()=>null);
+        selectionVerified=Boolean(selected?.resumeId===input.resumeId);
+      }
+      return { ...publicOperation(op), inspection: {
+        requestId, kind: op.kind, targetResumeId: typeof input.resumeId === 'string' ? input.resumeId : null,
+        targetTitle: typeof target?.title === 'string' ? target.title.slice(0, 500) : null,
+        autoRaiseEnabled: typeof input.autoRaiseEnabled === 'boolean' ? input.autoRaiseEnabled : null,
+        accessChanged,selectionVerified,
+        confirmationRevision:selectionVerified?inspectionRevision(op,access):null,
+        retryDispatched: false,
+      } };
+    });
+  }
+  async confirmInspection(userId,requestId,input) {
+    z.uuid().parse(requestId);input=inspectionInput.parse(input);
+    return this.repository.transaction(userId,async(db,access)=>{
+      const op=(await db.query('SELECT * FROM job_resume_operations WHERE user_id=$1 AND request_id=$2 FOR UPDATE',[userId,requestId])).rows[0];
+      if(op?.kind==='settings'&&op.status==='complete')return publicOperation(op);
+      if(!op||op.kind!=='settings'||op.status!=='unknown')throw jobError('operation_unknown');
+      if(stamp(access)===op.payload?.stamp||inspectionRevision(op,access)!==input.confirmationRevision)throw jobError('revision_conflict');
+      const {connection,manager}=await this.repository.current(db,userId);
+      const original=op.payload.input;
+      if(connection?.status!=='connected'||connection.revision!==original.connectionRevision
+        ||manager.revision!==original.expectedRevision)throw jobError('revision_conflict');
+      const selected=await this.browserClient.forUser(userId).connection().catch(()=>null);
+      if(selected?.resumeId!==original.resumeId)throw jobError('operation_unknown');
+      // The fresh, explicit confirmation authorizes a local commit under the
+      // current role. Preserve the original durable request and its payload.
+      await this.completeSettingsLocked(db,access,userId,{...op,payload:{...op.payload,stamp:stamp(access)}});
+      await db.query("UPDATE job_resume_operations SET result=$3 WHERE user_id=$1 AND request_id=$2",[userId,requestId,{reconciledAfterAccessChange:true}]);
+      return {requestId,status:'complete',kind:'settings',result:{reconciledAfterAccessChange:true}};
+    });
   }
   async refreshDue() {
     await this.repository.pool.query(`INSERT INTO job_resume_managers(user_id) SELECT user_id FROM job_connections

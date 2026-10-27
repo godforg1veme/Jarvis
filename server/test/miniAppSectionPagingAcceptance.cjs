@@ -50,7 +50,7 @@ test('Mini App paging uses real migrated PostgreSQL, exact timestamps and owner 
         assert.deepEqual(lengths, [30, 30, 5]);
         assert.equal(new Set(rows.map((row) => row.id)).size, 65);
         for (const row of rows) {
-          assert.ok(Object.keys(row).every((key) => ['id', 'title', 'detail', ...(section === 'memory' ? ['expectedDigest'] : [])].includes(key)));
+          assert.ok(Object.keys(row).every((key) => ['id', 'title', 'detail', ...(section === 'memory' ? ['expectedDigest'] : []), ...(section === 'life' ? ['resourceType'] : [])].includes(key)));
           if (section === 'memory') assert.equal(row.expectedDigest, createHash('sha256').update(row.title, 'utf8').digest('hex'));
         }
         const ownerRows = (await pool.query(`SELECT id FROM ${section === 'memory' ? 'memories' : section === 'life' ? 'life_commitments' : section} WHERE user_id=$1`, [userId])).rows;

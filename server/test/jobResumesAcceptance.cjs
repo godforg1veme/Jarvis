@@ -109,5 +109,92 @@ test('real Mini App routes bind selection to authenticated actor, origin and CSR
     assert.equal((await app.inject({method:'POST',url:'/mini/api/jobs/resumes/settings',headers,payload})).json().status,'complete');
     assert.equal((await app.inject({method:'GET',url:`/mini/api/jobs/resumes/operations/${payload.requestId}`,headers:{cookie:sessionCookie(member.token).split(';')[0]}})).statusCode,404);
     assert.equal((await f.service.get(f.member.userId)).primaryResumeId,'memberA');
+    const inspected=await app.inject({method:'GET',url:`/mini/api/jobs/resumes/operations/${payload.requestId}/inspection`,headers});
+    assert.equal(inspected.statusCode,200);assert.equal(inspected.json().inspection.targetResumeId,'ownerB');
+    assert.equal(inspected.json().inspection.retryDispatched,false);
+    assert.equal((await app.inject({method:'GET',url:`/mini/api/jobs/resumes/operations/${payload.requestId}/inspection`,headers:{cookie:sessionCookie(member.token).split(';')[0]}})).statusCode,404);
   }finally{await app.close();await f.close();}
+});
+
+test('manual unknown inspection reads the original HH selection without replay or premature unlock',async()=>{
+  const f=await fixture();try {
+    const userId=f.owner.userId;await f.service.refresh(userId,randomUUID());
+    const original=f.service.browserClient.forUser;
+    let selects=0;
+    f.service.browserClient.forUser=(id)=>({...original(id),async selectResume(){selects++;throw Error('Fixture ambiguous dispatch');}});
+    const input=await f.input(userId,'ownerB',false);
+    assert.equal((await f.service.settings(userId,input)).status,'unknown');
+    let info=await f.service.inspectOperation(userId,input.requestId);
+    assert.equal(info.status,'unknown');assert.equal(info.inspection.targetResumeId,'ownerB');
+    assert.equal(info.inspection.targetTitle,'Owner second');assert.equal(info.inspection.retryDispatched,false);
+    assert.equal(selects,1);
+    await assert.rejects(f.service.settings(userId,{...input,requestId:randomUUID()}),{code:'operation_unknown'});
+    await assert.rejects(f.service.inspectOperation(f.member.userId,input.requestId),{code:'operation_unknown'});
+    f.selected.set(userId,'ownerB');
+    info=await f.service.inspectOperation(userId,input.requestId);
+    assert.equal(info.status,'complete');assert.equal(selects,1);
+    assert.equal((await f.service.get(userId)).primaryResumeId,'ownerB');
+  }finally{await f.close();}
+});
+
+test('role revision after lost HH response keeps original unknown until explicit verified confirmation',async()=>{
+  const f=await fixture();try {
+    const userId=f.member.userId;
+    f.lists.get(userId).push({id:'memberB',title:'Member second',canRaise:true});
+    await f.service.refresh(userId,randomUUID());
+    const input=await f.input(userId,'memberB',false);f.loseSelection();
+    assert.equal((await f.service.settings(userId,input)).status,'unknown');
+    assert.equal(f.selections.length,1);
+    const role=(await f.pool.query('SELECT id,revision FROM access_roles WHERE id=$1',[f.member.roleId])).rows[0];
+    await f.access.mutate(f.owner.userId,'role.update',
+      {operationId:randomUUID(),revision:role.revision,name:'Resume fixture updated',permissions:['jobs']},role.id);
+    assert.equal((await f.service.operation(userId,input.requestId)).status,'unknown');
+    await f.pool.query("UPDATE job_resume_operations SET status='working',created_at=now()-interval '3 minutes' WHERE user_id=$1 AND request_id=$2",[userId,input.requestId]);
+    const inspected=await f.service.inspectOperation(userId,input.requestId);
+    assert.equal(inspected.status,'unknown');
+    assert.equal(inspected.inspection.accessChanged,true);
+    assert.equal(inspected.inspection.selectionVerified,true);
+    assert.match(inspected.inspection.confirmationRevision,/^[a-f0-9]{64}$/);
+    assert.equal(f.selections.length,1);
+    await assert.rejects(f.service.confirmInspection(f.owner.userId,input.requestId,
+      {confirmed:true,confirmationRevision:inspected.inspection.confirmationRevision}),{code:'operation_unknown'});
+    await assert.rejects(f.service.confirmInspection(userId,input.requestId,
+      {confirmed:true,confirmationRevision:'0'.repeat(64)}),{code:'revision_conflict'});
+    await f.access.mutate(f.owner.userId,'role.update',
+      {operationId:randomUUID(),revision:role.revision+1,name:'Resume fixture revised',permissions:['jobs']},role.id);
+    await assert.rejects(f.service.confirmInspection(userId,input.requestId,
+      {confirmed:true,confirmationRevision:inspected.inspection.confirmationRevision}),{code:'revision_conflict'});
+    const fresh=await f.service.inspectOperation(userId,input.requestId);
+    assert.equal(fresh.inspection.selectionVerified,true);
+    f.selected.set(userId,'memberA');
+    await assert.rejects(f.service.confirmInspection(userId,input.requestId,
+      {confirmed:true,confirmationRevision:fresh.inspection.confirmationRevision}),{code:'operation_unknown'});
+    f.selected.set(userId,'memberB');
+    const result=await f.service.confirmInspection(userId,input.requestId,
+      {confirmed:true,confirmationRevision:fresh.inspection.confirmationRevision});
+    assert.equal(result.status,'complete');assert.equal(f.selections.length,1);
+    assert.equal((await f.service.confirmInspection(userId,input.requestId,
+      {confirmed:true,confirmationRevision:fresh.inspection.confirmationRevision})).status,'complete');
+    assert.equal(f.selections.length,1);
+    assert.equal((await f.service.get(userId)).primaryResumeId,'memberB');
+  }finally{await f.close();}
+});
+
+test('manual HH confirmation cannot proceed after jobs permission is revoked',async()=>{
+  const f=await fixture();try {
+    const userId=f.member.userId;
+    f.lists.get(userId).push({id:'memberB',title:'Member second',canRaise:true});
+    await f.service.refresh(userId,randomUUID());
+    const input=await f.input(userId,'memberB',false);f.loseSelection();
+    assert.equal((await f.service.settings(userId,input)).status,'unknown');
+    const memberAccess=await f.access.getAccessForTelegram('303');
+    await f.access.mutate(f.owner.userId,'user.update',
+      {operationId:randomUUID(),revision:memberAccess.revision,overrides:{jobs:'deny'}},'303');
+    await assert.rejects(f.service.inspectOperation(userId,input.requestId),{code:'JOB_SCOPE_DENIED'});
+    await assert.rejects(f.service.confirmInspection(userId,input.requestId,
+      {confirmed:true,confirmationRevision:'0'.repeat(64)}),{code:'JOB_SCOPE_DENIED'});
+    assert.equal((await f.pool.query('SELECT status FROM job_resume_operations WHERE user_id=$1 AND request_id=$2',
+      [userId,input.requestId])).rows[0].status,'unknown');
+    assert.equal(f.selections.length,1);
+  }finally{await f.close();}
 });

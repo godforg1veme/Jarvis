@@ -4,6 +4,9 @@
 
 ## Русский
 
+Более новый результат 27 октября: [остальная часть этапа 5](2026-10-27-mini-app-stage-five-release.md).
+Ниже сохранён результат предыдущего выпуска.
+
 27 октября пользователь поручил завершить выпускные проверки и установить
 готовую ветку Mini App на VPS. Подготовлены этапы 1–4 и операции памяти этапа 5:
 надёжные квитанции диалога, отмена HH, актуальные списки доступа, безопасные
@@ -55,6 +58,9 @@ unknown остаются в плане; этап 6 не закрыт. Новые
 сообщений и действия с реальными подписками при выпускной проверке не выполняются.
 
 ## English
+
+Newer October 27 result: [the remaining part of stage 5](2026-10-27-mini-app-stage-five-release.md).
+The previous release result is preserved below.
 
 On October 27, the user authorized completing release checks and installing the
 ready Mini App branch on VPS nodes. Stages 1–4 and stage-5 memory actions are

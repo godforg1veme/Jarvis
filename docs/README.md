@@ -4,6 +4,13 @@
 
 ## Русский
 
+27 октября завершён [этап 5 Mini App](updates/2026-10-27-mini-app-stage-five-release.md):
+документы, устройства, Life OS и явная сверка неизвестного результата HH.
+Проверено 885 server tests, 32 PostgreSQL acceptance tests, десять браузерных
+fixture-программ и отдельный E2E с настоящими API, БД и файловым хранилищем.
+Выпуск подготовлен; статус установки обновляется в записи выпуска.
+Этап 6, живая приёмка Telegram, остаётся открытым.
+
 27 октября на DE установлен [выпуск кнопок и памяти Mini App](updates/2026-10-27-mini-app-buttons-release.md):
 877 server tests, 24 PostgreSQL-сценария, девять браузерных наборов и независимая
 ревизия всей ветки. Прежние два падающих теста и найденные ревизией гонки исправлены.
@@ -14,7 +21,7 @@
 добавление, исправление и удаление с подтверждением, квитанцией и безопасной отменой
 исходного запроса. Server 877/877, PostgreSQL 22/22, восемь браузерных наборов;
 независимая security-ревизия выполнена. Миграция 051 установлена в новом выпуске.
-Остальная часть этапа 5 и живая приёмка этапа 6 остаются открытыми.
+Остальная часть этапа 5 завершена новым результатом выше; живая приёмка этапа 6 открыта.
 
 На DE работает [прямая выдача подписок Happ](updates/2026-10-26-subscription-generated-links-release.md)
 без Cloudflare, включая новые ссылки и кнопку импорта для всех профилей.
@@ -135,6 +142,13 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 
 ## English
 
+October 27: [Mini App stage 5](updates/2026-10-27-mini-app-stage-five-release.md)
+is complete: documents, devices, Life OS and explicit verification of unknown
+HH results. Validation passed 885 server tests, 32 PostgreSQL acceptance tests,
+ten browser fixture programs and a separate E2E with real APIs, database and
+file storage. Release prepared; installation status is maintained in the release
+record. Stage 6, live Telegram acceptance, remains open.
+
 The [October 27 Mini App buttons and memory release](updates/2026-10-27-mini-app-buttons-release.md)
 is installed on DE: 877 server tests, 24 PostgreSQL scenarios, nine browser suites and
 independent full-branch review. Both previously failing tests and the reviewed
@@ -146,7 +160,7 @@ On October 27, [Mini App memory actions](updates/2026-10-27-mini-app-memory-deve
 were released: add, correct and forget with confirmation, a receipt and safe
 cancellation of the original request. Server 877/877, PostgreSQL 22/22 and eight
 browser suites passed; independent security review completed. Migration 051 was
-applied in the new release. Other stage-5 actions and live stage-6 acceptance remain open.
+applied in the new release. The newer result above completes stage 5; live stage-6 acceptance remains open.
 
 [Direct Happ subscription delivery](updates/2026-10-26-subscription-generated-links-release.md)
 is enabled on DE without Cloudflare, including new links and import buttons

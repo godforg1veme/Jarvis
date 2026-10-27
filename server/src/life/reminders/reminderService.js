@@ -30,7 +30,7 @@ class ReminderService {
     this.now = options.now || (() => new Date());
   }
 
-  async create({ userId, origin, input }) {
+  async create({ userId, origin, input, db = null }) {
     const parsed = reminderInputSchema.parse(input);
     const { requestId, ...reminderInput } = parsed;
     const internal = createReminderSchema.parse({
@@ -40,20 +40,20 @@ class ReminderService {
       originDeviceId: origin.channel === 'desktop' ? origin.deviceId : origin.deviceId || null,
       idempotencyKey: operationKey(userId, origin, requestId),
     });
-    const reminder = await this.repository.create({ userId, ...internal });
-    if (reminder) await this._record(userId, reminder, 'reminder.created', origin.deviceId);
+    const reminder = await this.repository.create({ userId, db, ...internal });
+    if (reminder) await this._record(userId, reminder, 'reminder.created', origin.deviceId, db);
     return reminder;
   }
 
-  async reschedule({ userId, reminderId, revision, triggerAt, timezone, recurrence, sourceDeviceId = null }) {
-    const reminder = await this.repository.update({ userId, reminderId, revision, triggerAt, timezone, recurrence });
-    if (reminder) await this._record(userId, reminder, 'reminder.rescheduled', sourceDeviceId);
+  async reschedule({ userId, reminderId, revision, triggerAt, timezone, recurrence, sourceDeviceId = null, db = null }) {
+    const reminder = await this.repository.update({ userId, reminderId, revision, triggerAt, timezone, recurrence, db });
+    if (reminder) await this._record(userId, reminder, 'reminder.rescheduled', sourceDeviceId, db);
     return reminder;
   }
 
-  async cancel({ userId, reminderId, revision, sourceDeviceId = null }) {
-    const reminder = await this.repository.update({ userId, reminderId, revision, state: 'cancelled' });
-    if (reminder) await this._record(userId, reminder, 'reminder.cancelled', sourceDeviceId);
+  async cancel({ userId, reminderId, revision, sourceDeviceId = null, db = null }) {
+    const reminder = await this.repository.update({ userId, reminderId, revision, state: 'cancelled', db });
+    if (reminder) await this._record(userId, reminder, 'reminder.cancelled', sourceDeviceId, db);
     return reminder;
   }
 
@@ -69,7 +69,7 @@ class ReminderService {
     return reminder;
   }
 
-  async _record(userId, reminder, eventType, sourceDeviceId = null) {
+  async _record(userId, reminder, eventType, sourceDeviceId = null, db = null) {
     if (!this.gateway) return;
     await this.gateway.record({
       userId, eventType, occurredAt: this.now(), sourceChannel: 'reminder', sourceDeviceId,
@@ -78,7 +78,7 @@ class ReminderService {
       summary: eventType === 'reminder.created' ? 'Напоминание создано' : 'Напоминание обновлено',
       structuredData: { reminderId: reminder.id, state: reminder.state, revision: reminder.revision },
       trustLevel: 'user', privacyClass: 'personal',
-    });
+    }, { db });
   }
 }
 

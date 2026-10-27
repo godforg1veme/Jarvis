@@ -117,6 +117,8 @@ const { registerMiniAppRoutes } = require('./miniApp/routes');
 const { registerMiniAppAssets } = require('./miniAppAssets');
 const { registerMiniAppSelfRoutes } = require('./miniAppSelfRoutes');
 const { SectionReader } = require('./miniApp/sectionReader');
+const { createDocumentActions } = require('./miniApp/documentActions');
+const { createLifeDeviceActions } = require('./miniApp/lifeDeviceActions');
 const { protectService, registerDesktopPermissionBoundary } = require('./userPermissionBoundary');
 
 async function createRuntime(config, overrides = {}) {
@@ -549,6 +551,13 @@ async function createRuntime(config, overrides = {}) {
     }));
     if (visualMemoryService) visualMemoryWorker = overrides.visualMemoryWorker || new VisualMemoryWorker({ service: visualMemoryService, logger: app.log });
     const miniAppMemoryService = memoryService;
+    const personalActionSections = {
+      documents: knowledgeService?.repository && knowledgeService?.storage ? createDocumentActions({ knowledgeService }) : null,
+      ...createLifeDeviceActions({ deviceService, reminderService: lifeReminderService,
+        reminderRepository: lifeReminderRepository, commitmentRepository: lifeCommitmentRepository,
+        commitmentLifecycleService: lifeCommitmentLifecycleService, missionControlService }),
+    };
+    const documentUploadMaxBytes = knowledgeService?.maxBytes;
     memoryService = protectService(memoryService, accessService, 'memory');
     knowledgeService = protectService(knowledgeService, accessService, 'documents');
     deviceService = protectService(deviceService, accessService, 'devices');
@@ -626,6 +635,7 @@ async function createRuntime(config, overrides = {}) {
         registerUserRoutes: (routes) => registerMiniAppSelfRoutes(routes, { accessService, pool,
           sectionReader: new SectionReader({ pool }),
           memoryService, memoryActionService: miniAppMemoryService,
+          personalActionSections, documentUploadMaxBytes,
           knowledgeService, deviceService, missionControlService, assistant, conversationRepository,
           getJobConnectionSessionService: () => jobRuntime?.connectionSessionService,
           getJobResumeService: () => jobRuntime?.resumeService,

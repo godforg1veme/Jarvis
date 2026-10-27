@@ -16,17 +16,18 @@ class DeviceService {
     this.now = options.now || (() => new Date());
   }
 
-  async beginPairing({ userId, deviceName }) {
+  async beginPairing({ userId, deviceName, db = null }) {
     if (this.accessService && !await this.accessService.allows(userId, 'devices')) throw permissionError();
     const code = createPairingCode();
     const expiresAt = new Date(this.now().getTime() + PAIRING_TTL_MS);
-    await this.repository.createPairingCode({
+    const pairing = await this.repository.createPairingCode({
       userId,
       code,
       deviceName: normalizeDeviceName(deviceName),
       expiresAt,
+      db,
     });
-    return { code, expiresAt };
+    return { pairingId: pairing.id, code, expiresAt };
   }
 
   async claimPairing({ code, capabilities }) {
@@ -43,12 +44,16 @@ class DeviceService {
     }
   }
 
-  async list({ userId }) {
-    return this.repository.listForUser(userId);
+  async list({ userId, db = null }) {
+    return this.repository.listForUser(userId, db);
   }
 
-  async revoke({ userId, deviceId }) {
-    return this.repository.revokeForUser({ userId, deviceId });
+  async revoke({ userId, deviceId, db = null }) {
+    return this.repository.revokeForUser({ userId, deviceId, db });
+  }
+
+  async cancelPairing({ userId, pairingId, db = null }) {
+    return this.repository.cancelPairingCode({ userId, pairingId, db });
   }
 }
 
