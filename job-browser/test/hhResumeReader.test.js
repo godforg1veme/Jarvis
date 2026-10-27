@@ -100,7 +100,7 @@ test('empty content reports only fixed structure booleans from alternate tags', 
         <div data-qa="untrusted-secret-attribute">secret@example.com</div></main>` }));
     await page.goto('https://hh.ru/resume/fixture123');
     const output = await captureFailure(() => readResumeContent(page, 'fixture123'));
-    assert.match(output, /^JOB_HH_RESUME_STRUCTURE 10101111\nJOB_HH_RESUME_DOM visited=7 visible=7 leaf=6 tags=P,MAIN,OTHER,OTHER,NONE,NONE qa=EDUCATION,NONE,NONE,NONE,NONE,NONE\nJOB_HH_RESUME_EDUCATION 6:1:111\|[0-9]+:[01]:111\|[0-9]+:[01]:111\|0:0:000\|0:0:000\nJOB_HH_RESUME_INITIAL_STATE 0010000000\nJOB_HH_RESUME_INITIAL_SHAPE count=0 [^\n]+\nJOB_HH_RESUME_INITIAL_IDENTITY seen=0 complete=0 candidate=UUU parent=UUU skillsFirst=U titleFirst=U\nJOB_HH_RESUME_READ_FAILURE empty_content\n$/);
+    assert.match(output, /^JOB_HH_RESUME_STRUCTURE 10101111\nJOB_HH_RESUME_DOM visited=7 visible=7 leaf=6 tags=P,MAIN,OTHER,OTHER,NONE,NONE qa=EDUCATION,NONE,NONE,NONE,NONE,NONE\nJOB_HH_RESUME_EDUCATION 6:1:111\|[0-9]+:[01]:111\|[0-9]+:[01]:111\|0:0:000\|0:0:000\nJOB_HH_RESUME_INITIAL_STATE 0010000000\nJOB_HH_RESUME_INITIAL_SHAPE count=0 [^\n]+\nJOB_HH_RESUME_INITIAL_IDENTITY seen=0 complete=0 candidate=UUU parent=UUU skillsFirst=U titleFirst=U heading=U\nJOB_HH_RESUME_READ_FAILURE empty_content\n$/);
     assert.doesNotMatch(output, /Secret Name|secret|fixture123|private text|sensitive detail|untrusted/);
     await page.close();
   } finally { await browser.close(); }
@@ -119,7 +119,7 @@ test('empty content maps unknown tags and data-qa values to closed types', async
         <div style="display:none">Private text after heading</div></section></article></main>` }));
     await page.goto('https://hh.ru/resume/fixture123');
     const output = await captureFailure(() => readResumeContent(page, 'fixture123'));
-    assert.match(output, /^JOB_HH_RESUME_STRUCTURE 00100010\nJOB_HH_RESUME_DOM visited=5 visible=4 leaf=2 tags=OTHER,SECTION,ARTICLE,MAIN,OTHER,OTHER qa=OTHER,EDUCATION,OTHER,NONE,NONE,NONE\nJOB_HH_RESUME_EDUCATION 1:0:000\|1:0:000\|2:0:000\|[0-9]+:0:000\|[0-9]+:0:000\nJOB_HH_RESUME_INITIAL_STATE 0010000000\nJOB_HH_RESUME_INITIAL_SHAPE count=0 [^\n]+\nJOB_HH_RESUME_INITIAL_IDENTITY seen=0 complete=0 candidate=UUU parent=UUU skillsFirst=U titleFirst=U\nJOB_HH_RESUME_READ_FAILURE empty_content\n$/);
+    assert.match(output, /^JOB_HH_RESUME_STRUCTURE 00100010\nJOB_HH_RESUME_DOM visited=5 visible=4 leaf=2 tags=OTHER,SECTION,ARTICLE,MAIN,OTHER,OTHER qa=OTHER,EDUCATION,OTHER,NONE,NONE,NONE\nJOB_HH_RESUME_EDUCATION 1:0:000\|1:0:000\|2:0:000\|[0-9]+:0:000\|[0-9]+:0:000\nJOB_HH_RESUME_INITIAL_STATE 0010000000\nJOB_HH_RESUME_INITIAL_SHAPE count=0 [^\n]+\nJOB_HH_RESUME_INITIAL_IDENTITY seen=0 complete=0 candidate=UUU parent=UUU skillsFirst=U titleFirst=U heading=U\nJOB_HH_RESUME_READ_FAILURE empty_content\n$/);
     assert.doesNotMatch(output, /Secret Name|secret|fixture123|private|token|custom-heading|example.com|VISIBILITY|ACCESS/);
     await page.close();
   } finally { await browser.close(); }
@@ -137,15 +137,15 @@ test('bounded initial state probe reports only allowlisted presence bits', async
         <template id="HH-Lux-InitialState">${stateText}</template>` }));
     const cases = [
       [{ parent: { applicantResume: { experience: 'secret@example.com', education: 'private', skills: [],
-        skillSet: [], title: 'Private Title', id: 'private-id' } } }, '1111111111', 'seen=1 complete=1 candidate=NNN parent=NNN skillsFirst=U titleFirst=U'],
+        skillSet: [], title: 'Private Title', id: 'private-id' } } }, '1111111111', 'seen=1 complete=1 candidate=NNN parent=NNN skillsFirst=U titleFirst=U heading=N'],
       [{ parent: { applicantResume: { education: 'secret@example.com', id: 'private-id' } } }, '1111010001',
-        'seen=1 complete=1 candidate=NNN parent=NNN skillsFirst=U titleFirst=U'],
-      ['x'.repeat(1048577), '1000000000', 'seen=0 complete=0 candidate=UUU parent=UUU skillsFirst=U titleFirst=U'],
-      [JSON.stringify('я'.repeat(600000)), '1000000000', 'seen=0 complete=0 candidate=UUU parent=UUU skillsFirst=U titleFirst=U'],
-      [Array.from({ length: 9 }).reduceRight((child) => ({ nested: child }), { applicantResume: { id: 'private-id' } }),
-        '1100000000', 'seen=0 complete=0 candidate=UUU parent=UUU skillsFirst=U titleFirst=U'],
-      [{ children: Array.from({ length: 3001 }, () => ({})) }, '1100000000',
-        'seen=0 complete=0 candidate=UUU parent=UUU skillsFirst=U titleFirst=U'],
+        'seen=1 complete=1 candidate=NNN parent=NNN skillsFirst=U titleFirst=U heading=N'],
+      ['x'.repeat(1048577), '1000000000', 'seen=0 complete=0 candidate=UUU parent=UUU skillsFirst=U titleFirst=U heading=U'],
+      [JSON.stringify('я'.repeat(600000)), '1000000000', 'seen=0 complete=0 candidate=UUU parent=UUU skillsFirst=U titleFirst=U heading=U'],
+      [Array.from({ length: 65 }).reduceRight((child) => ({ nested: child }), { applicantResume: { id: 'private-id' } }),
+        '1100000000', 'seen=0 complete=0 candidate=UUU parent=UUU skillsFirst=U titleFirst=U heading=U'],
+      [{ children: Array.from({ length: 20001 }, () => ({})) }, '1100000000',
+        'seen=0 complete=0 candidate=UUU parent=UUU skillsFirst=U titleFirst=U heading=U'],
     ];
     for (const [value, expected, identity] of cases) {
       stateText = typeof value === 'string' ? value : JSON.stringify(value);
@@ -168,26 +168,38 @@ test('bounded initial state probe reports only allowlisted presence bits', async
     assert.match(shape, /company:O/);
     assert.match(shape, / skills=O\/[^ ]*skillSet:A/);
     assert.match(shape, / title=O\/[^ ]*position:S/);
-    assert.match(output, /JOB_HH_RESUME_INITIAL_IDENTITY seen=2 complete=1 candidate=UUU parent=UUU skillsFirst=U titleFirst=U\n/);
+    assert.match(output, /JOB_HH_RESUME_INITIAL_IDENTITY seen=2 complete=1 candidate=UUU parent=UUU skillsFirst=U titleFirst=U heading=U\n/);
     assert.doesNotMatch(output, /private|phone|email|firstName|lastName|Private|fixture123/);
     stateText = JSON.stringify({ hash: 'fixture123', applicantResume: {
       resumeId: 'fixture123', skills: ['private skill'], title: [['private title']],
     } });
     await page.goto('https://hh.ru/resume/fixture123');
     const matched = await captureFailure(() => readResumeContent(page, 'fixture123'));
-    assert.match(matched, /JOB_HH_RESUME_INITIAL_IDENTITY seen=1 complete=1 candidate=NYN parent=NNY skillsFirst=S titleFirst=A\n/);
+    assert.match(matched, /JOB_HH_RESUME_INITIAL_IDENTITY seen=1 complete=1 candidate=NYN parent=NNY skillsFirst=S titleFirst=A heading=N\n/);
     assert.doesNotMatch(matched, /fixture123|private skill|private title/);
     stateText = JSON.stringify({ selected: 'fixture123', applicantResume: { experience: [] } });
     await page.goto('https://hh.ru/resume/fixture123');
     const unrelated = await captureFailure(() => readResumeContent(page, 'fixture123'));
-    assert.match(unrelated, /JOB_HH_RESUME_INITIAL_IDENTITY seen=1 complete=1 candidate=NNN parent=NNN skillsFirst=U titleFirst=U\n/);
+    assert.match(unrelated, /JOB_HH_RESUME_INITIAL_IDENTITY seen=1 complete=1 candidate=NNN parent=NNN skillsFirst=U titleFirst=U heading=N\n/);
     stateText = JSON.stringify({ hash: 'fixture123', applicantResume: {
       resumeId: 'fixture123', skills: ['private skill'], title: [['private title']],
-    }, unrelated: { deep: { branch: { one: { two: { three: { four: { five: { six: {} } } } } } } } } });
+    }, unrelated: Array.from({ length: 65 }).reduceRight(child => ({ deep: child }), {}) });
     await page.goto('https://hh.ru/resume/fixture123');
     const incomplete = await captureFailure(() => readResumeContent(page, 'fixture123'));
-    assert.match(incomplete, /JOB_HH_RESUME_INITIAL_IDENTITY seen=1 complete=0 candidate=NYN parent=NNY skillsFirst=S titleFirst=A\n/);
+    assert.match(incomplete, /JOB_HH_RESUME_INITIAL_IDENTITY seen=1 complete=0 candidate=NYN parent=NNY skillsFirst=S titleFirst=A heading=N\n/);
     assert.doesNotMatch(incomplete, /fixture123|private skill|private title|unrelated|branch/);
+    stateText = JSON.stringify({ applicantResume: {
+      skills: [{ skillName: 'Private skill' }], title: [{ text: 'Secret Name', display_name: 'Private alternate' }],
+    } });
+    await page.goto('https://hh.ru/resume/fixture123');
+    const headingMatched = await captureFailure(() => readResumeContent(page, 'fixture123'));
+    assert.match(headingMatched, /JOB_HH_RESUME_INITIAL_IDENTITY seen=1 complete=1 candidate=NNN parent=NNN skillsFirst=O titleFirst=O heading=Y\n/);
+    assert.match(headingMatched, / skills=A\/[^\n]*skillName:S[^\n]* title=A\/[^\n]*text:S/);
+    assert.doesNotMatch(headingMatched, /Private|fixture123/);
+    stateText = JSON.stringify({ applicantResume: { title: [{ text: 'Secret Name', value: 'Secret Name' }] } });
+    await page.goto('https://hh.ru/resume/fixture123');
+    const ambiguousHeading = await captureFailure(() => readResumeContent(page, 'fixture123'));
+    assert.match(ambiguousHeading, /JOB_HH_RESUME_INITIAL_IDENTITY seen=1 complete=1 candidate=NNN parent=NNN skillsFirst=U titleFirst=O heading=U\n/);
     await page.close();
   } finally { await browser.close(); }
 });
@@ -209,7 +221,7 @@ test('live-shaped initial state without resume identity cannot become letter con
     const output = await captureFailure(() => readResumeContent(page, 'fixture123'));
     assert.match(output, /JOB_HH_RESUME_INITIAL_STATE 1111101010\n/);
     assert.match(output, /JOB_HH_RESUME_INITIAL_SHAPE count=1 experience=A\/id:D,[^\n]* skills=A\/[^\n]* title=A\//);
-    assert.match(output, /JOB_HH_RESUME_INITIAL_IDENTITY seen=1 complete=1 candidate=NNN parent=NNN skillsFirst=S titleFirst=S\n/);
+    assert.match(output, /JOB_HH_RESUME_INITIAL_IDENTITY seen=1 complete=1 candidate=NNN parent=NNN skillsFirst=S titleFirst=S heading=N\n/);
     assert.match(output, /JOB_HH_RESUME_READ_FAILURE empty_content\n$/);
     assert.doesNotMatch(output, /Private|fixture123|Private work history/);
     await page.close();

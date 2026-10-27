@@ -5,7 +5,9 @@ const REASONS = new Set(['invalid_id', 'invalid_shape', 'invalid_field', 'field_
 const DOM_TAGS = new Set(['MAIN', 'SECTION', 'ARTICLE', 'DIV', 'SPAN', 'P', 'STRONG', 'EM', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'OTHER', 'NONE']);
 const DOM_QA = new Set(['EXPERIENCE', 'SKILLS', 'EDUCATION', 'ABOUT', 'RESUME', 'TITLE', 'RAISE', 'SECTION', 'CONTENT', 'OTHER', 'NONE']);
 const INITIAL_KEYS = ['id', 'resumeId', 'hash', 'experience', 'education', 'skills', 'skillSet', 'title',
-  'position', 'description', 'company', 'name', 'level', 'primary', 'additional', 'professionalRoles'];
+  'position', 'description', 'company', 'name', 'level', 'primary', 'additional', 'professionalRoles',
+  'text', 'value', 'label', 'skill', 'skillName', 'skill_name', 'displayName', 'display_name',
+  'positionName', 'position_name', 'specialization', 'professions', 'items', 'valueText'];
 const INITIAL_TYPES = new Set(['U', 'Z', 'A', 'O', 'S', 'D', 'B']);
 const fail = (reason) => {
   process.stderr.write(`JOB_HH_RESUME_READ_FAILURE ${REASONS.has(reason) ? reason : 'invalid_shape'}\n`);
@@ -117,10 +119,14 @@ async function readResumeContent(page, resumeId) {
       }
       educationLeaf.ancestors = ancestors;
     }
+    const safeKeys = ['id', 'resumeId', 'hash', 'experience', 'education', 'skills', 'skillSet', 'title',
+      'position', 'description', 'company', 'name', 'level', 'primary', 'additional', 'professionalRoles',
+      'text', 'value', 'label', 'skill', 'skillName', 'skill_name', 'displayName', 'display_name',
+      'positionName', 'position_name', 'specialization', 'professions', 'items', 'valueText'];
     const initialState = { template: false, parsed: false, bounded: true, applicantResume: false,
       fields: [false, false, false, false, false, false], matches: 0,
-      types: ['U', 'U', 'U'], nested: Array.from({ length: 3 }, () => Array(16).fill('U')),
-      identity: { candidate: 'UUU', parent: 'UUU', skillsFirst: 'U', titleFirst: 'U' } };
+      types: ['U', 'U', 'U'], nested: Array.from({ length: 3 }, () => Array(safeKeys.length).fill('U')),
+      identity: { candidate: 'UUU', parent: 'UUU', skillsFirst: 'U', titleFirst: 'U', heading: 'U' } };
     const template = document.getElementById('HH-Lux-InitialState');
     if (template?.tagName === 'TEMPLATE') {
       initialState.template = true;
@@ -137,12 +143,10 @@ async function readResumeContent(page, resumeId) {
             const typeOf = value => value === undefined ? 'U' : value === null ? 'Z' : Array.isArray(value) ? 'A'
               : typeof value === 'object' ? 'O' : typeof value === 'string' ? 'S'
                 : typeof value === 'number' ? 'D' : typeof value === 'boolean' ? 'B' : 'U';
-            const safeKeys = ['id', 'resumeId', 'hash', 'experience', 'education', 'skills', 'skillSet', 'title',
-              'position', 'description', 'company', 'name', 'level', 'primary', 'additional', 'professionalRoles'];
             const queue = [{ value: parsed, depth: 0 }];
             let candidate = null;
             let examined = 0;
-            for (let index = 0; index < queue.length && examined < 3000; index++) {
+            for (let index = 0; index < queue.length && examined < 20000; index++) {
               const { value, depth } = queue[index];
               if (!value || typeof value !== 'object') continue;
               examined++;
@@ -162,25 +166,32 @@ async function readResumeContent(page, resumeId) {
                     ? typeOf(entry[key]) : 'U');
                 });
               }
-              if (depth >= 8) {
+              if (depth >= 64) {
                 if (Object.values(value).some(child => child && typeof child === 'object')) initialState.bounded = false;
                 continue;
               }
               for (const child of Object.values(value)) {
                 if (!child || typeof child !== 'object') continue;
-                if (queue.length >= 3001) { initialState.bounded = false; break; }
+                if (queue.length >= 20001) { initialState.bounded = false; break; }
                 queue.push({ value: child, depth: depth + 1 });
               }
             }
-            if (queue.length > 3000) initialState.bounded = false;
+            if (queue.length > 20000) initialState.bounded = false;
             if (initialState.matches === 1 && candidate) {
               const fixedMatches = object => ['id', 'resumeId', 'hash'].map(key =>
                 Object.hasOwn(object, key) && typeof object[key] === 'string' && object[key] === selectedId ? 'Y' : 'N').join('');
+              const titleFields = ['text', 'value', 'label', 'name', 'title', 'position', 'positionName', 'position_name',
+                'displayName', 'display_name', 'skill', 'skillName', 'skill_name'];
+              const entries = [candidate.resume.title?.[0], candidate.resume.skills?.[0]];
+              const headingMatches = title.length === 1 && title[0]
+                ? entries.reduce((count, entry) => count + (entry && typeof entry === 'object' && !Array.isArray(entry)
+                  ? titleFields.filter(key => typeof entry[key] === 'string' && entry[key] === title[0]).length : 0), 0) : 0;
               initialState.identity = {
                 candidate: fixedMatches(candidate.resume),
                 parent: fixedMatches(candidate.parent),
                 skillsFirst: typeOf(Array.isArray(candidate.resume.skills) ? candidate.resume.skills[0] : undefined),
                 titleFirst: typeOf(Array.isArray(candidate.resume.title) ? candidate.resume.title[0] : undefined),
+                heading: title.length === 1 && title[0] ? headingMatches === 1 ? 'Y' : headingMatches === 0 ? 'N' : 'U' : 'U',
               };
             }
           }
@@ -232,9 +243,9 @@ async function readResumeContent(page, resumeId) {
     process.stderr.write(`JOB_HH_RESUME_INITIAL_SHAPE count=${shape?.matches || 0} experience=${format(shape?.types[0] || 'U', shape?.nested[0] || unknown)} skills=${format(shape?.types[1] || 'U', shape?.nested[1] || unknown)} title=${format(shape?.types[2] || 'U', shape?.nested[2] || unknown)}\n`);
     const identity = shape?.identity;
     const safeIdentity = identity && /^[YNU]{3}$/.test(identity.candidate) && /^[YNU]{3}$/.test(identity.parent)
-      && INITIAL_TYPES.has(identity.skillsFirst) && INITIAL_TYPES.has(identity.titleFirst)
-      ? identity : { candidate: 'UUU', parent: 'UUU', skillsFirst: 'U', titleFirst: 'U' };
-    process.stderr.write(`JOB_HH_RESUME_INITIAL_IDENTITY seen=${shape?.matches || 0} complete=${safeState.template && safeState.parsed && safeState.bounded ? 1 : 0} candidate=${safeIdentity.candidate} parent=${safeIdentity.parent} skillsFirst=${safeIdentity.skillsFirst} titleFirst=${safeIdentity.titleFirst}\n`);
+      && INITIAL_TYPES.has(identity.skillsFirst) && INITIAL_TYPES.has(identity.titleFirst) && /^[YNU]$/.test(identity.heading)
+      ? identity : { candidate: 'UUU', parent: 'UUU', skillsFirst: 'U', titleFirst: 'U', heading: 'U' };
+    process.stderr.write(`JOB_HH_RESUME_INITIAL_IDENTITY seen=${shape?.matches || 0} complete=${safeState.template && safeState.parsed && safeState.bounded ? 1 : 0} candidate=${safeIdentity.candidate} parent=${safeIdentity.parent} skillsFirst=${safeIdentity.skillsFirst} titleFirst=${safeIdentity.titleFirst} heading=${safeIdentity.heading}\n`);
   }
   return resumeSnapshotSchema(snapshot, resumeId);
 }
