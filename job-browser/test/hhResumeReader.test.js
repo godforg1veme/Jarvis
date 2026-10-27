@@ -100,8 +100,27 @@ test('empty content reports only fixed structure booleans from alternate tags', 
         <div data-qa="untrusted-secret-attribute">secret@example.com</div></main>` }));
     await page.goto('https://hh.ru/resume/fixture123');
     const output = await captureFailure(() => readResumeContent(page, 'fixture123'));
-    assert.equal(output, 'JOB_HH_RESUME_STRUCTURE 10101111\nJOB_HH_RESUME_READ_FAILURE empty_content\n');
+    assert.equal(output, 'JOB_HH_RESUME_STRUCTURE 10101111\nJOB_HH_RESUME_DOM visited=7 visible=7 leaf=6 tags=P,MAIN,OTHER,OTHER,NONE,NONE qa=EDUCATION,NONE,NONE,NONE,NONE,NONE\nJOB_HH_RESUME_READ_FAILURE empty_content\n');
     assert.doesNotMatch(output, /Secret Name|secret|fixture123|private text|sensitive detail|untrusted/);
+    await page.close();
+  } finally { await browser.close(); }
+});
+
+test('empty content maps unknown tags and data-qa values to closed types', async t => {
+  let browser;
+  try { browser = await chromium.launch({ headless: true, ...(process.platform === 'win32' ? { channel: 'msedge' } : {}) }); }
+  catch { t.skip('Local Chromium is unavailable'); return; }
+  try {
+    const page = await browser.newPage();
+    await page.route('https://hh.ru/resume/fixture123', route => route.fulfill({ status: 200,
+      contentType: 'text/html; charset=utf-8', body: `<main><h1>Secret Name</h1>
+        <article data-qa="private-parent-token"><section data-qa="resume-block-education">
+        <custom-heading data-qa="private-leaf-token">Образование secret@example.com</custom-heading>
+        </section></article></main>` }));
+    await page.goto('https://hh.ru/resume/fixture123');
+    const output = await captureFailure(() => readResumeContent(page, 'fixture123'));
+    assert.equal(output, 'JOB_HH_RESUME_STRUCTURE 00100010\nJOB_HH_RESUME_DOM visited=4 visible=4 leaf=2 tags=OTHER,SECTION,ARTICLE,MAIN,OTHER,OTHER qa=OTHER,EDUCATION,OTHER,NONE,NONE,NONE\nJOB_HH_RESUME_READ_FAILURE empty_content\n');
+    assert.doesNotMatch(output, /Secret Name|secret|fixture123|private|token|custom-heading|example.com/);
     await page.close();
   } finally { await browser.close(); }
 });

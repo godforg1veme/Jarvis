@@ -2,6 +2,8 @@ const ID = /^[a-zA-Z0-9]{1,100}$/;
 const FIELDS = ['title', 'experience', 'skills', 'education', 'summary'];
 const REASONS = new Set(['invalid_id', 'invalid_shape', 'invalid_field', 'field_too_long', 'private_content',
   'empty_content', 'snapshot_too_large', 'wrong_page', 'main_missing', 'title_count', 'duplicate_section', 'section_container']);
+const DOM_TAGS = new Set(['MAIN', 'SECTION', 'ARTICLE', 'DIV', 'SPAN', 'P', 'STRONG', 'EM', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'OTHER', 'NONE']);
+const DOM_QA = new Set(['EXPERIENCE', 'SKILLS', 'EDUCATION', 'ABOUT', 'RESUME', 'TITLE', 'OTHER', 'NONE']);
 const fail = (reason) => {
   process.stderr.write(`JOB_HH_RESUME_READ_FAILURE ${REASONS.has(reason) ? reason : 'invalid_shape'}\n`);
   throw Object.assign(new Error('JOB_HH_RESUME_UNAVAILABLE'), { code: 'JOB_HH_RESUME_UNAVAILABLE' });
@@ -55,13 +57,33 @@ async function readResumeContent(page, resumeId) {
     const qa = qaNames.map(name => Boolean(root.querySelector(`[data-qa="${name}"]`)));
     const headingPrefixes = [/^Опыт работы/iu, /^Ключевые навыки/iu, /^Образование/iu, /^Обо мне/iu];
     const headingsInAnyTag = [false, false, false, false];
+    const qaTypes = { 'resume-block-experience': 'EXPERIENCE', 'resume-block-skills': 'SKILLS',
+      'resume-block-education': 'EDUCATION', 'resume-block-about': 'ABOUT', resume: 'RESUME', 'resume-title': 'TITLE' };
+    const allowedTags = new Set(['MAIN', 'SECTION', 'ARTICLE', 'DIV', 'SPAN', 'P', 'STRONG', 'EM', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI']);
+    let educationLeaf = null;
+    let visited = 0;
+    let visibleCount = 0;
+    let visibleLeafCount = 0;
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
-    for (let count = 0, node; count < 5000 && (node = walker.nextNode()); count++) {
-      if (node.children.length || !visible(node)) continue;
+    for (let node; visited < 5000 && (node = walker.nextNode()); visited++) {
+      if (!visible(node)) continue;
+      visibleCount++;
+      if (node.children.length) continue;
+      visibleLeafCount++;
       const value = node.textContent.slice(0, 100).trim();
       headingPrefixes.forEach((pattern, index) => { if (pattern.test(value)) headingsInAnyTag[index] = true; });
+      if (!educationLeaf && headingPrefixes[2].test(value)) {
+        const tags = [], qaTypesFound = [];
+        for (let ancestor = node, depth = 0; depth < 6; depth++, ancestor = ancestor?.parentElement) {
+          tags.push(ancestor ? allowedTags.has(ancestor.tagName) ? ancestor.tagName : 'OTHER' : 'NONE');
+          const name = ancestor?.getAttribute('data-qa');
+          qaTypesFound.push(name == null ? 'NONE' : Object.hasOwn(qaTypes, name) ? qaTypes[name] : 'OTHER');
+        }
+        educationLeaf = { tags, qaTypesFound };
+      }
     }
-    return { pathname, title, blocks, structure: { qa, headingsInAnyTag } };
+    return { pathname, title, blocks, structure: { qa, headingsInAnyTag,
+      dom: { visited, visibleCount, visibleLeafCount, educationLeaf } } };
   });
   if (raw?.pathname !== `/resume/${resumeId}`) fail('wrong_page');
   if (raw?.failure) fail(raw.failure);
@@ -74,6 +96,14 @@ async function readResumeContent(page, resumeId) {
     const flags = [...(raw.structure?.qa || []), ...(raw.structure?.headingsInAnyTag || [])];
     const safe = flags.length === 8 && flags.every(flag => typeof flag === 'boolean') ? flags : Array(8).fill(false);
     process.stderr.write(`JOB_HH_RESUME_STRUCTURE ${safe.map(flag => flag ? '1' : '0').join('')}\n`);
+    const dom = raw.structure?.dom;
+    const count = value => Number.isInteger(value) && value >= 0 && value <= 5000 ? value : 0;
+    const tags = dom?.educationLeaf?.tags;
+    const qaTypesFound = dom?.educationLeaf?.qaTypesFound;
+    const safeTags = Array.isArray(tags) && tags.length === 6 && tags.every(tag => DOM_TAGS.has(tag)) ? tags : Array(6).fill('NONE');
+    const safeQa = Array.isArray(qaTypesFound) && qaTypesFound.length === 6 && qaTypesFound.every(type => DOM_QA.has(type))
+      ? qaTypesFound : Array(6).fill('NONE');
+    process.stderr.write(`JOB_HH_RESUME_DOM visited=${count(dom?.visited)} visible=${count(dom?.visibleCount)} leaf=${count(dom?.visibleLeafCount)} tags=${safeTags.join(',')} qa=${safeQa.join(',')}\n`);
   }
   return resumeSnapshotSchema(snapshot, resumeId);
 }
