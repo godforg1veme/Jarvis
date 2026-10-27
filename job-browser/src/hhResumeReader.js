@@ -4,6 +4,9 @@ const REASONS = new Set(['invalid_id', 'invalid_shape', 'invalid_field', 'field_
   'empty_content', 'snapshot_too_large', 'wrong_page', 'main_missing', 'title_count', 'duplicate_section', 'section_container']);
 const DOM_TAGS = new Set(['MAIN', 'SECTION', 'ARTICLE', 'DIV', 'SPAN', 'P', 'STRONG', 'EM', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'OTHER', 'NONE']);
 const DOM_QA = new Set(['EXPERIENCE', 'SKILLS', 'EDUCATION', 'ABOUT', 'RESUME', 'TITLE', 'RAISE', 'SECTION', 'CONTENT', 'OTHER', 'NONE']);
+const INITIAL_KEYS = ['id', 'resumeId', 'hash', 'experience', 'education', 'skills', 'skillSet', 'title',
+  'position', 'description', 'company', 'name', 'level', 'primary', 'additional', 'professionalRoles'];
+const INITIAL_TYPES = new Set(['U', 'Z', 'A', 'O', 'S', 'D', 'B']);
 const fail = (reason) => {
   process.stderr.write(`JOB_HH_RESUME_READ_FAILURE ${REASONS.has(reason) ? reason : 'invalid_shape'}\n`);
   throw Object.assign(new Error('JOB_HH_RESUME_UNAVAILABLE'), { code: 'JOB_HH_RESUME_UNAVAILABLE' });
@@ -115,7 +118,8 @@ async function readResumeContent(page, resumeId) {
       educationLeaf.ancestors = ancestors;
     }
     const initialState = { template: false, parsed: false, bounded: true, applicantResume: false,
-      fields: [false, false, false, false, false, false] };
+      fields: [false, false, false, false, false, false], matches: 0,
+      types: ['U', 'U', 'U'], nested: Array.from({ length: 3 }, () => Array(16).fill('U')) };
     const template = document.getElementById('HH-Lux-InitialState');
     if (template?.tagName === 'TEMPLATE') {
       initialState.template = true;
@@ -129,18 +133,31 @@ async function readResumeContent(page, resumeId) {
           let parsed;
           try { parsed = JSON.parse(source); initialState.parsed = true; } catch {}
           if (initialState.parsed) {
+            const typeOf = value => value === undefined ? 'U' : value === null ? 'Z' : Array.isArray(value) ? 'A'
+              : typeof value === 'object' ? 'O' : typeof value === 'string' ? 'S'
+                : typeof value === 'number' ? 'D' : typeof value === 'boolean' ? 'B' : 'U';
+            const safeKeys = ['id', 'resumeId', 'hash', 'experience', 'education', 'skills', 'skillSet', 'title',
+              'position', 'description', 'company', 'name', 'level', 'primary', 'additional', 'professionalRoles'];
             const queue = [{ value: parsed, depth: 0 }];
             let examined = 0;
             for (let index = 0; index < queue.length && examined < 3000; index++) {
               const { value, depth } = queue[index];
               if (!value || typeof value !== 'object') continue;
               examined++;
-              const resume = !Array.isArray(value) && Object.hasOwn(value, 'applicantResume') ? value.applicantResume : null;
-              if (resume && typeof resume === 'object' && !Array.isArray(resume)) {
+              const hasResumeKey = !Array.isArray(value) && Object.hasOwn(value, 'applicantResume');
+              if (hasResumeKey) initialState.matches = Math.min(2, initialState.matches + 1);
+              const resume = hasResumeKey ? value.applicantResume : null;
+              if (!initialState.applicantResume && resume && typeof resume === 'object' && !Array.isArray(resume)) {
                 initialState.applicantResume = true;
                 initialState.fields = ['experience', 'education', 'skills', 'skillSet', 'title', 'id']
                   .map(name => Object.hasOwn(resume, name));
-                break;
+                initialState.types = ['experience', 'skills', 'title'].map(name => typeOf(resume[name]));
+                initialState.nested = ['experience', 'skills', 'title'].map(name => {
+                  const direct = resume[name];
+                  const entry = Array.isArray(direct) ? direct[0] : direct;
+                  return safeKeys.map(key => entry && typeof entry === 'object' && !Array.isArray(entry)
+                    ? typeOf(entry[key]) : 'U');
+                });
               }
               if (depth >= 8) {
                 if (Object.values(value).some(child => child && typeof child === 'object')) initialState.bounded = false;
@@ -152,7 +169,7 @@ async function readResumeContent(page, resumeId) {
                 queue.push({ value: child, depth: depth + 1 });
               }
             }
-            if (!initialState.applicantResume && queue.length > 3000) initialState.bounded = false;
+            if (queue.length > 3000) initialState.bounded = false;
           }
         }
       }
@@ -192,6 +209,14 @@ async function readResumeContent(page, resumeId) {
       ? state : { template: false, parsed: false, bounded: false, applicantResume: false, fields: Array(6).fill(false) };
     process.stderr.write(`JOB_HH_RESUME_INITIAL_STATE ${[safeState.template, safeState.parsed, safeState.bounded, safeState.applicantResume,
       ...safeState.fields].map(value => value ? 1 : 0).join('')}\n`);
+    const validTypes = values => Array.isArray(values) && values.length === 3 && values.every(code => INITIAL_TYPES.has(code));
+    const validNested = values => Array.isArray(values) && values.length === 3
+      && values.every(row => Array.isArray(row) && row.length === INITIAL_KEYS.length && row.every(code => INITIAL_TYPES.has(code)));
+    const shape = Number.isInteger(safeState.matches) && safeState.matches >= 0 && safeState.matches <= 2
+      && validTypes(safeState.types) && validNested(safeState.nested) ? safeState : null;
+    const format = (type, row) => `${type}/${INITIAL_KEYS.map((key, index) => `${key}:${row[index]}`).join(',')}`;
+    const unknown = Array(INITIAL_KEYS.length).fill('U');
+    process.stderr.write(`JOB_HH_RESUME_INITIAL_SHAPE count=${shape?.matches || 0} experience=${format(shape?.types[0] || 'U', shape?.nested[0] || unknown)} skills=${format(shape?.types[1] || 'U', shape?.nested[1] || unknown)} title=${format(shape?.types[2] || 'U', shape?.nested[2] || unknown)}\n`);
   }
   return resumeSnapshotSchema(snapshot, resumeId);
 }

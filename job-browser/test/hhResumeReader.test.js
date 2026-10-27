@@ -100,7 +100,7 @@ test('empty content reports only fixed structure booleans from alternate tags', 
         <div data-qa="untrusted-secret-attribute">secret@example.com</div></main>` }));
     await page.goto('https://hh.ru/resume/fixture123');
     const output = await captureFailure(() => readResumeContent(page, 'fixture123'));
-    assert.match(output, /^JOB_HH_RESUME_STRUCTURE 10101111\nJOB_HH_RESUME_DOM visited=7 visible=7 leaf=6 tags=P,MAIN,OTHER,OTHER,NONE,NONE qa=EDUCATION,NONE,NONE,NONE,NONE,NONE\nJOB_HH_RESUME_EDUCATION 6:1:111\|[0-9]+:[01]:111\|[0-9]+:[01]:111\|0:0:000\|0:0:000\nJOB_HH_RESUME_INITIAL_STATE 0010000000\nJOB_HH_RESUME_READ_FAILURE empty_content\n$/);
+    assert.match(output, /^JOB_HH_RESUME_STRUCTURE 10101111\nJOB_HH_RESUME_DOM visited=7 visible=7 leaf=6 tags=P,MAIN,OTHER,OTHER,NONE,NONE qa=EDUCATION,NONE,NONE,NONE,NONE,NONE\nJOB_HH_RESUME_EDUCATION 6:1:111\|[0-9]+:[01]:111\|[0-9]+:[01]:111\|0:0:000\|0:0:000\nJOB_HH_RESUME_INITIAL_STATE 0010000000\nJOB_HH_RESUME_INITIAL_SHAPE count=0 [^\n]+\nJOB_HH_RESUME_READ_FAILURE empty_content\n$/);
     assert.doesNotMatch(output, /Secret Name|secret|fixture123|private text|sensitive detail|untrusted/);
     await page.close();
   } finally { await browser.close(); }
@@ -119,7 +119,7 @@ test('empty content maps unknown tags and data-qa values to closed types', async
         <div style="display:none">Private text after heading</div></section></article></main>` }));
     await page.goto('https://hh.ru/resume/fixture123');
     const output = await captureFailure(() => readResumeContent(page, 'fixture123'));
-    assert.match(output, /^JOB_HH_RESUME_STRUCTURE 00100010\nJOB_HH_RESUME_DOM visited=5 visible=4 leaf=2 tags=OTHER,SECTION,ARTICLE,MAIN,OTHER,OTHER qa=OTHER,EDUCATION,OTHER,NONE,NONE,NONE\nJOB_HH_RESUME_EDUCATION 1:0:000\|1:0:000\|2:0:000\|[0-9]+:0:000\|[0-9]+:0:000\nJOB_HH_RESUME_INITIAL_STATE 0010000000\nJOB_HH_RESUME_READ_FAILURE empty_content\n$/);
+    assert.match(output, /^JOB_HH_RESUME_STRUCTURE 00100010\nJOB_HH_RESUME_DOM visited=5 visible=4 leaf=2 tags=OTHER,SECTION,ARTICLE,MAIN,OTHER,OTHER qa=OTHER,EDUCATION,OTHER,NONE,NONE,NONE\nJOB_HH_RESUME_EDUCATION 1:0:000\|1:0:000\|2:0:000\|[0-9]+:0:000\|[0-9]+:0:000\nJOB_HH_RESUME_INITIAL_STATE 0010000000\nJOB_HH_RESUME_INITIAL_SHAPE count=0 [^\n]+\nJOB_HH_RESUME_READ_FAILURE empty_content\n$/);
     assert.doesNotMatch(output, /Secret Name|secret|fixture123|private|token|custom-heading|example.com|VISIBILITY|ACCESS/);
     await page.close();
   } finally { await browser.close(); }
@@ -148,9 +148,22 @@ test('bounded initial state probe reports only allowlisted presence bits', async
       stateText = typeof value === 'string' ? value : JSON.stringify(value);
       await page.goto('https://hh.ru/resume/fixture123');
       const output = await captureFailure(() => readResumeContent(page, 'fixture123'));
-      assert.match(output, new RegExp(`^JOB_HH_RESUME_STRUCTURE [01]{8}\\nJOB_HH_RESUME_DOM [^\\n]+\\nJOB_HH_RESUME_EDUCATION [0-9:|]+\\nJOB_HH_RESUME_INITIAL_STATE ${expected}\\nJOB_HH_RESUME_READ_FAILURE empty_content\\n$`));
+      assert.match(output, new RegExp(`^JOB_HH_RESUME_STRUCTURE [01]{8}\\nJOB_HH_RESUME_DOM [^\\n]+\\nJOB_HH_RESUME_EDUCATION [0-9:|]+\\nJOB_HH_RESUME_INITIAL_STATE ${expected}\\nJOB_HH_RESUME_INITIAL_SHAPE [^\\n]+\\nJOB_HH_RESUME_READ_FAILURE empty_content\\n$`));
       assert.doesNotMatch(output, /secret|private-id|Private Title|Secret Name|nested|parent|children/);
     }
+    stateText = JSON.stringify({ parent: { applicantResume: {
+      experience: [{ id: 'private-id', company: { name: 'Private Company' }, phone: 'private phone' }],
+      skills: { skillSet: ['private skill'], email: 'private email' },
+      title: { position: 'Private Role', firstName: 'Private Name' },
+    } }, duplicate: { applicantResume: null } });
+    await page.goto('https://hh.ru/resume/fixture123');
+    const output = await captureFailure(() => readResumeContent(page, 'fixture123'));
+    const shape = output.split('\n').find(line => line.startsWith('JOB_HH_RESUME_INITIAL_SHAPE '));
+    assert.match(shape, /^JOB_HH_RESUME_INITIAL_SHAPE count=2 experience=A\/id:S,/);
+    assert.match(shape, /company:O/);
+    assert.match(shape, / skills=O\/[^ ]*skillSet:A/);
+    assert.match(shape, / title=O\/[^ ]*position:S/);
+    assert.doesNotMatch(output, /private|phone|email|firstName|lastName|Private|fixture123/);
     await page.close();
   } finally { await browser.close(); }
 });
