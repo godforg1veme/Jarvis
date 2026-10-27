@@ -84,3 +84,24 @@ test('page diagnostics distinguish missing structure without logging page text',
     await page.close();
   } finally { await browser.close(); }
 });
+
+test('empty content reports only fixed structure booleans from alternate tags', async t => {
+  let browser;
+  try { browser = await chromium.launch({ headless: true, ...(process.platform === 'win32' ? { channel: 'msedge' } : {}) }); }
+  catch { t.skip('Local Chromium is unavailable'); return; }
+  try {
+    const page = await browser.newPage();
+    await page.route('https://hh.ru/resume/fixture123', route => route.fulfill({ status: 200,
+      contentType: 'text/html; charset=utf-8', body: `<main><h1>Secret Name</h1>
+        <div data-qa="resume-block-experience"><span>Опыт работы · secret@example.com</span></div>
+        <p data-qa="resume-block-education">Образование: sensitive detail</p>
+        <strong>Ключевые навыки: private text</strong>
+        <em>Обо мне: private text</em>
+        <div data-qa="untrusted-secret-attribute">secret@example.com</div></main>` }));
+    await page.goto('https://hh.ru/resume/fixture123');
+    const output = await captureFailure(() => readResumeContent(page, 'fixture123'));
+    assert.equal(output, 'JOB_HH_RESUME_STRUCTURE 10101111\nJOB_HH_RESUME_READ_FAILURE empty_content\n');
+    assert.doesNotMatch(output, /Secret Name|secret|fixture123|private text|sensitive detail|untrusted/);
+    await page.close();
+  } finally { await browser.close(); }
+});

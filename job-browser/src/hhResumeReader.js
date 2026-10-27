@@ -49,7 +49,19 @@ async function readResumeContent(page, resumeId) {
         blocks[key] = value.slice(0, 12001);
       }
     }
-    return { pathname, title, blocks };
+    if (Object.values(blocks).some(value => value.trim())) return { pathname, title, blocks };
+    // Fixed booleans only: the page text and data-qa values never leave the browser.
+    const qaNames = ['resume-block-experience', 'resume-block-skills', 'resume-block-education', 'resume-block-about'];
+    const qa = qaNames.map(name => Boolean(root.querySelector(`[data-qa="${name}"]`)));
+    const headingPrefixes = [/^Опыт работы/iu, /^Ключевые навыки/iu, /^Образование/iu, /^Обо мне/iu];
+    const headingsInAnyTag = [false, false, false, false];
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+    for (let count = 0, node; count < 5000 && (node = walker.nextNode()); count++) {
+      if (node.children.length || !visible(node)) continue;
+      const value = node.textContent.slice(0, 100).trim();
+      headingPrefixes.forEach((pattern, index) => { if (pattern.test(value)) headingsInAnyTag[index] = true; });
+    }
+    return { pathname, title, blocks, structure: { qa, headingsInAnyTag } };
   });
   if (raw?.pathname !== `/resume/${resumeId}`) fail('wrong_page');
   if (raw?.failure) fail(raw.failure);
@@ -58,6 +70,11 @@ async function readResumeContent(page, resumeId) {
   const snapshot = { resumeId, title: raw.title[0], experience: raw.blocks.experience || '',
     skills: raw.blocks.skills || '', education: raw.blocks.education || '', summary: raw.blocks.summary || '',
     grammaticalGender: 'unknown' };
+  if (![snapshot.experience, snapshot.skills, snapshot.education, snapshot.summary].some(value => value.trim())) {
+    const flags = [...(raw.structure?.qa || []), ...(raw.structure?.headingsInAnyTag || [])];
+    const safe = flags.length === 8 && flags.every(flag => typeof flag === 'boolean') ? flags : Array(8).fill(false);
+    process.stderr.write(`JOB_HH_RESUME_STRUCTURE ${safe.map(flag => flag ? '1' : '0').join('')}\n`);
+  }
   return resumeSnapshotSchema(snapshot, resumeId);
 }
 
