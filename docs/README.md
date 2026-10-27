@@ -8,7 +8,8 @@
 документы, устройства, Life OS и явная сверка неизвестного результата HH.
 Проверено 885 server tests, 32 PostgreSQL acceptance tests, десять браузерных
 fixture-программ и отдельный E2E с настоящими API, БД и файловым хранилищем.
-Выпуск подготовлен; статус установки обновляется в записи выпуска.
+Выпуск установлен на DE: healthy, 54 миграции, 371 server file и 24 assets
+совпали с принятым кодом; оба VPS source синхронизированы с GitHub main.
 Этап 6, живая приёмка Telegram, остаётся открытым.
 
 27 октября на DE установлен [выпуск кнопок и памяти Mini App](updates/2026-10-27-mini-app-buttons-release.md):
@@ -146,8 +147,9 @@ October 27: [Mini App stage 5](updates/2026-10-27-mini-app-stage-five-release.md
 is complete: documents, devices, Life OS and explicit verification of unknown
 HH results. Validation passed 885 server tests, 32 PostgreSQL acceptance tests,
 ten browser fixture programs and a separate E2E with real APIs, database and
-file storage. Release prepared; installation status is maintained in the release
-record. Stage 6, live Telegram acceptance, remains open.
+file storage. Deployed to DE: healthy, 54 migrations, 371 server files and
+24 assets verified against accepted code; both VPS sources match GitHub main.
+Stage 6, live Telegram acceptance, remains open.
 
 The [October 27 Mini App buttons and memory release](updates/2026-10-27-mini-app-buttons-release.md)
 is installed on DE: 877 server tests, 24 PostgreSQL scenarios, nine browser suites and

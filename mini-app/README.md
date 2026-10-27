@@ -9,7 +9,7 @@
 отзыв кодов, напоминания, договорённости и проекты. Неизвестный результат HH
 можно сверить по исходному UUID и подтвердить без повторного select/raise.
 885 server tests, 32 PostgreSQL acceptance tests, десять браузерных fixtures и
-отдельный E2E с настоящими API/БД прошли. Установка отмечается в записи выпуска;
+отдельный E2E с настоящими API/БД прошли. Выпуск установлен на DE, server healthy;
 живая приёмка Telegram остаётся открытой.
 
 27 октября на DE установлен [выпуск кнопок и памяти](../docs/updates/2026-10-27-mini-app-buttons-release.md):
@@ -174,8 +174,8 @@ is complete: confirmed document upload/deletion, device pairing/revocation and
 code cancellation, reminders, commitments and projects. Unknown HH results can
 be inspected by original UUID and confirmed without another select/raise.
 885 server tests, 32 PostgreSQL acceptance tests, ten browser fixtures and a
-separate E2E with real APIs/database passed. Installation status is recorded in
-the release note; live Telegram acceptance remains open.
+separate E2E with real APIs/database passed. Deployed to DE, server healthy;
+live Telegram acceptance remains open.
 
 The [October 27 buttons and memory release](../docs/updates/2026-10-27-mini-app-buttons-release.md)
 is installed on DE: stages 1–4 and the first stage-5 section passed full validation and

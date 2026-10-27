@@ -30,10 +30,25 @@ Fastify → PostgreSQL → filesystem E2E. Последний включает o
 security-ревизия выполнена; заключительная повторная ревизия HH недоступна из-за
 лимита помощников. Итог принят после проверки основным агентом и тестов.
 
-Статус установки: выпуск подготовлен; фактические SHA, образ и результаты DE/NL
-будут записаны после установки. Production-операции с личными данными не нужны.
-Desktop не изменён. Этап 6 — два реальных Telegram-аккаунта, WebView/cookies,
-узкий экран и клавиатура — остаётся открытым.
+На DE установлен image `jarvis-mini-app:6e240e5afdc8`, immutable release
+`/home/deploy/releases/jarvis-mini-6e240e5afdc8`, код
+`6e240e5afdc82d7c7cdc7db885e370fe63f7e54c`. В Linux-образе прошли 883 теста,
+два теста с отдельной БД пропущены; локально они прошли в полном наборе 885/885.
+Server healthy; подтверждены 54 миграции, включая 052, совпадение 371 серверного
+файла и 24 собранных assets. Публичные live/ready, Mini App и новый JS отвечают
+200; личный API и binary upload без сессии — 401. Пересоздан только server,
+остальные контейнеры и эффективное окружение сохранены.
+
+Windows и source обоих VPS синхронизированы с GitHub main. На NL отдельного
+server runtime нет. На обоих узлах Host Agent совпал по 17 файлам, Host Agent,
+Xray, Hysteria и VPN probe timer активны; PID VPN-сервисов не изменились.
+Незавершённая HH-работа другого worktree сохранена и не опубликована. Общая
+инвентаризация отмечает существующие ветки/worktrees и недоступный manifest
+установленного Desktop; сравнение Desktop/wake/native runtime не подтверждено.
+Windows-код этим выпуском не менялся, EXE не пересобирался и не устанавливался.
+
+Личные production-данные проверочными операциями не изменялись. Этап 6 — два
+реальных Telegram-аккаунта, WebView/cookies, узкий экран и клавиатура — открыт.
 
 ## English
 
@@ -64,7 +79,23 @@ independent security review completed; the final HH re-review was unavailable
 because helper quota was exhausted. The primary agent reviewed and accepted
 the final code after testing.
 
-Installation status: release prepared; actual SHAs, image and DE/NL results will
-be recorded after installation. No production personal-data mutations are needed.
-Desktop is unchanged. Stage 6 remains open: two real Telegram accounts,
-WebView/cookies, narrow screens and keyboard acceptance.
+DE runs image `jarvis-mini-app:6e240e5afdc8`, immutable release
+`/home/deploy/releases/jarvis-mini-6e240e5afdc8`, code revision
+`6e240e5afdc82d7c7cdc7db885e370fe63f7e54c`. The Linux image passed 883 tests;
+two tests requiring a separate database were skipped there and passed locally
+in the full 885/885 run. Server is healthy; all 54 migrations including 052,
+371 server files and 24 compiled assets were verified. Public live/ready,
+Mini App and the new JS return 200; personal API and binary upload without a
+session return 401. Only server was recreated; other containers and effective
+environment were preserved.
+
+Windows and both VPS source checkouts match GitHub main. NL has no separate
+server runtime. Both Host Agents matched 17 files; Host Agent, Xray, Hysteria
+and VPN probe timers are active, with VPN service PIDs unchanged. Unfinished
+HH work in another worktree was preserved and excluded from publication. The
+global inventory flags existing branches/worktrees and an unavailable installed
+Desktop manifest; Desktop/wake/native runtime comparison remains unverified.
+This release changes no Windows client code; no EXE was rebuilt or installed.
+
+Verification did not mutate production personal data. Stage 6 remains open:
+two real Telegram accounts, WebView/cookies, narrow screens and keyboard acceptance.
