@@ -44,16 +44,20 @@
 содержал две бесплатные и две разрешённые платные модели с поддержкой схемы.
 Доступность моделей может меняться.
 
-Промежуточное серверное исправление установлено на DE: `8720496f11fc8ddfaade6ec3f54ac0a725ee881d`,
-образ `jarvis-letter-output:8720496`. Linux-образ прошёл 887 тестов; два теста с
+Окончательное серверное исправление установлено на DE: `5dbb200e9f6f391d6cf825eaa82283f3b7b9771a`,
+образ `jarvis-letter-output:5dbb200`. Linux-образ прошёл 888 тестов; два теста с
 БД пропущены в изолированном запуске без сети и отдельно пройдены локально.
 372 серверных файла и Compose release inputs совпали с принятой версией,
 health healthy, readiness HTTP 200. Окружение, именованные хранилища и inode
 смонтированных секретов проверены до замены контейнера. Изменён только server;
 browser, Host Agent и Desktop не пересобирались. Оба VPS source и Windows
 синхронизированы с GitHub main. Реальный отклик работодателю не отправлялся.
-Обновление с отключением reasoning ещё не установлено. Проверка полного создания
-письма через пользовательский интерфейс Telegram после выпуска остаётся за пользователем.
+Установленный адаптер подтвердил `enabled=false`, `exclude=true` и таймаут
+120 секунд. Контрольный запрос уже на установленном коде с выбранным резюме
+также прошёл: `stop`, 410 токенов, непустое письмо, валидные формат и ссылки на
+факты. Временных переопределений настроек в этом запросе не было, новый черновик
+не сохранялся. Проверка полного создания письма через пользовательский интерфейс
+Telegram после выпуска остаётся за пользователем.
 
 ## English
 
@@ -98,16 +102,19 @@ retention, usage accounting and request deduplication. Independent review found
 no defects. The live catalog had two free and two approved paid schema-capable
 models when checked; future availability can change.
 
-The intermediate server fix is deployed on DE at `8720496f11fc8ddfaade6ec3f54ac0a725ee881d`,
-image `jarvis-letter-output:8720496`. The Linux image passed 887 tests; two DB
+The final server fix is deployed on DE at `5dbb200e9f6f391d6cf825eaa82283f3b7b9771a`,
+image `jarvis-letter-output:5dbb200`. The Linux image passed 888 tests; two DB
 tests were skipped in the isolated network-free run and passed separately locally.
 All 372 server files and Compose release inputs match the accepted version;
 health is healthy and readiness returns HTTP 200. Environment values, named
 storage volumes and mounted secret inodes were compared before replacement.
 Only the server changed; browser, Host Agent and Desktop were not rebuilt.
 Both VPS source checkouts and Windows are synchronized with GitHub main.
-No employer application was submitted. The update disabling reasoning has not
-been deployed yet. A full letter-creation check through the user's Telegram
-interface after deployment remains for the user.
+No employer application was submitted. The installed adapter confirmed
+`enabled=false`, `exclude=true` and a 120-second timeout. A control request on the
+installed code with the selected resume also passed: `stop`, 410 tokens, nonempty
+letter, valid format and fact references. This request used no temporary setting
+overrides and saved no draft. A full letter-creation check through the user's
+Telegram interface after deployment remains for the user.
 
 API contract: [OpenRouter structured outputs](https://openrouter.ai/docs/guides/features/structured-outputs).
