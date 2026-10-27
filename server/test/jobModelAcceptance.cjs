@@ -11,7 +11,7 @@ async function evaluateJobModels({ apiKey, profile, models, cases = JOB_MODEL_EV
   for (const candidate of cases) {
     for (const model of models) {
       const provider = new OpenAiCompatibleProvider({ name: 'job-model-evaluation', baseUrl: 'https://openrouter.ai/api/v1',
-        apiKey, model, reasoning: { effort: 'low', exclude: true }, timeoutMs: 120000,
+        apiKey, model, reasoning: { enabled: false, exclude: true }, timeoutMs: 120000,
         providerRouting: { require_parameters: true } });
       const started = performance.now();
       const row = { caseId: candidate.id, model, source: candidate.source || null, fixture: Boolean(candidate.fixture),

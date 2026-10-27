@@ -7,7 +7,7 @@ class JobModelAdapter {
     this.config = config;
     // Letter generation has a bounded output budget; global chat reasoning must not consume it.
     this.provider = config.openrouterApiKey ? new FreeFirstProvider({ ...config,
-      openrouterReasoningEffort: 'low', openrouterReasoningExclude: true, modelTimeoutMs: 120000 }, { fetchImpl }) : null;
+      modelTimeoutMs: 120000 }, { fetchImpl, disableReasoning: true }) : null;
   }
   async generate({ messages }) {
     if (!this.provider) throw jobError('JOB_MODEL_NOT_CONFIGURED');

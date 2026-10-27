@@ -2,6 +2,8 @@
 
 ## Русский
 
+Более новый результат 28 октября: [исправление обрыва ответа модели при создании письма](2026-10-28-hh-letter-output-fix.md).
+
 Обновление 28 октября: reader исправлен и установлен на DE, образ
 `jarvis-hh-browser:ee29c85`. Все 108 Linux-тестов прошли без пропусков.
 Штатный серверный запрос подтвердил чтение выбранного резюме: название,
@@ -31,6 +33,8 @@
 Продолжение диагностики и живая проверка создания письма остаются открытыми.
 
 ## English
+
+Later October 28 result: [cover-letter model output truncation fix](2026-10-28-hh-letter-output-fix.md).
 
 October 28 update: the reader fix is deployed on DE as
 `jarvis-hh-browser:ee29c85`. All 108 Linux tests passed without skips.

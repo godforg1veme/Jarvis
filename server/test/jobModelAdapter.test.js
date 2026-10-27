@@ -30,7 +30,8 @@ const { FREE_MODELS } = require('../src/providers/freeFirstProvider');
 
 function catalogModel(id, prompt, completion) {
   return { id, context_length: 100000, pricing: { prompt, completion, request: '0' },
-    architecture: { input_modalities: ['text'], output_modalities: ['text'] }, supported_parameters: ['structured_outputs', 'reasoning'] };
+    architecture: { input_modalities: ['text'], output_modalities: ['text'] }, supported_parameters: ['structured_outputs', 'reasoning'],
+    reasoning: { mandatory: false } };
 }
 
 test('job adapter selects verified free model, retries eligible failure, then uses priced backup with usage', async () => {
@@ -47,7 +48,7 @@ test('job adapter selects verified free model, retries eligible failure, then us
     assert.equal(body.response_format.json_schema.strict, true);
     assert.equal(body.response_format.json_schema.schema.additionalProperties, false);
     assert.equal(body.provider.require_parameters, true);
-    assert.deepEqual(body.reasoning, { effort: 'low', exclude: true });
+    assert.deepEqual(body.reasoning, { enabled: false, exclude: true });
     if (body.model !== paid) return Response.json({ error: { message: 'busy' } }, { status: 429 });
     return Response.json({ id: 'paid-request', usage: { cost: 0.002 }, choices: [{ message: { content: 'draft' } }] });
   };
@@ -113,6 +114,25 @@ test('job adapter never dispatches without a schema-capable model', async () => 
   const adapter = new JobModelAdapter({ config: { openrouterApiKey: 'fixture' }, fetchImpl });
   await assert.rejects(adapter.generate({ messages: [] }), { code: 'JOB_MODEL_UNAVAILABLE' });
   assert.equal(completions, 0);
+});
+
+test('job adapter skips models with mandatory or unknown reasoning before dispatch', async () => {
+  const mandatory = { ...catalogModel(FREE_MODELS[0], '0', '0'), reasoning: { mandatory: true } };
+  const unknown = { ...catalogModel(FREE_MODELS[1], '0', '0'), reasoning: undefined };
+  const mandatoryWithoutControl = { ...catalogModel(FREE_MODELS[3], '0', '0'),
+    supported_parameters: ['structured_outputs'], reasoning: { mandatory: true } };
+  const optional = catalogModel(FREE_MODELS[2], '0', '0');
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    if (url.endsWith('/models/user')) return Response.json({ data: [mandatory, unknown, mandatoryWithoutControl, optional] });
+    if (url.endsWith('/key')) return Response.json({ data: {} });
+    const body = JSON.parse(init.body); calls.push(body);
+    return Response.json({ choices: [{ message: { content: '{"text":"Letter","factIds":[]}' }, finish_reason: 'stop' }] });
+  };
+  const adapter = new JobModelAdapter({ config: { openrouterApiKey: 'fixture', openrouterReasoningEffort: 'xhigh' }, fetchImpl });
+  await adapter.generate({ messages: [] });
+  assert.deepEqual(calls.map((x) => x.model), [FREE_MODELS[2]]);
+  assert.deepEqual(calls[0].reasoning, { enabled: false, exclude: true });
 });
 
 test('letter validation gives only closed reasons and rejects wrappers and invalid shapes', () => {

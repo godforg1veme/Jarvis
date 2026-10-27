@@ -17,7 +17,8 @@ class FreeFirstProvider {
     this.name = 'openrouter-free-first';
     this.now = options.now || Date.now; this.fetch = options.fetchImpl || globalThis.fetch;
     this.apiKey = config.openrouterApiKey; this.timeoutMs = config.modelTimeoutMs || 60000;
-    this.reasoning = config.openrouterReasoningEffort
+    this.disableReasoning = options.disableReasoning === true;
+    this.reasoning = this.disableReasoning ? { enabled: false, exclude: true } : config.openrouterReasoningEffort
       ? { effort: config.openrouterReasoningEffort, exclude: config.openrouterReasoningExclude } : null;
     this.paidIds = [...new Set([config.openrouterModel, config.openrouterFallbackModel].filter(Boolean))];
     this.catalog = new OpenRouterCatalog({ apiKey: this.apiKey, modelIds: [...FREE_MODELS, ...this.paidIds], fetchImpl: this.fetch, now: this.now });
@@ -38,6 +39,7 @@ class FreeFirstProvider {
     const usable = (m) => m.text && m.context >= inputSize + maxTokens
       && (!hasTools || m.parameters.includes('tools'))
       && (!structured || m.parameters.includes('structured_outputs'))
+      && (!this.disableReasoning || (!m.reasoningMandatory && (!m.parameters.includes('reasoning') || m.reasoningOptional)))
       && (this.cooldowns.get(m.id) || 0) <= this.now();
     const free = [...new Set([...FREE_MODELS, ...this.paidIds])]
       .map((id) => models.find((m) => m.id === id && m.free)).filter((m) => m && usable(m));

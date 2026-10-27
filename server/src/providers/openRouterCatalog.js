@@ -44,6 +44,8 @@ function metadata(model) {
     text: model.architecture?.input_modalities?.includes('text') === true
       && model.architecture?.output_modalities?.includes('text') === true,
     parameters: Array.isArray(model.supported_parameters) ? model.supported_parameters.filter((p) => typeof p === 'string') : [],
+    reasoningOptional: model.reasoning?.mandatory === false,
+    reasoningMandatory: model.reasoning?.mandatory === true,
   };
 }
 

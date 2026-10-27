@@ -6,8 +6,11 @@
 
 27 октября установлена [диагностика чтения резюме HH](updates/2026-10-27-hh-resume-diagnostics-release.md).
 28 октября reader исправлен: сервер прочитал название, опыт и навыки выбранного
-резюме. Защита привязки писем и migration 053 установлены на DE. Живая проверка
-создания письма в Telegram ещё открыта.
+резюме. Защита привязки писем и migration 053 установлены на DE.
+28 октября также исправлен [обрыв ответа при создании письма](updates/2026-10-28-hh-letter-output-fix.md):
+строгая JSON-схема, отключённый reasoning и запас до 6000 токенов для всех профилей.
+890 серверных тестов и 10 PostgreSQL-сценариев прошли; сервер обновлён.
+Живая диагностика с выбранным резюме прошла; создание письма через Telegram ещё открыто.
 
 27 октября завершён [этап 5 Mini App](updates/2026-10-27-mini-app-stage-five-release.md):
 документы, устройства, Life OS и явная сверка неизвестного результата HH.
@@ -151,7 +154,11 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 October 27: [HH resume read diagnostics](updates/2026-10-27-hh-resume-diagnostics-release.md)
 are deployed. On October 28, the fixed reader successfully read the selected
 resume's title, experience and skills. Draft provenance guards and migration 053
-are deployed on DE; live Telegram letter creation remains open.
+are deployed on DE. October 28: [cover-letter truncation is also addressed](updates/2026-10-28-hh-letter-output-fix.md)
+with strict JSON output, disabled reasoning and a 6000-token allowance
+for every profile. All 890 server tests and 10 PostgreSQL scenarios passed;
+the server is updated. Live diagnostic generation with the selected resume
+passed; full letter creation through Telegram remains open.
 
 October 27: [Mini App stage 5](updates/2026-10-27-mini-app-stage-five-release.md)
 is complete: documents, devices, Life OS and explicit verification of unknown
