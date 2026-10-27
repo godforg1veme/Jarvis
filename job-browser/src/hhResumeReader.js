@@ -3,7 +3,7 @@ const FIELDS = ['title', 'experience', 'skills', 'education', 'summary'];
 const REASONS = new Set(['invalid_id', 'invalid_shape', 'invalid_field', 'field_too_long', 'private_content',
   'empty_content', 'snapshot_too_large', 'wrong_page', 'main_missing', 'title_count', 'duplicate_section', 'section_container']);
 const DOM_TAGS = new Set(['MAIN', 'SECTION', 'ARTICLE', 'DIV', 'SPAN', 'P', 'STRONG', 'EM', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'OTHER', 'NONE']);
-const DOM_QA = new Set(['EXPERIENCE', 'SKILLS', 'EDUCATION', 'ABOUT', 'RESUME', 'TITLE', 'OTHER', 'NONE']);
+const DOM_QA = new Set(['EXPERIENCE', 'SKILLS', 'EDUCATION', 'ABOUT', 'RESUME', 'TITLE', 'RAISE', 'SECTION', 'CONTENT', 'OTHER', 'NONE']);
 const fail = (reason) => {
   process.stderr.write(`JOB_HH_RESUME_READ_FAILURE ${REASONS.has(reason) ? reason : 'invalid_shape'}\n`);
   throw Object.assign(new Error('JOB_HH_RESUME_UNAVAILABLE'), { code: 'JOB_HH_RESUME_UNAVAILABLE' });
@@ -58,9 +58,17 @@ async function readResumeContent(page, resumeId) {
     const headingPrefixes = [/^Опыт работы/iu, /^Ключевые навыки/iu, /^Образование/iu, /^Обо мне/iu];
     const headingsInAnyTag = [false, false, false, false];
     const qaTypes = { 'resume-block-experience': 'EXPERIENCE', 'resume-block-skills': 'SKILLS',
-      'resume-block-education': 'EDUCATION', 'resume-block-about': 'ABOUT', resume: 'RESUME', 'resume-title': 'TITLE' };
+      'resume-block-education': 'EDUCATION', 'resume-block-about': 'ABOUT',
+      'resume-experience': 'EXPERIENCE', 'resume-skills': 'SKILLS', 'resume-education': 'EDUCATION',
+      'resume-about': 'ABOUT', resume: 'RESUME', 'resume-title': 'TITLE', 'resume-section': 'SECTION',
+      'resume-content': 'CONTENT',
+      'resume-update-button_actions': 'RAISE' };
     const allowedTags = new Set(['MAIN', 'SECTION', 'ARTICLE', 'DIV', 'SPAN', 'P', 'STRONG', 'EM', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI']);
     let educationLeaf = null;
+    let educationNode = null;
+    let educationAncestors = [];
+    const textAfter = [false, false, false, false, false];
+    const otherHeadingAncestors = [new Set(), new Set(), new Set()];
     let visited = 0;
     let visibleCount = 0;
     let visibleLeafCount = 0;
@@ -71,8 +79,21 @@ async function readResumeContent(page, resumeId) {
       if (node.children.length) continue;
       visibleLeafCount++;
       const value = node.textContent.slice(0, 100).trim();
+      if (educationNode && value && (educationNode.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING))
+        educationAncestors.forEach((ancestor, index) => { if (ancestor?.contains(node)) textAfter[index] = true; });
       headingPrefixes.forEach((pattern, index) => { if (pattern.test(value)) headingsInAnyTag[index] = true; });
+      [0, 1, 3].forEach((index, section) => {
+        if (!headingPrefixes[index].test(value)) return;
+        for (let parent = node.parentElement, depth = 0; parent && depth < 12; parent = parent.parentElement, depth++)
+          otherHeadingAncestors[section].add(parent);
+      });
       if (!educationLeaf && headingPrefixes[2].test(value)) {
+        educationNode = node;
+        educationAncestors = Array.from({ length: 5 }, (_, index) => {
+          let parent = node.parentElement;
+          for (let step = 0; step < index; step++) parent = parent?.parentElement;
+          return parent;
+        });
         const tags = [], qaTypesFound = [];
         for (let ancestor = node, depth = 0; depth < 6; depth++, ancestor = ancestor?.parentElement) {
           tags.push(ancestor ? allowedTags.has(ancestor.tagName) ? ancestor.tagName : 'OTHER' : 'NONE');
@@ -81,6 +102,17 @@ async function readResumeContent(page, resumeId) {
         }
         educationLeaf = { tags, qaTypesFound };
       }
+    }
+    if (educationNode) {
+      const ancestors = [];
+      for (let depth = 0; depth < 5; depth++) {
+        const parent = educationAncestors[depth];
+        if (!parent) { ancestors.push({ children: 0, after: false, sections: [false, false, false] }); continue; }
+        const visibleChildren = [...parent.children].slice(0, 21).filter(visible).length;
+        ancestors.push({ children: Math.min(visibleChildren, 20), after: textAfter[depth],
+          sections: otherHeadingAncestors.map(found => found.has(parent)) });
+      }
+      educationLeaf.ancestors = ancestors;
     }
     return { pathname, title, blocks, structure: { qa, headingsInAnyTag,
       dom: { visited, visibleCount, visibleLeafCount, educationLeaf } } };
@@ -104,6 +136,13 @@ async function readResumeContent(page, resumeId) {
     const safeQa = Array.isArray(qaTypesFound) && qaTypesFound.length === 6 && qaTypesFound.every(type => DOM_QA.has(type))
       ? qaTypesFound : Array(6).fill('NONE');
     process.stderr.write(`JOB_HH_RESUME_DOM visited=${count(dom?.visited)} visible=${count(dom?.visibleCount)} leaf=${count(dom?.visibleLeafCount)} tags=${safeTags.join(',')} qa=${safeQa.join(',')}\n`);
+    const ancestorData = dom?.educationLeaf?.ancestors;
+    const validAncestor = item => item && Number.isInteger(item.children) && item.children >= 0 && item.children <= 20
+      && typeof item.after === 'boolean'
+      && Array.isArray(item.sections) && item.sections.length === 3 && item.sections.every(value => typeof value === 'boolean');
+    const safeAncestors = Array.isArray(ancestorData) && ancestorData.length === 5 && ancestorData.every(validAncestor)
+      ? ancestorData : Array.from({ length: 5 }, () => ({ children: 0, after: false, sections: [false, false, false] }));
+    process.stderr.write(`JOB_HH_RESUME_EDUCATION ${safeAncestors.map(item => `${item.children}:${item.after ? 1 : 0}:${item.sections.map(value => value ? 1 : 0).join('')}`).join('|')}\n`);
   }
   return resumeSnapshotSchema(snapshot, resumeId);
 }
