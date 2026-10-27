@@ -357,7 +357,7 @@ Migration 036 добавляет `job_setting_value`, закрытый context
 
 ## Job search: letter modes and send confirmation
 
-### Resume provenance guard (local, October 27, 2026)
+### Resume provenance guard (deployed, October 28, 2026)
 
 По согласованию владельца подготовлен контроль связи письма с основным резюме
 для всех профилей. Подготовка и подтверждение отклоняют черновик, если его
@@ -366,7 +366,7 @@ Migration 036 добавляет `job_setting_value`, закрытый context
 новый вариант письма. Продолжение и ручная правка сохраняют исходную привязку;
 выбор нового варианта начинает независимое письмо и не передаёт старый текст
 модели. Подтверждение точного текста, вакансии и резюме остаётся в исходном чате.
-Изменение и migration 053 пока локальные; реальная клиентская проверка открыта.
+Изменение и migration 053 установлены на DE; реальная клиентская проверка открыта.
 
 The owner approved a resume provenance guard for all profiles. Preparation
 and confirmation reject a draft whose saved resume or connection revision no
@@ -374,7 +374,7 @@ longer matches. Older drafts without provenance stay in history but cannot be
 sent; the user must explicitly choose a new letter. Edits retain their original
 binding, while a new letter does not pass the old draft to the model. Exact-text,
 vacancy and resume confirmation remains in the originating chat. The change and
-migration 053 are local; live client acceptance is still pending.
+migration 053 are deployed on DE; live client acceptance is still pending.
 
 Выпущено на DE 24 октября 2026, миграция 046 применена: у любого текущего
 черновика добавлена «Редактировать текст» (`job:manual_edit:<draft-uuid>`).

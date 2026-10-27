@@ -5,8 +5,9 @@
 ## Русский
 
 27 октября установлена [диагностика чтения резюме HH](updates/2026-10-27-hh-resume-diagnostics-release.md).
-Reader не распознаёт разделы выбранного резюме; исправление и живая проверка
-создания письма ещё не завершены.
+28 октября reader исправлен: сервер прочитал название, опыт и навыки выбранного
+резюме. Защита привязки писем и migration 053 установлены на DE. Живая проверка
+создания письма в Telegram ещё открыта.
 
 27 октября завершён [этап 5 Mini App](updates/2026-10-27-mini-app-stage-five-release.md):
 документы, устройства, Life OS и явная сверка неизвестного результата HH.
@@ -148,8 +149,9 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 ## English
 
 October 27: [HH resume read diagnostics](updates/2026-10-27-hh-resume-diagnostics-release.md)
-are deployed. The reader does not recognize the selected resume's sections; the
-fix and live cover-letter verification remain open.
+are deployed. On October 28, the fixed reader successfully read the selected
+resume's title, experience and skills. Draft provenance guards and migration 053
+are deployed on DE; live Telegram letter creation remains open.
 
 October 27: [Mini App stage 5](updates/2026-10-27-mini-app-stage-five-release.md)
 is complete: documents, devices, Life OS and explicit verification of unknown

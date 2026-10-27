@@ -8,7 +8,13 @@
 опыт и навыки получены без вывода содержимого. Reader проверяет точный адрес,
 единственность источника HH, объём и формат данных; временная подробная
 диагностика удалена. Проверка самого создания письма в Telegram ещё открыта.
-Защита связи старых писем с резюме и migration 053 пока локальные.
+Защита связи писем с резюме установлена на DE в образе
+`jarvis-hh-context:997b3cd`, migration 053 применена. Локально прошли 885
+серверных тестов, 47 профильных проверок PostgreSQL и 78 Telegram-проверок;
+сквозной тест через обработчики Telegram и PostgreSQL также прошёл. В Linux
+прошли 883 серверных теста, два с отдельной БД проверены локально. Настройки,
+тома и исходный файл подключаемого секрета сохранены; readiness вернул 200.
+Реальные отклики работодателям не отправлялись.
 
 27 октября 2026 года по поручению владельца на DE установлена диагностика
 чтения резюме для сопроводительных писем. Проверка выбранного профиля показала:
@@ -32,7 +38,12 @@ A normal server request successfully read the selected resume's title,
 experience and skills without printing their contents. The reader checks the
 exact URL, unique HH source, size and data shape; detailed temporary diagnostics
 were removed. Live letter creation in Telegram remains open. Draft provenance
-guards and migration 053 remain local.
+guards are deployed on DE as `jarvis-hh-context:997b3cd`; migration 053 is applied.
+Validation passed 885 local server tests, 47 focused PostgreSQL tests and
+78 Telegram tests, plus the handler/PostgreSQL E2E. Linux passed 883 server
+tests; two database-dependent tests passed locally. Environment, volumes and
+the original mounted secret file were retained; readiness returned 200.
+No real applications were sent to employers.
 
 On October 27, 2026, the owner authorized deployment of diagnostics for HH resume
 reading during cover-letter preparation. A check of the selected profile showed
