@@ -13,6 +13,16 @@ const SCHEMA_KEYS = ['data', 'content', 'children', 'props', 'field', 'fields', 
   'attributes', 'display', 'skill_id', 'skillId', 'skillText', 'skill_text', 'skillValue', 'skill_value',
   'tag', 'typename', '__typename', 'id', 'items', 'valueText'];
 const SCHEMA_CHILDREN = ['data', 'content', 'children', 'props', 'fields'];
+const SINGLE_KEYS = ['0', 'ru', 'en', 'RU', 'EN', 'russian', 'eng', 'rus', 'raw', 'html', 'plain', 'body',
+  'string', 'str', 'contentText', 'content_text', 'fieldValue', 'field_value', 'localized', 'translation',
+  'translated', 'translationText', 'translatedText', 'default', 'original', 'dataText', 'data_text',
+  'descriptionText', 'description_text', 'skill_value', 'skillName', 'skill_name', 'labelText',
+  'label_text', '@value', '@type', '$', '__html', 'node', '_value', 'textValue', 'text_value',
+  'keySkill', 'key_skill', 'nameText', 'name_text', 'description', 'titleText', 'title_text',
+  'positionText', 'position_text', 'literal', 'key_skill_name', 'skill_description', 'keySkillName',
+  'resumeTitle', 'resume_title', 'professional_role', 'profession', 'role', 'tagName', 'locale',
+  'value_text', 'skill_title', 'skillTitle', 'localizedText', 'localized_text', 'language',
+  'translit', 'comment', 'formatted', 'markup', 'data-qa'];
 const fail = (reason) => {
   process.stderr.write(`JOB_HH_RESUME_READ_FAILURE ${REASONS.has(reason) ? reason : 'invalid_shape'}\n`);
   throw Object.assign(new Error('JOB_HH_RESUME_UNAVAILABLE'), { code: 'JOB_HH_RESUME_UNAVAILABLE' });
@@ -132,12 +142,22 @@ async function readResumeContent(page, resumeId) {
       'attributes', 'display', 'skill_id', 'skillId', 'skillText', 'skill_text', 'skillValue', 'skill_value',
       'tag', 'typename', '__typename', 'id', 'items', 'valueText'];
     const schemaChildren = ['data', 'content', 'children', 'props', 'fields'];
+    const singleKeys = ['0', 'ru', 'en', 'RU', 'EN', 'russian', 'eng', 'rus', 'raw', 'html', 'plain', 'body',
+      'string', 'str', 'contentText', 'content_text', 'fieldValue', 'field_value', 'localized', 'translation',
+      'translated', 'translationText', 'translatedText', 'default', 'original', 'dataText', 'data_text',
+      'descriptionText', 'description_text', 'skill_value', 'skillName', 'skill_name', 'labelText',
+      'label_text', '@value', '@type', '$', '__html', 'node', '_value', 'textValue', 'text_value',
+      'keySkill', 'key_skill', 'nameText', 'name_text', 'description', 'titleText', 'title_text',
+      'positionText', 'position_text', 'literal', 'key_skill_name', 'skill_description', 'keySkillName',
+      'resumeTitle', 'resume_title', 'professional_role', 'profession', 'role', 'tagName', 'locale',
+      'value_text', 'skill_title', 'skillTitle', 'localizedText', 'localized_text', 'language',
+      'translit', 'comment', 'formatted', 'markup', 'data-qa'];
     const unknownSchema = () => ({ count: 0, more: false, kinds: [0, 0, 0, 0], keys: Array(schemaKeys.length).fill('U'),
       children: Array.from({ length: schemaChildren.length }, () => Array(schemaKeys.length).fill('U')) });
     const initialState = { template: false, parsed: false, bounded: true, applicantResume: false,
       fields: [false, false, false, false, false, false], matches: 0,
       types: ['U', 'U', 'U'], nested: Array.from({ length: 3 }, () => Array(safeKeys.length).fill('U')),
-      schema: [unknownSchema(), unknownSchema()],
+      schema: [unknownSchema(), unknownSchema()], singles: ['U', 'U'],
       identity: { candidate: 'UUU', parent: 'UUU', skillsFirst: 'U', titleFirst: 'U', heading: 'U' } };
     const template = document.getElementById('HH-Lux-InitialState');
     if (template?.tagName === 'TEMPLATE') {
@@ -198,6 +218,14 @@ async function readResumeContent(page, resumeId) {
                 initialState.schema = ['skills', 'title'].map(name => {
                   const direct = resume[name];
                   return schemaOf(Array.isArray(direct) ? direct[0] : direct);
+                });
+                initialState.singles = ['skills', 'title'].map(name => {
+                  const direct = resume[name];
+                  const entry = Array.isArray(direct) ? direct[0] : direct;
+                  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return 'U';
+                  const names = Object.keys(entry);
+                  if (names.length !== 1 || typeof entry[names[0]] !== 'string') return 'U';
+                  return singleKeys.map(key => key === names[0] ? '1' : '0').join('');
                 });
               }
               if (depth >= 64) {
@@ -288,6 +316,9 @@ async function readResumeContent(page, resumeId) {
       return `${safe.count}:${safe.more ? 1 : 0}:${safe.kinds.join(',')}/${fields(safe.keys)}/${SCHEMA_CHILDREN.map((key, index) => `${key}{${fields(safe.children[index])}}`).join('/')}`;
     };
     process.stderr.write(`JOB_HH_RESUME_INITIAL_SCHEMA skills=${formatSchema(shape?.schema?.[0])} title=${formatSchema(shape?.schema?.[1])}\n`);
+    const singleBits = value => typeof value === 'string' && new RegExp(`^[01]{${SINGLE_KEYS.length}}$`).test(value)
+      ? value : 'U';
+    process.stderr.write(`JOB_HH_RESUME_INITIAL_SINGLE skills=${singleBits(shape?.singles?.[0])} title=${singleBits(shape?.singles?.[1])}\n`);
     const identity = shape?.identity;
     const safeIdentity = identity && /^[YNU]{3}$/.test(identity.candidate) && /^[YNU]{3}$/.test(identity.parent)
       && INITIAL_TYPES.has(identity.skillsFirst) && INITIAL_TYPES.has(identity.titleFirst) && /^[YNU]$/.test(identity.heading)
