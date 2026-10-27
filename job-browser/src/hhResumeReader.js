@@ -1,29 +1,9 @@
 const ID = /^[a-zA-Z0-9]{1,100}$/;
 const FIELDS = ['title', 'experience', 'skills', 'education', 'summary'];
 const REASONS = new Set(['invalid_id', 'invalid_shape', 'invalid_field', 'field_too_long', 'private_content',
-  'empty_content', 'snapshot_too_large', 'wrong_page', 'main_missing', 'title_count', 'duplicate_section', 'section_container']);
-const DOM_TAGS = new Set(['MAIN', 'SECTION', 'ARTICLE', 'DIV', 'SPAN', 'P', 'STRONG', 'EM', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'OTHER', 'NONE']);
-const DOM_QA = new Set(['EXPERIENCE', 'SKILLS', 'EDUCATION', 'ABOUT', 'RESUME', 'TITLE', 'RAISE', 'SECTION', 'CONTENT', 'OTHER', 'NONE']);
-const INITIAL_KEYS = ['id', 'resumeId', 'hash', 'experience', 'education', 'skills', 'skillSet', 'title',
-  'position', 'description', 'company', 'name', 'level', 'primary', 'additional', 'professionalRoles',
-  'text', 'value', 'label', 'skill', 'skillName', 'skill_name', 'displayName', 'display_name',
-  'positionName', 'position_name', 'specialization', 'professions', 'items', 'valueText'];
-const INITIAL_TYPES = new Set(['U', 'Z', 'A', 'O', 'S', 'D', 'B']);
-const SCHEMA_KEYS = ['data', 'content', 'children', 'props', 'field', 'fields', 'key', 'code', 'type', 'kind',
-  'attributes', 'display', 'skill_id', 'skillId', 'skillText', 'skill_text', 'skillValue', 'skill_value',
-  'tag', 'typename', '__typename', 'id', 'items', 'valueText'];
-const SCHEMA_CHILDREN = ['data', 'content', 'children', 'props', 'fields'];
-const SINGLE_KEYS = ['0', 'ru', 'en', 'RU', 'EN', 'russian', 'eng', 'rus', 'raw', 'html', 'plain', 'body',
-  'string', 'str', 'contentText', 'content_text', 'fieldValue', 'field_value', 'localized', 'translation',
-  'translated', 'translationText', 'translatedText', 'default', 'original', 'dataText', 'data_text',
-  'descriptionText', 'description_text', 'skill_value', 'skillName', 'skill_name', 'labelText',
-  'label_text', '@value', '@type', '$', '__html', 'node', '_value', 'textValue', 'text_value',
-  'keySkill', 'key_skill', 'nameText', 'name_text', 'description', 'titleText', 'title_text',
-  'positionText', 'position_text', 'literal', 'key_skill_name', 'skill_description', 'keySkillName',
-  'resumeTitle', 'resume_title', 'professional_role', 'profession', 'role', 'tagName', 'locale',
-  'value_text', 'skill_title', 'skillTitle', 'localizedText', 'localized_text', 'language',
-  'translit', 'comment', 'formatted', 'markup', 'data-qa'];
-const fail = (reason) => {
+  'empty_content', 'snapshot_too_large', 'wrong_page', 'main_missing', 'title_count', 'duplicate_section',
+  'section_container', 'ssr_template', 'ssr_size', 'ssr_parse', 'ssr_incomplete', 'ssr_ambiguous', 'ssr_shape']);
+const fail = reason => {
   process.stderr.write(`JOB_HH_RESUME_READ_FAILURE ${REASONS.has(reason) ? reason : 'invalid_shape'}\n`);
   throw Object.assign(new Error('JOB_HH_RESUME_UNAVAILABLE'), { code: 'JOB_HH_RESUME_UNAVAILABLE' });
 };
@@ -47,13 +27,15 @@ function resumeSnapshotSchema(value, resumeId) {
 
 async function readResumeContent(page, resumeId) {
   if (!ID.test(resumeId)) fail('invalid_id');
-  const raw = await page.evaluate((selectedId) => {
-    const visible = node => node && node.getClientRects().length > 0 && getComputedStyle(node).visibility === 'visible';
+  const raw = await page.evaluate(selectedId => {
     const pathname = new URL(location.href).pathname;
-    const originMatch = location.origin === 'https://hh.ru';
+    if (location.origin !== 'https://hh.ru' || pathname !== `/resume/${selectedId}`)
+      return { failure: 'wrong_page' };
+    const visible = node => node && node.getClientRects().length > 0 && getComputedStyle(node).visibility === 'visible';
     const root = document.querySelector('main');
-    if (!root || !visible(root)) return { pathname, originMatch, failure: 'main_missing' };
-    const title = [...root.querySelectorAll('h1')].filter(visible).map(n => n.innerText.trim());
+    if (!root || !visible(root)) return { failure: 'main_missing' };
+    const title = [...root.querySelectorAll('h1')].filter(visible).map(node => node.innerText.trim());
+    if (title.length !== 1) return { failure: 'title_count' };
     const labels = {
       experience: /^(?:Опыт работы|Опыт)$/iu,
       skills: /^(?:Ключевые навыки|Навыки)$/iu,
@@ -62,269 +44,78 @@ async function readResumeContent(page, resumeId) {
     };
     const blocks = {};
     for (const [key, pattern] of Object.entries(labels)) {
-      const headings = [...root.querySelectorAll('h2,h3')].filter(n => visible(n) && pattern.test(n.textContent.trim()));
-      if (headings.length > 1) return { pathname, originMatch, failure: 'duplicate_section' };
+      const headings = [...root.querySelectorAll('h2,h3')].filter(node => visible(node) && pattern.test(node.textContent.trim()));
+      if (headings.length > 1) return { failure: 'duplicate_section' };
       if (headings.length === 1) {
         const section = headings[0].closest('section,[data-qa^="resume-block-"]');
-        if (!section || !visible(section)) return { pathname, originMatch, failure: 'section_container' };
-        const value = section.innerText || '';
-        blocks[key] = value.slice(0, 12001);
+        if (!section || !visible(section)) return { failure: 'section_container' };
+        blocks[key] = (section.innerText || '').slice(0, 12001);
       }
     }
-    if (Object.values(blocks).some(value => value.trim())) return { pathname, originMatch, title, blocks };
-    // Fixed booleans only: the page text and data-qa values never leave the browser.
-    const qaNames = ['resume-block-experience', 'resume-block-skills', 'resume-block-education', 'resume-block-about'];
-    const qa = qaNames.map(name => Boolean(root.querySelector(`[data-qa="${name}"]`)));
-    const headingPrefixes = [/^Опыт работы/iu, /^Ключевые навыки/iu, /^Образование/iu, /^Обо мне/iu];
-    const headingsInAnyTag = [false, false, false, false];
-    const qaTypes = { 'resume-block-experience': 'EXPERIENCE', 'resume-block-skills': 'SKILLS',
-      'resume-block-education': 'EDUCATION', 'resume-block-about': 'ABOUT',
-      'resume-experience': 'EXPERIENCE', 'resume-skills': 'SKILLS', 'resume-education': 'EDUCATION',
-      'resume-about': 'ABOUT', resume: 'RESUME', 'resume-title': 'TITLE', 'resume-section': 'SECTION',
-      'resume-content': 'CONTENT',
-      'resume-update-button_actions': 'RAISE' };
-    const allowedTags = new Set(['MAIN', 'SECTION', 'ARTICLE', 'DIV', 'SPAN', 'P', 'STRONG', 'EM', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI']);
-    let educationLeaf = null;
-    let educationNode = null;
-    let educationAncestors = [];
-    const textAfter = [false, false, false, false, false];
-    const otherHeadingAncestors = [new Set(), new Set(), new Set()];
-    let visited = 0;
-    let visibleCount = 0;
-    let visibleLeafCount = 0;
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
-    for (let node; visited < 5000 && (node = walker.nextNode()); visited++) {
-      if (!visible(node)) continue;
-      visibleCount++;
-      if (node.children.length) continue;
-      visibleLeafCount++;
-      const value = node.textContent.slice(0, 100).trim();
-      if (educationNode && value && (educationNode.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING))
-        educationAncestors.forEach((ancestor, index) => { if (ancestor?.contains(node)) textAfter[index] = true; });
-      headingPrefixes.forEach((pattern, index) => { if (pattern.test(value)) headingsInAnyTag[index] = true; });
-      [0, 1, 3].forEach((index, section) => {
-        if (!headingPrefixes[index].test(value)) return;
-        for (let parent = node.parentElement, depth = 0; parent && depth < 12; parent = parent.parentElement, depth++)
-          otherHeadingAncestors[section].add(parent);
-      });
-      if (!educationLeaf && headingPrefixes[2].test(value)) {
-        educationNode = node;
-        educationAncestors = Array.from({ length: 5 }, (_, index) => {
-          let parent = node.parentElement;
-          for (let step = 0; step < index; step++) parent = parent?.parentElement;
-          return parent;
-        });
-        const tags = [], qaTypesFound = [];
-        for (let ancestor = node, depth = 0; depth < 6; depth++, ancestor = ancestor?.parentElement) {
-          tags.push(ancestor ? allowedTags.has(ancestor.tagName) ? ancestor.tagName : 'OTHER' : 'NONE');
-          const name = ancestor?.getAttribute('data-qa');
-          qaTypesFound.push(name == null ? 'NONE' : Object.hasOwn(qaTypes, name) ? qaTypes[name] : 'OTHER');
-        }
-        educationLeaf = { tags, qaTypesFound };
+    if (Object.values(blocks).some(value => value.trim())) return { title: title[0], blocks };
+    const templates = document.querySelectorAll('template#HH-Lux-InitialState');
+    if (templates.length !== 1) return { failure: 'ssr_template' };
+    const content = templates[0].content;
+    const node = content?.firstChild;
+    if (content?.childNodes.length !== 1 || node?.nodeType !== Node.TEXT_NODE || node.textContent.length > 1048576)
+      return { failure: 'ssr_size' };
+    const source = node.textContent;
+    if (new TextEncoder().encode(source).length > 1048576) return { failure: 'ssr_size' };
+    let parsed;
+    try { parsed = JSON.parse(source); } catch { return { failure: 'ssr_parse' }; }
+    const queue = [{ value: parsed, depth: 0 }];
+    let examined = 0;
+    let candidate = null;
+    let matches = 0;
+    for (let index = 0; index < queue.length; index++) {
+      if (examined >= 20000) return { failure: 'ssr_incomplete' };
+      const { value, depth } = queue[index];
+      if (!value || typeof value !== 'object') continue;
+      examined++;
+      if (!Array.isArray(value) && Object.hasOwn(value, 'applicantResume')) {
+        matches++;
+        if (matches > 1) return { failure: 'ssr_ambiguous' };
+        candidate = value.applicantResume;
       }
+      const children = Object.values(value).filter(child => child && typeof child === 'object');
+      if (depth >= 64 && children.length) return { failure: 'ssr_incomplete' };
+      if (queue.length + children.length > 20000) return { failure: 'ssr_incomplete' };
+      for (const child of children) queue.push({ value: child, depth: depth + 1 });
     }
-    if (educationNode) {
-      const ancestors = [];
-      for (let depth = 0; depth < 5; depth++) {
-        const parent = educationAncestors[depth];
-        if (!parent) { ancestors.push({ children: 0, after: false, sections: [false, false, false] }); continue; }
-        const visibleChildren = [...parent.children].slice(0, 21).filter(visible).length;
-        ancestors.push({ children: Math.min(visibleChildren, 20), after: textAfter[depth],
-          sections: otherHeadingAncestors.map(found => found.has(parent)) });
+    if (matches !== 1 || !candidate || typeof candidate !== 'object' || Array.isArray(candidate))
+      return { failure: 'ssr_ambiguous' };
+    const stringArray = value => {
+      if (!Array.isArray(value)) return null;
+      const result = [];
+      for (const item of value) {
+        if (!item || typeof item !== 'object' || Array.isArray(item)
+          || Object.keys(item).length !== 1 || typeof item.string !== 'string'
+          || !item.string.trim() || item.string.length > 12000) return null;
+        result.push(item.string.trim());
       }
-      educationLeaf.ancestors = ancestors;
+      return result;
+    };
+    const titles = stringArray(candidate.title);
+    const skills = stringArray(candidate.skills);
+    if (!titles || titles.length === 0 || !skills || !Array.isArray(candidate.experience))
+      return { failure: 'ssr_shape' };
+    const experience = [];
+    for (const item of candidate.experience) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)
+        || typeof item.position !== 'string' || typeof item.description !== 'string'
+        || !item.position.trim() || !item.description.trim()
+        || item.position.length > 12000 || item.description.length > 12000)
+        return { failure: 'ssr_shape' };
+      experience.push(`${item.position.trim()}\n${item.description.trim()}`);
     }
-    const safeKeys = ['id', 'resumeId', 'hash', 'experience', 'education', 'skills', 'skillSet', 'title',
-      'position', 'description', 'company', 'name', 'level', 'primary', 'additional', 'professionalRoles',
-      'text', 'value', 'label', 'skill', 'skillName', 'skill_name', 'displayName', 'display_name',
-      'positionName', 'position_name', 'specialization', 'professions', 'items', 'valueText'];
-    const schemaKeys = ['data', 'content', 'children', 'props', 'field', 'fields', 'key', 'code', 'type', 'kind',
-      'attributes', 'display', 'skill_id', 'skillId', 'skillText', 'skill_text', 'skillValue', 'skill_value',
-      'tag', 'typename', '__typename', 'id', 'items', 'valueText'];
-    const schemaChildren = ['data', 'content', 'children', 'props', 'fields'];
-    const singleKeys = ['0', 'ru', 'en', 'RU', 'EN', 'russian', 'eng', 'rus', 'raw', 'html', 'plain', 'body',
-      'string', 'str', 'contentText', 'content_text', 'fieldValue', 'field_value', 'localized', 'translation',
-      'translated', 'translationText', 'translatedText', 'default', 'original', 'dataText', 'data_text',
-      'descriptionText', 'description_text', 'skill_value', 'skillName', 'skill_name', 'labelText',
-      'label_text', '@value', '@type', '$', '__html', 'node', '_value', 'textValue', 'text_value',
-      'keySkill', 'key_skill', 'nameText', 'name_text', 'description', 'titleText', 'title_text',
-      'positionText', 'position_text', 'literal', 'key_skill_name', 'skill_description', 'keySkillName',
-      'resumeTitle', 'resume_title', 'professional_role', 'profession', 'role', 'tagName', 'locale',
-      'value_text', 'skill_title', 'skillTitle', 'localizedText', 'localized_text', 'language',
-      'translit', 'comment', 'formatted', 'markup', 'data-qa'];
-    const unknownSchema = () => ({ count: 0, more: false, kinds: [0, 0, 0, 0], keys: Array(schemaKeys.length).fill('U'),
-      children: Array.from({ length: schemaChildren.length }, () => Array(schemaKeys.length).fill('U')) });
-    const initialState = { template: false, parsed: false, bounded: true, applicantResume: false,
-      fields: [false, false, false, false, false, false], matches: 0,
-      types: ['U', 'U', 'U'], nested: Array.from({ length: 3 }, () => Array(safeKeys.length).fill('U')),
-      schema: [unknownSchema(), unknownSchema()], singles: ['U', 'U'],
-      identity: { candidate: 'UUU', parent: 'UUU', skillsFirst: 'U', titleFirst: 'U', heading: 'U' } };
-    const template = document.getElementById('HH-Lux-InitialState');
-    if (template?.tagName === 'TEMPLATE') {
-      initialState.template = true;
-      const node = template.content?.firstChild;
-      if (template.content?.childNodes.length !== 1 || node?.nodeType !== Node.TEXT_NODE
-        || node.textContent.length > 1048576) initialState.bounded = false;
-      else {
-        const source = node.textContent;
-        if (new TextEncoder().encode(source).length > 1048576) initialState.bounded = false;
-        else {
-          let parsed;
-          try { parsed = JSON.parse(source); initialState.parsed = true; } catch {}
-          if (initialState.parsed) {
-            const typeOf = value => value === undefined ? 'U' : value === null ? 'Z' : Array.isArray(value) ? 'A'
-              : typeof value === 'object' ? 'O' : typeof value === 'string' ? 'S'
-                : typeof value === 'number' ? 'D' : typeof value === 'boolean' ? 'B' : 'U';
-            const schemaOf = entry => {
-              if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return unknownSchema();
-              const names = Object.keys(entry);
-              const kinds = [0, 0, 0, 0];
-              for (const name of names.slice(0, 32)) {
-                const kind = typeOf(entry[name]);
-                const index = ['A', 'O', 'S', 'D'].indexOf(kind);
-                if (index >= 0) kinds[index]++;
-              }
-              return { count: Math.min(names.length, 32), more: names.length > 32, kinds,
-                keys: schemaKeys.map(key => typeOf(entry[key])),
-                children: schemaChildren.map(key => {
-                  const child = entry[key];
-                  const object = Array.isArray(child) ? child[0] : child;
-                  return schemaKeys.map(name => object && typeof object === 'object' && !Array.isArray(object)
-                    ? typeOf(object[name]) : 'U');
-                }) };
-            };
-            const queue = [{ value: parsed, depth: 0 }];
-            let candidate = null;
-            let examined = 0;
-            for (let index = 0; index < queue.length && examined < 20000; index++) {
-              const { value, depth } = queue[index];
-              if (!value || typeof value !== 'object') continue;
-              examined++;
-              const hasResumeKey = !Array.isArray(value) && Object.hasOwn(value, 'applicantResume');
-              if (hasResumeKey) initialState.matches = Math.min(2, initialState.matches + 1);
-              const resume = hasResumeKey ? value.applicantResume : null;
-              if (!initialState.applicantResume && resume && typeof resume === 'object' && !Array.isArray(resume)) {
-                initialState.applicantResume = true;
-                candidate = { resume, parent: value };
-                initialState.fields = ['experience', 'education', 'skills', 'skillSet', 'title', 'id']
-                  .map(name => Object.hasOwn(resume, name));
-                initialState.types = ['experience', 'skills', 'title'].map(name => typeOf(resume[name]));
-                initialState.nested = ['experience', 'skills', 'title'].map(name => {
-                  const direct = resume[name];
-                  const entry = Array.isArray(direct) ? direct[0] : direct;
-                  return safeKeys.map(key => entry && typeof entry === 'object' && !Array.isArray(entry)
-                    ? typeOf(entry[key]) : 'U');
-                });
-                initialState.schema = ['skills', 'title'].map(name => {
-                  const direct = resume[name];
-                  return schemaOf(Array.isArray(direct) ? direct[0] : direct);
-                });
-                initialState.singles = ['skills', 'title'].map(name => {
-                  const direct = resume[name];
-                  const entry = Array.isArray(direct) ? direct[0] : direct;
-                  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return 'U';
-                  const names = Object.keys(entry);
-                  if (names.length !== 1 || typeof entry[names[0]] !== 'string') return 'U';
-                  return singleKeys.map(key => key === names[0] ? '1' : '0').join('');
-                });
-              }
-              if (depth >= 64) {
-                if (Object.values(value).some(child => child && typeof child === 'object')) initialState.bounded = false;
-                continue;
-              }
-              for (const child of Object.values(value)) {
-                if (!child || typeof child !== 'object') continue;
-                if (queue.length >= 20001) { initialState.bounded = false; break; }
-                queue.push({ value: child, depth: depth + 1 });
-              }
-            }
-            if (queue.length > 20000) initialState.bounded = false;
-            if (initialState.matches === 1 && candidate) {
-              const fixedMatches = object => ['id', 'resumeId', 'hash'].map(key =>
-                Object.hasOwn(object, key) && typeof object[key] === 'string' && object[key] === selectedId ? 'Y' : 'N').join('');
-              const titleFields = ['text', 'value', 'label', 'name', 'title', 'position', 'positionName', 'position_name',
-                'displayName', 'display_name', 'skill', 'skillName', 'skill_name'];
-              const entries = [candidate.resume.title?.[0], candidate.resume.skills?.[0]];
-              const headingMatches = title.length === 1 && title[0]
-                ? entries.reduce((count, entry) => count + (entry && typeof entry === 'object' && !Array.isArray(entry)
-                  ? titleFields.filter(key => typeof entry[key] === 'string' && entry[key] === title[0]).length : 0), 0) : 0;
-              initialState.identity = {
-                candidate: fixedMatches(candidate.resume),
-                parent: fixedMatches(candidate.parent),
-                skillsFirst: typeOf(Array.isArray(candidate.resume.skills) ? candidate.resume.skills[0] : undefined),
-                titleFirst: typeOf(Array.isArray(candidate.resume.title) ? candidate.resume.title[0] : undefined),
-                heading: title.length === 1 && title[0] ? headingMatches === 1 ? 'Y' : headingMatches === 0 ? 'N' : 'U' : 'U',
-              };
-            }
-          }
-        }
-      }
-    }
-    return { pathname, originMatch, title, blocks, structure: { qa, headingsInAnyTag,
-      dom: { visited, visibleCount, visibleLeafCount, educationLeaf }, initialState } };
+    return { title: titles.join(' '), blocks: { experience: experience.join('\n\n'), skills: skills.join(', '),
+      education: '', summary: '' } };
   }, resumeId);
-  if (raw?.pathname !== `/resume/${resumeId}` || raw?.originMatch !== true) fail('wrong_page');
   if (raw?.failure) fail(raw.failure);
-  if (!Array.isArray(raw?.title) || raw.title.length !== 1) fail('title_count');
-  if (!raw.blocks) fail('invalid_shape');
-  const snapshot = { resumeId, title: raw.title[0], experience: raw.blocks.experience || '',
+  if (!raw || typeof raw.title !== 'string' || !raw.blocks || typeof raw.blocks !== 'object') fail('invalid_shape');
+  const snapshot = { resumeId, title: raw.title, experience: raw.blocks.experience || '',
     skills: raw.blocks.skills || '', education: raw.blocks.education || '', summary: raw.blocks.summary || '',
     grammaticalGender: 'unknown' };
-  if (![snapshot.experience, snapshot.skills, snapshot.education, snapshot.summary].some(value => value.trim())) {
-    const flags = [...(raw.structure?.qa || []), ...(raw.structure?.headingsInAnyTag || [])];
-    const safe = flags.length === 8 && flags.every(flag => typeof flag === 'boolean') ? flags : Array(8).fill(false);
-    process.stderr.write(`JOB_HH_RESUME_STRUCTURE ${safe.map(flag => flag ? '1' : '0').join('')}\n`);
-    const dom = raw.structure?.dom;
-    const count = value => Number.isInteger(value) && value >= 0 && value <= 5000 ? value : 0;
-    const tags = dom?.educationLeaf?.tags;
-    const qaTypesFound = dom?.educationLeaf?.qaTypesFound;
-    const safeTags = Array.isArray(tags) && tags.length === 6 && tags.every(tag => DOM_TAGS.has(tag)) ? tags : Array(6).fill('NONE');
-    const safeQa = Array.isArray(qaTypesFound) && qaTypesFound.length === 6 && qaTypesFound.every(type => DOM_QA.has(type))
-      ? qaTypesFound : Array(6).fill('NONE');
-    process.stderr.write(`JOB_HH_RESUME_DOM visited=${count(dom?.visited)} visible=${count(dom?.visibleCount)} leaf=${count(dom?.visibleLeafCount)} tags=${safeTags.join(',')} qa=${safeQa.join(',')}\n`);
-    const ancestorData = dom?.educationLeaf?.ancestors;
-    const validAncestor = item => item && Number.isInteger(item.children) && item.children >= 0 && item.children <= 20
-      && typeof item.after === 'boolean'
-      && Array.isArray(item.sections) && item.sections.length === 3 && item.sections.every(value => typeof value === 'boolean');
-    const safeAncestors = Array.isArray(ancestorData) && ancestorData.length === 5 && ancestorData.every(validAncestor)
-      ? ancestorData : Array.from({ length: 5 }, () => ({ children: 0, after: false, sections: [false, false, false] }));
-    process.stderr.write(`JOB_HH_RESUME_EDUCATION ${safeAncestors.map(item => `${item.children}:${item.after ? 1 : 0}:${item.sections.map(value => value ? 1 : 0).join('')}`).join('|')}\n`);
-    const state = raw.structure?.initialState;
-    const safeState = state && ['template', 'parsed', 'bounded', 'applicantResume'].every(key => typeof state[key] === 'boolean')
-      && Array.isArray(state.fields) && state.fields.length === 6 && state.fields.every(value => typeof value === 'boolean')
-      ? state : { template: false, parsed: false, bounded: false, applicantResume: false, fields: Array(6).fill(false) };
-    process.stderr.write(`JOB_HH_RESUME_INITIAL_STATE ${[safeState.template, safeState.parsed, safeState.bounded, safeState.applicantResume,
-      ...safeState.fields].map(value => value ? 1 : 0).join('')}\n`);
-    const validTypes = values => Array.isArray(values) && values.length === 3 && values.every(code => INITIAL_TYPES.has(code));
-    const validNested = values => Array.isArray(values) && values.length === 3
-      && values.every(row => Array.isArray(row) && row.length === INITIAL_KEYS.length && row.every(code => INITIAL_TYPES.has(code)));
-    const shape = Number.isInteger(safeState.matches) && safeState.matches >= 0 && safeState.matches <= 2
-      && validTypes(safeState.types) && validNested(safeState.nested) ? safeState : null;
-    const format = (type, row) => `${type}/${INITIAL_KEYS.map((key, index) => `${key}:${row[index]}`).join(',')}`;
-    const unknown = Array(INITIAL_KEYS.length).fill('U');
-    process.stderr.write(`JOB_HH_RESUME_INITIAL_SHAPE count=${shape?.matches || 0} experience=${format(shape?.types[0] || 'U', shape?.nested[0] || unknown)} skills=${format(shape?.types[1] || 'U', shape?.nested[1] || unknown)} title=${format(shape?.types[2] || 'U', shape?.nested[2] || unknown)}\n`);
-    const validSchema = item => item && Number.isInteger(item.count) && item.count >= 0 && item.count <= 32
-      && typeof item.more === 'boolean' && Array.isArray(item.kinds) && item.kinds.length === 4
-      && item.kinds.every(value => Number.isInteger(value) && value >= 0 && value <= 32)
-      && Array.isArray(item.keys) && item.keys.length === SCHEMA_KEYS.length && item.keys.every(code => INITIAL_TYPES.has(code))
-      && Array.isArray(item.children) && item.children.length === SCHEMA_CHILDREN.length
-      && item.children.every(row => Array.isArray(row) && row.length === SCHEMA_KEYS.length && row.every(code => INITIAL_TYPES.has(code)));
-    const formatSchema = item => {
-      const safe = validSchema(item) ? item : { count: 0, more: false, kinds: [0, 0, 0, 0],
-        keys: Array(SCHEMA_KEYS.length).fill('U'), children: SCHEMA_CHILDREN.map(() => Array(SCHEMA_KEYS.length).fill('U')) };
-      const fields = row => SCHEMA_KEYS.map((key, index) => `${key}:${row[index]}`).join(',');
-      return `${safe.count}:${safe.more ? 1 : 0}:${safe.kinds.join(',')}/${fields(safe.keys)}/${SCHEMA_CHILDREN.map((key, index) => `${key}{${fields(safe.children[index])}}`).join('/')}`;
-    };
-    process.stderr.write(`JOB_HH_RESUME_INITIAL_SCHEMA skills=${formatSchema(shape?.schema?.[0])} title=${formatSchema(shape?.schema?.[1])}\n`);
-    const singleBits = value => typeof value === 'string' && new RegExp(`^[01]{${SINGLE_KEYS.length}}$`).test(value)
-      ? value : 'U';
-    process.stderr.write(`JOB_HH_RESUME_INITIAL_SINGLE skills=${singleBits(shape?.singles?.[0])} title=${singleBits(shape?.singles?.[1])}\n`);
-    const identity = shape?.identity;
-    const safeIdentity = identity && /^[YNU]{3}$/.test(identity.candidate) && /^[YNU]{3}$/.test(identity.parent)
-      && INITIAL_TYPES.has(identity.skillsFirst) && INITIAL_TYPES.has(identity.titleFirst) && /^[YNU]$/.test(identity.heading)
-      ? identity : { candidate: 'UUU', parent: 'UUU', skillsFirst: 'U', titleFirst: 'U', heading: 'U' };
-    process.stderr.write(`JOB_HH_RESUME_INITIAL_IDENTITY seen=${shape?.matches || 0} complete=${safeState.template && safeState.parsed && safeState.bounded ? 1 : 0} candidate=${safeIdentity.candidate} parent=${safeIdentity.parent} skillsFirst=${safeIdentity.skillsFirst} titleFirst=${safeIdentity.titleFirst} heading=${safeIdentity.heading}\n`);
-  }
   return resumeSnapshotSchema(snapshot, resumeId);
 }
 
