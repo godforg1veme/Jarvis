@@ -69,6 +69,42 @@ Restore playbooks remain disabled.
 
 Happ receives a normal Base64 subscription. It can refresh endpoint metadata from the same URL but its automatic selection is not claimed. Explicit Sing-box JSON alone has `url-test` automatic selection. Hysteria2 uses a bounded public port list and native UDP hopping; a fixed UDP 443 success proves only the basic path. VLESS/REALITY over TCP 8443 is the independent fallback when an access network blocks UDP broadly. Russian split routing is client-side routing only; reconnect Happ after changing it and never use it as evidence of a transport repair.
 
+## UDP socket buffers and call quality
+
+For the owner-approved October 29 experiment, use
+`sudo python3 deploy/vpn/tune-udp-buffers.py status|apply|rollback` from the
+verified source checkout. Apply raises only `net.core.rmem_max` and
+`net.core.wmem_max` to at least 7340032 bytes. It preserves the original state
+in a root-only journal and a managed persistent sysctl drop-in. It does not
+change socket defaults, credentials, hopping pools, routing or subscriptions.
+Do not run a global `sysctl --system` for this operation.
+
+Before and after, inspect UDP error counter deltas, load, the Hysteria socket
+memory and fresh authenticated peer probes. Raising a kernel maximum does not
+resize an existing socket. If needed within the authorized maintenance, restart
+Hysteria on one node at a time and verify its actual socket buffer growth; this
+briefly interrupts that node's Hysteria sessions. Xray need not restart.
+If an operation is interrupted, inspect the saved phase and resume the same
+operation; do not remove its journal or overwrite a foreign sysctl change.
+
+High throughput and healthy peer probes do not establish good Discord quality.
+Compare the same call/stream on the same client and network before/after,
+including latency under load and packet loss. Cumulative host UDP drops include
+all applications and do not identify the affected client's session.
+
+Russian-site bypass remains a separate Happ profile. The `.ru` rule already
+covers `gosuslugi.ru` and the official `vkusnoitochka.ru` website. Do not add
+unverified third-party CDN ranges to direct routing. Reopen the existing
+`/happ-routing` page to import the current profile, check that it is active and
+reconnect. Refreshing the VPN subscription alone does not replace this profile.
+If an app fails only while VPN is active, compare the exact action with VPN off
+and on before assuming a missing domain; its additional API domains and any
+local VPN-presence detection need separate device-side evidence.
+
+References: [quic-go UDP buffers](https://quic-go.net/docs/quic/optimizations/),
+[Happ routing](https://www.happ.su/main/dev-docs/routing),
+[official restaurant app page](https://vkusnoitochka.ru/app).
+
 ## Normal subscription lifecycle
 
 1. Create and bind a profile through the existing owner-confirmed flow.

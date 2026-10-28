@@ -252,6 +252,13 @@ originating Telegram/Desktop client.
 
 ## Happ VPN
 
+Owner-approved UDP socket tuning is documented in the
+[VPN runbook](../docs/VPN_RESILIENCE_RUNBOOK.md#udp-socket-buffers-and-call-quality).
+Use `sudo python3 deploy/vpn/tune-udp-buffers.py status`, then `apply` only for
+an authorized change. The managed journal enables a checked `rollback`.
+Verify actual Hysteria socket sizes after the change; source synchronization
+alone does not resize a running socket.
+
 The 2026-10-08 release aligns scheduled proof freshness with the 15-minute
 peer timers: cached snapshots expire after 20 minutes, while owner-confirmed
 one-shot installation/recheck proofs still expire after five minutes. Unknown
