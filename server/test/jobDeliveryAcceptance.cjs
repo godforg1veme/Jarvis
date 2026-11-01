@@ -4,11 +4,16 @@ const { createJobPostgresFixture } = require('./helpers/jobPostgresFixture');
 const { JobSearchRepository } = require('../src/jobs/jobSearchRepository');
 const { JobDeliveryRepository } = require('../src/jobs/jobDeliveryRepository');
 const { JobDeliveryWorker } = require('../src/jobs/jobDeliveryWorker');
+const { AccessService } = require('../src/access/accessService');
 
 test('real PG delivery: rate limits, lost acknowledgements, pause, hidden and revoked owner', async () => {
   const f = await createJobPostgresFixture(); let calls = 0, mode = 'rate';
-  const search = new JobSearchRepository(f.pool), deliveries = new JobDeliveryRepository(f.pool);
-  const worker = new JobDeliveryWorker({ pool: f.pool, searchRepository: search, deliveryRepository: deliveries,
+  await f.pool.query("INSERT INTO user_identities(user_id,provider,external_id) VALUES($1,'telegram','101')",[f.owner]);
+  const accessService = new AccessService({pool:f.pool,ownerTelegramId:'999',legacyAllowedIds:['101']});
+  await accessService.initialize();
+  await f.pool.query("INSERT INTO access_user_overrides(user_id,permission,effect) VALUES($1,'jobs','allow')",[f.owner]);
+  const search = new JobSearchRepository(f.pool,{accessService}), deliveries = new JobDeliveryRepository(f.pool,{accessService});
+  const worker = new JobDeliveryWorker({ pool: f.pool, searchRepository: search, deliveryRepository: deliveries, accessService,
     send: async () => { calls++;
       if (mode === 'rate') throw { error_code: 429, parameters: { retry_after: 2 } };
       if (mode === 'lost') throw new Error('Synthetic dropped acknowledgement');
@@ -47,11 +52,12 @@ test('real PG delivery: rate limits, lost acknowledgements, pause, hidden and re
     await search.mark({ scope: f.scope, vacancyId: paused.vacancy.id, action: 'hide' });
     await worker.tick(); assert.equal(calls, 6, 'hidden card is not sent');
     const revoked = await queue('104');
-    await f.pool.query("UPDATE users SET role='member' WHERE id=$1", [f.owner]);
+    await f.pool.query('UPDATE access_memberships SET blocked=true WHERE user_id=$1', [f.owner]);
     await worker.tick(); assert.equal(calls, 6, 'revoked owner receives no private job data');
-    assert.equal((await state(revoked.delivery.id)).status, 'queued');
-    await f.pool.query("UPDATE users SET role='owner' WHERE id=$1", [f.owner]);
-    await worker.tick(); assert.equal((await state(revoked.delivery.id)).status, 'sent');
+    assert.equal((await state(revoked.delivery.id)).status, 'failed');
+    await f.pool.query('UPDATE access_memberships SET blocked=false WHERE user_id=$1', [f.owner]);
+    const restored=await queue('1041');
+    await worker.tick(); assert.equal((await state(restored.delivery.id)).status, 'sent');
     const orphan = await queue('105'); await deliveries.claim();
     await f.pool.query("UPDATE job_deliveries SET lease_until=now()-interval '1 second' WHERE id=$1", [orphan.delivery.id]);
     await worker.tick(); assert.equal((await state(orphan.delivery.id)).status, 'unknown');

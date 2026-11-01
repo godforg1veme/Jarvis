@@ -27,7 +27,11 @@ class JobDeliveryRepository {
           AND c.channel='telegram' AND c.external_chat_id=s.chat_id
         JOIN user_identities i ON i.user_id=d.user_id AND i.provider='telegram' AND i.external_id=s.chat_id
         WHERE d.status='queued' AND d.available_at<=now() AND (d.kind IN ('budget','attention') OR s.settings->>'paused'='false')
-        AND (d.kind<>'card' OR EXISTS(SELECT 1 FROM job_matches m WHERE m.user_id=d.user_id AND m.vacancy_id=d.vacancy_id AND NOT m.hidden))
+        AND (d.kind<>'card' OR NOT EXISTS(SELECT 1 FROM job_automations a
+          WHERE a.user_id=d.user_id AND a.enabled))
+        AND (d.kind<>'card' OR EXISTS(SELECT 1 FROM job_matches m WHERE m.user_id=d.user_id AND m.vacancy_id=d.vacancy_id AND NOT m.hidden
+          AND NOT EXISTS(SELECT 1 FROM job_automation_items ai WHERE ai.user_id=m.user_id AND ai.vacancy_id=m.vacancy_id
+            AND ai.status IN ('evaluating','generating','submitting','skipped','sent','manual_required','unknown'))))
         ORDER BY CASE WHEN d.kind='attention' THEN 0 ELSE 1 END,d.priority DESC,d.created_at,d.id
         FOR UPDATE OF d SKIP LOCKED LIMIT 50`)).rows;
       for (const candidate of candidates) {

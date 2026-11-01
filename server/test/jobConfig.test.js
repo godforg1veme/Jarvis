@@ -7,7 +7,7 @@ test('job search is disabled by default without a separate model setting', () =>
   assert.equal(config.jobSearchEnabled, false);
   assert.equal(config.jobCollectorIntervalMs, 1800000);
   assert.equal(config.jobHistoryDays, 14);
-  assert.equal(config.jobBudgetUsd, 3);
+  assert.equal(config.jobBudgetUsd, 2);
   assert.equal(Object.hasOwn(config,'jobSearchModel'),false);
 });
 

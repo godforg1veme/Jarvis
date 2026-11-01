@@ -39,7 +39,7 @@ class JobDraftService {
     });
   }
   async generate({ scope, vacancyId, requestId, parentDraftId = null, replaceCurrentDraftId = null, instruction = '', language = 'auto', mode, sourceText,
-    expectedProfileRevision, expectedVacancyRevision }) {
+    expectedProfileRevision, expectedVacancyRevision, requireCompleteResume = false }) {
     await assertJobScope(this.pool, scope, this.accessService);
     uuid.parse(vacancyId);
     if (typeof requestId !== 'string' || !requestId || requestId.length > 150) throw jobError('JOB_INVALID_REQUEST');
@@ -57,7 +57,8 @@ class JobDraftService {
     if (mode === 'custom') mode = 'custom_ai';
     if (!['legacy_ai', 'improved', 'custom_ai'].includes(mode)) throw jobError('JOB_INVALID_DRAFT');
     sourceText = sourceText ?? previous?.source_text ?? '';
-    const resumeContext = this.resumeContextService ? await this.resumeContextService.getSelected({ scope }) : null;
+    const resumeContext = this.resumeContextService ? await this.resumeContextService.getSelected({ scope,
+      ...(requireCompleteResume ? { requireComplete: true } : {}) }) : null;
     if (previous && (!previous.resume_id || !previous.connection_revision
       || previous.resume_id !== resumeContext?.resumeId || previous.connection_revision !== resumeContext?.connectionRevision))
       throw jobError('JOB_DRAFT_RESUME_STALE');
@@ -94,7 +95,7 @@ class JobDraftService {
       await this.usageRepository.record({ userId: scope.userId, requestId, outcome: 'pending', occurredAt: this.now() });
       const result = await this.modelAdapter.generate({ messages });
       await this.usageRepository.record({ userId: scope.userId, requestId, providerRequestId: result.requestId,
-        costUsd: result.usage?.cost ?? null, outcome: 'success', occurredAt: this.now() });
+        costUsd: result.usage?.cost ?? null, costBasis: result.usage?.costBasis || 'provider', outcome: 'success', occurredAt: this.now() });
       const letter = parseJobLetter(result.text, profile.profile, { finishReason: result.finishReason });
       if (resumeContext) await this.resumeContextService.assertCurrent({ scope, resumeId: resumeContext.resumeId,
         connectionRevision: resumeContext.connectionRevision });
@@ -104,6 +105,9 @@ class JobDraftService {
       await this.pool.query("UPDATE job_tasks SET status='complete',result_id=$1 WHERE id=$2", [draft.id, task.id]);
       return draft;
     } catch (error) {
+      if (error.modelUsage) await this.usageRepository.record({ userId: scope.userId, requestId,
+        providerRequestId: error.modelRequestId, costUsd: error.modelUsage.cost ?? null,
+        costBasis: error.modelUsage.costBasis || 'provider', outcome: 'failed', occurredAt: this.now() });
       const validationFailure = error.code === 'JOB_MODEL_INVALID_FACTS' ? 'facts'
         : error.code === 'JOB_MODEL_INVALID_OUTPUT'
           && ['truncated', 'filtered', 'size', 'json', 'schema'].includes(error.validationReason) ? error.validationReason : null;

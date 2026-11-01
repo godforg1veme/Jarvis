@@ -16,8 +16,8 @@ function applicationView(operation) {
 }
 
 class JobApplicationService {
-  constructor({ pool, repository, searchRepository, adapter = null, historyRepository = null, accessService = null }) {
-    Object.assign(this, { pool, repository, searchRepository, adapter, historyRepository, accessService });
+  constructor({ pool, repository, searchRepository, adapter = null, historyRepository = null, accessService = null, automationRepository = null }) {
+    Object.assign(this, { pool, repository, searchRepository, adapter, historyRepository, accessService, automationRepository });
   }
   async requireAdapter({ scope }) {
     await assertJobScope(this.pool, scope, this.accessService);
@@ -76,6 +76,41 @@ class JobApplicationService {
     const valid = this.validResult(result);
     const saved = await this.repository.finish({ userId: scope.userId, operationId: operation.operation_id, ...valid });
     return applicationView(saved || operation);
+  }
+  async submitAutomatic({ scope, draftId, automationRevision }) {
+    await this.requireAdapter({ scope });
+    if (!this.automationRepository) throw jobError('JOB_AUTOMATION_UNAVAILABLE');
+    await this.automationRepository.assertCurrent({ scope, revision: automationRevision });
+    const blocked = await this.inspect({ scope, draftId });
+    if (blocked) return { status: blocked.outcome, operationId: null };
+    const { operation, execute } = await this.repository.claimAutomatic({ scope, draftId, automationRevision });
+    if (!execute) {
+      if (operation.status === 'unknown' || operation.status === 'sending')
+        return { status: 'unknown', operationId: operation.operation_id };
+      return { status: operation.status, operationId: operation.operation_id };
+    }
+    try {
+      await this.automationRepository.assertCurrent({ scope, revision: automationRevision,
+        resumeId: operation.resume_id });
+      const latest = (await this.pool.query(`SELECT m.hidden,m.filter_revision,s.revision AS search_revision
+        FROM job_matches m JOIN job_searches s ON s.user_id=m.user_id
+        WHERE m.user_id=$1 AND m.vacancy_id=$2`, [scope.userId, operation.vacancy_id])).rows[0];
+      if (!latest || latest.hidden || latest.filter_revision !== latest.search_revision)
+        throw jobError('JOB_REVISION_CONFLICT');
+    } catch {
+      await this.repository.finish({ userId: scope.userId, operationId: operation.operation_id,
+        status: 'failed', failureCode: 'JOB_AUTOMATION_PRECHECK_FAILED' });
+      return { status: 'failed', operationId: operation.operation_id };
+    }
+    let result;
+    try {
+      result = await this.adapter.submit({ userId: scope.userId, operationId: operation.operation_id,
+        externalId: (await this.repository.get({ scope, operationId: operation.operation_id })).vacancy_external_id,
+        resumeId: operation.resume_id, letter: operation.approved_text });
+    } catch { result = { outcome: 'unknown', failureCode: 'JOB_SUBMISSION_OUTCOME_UNKNOWN' }; }
+    const saved = await this.repository.finish({ userId: scope.userId, operationId: operation.operation_id,
+      ...this.validResult(result) });
+    return { status: (saved || operation).status, operationId: operation.operation_id };
   }
   validResult(result) {
     if (result?.outcome === 'sent' && result.verified === true && /^[\w-]{1,128}$/.test(String(result.externalId || ''))) {

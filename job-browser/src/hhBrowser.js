@@ -301,13 +301,13 @@ class HhBrowser {
     return this.run(() => this.read(`https://hh.ru/vacancy/${externalId}`, 'vacancy', (page) => readVacancyPage(page, externalId)));
   }
   listResumes() { return this.run(() => this.read('https://hh.ru/applicant/resumes', 'authenticated', readResumes)); }
-  resumeContent({ resumeId }) {
+  resumeContent({ resumeId, requireComplete = false }) {
     if (!/^[a-zA-Z0-9]{1,100}$/.test(resumeId || '')) return Promise.reject(failure('JOB_HH_RESUME_UNAVAILABLE'));
     return this.run(async () => {
       if (resumeId !== this.primaryResumeId) throw failure('JOB_HH_RESUME_UNAVAILABLE');
       const resumes = await this.read('https://hh.ru/applicant/resumes', 'authenticated', readResumes);
       if (!resumes.some(item => item.id === resumeId) || resumeId !== this.primaryResumeId) throw failure('JOB_HH_RESUME_UNAVAILABLE');
-      return this.read(`https://hh.ru/resume/${resumeId}`, 'resume_content', page => readResumeContent(page, resumeId));
+      return this.read(`https://hh.ru/resume/${resumeId}`, 'resume_content', page => readResumeContent(page, resumeId, { requireComplete }));
     });
   }
   history({ section, page }) {

@@ -4,6 +4,13 @@
 
 ## Русский
 
+1 ноября локально добавлен «Автопоиск с LLM» в разделе поиска работы. Переключатель
+разрешает личные автоотклики от выбранного резюме, а после смены резюме предлагает
+обновить разрешение. При выключении возвращается ручная доставка. Тесты и ошибки
+приходят в личный Telegram; $2 за месяц вызывают одно уведомление без остановки.
+[Проверки и ограничения](../docs/updates/2026-11-01-hh-autonomous-search-development.md).
+Изменение ещё не выпущено.
+
 27 октября завершён [этап 5](../docs/updates/2026-10-27-mini-app-stage-five-release.md):
 подтверждённые загрузка/удаление документов, подключение/отключение устройств и
 отзыв кодов, напоминания, договорённости и проекты. Неизвестный результат HH
@@ -168,6 +175,13 @@ Mini App build и Edge fixtures. Команды и границы проверо
 [результат](../docs/updates/2026-10-18-telegram-mini-app-release.md).
 
 ## English
+
+November 1: the jobs section locally adds Autonomous job search. The control
+authorizes personal applications from the selected resume and offers renewed
+consent after a resume change. Disabling restores manual delivery. Tests and
+actionable failures go to private Telegram; one $2 monthly notice does not stop
+processing. [Checks and limits](../docs/updates/2026-11-01-hh-autonomous-search-development.md).
+This change has not been deployed.
 
 October 27: [stage 5](../docs/updates/2026-10-27-mini-app-stage-five-release.md)
 is complete: confirmed document upload/deletion, device pairing/revocation and

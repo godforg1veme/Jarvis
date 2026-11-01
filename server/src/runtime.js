@@ -639,6 +639,7 @@ async function createRuntime(config, overrides = {}) {
           knowledgeService, deviceService, missionControlService, assistant, conversationRepository,
           getJobConnectionSessionService: () => jobRuntime?.connectionSessionService,
           getJobResumeService: () => jobRuntime?.resumeService,
+          getJobAutomationService: () => jobRuntime?.automationService,
           getJobLoginLinkDelivery: () => jobRuntime?.loginLinkDelivery,
           getTelegramBotUsername: () => bot?.botInfo?.username,
           operationsEnabled: config.operationsEnabled,

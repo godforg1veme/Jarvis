@@ -6,12 +6,11 @@ const { JobSearchRepository } = require('../src/jobs/jobSearchRepository');
 const { JobProfileRepository } = require('../src/jobs/jobProfileRepository');
 const { JobDraftRepository } = require('../src/jobs/jobDraftRepository');
 const { JobUsageRepository } = require('../src/jobs/jobUsageRepository');
-const { JobModelAdapter } = require('../src/jobs/jobModelAdapter');
+const { JobModelAdapter, JOB_MODEL } = require('../src/jobs/jobModelAdapter');
 const { JobDraftService } = require('../src/jobs/jobDraftService');
 const { recoverJobGenerations } = require('../src/jobs/jobRecovery');
 const { configuredOwnerJobAccess } = require('../src/jobs/configuredOwnerJobAccess');
 const { JobResumeContextService } = require('../src/jobs/jobResumeContextService');
-const { FREE_MODELS } = require('../src/providers/freeFirstProvider');
 
 test('real PostgreSQL: automatic model routing, duplicate request, revisions and failure retention', async () => {
   const f = await createJobPostgresFixture(); let calls = 0, fail = false, responseMode = 'valid';
@@ -35,12 +34,8 @@ test('real PostgreSQL: automatic model routing, duplicate request, revisions and
             education: '', summary: '', grammaticalGender: 'unknown' };
         } };
       } } });
-    const modelId = FREE_MODELS[0];
+    const modelId = JOB_MODEL;
     const adapter = new JobModelAdapter({ config: { openrouterApiKey: crypto.randomUUID() }, fetchImpl: async (url, init) => {
-      if (url.endsWith('/models/user')) return Response.json({ data: [{ id: modelId, context_length: 100000,
-        pricing: { prompt: '0', completion: '0', request: '0' }, architecture: { input_modalities: ['text'], output_modalities: ['text'] },
-        supported_parameters: ['structured_outputs'] }] });
-      if (url.endsWith('/key')) return Response.json({ data: { free_model_daily_requests: { remaining: 100 } } });
       calls++; const body = JSON.parse(init.body);
       assert.equal(body.model, modelId); assert.equal(body.usage.include, true); assert.equal(body.max_tokens, 6000);
       assert.equal(body.response_format.json_schema.strict, true);

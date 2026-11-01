@@ -33,6 +33,7 @@ const PUBLIC_CODES = new Set([
   'JOB_LOGIN_UNAVAILABLE',
   'JOB_BROWSER_BUSY',
   'JOB_RESUME_UNAVAILABLE','JOB_RESUME_RAISE_UNAVAILABLE','JOB_HH_NOT_CONNECTED','JOB_LOGIN_RESUME_INVALID',
+  'JOB_AUTOMATION_UNAVAILABLE','JOB_REVISION_CONFLICT','JOB_SCOPE_DENIED',
 ]);
 function publicError(error, reply) {
   const code = PUBLIC_CODES.has(error?.code) ? error.code : 'unavailable';
@@ -47,15 +48,16 @@ function publicError(error, reply) {
             'invalid_csrf',
             'invalid_origin',
             'JOB_ACCESS_REVOKED',
+            'JOB_SCOPE_DENIED',
           ].includes(code)
         ? 403
         : code === 'not_found' || code === 'operation_unknown'
           ? 404
-          : code.includes('conflict') || code === 'already_exists' || code === 'JOB_LOGIN_ALREADY_ACTIVE'
+          : code.includes('conflict') || code === 'JOB_REVISION_CONFLICT' || code === 'already_exists' || code === 'JOB_LOGIN_ALREADY_ACTIVE'
             ? 409
             : code === 'rate_limited' || code === 'JOB_BROWSER_BUSY'
               ? 429
-              : code === 'unavailable' || code === 'JOB_LOGIN_UNAVAILABLE'
+              : code === 'unavailable' || code === 'JOB_LOGIN_UNAVAILABLE' || code === 'JOB_AUTOMATION_UNAVAILABLE'
                 ? 503
                 : 400;
   return reply.code(status).send({ ok: false, code });

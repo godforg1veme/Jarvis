@@ -7,12 +7,13 @@ class JobApplicationRepository {
   async snapshot(client, { scope, draftId }) {
     const row = (await client.query(`SELECT d.*,v.external_id,v.snapshot,v.revision AS latest_vacancy_revision,
       p.revision AS latest_profile_revision,
+      m.hidden AS match_hidden,m.filter_revision AS match_filter_revision,
       c.resume_id AS selected_resume_id,c.revision AS selected_connection_revision,c.status AS connection_status
       FROM job_drafts d JOIN job_vacancies v ON v.id=d.vacancy_id
       JOIN job_matches m ON m.vacancy_id=v.id AND m.user_id=d.user_id
       JOIN job_profiles p ON p.user_id=d.user_id JOIN job_connections c ON c.user_id=d.user_id
       WHERE d.id=$1 AND d.user_id=$2 AND d.current
-      FOR SHARE OF v,p,c`, [uuid.parse(draftId), scope.userId])).rows[0];
+      FOR SHARE OF v,p,c,m`, [uuid.parse(draftId), scope.userId])).rows[0];
     if (!row) throw jobError('JOB_NOT_FOUND');
     if (row.profile_revision !== row.latest_profile_revision || row.vacancy_revision !== row.latest_vacancy_revision) throw jobError('JOB_REVISION_CONFLICT');
     if (row.connection_status !== 'connected' || !row.selected_resume_id) throw jobError('JOB_HH_NOT_CONNECTED');
@@ -70,6 +71,40 @@ class JobApplicationRepository {
         confirmation_id,operation_id,approved_text,status) VALUES($1,$2,$3,$4,$5,$6,$7,'sending') RETURNING *`,
       [scope.userId, row.vacancy_id, row.resume_id, row.id, confirmation.id, crypto.randomUUID(), row.text])).rows[0];
       await client.query("UPDATE job_confirmations SET status='consumed' WHERE id=$1", [confirmation.id]);
+      return { operation, execute: true };
+    });
+  }
+  async claimAutomatic({ scope, draftId, automationRevision }) {
+    if (!Number.isInteger(automationRevision) || automationRevision < 1) throw jobError('JOB_AUTOMATION_UNAVAILABLE');
+    return jobTransaction(this.pool, async client => {
+      await client.query("SELECT pg_advisory_xact_lock(hashtext('jarvis-access-admin'))");
+      await assertJobScope(client, scope, this.accessService);
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`job-owner:${scope.userId}`]);
+      const consent = (await client.query(`SELECT a.* FROM job_automations a
+        JOIN job_searches s ON s.user_id=a.user_id
+        JOIN job_connections c ON c.user_id=a.user_id
+        WHERE a.user_id=$1 AND a.enabled AND a.revision=$2
+          AND a.conversation_id=$3 AND a.chat_id=$4
+          AND c.status='connected' AND c.resume_id=a.resume_id AND c.revision=a.connection_revision
+          AND s.conversation_id=a.conversation_id AND s.chat_id=a.chat_id
+          AND s.settings->>'activated'='true' AND s.settings->>'paused'='false' FOR SHARE OF a,c,s`,
+      [scope.userId, automationRevision, scope.conversationId, scope.chatId])).rows[0];
+      if (!consent) throw jobError('JOB_AUTOMATION_UNAVAILABLE');
+      const row = await this.snapshot(client, { scope, draftId });
+      if (row.resume_id !== consent.resume_id || row.connection_revision !== consent.connection_revision)
+        throw jobError('JOB_AUTOMATION_UNAVAILABLE');
+      const search = (await client.query('SELECT revision FROM job_searches WHERE user_id=$1', [scope.userId])).rows[0];
+      if (row.match_hidden || row.match_filter_revision !== search?.revision)
+        throw jobError('JOB_REVISION_CONFLICT');
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`job-draft:${scope.userId}:${row.vacancy_id}`]);
+      const existing = (await client.query(`SELECT * FROM job_applications WHERE user_id=$1 AND vacancy_id=$2
+        AND (resume_id=$3 OR status IN ('sending','unknown')) ORDER BY created_at LIMIT 1`,
+      [scope.userId, row.vacancy_id, row.resume_id])).rows[0];
+      if (existing) return { operation: existing, execute: false };
+      const operation = (await client.query(`INSERT INTO job_applications(user_id,vacancy_id,resume_id,draft_id,
+        confirmation_id,automation_revision,operation_id,approved_text,status)
+        VALUES($1,$2,$3,$4,NULL,$5,$6,$7,'sending') RETURNING *`,
+      [scope.userId,row.vacancy_id,row.resume_id,row.id,automationRevision,crypto.randomUUID(),row.text])).rows[0];
       return { operation, execute: true };
     });
   }

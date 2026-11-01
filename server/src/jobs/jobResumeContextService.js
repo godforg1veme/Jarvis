@@ -30,11 +30,12 @@ class JobResumeContextService {
     const row = await this.selected(scope);
     if (row.resume_id !== resumeId || row.revision !== connectionRevision) throw jobError('JOB_REVISION_CONFLICT');
   }
-  async getSelected({ scope }) {
+  async getSelected({ scope, requireComplete = false }) {
     const first = await this.selected(scope, { allowDisconnected: true });
     if (!first) return null;
     if (!this.browserClient) throw jobError('JOB_HH_RESUME_UNAVAILABLE');
-    const raw = await this.browserClient.forUser(scope.userId).readResume({ resumeId: first.resume_id });
+    const raw = await this.browserClient.forUser(scope.userId).readResume({ resumeId: first.resume_id,
+      ...(requireComplete ? { requireComplete: true } : {}) });
     await this.assertCurrent({ scope, resumeId: first.resume_id, connectionRevision: first.revision });
     return { resumeId: first.resume_id, connectionRevision: first.revision,
       snapshot: resumeSnapshotSchema(raw, first.resume_id) };

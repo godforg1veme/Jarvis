@@ -11,6 +11,15 @@ and 443 are free, but it must not be started on the current Xray host.
 
 ## Layout and trust boundaries
 
+Local autonomous HH search (not yet deployed): configure
+the existing `OPENROUTER_API_KEY` for fixed `z-ai/glm-5.3-flash` and retain
+the separate `JARVIS_JOB_BROWSER_APPLY_ENABLED=1`/apply credential boundary.
+Never put actual keys in this file or Git. Deploy server/Mini App, job-browser
+and migrations 054/055 together after explicit release authorization. Default
+monthly notice threshold is $2 and is informational. The new strict resume RPC
+must be supported by the browser before users enable automation.
+[Behavior, verification and live acceptance](../docs/updates/2026-11-01-hh-autonomous-search-development.md).
+
 - production directory: `/home/deploy/apps/jarvis`;
 - SSH access: configured via `~/.ssh/config` (`jarvis-vps` for `87.120.187.202`, `jarvis-vps-new` for new `94.183.208.56`);
 - `server` listens only inside the Compose network on port 3210;

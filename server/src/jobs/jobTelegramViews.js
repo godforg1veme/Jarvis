@@ -3,17 +3,18 @@ function response(answer, buttons = []) {
     historyAnswer: 'Поиск работы: результат действия показан владельцу.' };
 }
 function button(text, action, id) { return { text, data: `job:${action}${id == null ? '' : `:${id}`}` }; }
-function homeView({ search, usage, connection, captchaEnabled = false, resumeEnabled = false }) {
+function homeView({ search, usage, connection, captchaEnabled = false, resumeEnabled = false, automationConfigured = false }) {
   const enabled = search.settings.activated && !search.settings.paused;
   return response(`Поиск работы\n${enabled ? 'Поиск включён' : 'Поиск выключен'}${!search.settings.queries.length?'\nДобавь запросы в настройках: каждую фразу с новой строки.':''}
 Проверка: каждые ${Math.round(search.settings.intervalMs / 60000)} мин.
 Первая выдача: ${search.settings.historyDays} дней.
 Последняя успешная проверка: ${search.checkpoint ? new Date(search.checkpoint).toLocaleString('ru-RU', { timeZone: 'Etc/GMT-3' }) : 'ещё не выполнена'}
-API за ${usage.month}: $${Number(usage.total).toFixed(4)}${usage.pending ? `, ${usage.pending} запросов с уточняемой стоимостью` : ''}.
+API за ${usage.month}: $${Number(usage.total).toFixed(4)}${usage.estimated ? ' (включая расчёт по токенам)' : ''}${usage.pending ? `, ${usage.pending} запросов с уточняемой стоимостью` : ''}.
 Уведомление: $${search.settings.budgetUsd}; работа после него продолжается.
 HH: ${connection?.status === 'connected' ? connection.resume_id ? 'подключён, основное резюме выбрано' : 'нужно выбрать резюме' : 'не подключён'}.
 ${search.status === 'attention' ? 'Последняя проверка не завершена; сохранённый прогресс будет использован повторно.' : ''}`.trim(), [
     [button(enabled ? 'Выключить поиск' : 'Включить поиск', enabled ? 'pause' : 'resume')],
+    ...(automationConfigured ? [[button('Автопоиск с LLM', 'auto')]] : []),
     [button('Настройки', 'settings'), button('Сохранённые', 'saved', 0)],
     [button('Отклики', 'applications', 0), button('Проверить сейчас', 'check')],
     [button('Профиль и примеры', 'profile'), button('Подключить HH', 'connect')],
@@ -21,6 +22,17 @@ ${search.status === 'attention' ? 'Последняя проверка не за
     [button('Редактировать базовое сопроводительное', 'base_letter')],
     ...(captchaEnabled ? [[button('Проверить HH', 'captcha')]] : []),
     [button('Назад', 'back')],
+  ]);
+}
+function automaticSearchView(state) {
+  const enabled = state?.enabled === true;
+  const available = state?.available !== false;
+  const answer = `Автопоиск с LLM\nСейчас: ${enabled ? available ? 'включён' : 'включён, но выполнение приостановлено' : 'выключен'}.\n\nКогда включён, Jarvis читает выбранное резюме и подтверждённые факты, сравнивает их с вакансиями и сам отправляет подходящие отклики. Сопроводительное составляется по реальному опыту. Неподходящие вакансии пропускаются без сообщений. Если нужен тест или дополнительные поля, придёт сообщение в личный Telegram. При расходах API $2 за месяц придёт одно уведомление; поиск продолжится.\n\nКогда выключен, подходящие по поисковым фразам вакансии приходят тебе для ручного отклика.${available ? '' : '\n\nПроверь, включён ли поиск, подключение HH, основное резюме и доступность модели. Если резюме изменилось, обнови разрешение.'}`;
+  return response(answer, [
+    ...(enabled ? [[button('Выключить автопоиск', 'auto_off', state.revision)]] : []),
+    ...(enabled && !available ? [[button('Обновить разрешение', 'auto_on', state.revision)]] : []),
+    ...(!enabled && available ? [[button('Включить автопоиск и автоотклики', 'auto_on', state.revision)]] : []),
+    [button('В поиск работы', 'menu')],
   ]);
 }
 const ANNOTATIONS = { SALARY_UNKNOWN: 'Доход нужно уточнить', SALARY_NEEDS_CLARIFICATION: 'Налоги, период оплаты или премии нужно уточнить',
@@ -75,5 +87,5 @@ function attentionView(captchaEnabled = false) {
   if (captchaEnabled) return { ...response('Поиск работы приостановлен из-за капчи HH. Бот пришлёт картинку отдельно; ответь на фото текстом с картинки. Прогресс поиска сохранён.', [[button('Проверить HH', 'captcha')]]), buttons: [[button('Проверить HH', 'captcha')]] };
   return { ...response('Поиск работы: автоматическая попытка прохождения капчи HH не подтвердила доступ. Проверьте сессию HH в браузере на VPS; при запросе пройдите капчу вручную. Прогресс поиска сохранён; для этой проверки повторной отправки ответа не будет.'), buttons: [] };
 }
-module.exports = { attentionView, response, button, homeView, cardView, draftView, letterModeView, listView, salaryText };
+module.exports = { attentionView, response, button, homeView, automaticSearchView, cardView, draftView, letterModeView, listView, salaryText };
 const { descriptionSalary } = require('./salaryRules');

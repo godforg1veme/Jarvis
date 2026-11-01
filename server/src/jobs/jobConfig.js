@@ -23,7 +23,7 @@ function loadJobConfig(env) {
     jobSearchEnabled: ['true', '1', 'yes', 'on'].includes(String(env.JARVIS_JOB_SEARCH_ENABLED || '').toLowerCase()),
     jobCollectorIntervalMs: Number(env.JARVIS_JOB_COLLECTOR_INTERVAL_MS || 1800000),
     jobHistoryDays: Number(env.JARVIS_JOB_HISTORY_DAYS || 14),
-    jobBudgetUsd: Number(env.JARVIS_JOB_BUDGET_USD || 3),
+    jobBudgetUsd: Number(env.JARVIS_JOB_BUDGET_USD || 2),
     jobSecretKey: String(env.JARVIS_JOB_SECRET_KEY || '').trim(),
     jobPublicOrigin: String(env.JARVIS_JOB_PUBLIC_ORIGIN || '').trim(),
     jobCaptchaTelegram: env.JARVIS_HH_CAPTCHA_TELEGRAM === '1',

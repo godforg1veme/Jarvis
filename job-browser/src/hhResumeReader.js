@@ -2,7 +2,7 @@ const ID = /^[a-zA-Z0-9]{1,100}$/;
 const FIELDS = ['title', 'experience', 'skills', 'education', 'summary'];
 const REASONS = new Set(['invalid_id', 'invalid_shape', 'invalid_field', 'field_too_long', 'private_content',
   'empty_content', 'snapshot_too_large', 'wrong_page', 'main_missing', 'title_count', 'duplicate_section',
-  'section_container', 'ssr_template', 'ssr_size', 'ssr_parse', 'ssr_incomplete', 'ssr_ambiguous', 'ssr_shape']);
+  'section_container', 'ssr_template', 'ssr_size', 'ssr_parse', 'ssr_incomplete', 'ssr_ambiguous', 'ssr_shape', 'incomplete_content']);
 const fail = reason => {
   process.stderr.write(`JOB_HH_RESUME_READ_FAILURE ${REASONS.has(reason) ? reason : 'invalid_shape'}\n`);
   throw Object.assign(new Error('JOB_HH_RESUME_UNAVAILABLE'), { code: 'JOB_HH_RESUME_UNAVAILABLE' });
@@ -25,7 +25,7 @@ function resumeSnapshotSchema(value, resumeId) {
   return value;
 }
 
-async function readResumeContent(page, resumeId) {
+async function readResumeContent(page, resumeId, { requireComplete = false } = {}) {
   if (!ID.test(resumeId)) fail('invalid_id');
   const raw = await page.evaluate(selectedId => {
     const pathname = new URL(location.href).pathname;
@@ -41,6 +41,9 @@ async function readResumeContent(page, resumeId) {
       skills: /^(?:Ключевые навыки|Навыки)$/iu,
       education: /^Образование$/iu,
       summary: /^(?:Обо мне|О себе|Дополнительная информация)$/iu,
+      languages: /^(?:Знание языков|Языки)$/iu,
+      courses: /^(?:Повышение квалификации|Курсы|Повышение квалификации, курсы)$/iu,
+      certificates: /^(?:Тесты, экзамены|Сертификаты|Электронные сертификаты)$/iu,
     };
     const blocks = {};
     for (const [key, pattern] of Object.entries(labels)) {
@@ -52,7 +55,13 @@ async function readResumeContent(page, resumeId) {
         blocks[key] = (section.innerText || '').slice(0, 12001);
       }
     }
-    if (Object.values(blocks).some(value => value.trim())) return { title: title[0], blocks };
+    if (Object.values(blocks).some(value => value.trim())) {
+      const complete = ['experience','skills','education','summary'].every(key => Object.hasOwn(blocks,key))
+        && !root.querySelector('[aria-busy="true"]')
+        && [...root.querySelectorAll('h2,h3')].every(node =>
+          !Object.values(labels).some(pattern => pattern.test(node.textContent.trim())) || visible(node));
+      return { title: title[0], blocks, complete };
+    }
     const templates = document.querySelectorAll('template#HH-Lux-InitialState');
     if (templates.length !== 1) return { failure: 'ssr_template' };
     const content = templates[0].content;
@@ -113,8 +122,12 @@ async function readResumeContent(page, resumeId) {
   }, resumeId);
   if (raw?.failure) fail(raw.failure);
   if (!raw || typeof raw.title !== 'string' || !raw.blocks || typeof raw.blocks !== 'object') fail('invalid_shape');
+  // The legacy SSR fallback does not prove education/about coverage. Never
+  // silently evaluate or submit automatically using that partial snapshot.
+  if (requireComplete && raw.complete !== true) fail('incomplete_content');
   const snapshot = { resumeId, title: raw.title, experience: raw.blocks.experience || '',
-    skills: raw.blocks.skills || '', education: raw.blocks.education || '', summary: raw.blocks.summary || '',
+    skills: raw.blocks.skills || '', education: raw.blocks.education || '',
+    summary: [raw.blocks.summary,raw.blocks.languages,raw.blocks.courses,raw.blocks.certificates].filter(Boolean).join('\n\n'),
     grammaticalGender: 'unknown' };
   return resumeSnapshotSchema(snapshot, resumeId);
 }

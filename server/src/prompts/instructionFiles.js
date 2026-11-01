@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const MAX_INSTRUCTION_BYTES = 32 * 1024;
-const FILES = Object.freeze({ core: 'core.ru.md', 'cover-letter': 'cover-letter.ru.md', 'web-search': 'web-search.ru.md' });
+const FILES = Object.freeze({ core: 'core.ru.md', 'cover-letter': 'cover-letter.ru.md', 'web-search': 'web-search.ru.md', 'job-selection': 'job-selection.ru.md' });
 
 function loadInstruction(name, { directory = path.join(__dirname, 'instructions') } = {}) {
   if (!Object.hasOwn(FILES, name)) throw Object.assign(new Error('Unknown instruction'), { code: 'PROMPT_INSTRUCTION_NAME_INVALID' });

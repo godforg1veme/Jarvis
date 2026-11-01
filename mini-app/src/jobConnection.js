@@ -1,4 +1,5 @@
 import { createJobResumePanel } from './jobResumes.js';
+import { createJobAutomationPanel } from './jobAutomation.js';
 const UUID = /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i;
 
 function button(parent, label, handler, className = 'secondary') {
@@ -56,6 +57,7 @@ export function createJobConnectionPanel({ api, actor, anchor }) {
   const cancel = button(controls, 'Отменить подключение', cancelLogin); cancel.hidden = true;
   panel.append(heading, status, controls, linkBox, resumes); anchor.after(panel);
   const resumeManager=createJobResumePanel({api,actor,parent:panel});
+  const automationPanel=createJobAutomationPanel({api,parent:panel});
 
   function message(value) { if (!disposed) status.textContent = value; }
   function store(key, value) { try { sessionStorage.setItem(sessionKey(actor, key), value); } catch {} }
@@ -234,5 +236,5 @@ export function createJobConnectionPanel({ api, actor, anchor }) {
     }
   }
   void load().catch((error) => message(error.message || 'Не удалось загрузить состояние HH.'));
-  return { dispose() { disposed = true; invalidate(); resumeManager.dispose(); panel.remove(); } };
+  return { dispose() { disposed = true; invalidate(); resumeManager.dispose(); automationPanel.dispose(); panel.remove(); } };
 }

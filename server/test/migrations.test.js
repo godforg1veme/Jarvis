@@ -61,6 +61,8 @@ test('migration files are ordered and narrowly named', () => {
     '051_mini_app_memory_operations.sql',
     '052_mini_app_personal_operations.sql',
     '053_job_draft_resume_context.sql',
+    '054_job_automation.sql',
+    '055_job_usage_cost_basis.sql',
   ]);
 });
 

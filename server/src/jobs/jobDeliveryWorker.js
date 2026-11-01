@@ -4,8 +4,8 @@ const { captchaNoticeView } = require('./jobCaptchaNotices');
 const { collectionNoticeView } = require('./jobCollectionNotices');
 const { assertJobScope } = require('./jobSchemas');
 class JobDeliveryWorker {
-  constructor({ pool, searchRepository, deliveryRepository, send, captchaEnabled = false, captchaAutomatic = false, intervalMs = 2000, accessService = null }) {
-    Object.assign(this, { pool, searchRepository, deliveryRepository, send, captchaEnabled, captchaAutomatic, intervalMs, accessService });
+  constructor({ pool, searchRepository, deliveryRepository, send, captchaEnabled = false, captchaAutomatic = false, intervalMs = 2000, accessService = null, automationService = null }) {
+    Object.assign(this, { pool, searchRepository, deliveryRepository, send, captchaEnabled, captchaAutomatic, intervalMs, accessService, automationService });
     this.timer = null; this.running = false;
     trackWorker(this, 'tick');
   }
@@ -23,11 +23,52 @@ class JobDeliveryWorker {
       const search = await this.searchRepository.getSettings({ userId: delivery.user_id });
       let view;
       if (delivery.kind === 'card') {
+        // A card can have been claimed immediately before automation was enabled.
+        if (this.automationService) {
+          const state = await this.automationService.get({ scope: { userId: delivery.user_id,
+            conversationId: search.conversation_id, chatId: search.chat_id, channel: 'telegram' } });
+          if (state.enabled) { await this.deliveryRepository.finish({ deliveryId: delivery.id, outcome: 'queued' }); return; }
+        }
         const vacancy = await this.searchRepository.getVacancy({ userId: delivery.user_id, vacancyId: delivery.vacancy_id });
         if (!vacancy || vacancy.hidden) { await this.deliveryRepository.finish({ deliveryId: delivery.id, outcome: 'failed' }); return; }
         view = cardView(vacancy);
       } else if (delivery.kind === 'attention') {
-        if (delivery.payload?.reason === 'HH_COLLECTION_STATUS') {
+        if (['HH_AUTO_MANUAL','HH_AUTO_ATTENTION'].includes(delivery.payload?.reason)) {
+          const scope = { userId: delivery.user_id, conversationId: delivery.payload.conversationId,
+            chatId: delivery.payload.chatId, channel: 'telegram' };
+          try {
+            await assertJobScope(this.pool, scope, this.accessService);
+            const consent = (await this.pool.query(`SELECT 1 FROM job_automations
+              WHERE user_id=$1 AND enabled AND revision=$2 AND conversation_id=$3 AND chat_id=$4`,
+            [scope.userId, delivery.payload.automationRevision, scope.conversationId, scope.chatId])).rowCount;
+            if (!consent || search.conversation_id !== scope.conversationId || search.chat_id !== scope.chatId)
+              throw new Error('unavailable');
+            const messages = {
+              MANUAL_REQUIRED: 'Для отклика на эту вакансию нужно пройти тест или заполнить дополнительные поля. Открой вакансию и заверши отклик вручную.',
+              LOGIN_REQUIRED: 'Автопоиску нужен повторный вход в твой HH-профиль. Открой «Поиск работы → Подключить HH».',
+              RESULT_UNKNOWN: 'Результат автоотклика пока неизвестен. Повторная отправка заблокирована. Проверь исходный отклик в разделе «Отклики».',
+              PROCESSING_UNKNOWN: 'Обработка вакансии прервана. Автоматический отклик не подтверждён. Открой вакансию для ручной проверки; неопределённая операция автоматически не повторяется.',
+              MODEL_UNAVAILABLE: 'Сервис обработки вакансий временно недоступен. Автопоиск попробует продолжить позднее. Если проблема повторяется, обратись к владельцу Jarvis.',
+              RESUME_UNAVAILABLE: 'Не удалось полностью прочитать выбранное резюме. Проверь его в HH и настройках поиска работы.',
+            };
+            const message = messages[delivery.payload.code];
+            if (!message) throw new Error('unavailable');
+            if (delivery.payload.vacancyId == null && ['LOGIN_REQUIRED','RESUME_UNAVAILABLE'].includes(delivery.payload.code)) {
+              view = { answer: message, buttons: [] };
+            } else {
+              const vacancy = await this.searchRepository.getVacancy({ userId: scope.userId, vacancyId: delivery.payload.vacancyId });
+              if (!vacancy || !/^\d{1,20}$/.test(vacancy.external_id)) throw new Error('unavailable');
+              view = { answer: `${message}\n\n${vacancy.snapshot.title}\nhttps://hh.ru/vacancy/${vacancy.external_id}`, buttons: [] };
+            }
+          } catch {
+            await this.deliveryRepository.finish({ deliveryId: delivery.id, outcome: 'failed' }); return;
+          }
+        } else if (delivery.payload?.reason === 'HH_COLLECTION_STATUS') {
+          if (this.automationService) {
+            const state = await this.automationService.get({ scope: { userId: delivery.user_id,
+              conversationId: search.conversation_id, chatId: search.chat_id, channel: 'telegram' } });
+            if (state.enabled) { await this.deliveryRepository.finish({ deliveryId: delivery.id, outcome: 'failed' }); return; }
+          }
           view = collectionNoticeView(delivery.payload.code);
           const scope = { userId: delivery.user_id, conversationId: delivery.payload.conversationId,
             chatId: delivery.payload.chatId, channel: 'telegram' };
@@ -76,7 +117,7 @@ class JobDeliveryWorker {
           view = attentionView(this.captchaEnabled);
         }
         else { await this.deliveryRepository.finish({ deliveryId: delivery.id, outcome: 'failed' }); return; }
-      } else if (delivery.kind === 'budget') view = { answer: `Поиск работы: расходы API за ${delivery.payload.month} достигли $${delivery.payload.thresholdUsd}. Работа продолжается.`, buttons: [] };
+      } else if (delivery.kind === 'budget') view = { answer: `Поиск работы: ${delivery.payload.estimated ? 'расчётные расходы API' : 'расходы API'} за ${delivery.payload.month} достигли $${delivery.payload.thresholdUsd}. Работа продолжается.`, buttons: [] };
       else { await this.deliveryRepository.finish({ deliveryId: delivery.id, outcome: 'failed' }); return; }
       try {
         const result = await this.send({ chatId: search.chat_id, ...view });

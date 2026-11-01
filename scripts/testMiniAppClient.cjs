@@ -10,7 +10,7 @@ const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
 const server = http.createServer(async (request, response) => {
   let relative = new URL(request.url, 'http://localhost').pathname.replace(/^\/mini\//, '') || 'index.html';
   if (relative === 'job-connect/') relative = 'job-connect.html';
-  if (relative.includes('..') || !/^(index\.html|job-connect\.html|(?:app|api|admin|core|orbitalBodies|orbitMotion|sectionViews|memoryActions|personalActions|jobConnect|jobConnection|jobResumes)\.js|(?:style|orbital|interior|jobResumes)\.css|assets\/milky-way-gaia-4k\.webp|vendor\/(?:three\.module|three\.core|RoomEnvironment)\.js)$/.test(relative)) return response.writeHead(404).end();
+  if (relative.includes('..') || !/^(index\.html|job-connect\.html|(?:app|api|admin|core|orbitalBodies|orbitMotion|sectionViews|memoryActions|personalActions|jobConnect|jobConnection|jobAutomation|jobResumes)\.js|(?:style|orbital|interior|jobResumes)\.css|assets\/milky-way-gaia-4k\.webp|vendor\/(?:three\.module|three\.core|RoomEnvironment)\.js)$/.test(relative)) return response.writeHead(404).end();
   try { const content = await fs.readFile(path.join(root, relative)); response.writeHead(200, { 'Content-Type': types[path.extname(relative)], 'Content-Security-Policy': "default-src 'self'; script-src 'self' https://telegram.org; connect-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'" }).end(content); }
   catch { response.writeHead(404).end(); }
 });
@@ -19,7 +19,7 @@ async function fixture(context, { level = 'owner', outside = false, sdkBlocked =
   const roles = [{ id: 'search', name: 'Только поиск', permissions: ['jobs'], revision: 1 }];
   const actor = level === 'member' ? users[1] : { ...users[0], level };
   const state = { mutations: [], uncertain: false, conflict: false, session: false, op: null, section: null, sectionResponses: {}, sectionGates: {}, sectionReads: {}, historyGets: 0, blocked: false, chatUncertain: false, chatPosts: [], chatOp: null, messages: [], operationUnknown: false,
-    jobSessionId: randomUUID(), jobTicket: 'a'.repeat(64), jobStatus: 'waiting', jobConnected: false, jobCreateRequests: [], jobClaims: [], jobConfirm: null, guestEvents: [] };
+    jobSessionId: randomUUID(), jobTicket: 'a'.repeat(64), jobStatus: 'waiting', jobConnected: false, jobCreateRequests: [], jobClaims: [], jobConfirm: null, guestEvents: [], jobAutoEnabled: false, jobAutoRevision: 0, jobAutoWrites: [] };
   const external = []; const errors = [];
   context.on('page', (page) => page.on('pageerror', (error) => errors.push(error.message)));
   await context.route('https://telegram.org/**', (route) => sdkBlocked ? route.abort() : route.fulfill({ contentType: 'text/javascript', body: outside ? '' : 'window.Telegram={WebApp:{initData:"synthetic-fixture",ready(){},expand(){}}};' }));
@@ -38,6 +38,15 @@ async function fixture(context, { level = 'owner', outside = false, sdkBlocked =
       return response ? send(response.body, response.status || 200) : send({ ok: true, section: permission, items, notice: permission === 'jobs' ? 'Нужно личное подключение HH.' : 'Только твои данные.' });
     }
     if (endpoint === '/jobs/connection') return send({ ok: true, available: true, connected: state.jobConnected, ...(state.jobConnected ? { resumeId: 'resume-1' } : {}) });
+    if (endpoint === '/jobs/automation') {
+      if (request.method() === 'POST') {
+        assert.equal(request.headers()['x-jarvis-csrf'], 'fixture-csrf');
+        assert.deepEqual(Object.keys(body).sort(), ['enabled', 'expectedRevision']);
+        if (body.expectedRevision !== state.jobAutoRevision) return send({ ok: false, code: 'JOB_REVISION_CONFLICT' }, 409);
+        if (body.enabled !== state.jobAutoEnabled) { state.jobAutoEnabled = body.enabled; state.jobAutoRevision++; state.jobAutoWrites.push(body); }
+      }
+      return send({ ok: true, enabled: state.jobAutoEnabled, revision: state.jobAutoRevision, available: state.jobConnected });
+    }
     if (endpoint === '/jobs/resumes') return send({ok:true,connected:state.jobConnected,primaryResumeId:'resume-1',connectionRevision:1,revision:1,
       resumes:[{id:'resume-1',title:'Моё резюме'}],updatedAt:new Date().toISOString(),autoRaise:{enabled:false,resumeId:null,nextAt:null,lastAt:null,lastOutcome:null},lastError:null,raiseAvailable:false});
     if (endpoint === '/jobs/login' && request.method() === 'POST') {
@@ -278,6 +287,18 @@ async function main() {
     await page.getByText(/HH подключён\. Резюме и настройки обновления доступны ниже/).waitFor();
     assert.deepEqual(state.jobConfirm, { sessionId: state.jobSessionId, resumeId: 'resume-1' });
     await connectPage.close();
+    await page.getByRole('link', { name: 'Главная', exact: true }).click();
+    if (await page.locator('#modules').isHidden()) await page.locator('#all-sections').click();
+    await page.locator('[data-module="jobs"]').click();
+    const automatic = page.locator('.job-automation');
+    await automatic.getByRole('button', { name: 'Включить автопоиск и автоотклики' }).click();
+    await automatic.getByText('Автопоиск включён.').waitFor();
+    await automatic.getByRole('button', { name: 'Выключить автопоиск' }).click();
+    await automatic.getByText('Автопоиск выключен. Вакансии приходят для ручного отклика.').waitFor();
+    assert.deepEqual(state.jobAutoWrites, [{ enabled: true, expectedRevision: 0 }, { enabled: false, expectedRevision: 1 }]);
+    for (const width of [390, 1280]) { await page.setViewportSize({ width, height: 900 });
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `autosearch fits ${width}px`);
+      if (width === 390) await automatic.screenshot({ path: path.join(output, 'job-automation-mobile.png') }); }
     await page.getByRole('link', { name: 'Ассистент', exact: true }).click(); await page.getByLabel('Сообщение Jarvis').fill('Мой вопрос'); state.chatUncertain = true;
     await page.getByRole('button', { name: 'Отправить', exact: true }).click(); await page.getByRole('button', { name: 'Проверить исходный запрос', exact: true }).waitFor();
     assert.equal(await page.getByLabel('Сообщение Jarvis').inputValue(), 'Мой вопрос');

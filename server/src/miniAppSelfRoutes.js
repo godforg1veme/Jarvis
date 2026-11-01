@@ -27,7 +27,8 @@ const fail = (code) => { throw Object.assign(new Error(code), { code }); };
 
 function registerMiniAppSelfRoutes({ route, authorize, requireOrigin }, services) {
   const { accessService, memoryService, memoryActionService, knowledgeService, deviceService, missionControlService,
-    assistant, conversationRepository, pool, getJobConnectionSessionService, getJobLoginLinkDelivery, getJobResumeService } = services;
+    assistant, conversationRepository, pool, getJobConnectionSessionService, getJobLoginLinkDelivery, getJobResumeService,
+    getJobAutomationService } = services;
   const chatLimiter = new FixedWindowRateLimiter();
   const personalActions = registerPersonalRoutes({ route, authorize }, services);
   const memoryActions = memoryActionService
@@ -64,6 +65,30 @@ function registerMiniAppSelfRoutes({ route, authorize, requireOrigin }, services
     return service;
   };
   const jobResumes = () => { const service=getJobResumeService?.(); if(!service)fail('JOB_RESUME_UNAVAILABLE');return service; };
+  const jobAutomation = () => { const service=getJobAutomationService?.(); if(!service)fail('JOB_AUTOMATION_UNAVAILABLE');return service; };
+  async function automationScope(actor) {
+    const chatId = String(actor.telegramId || '');
+    if (!/^[1-9]\d{0,19}$/.test(chatId)) fail('forbidden');
+    const result = await pool.query(`SELECT s.conversation_id AS id FROM job_searches s
+      JOIN conversations c ON c.id=s.conversation_id AND c.user_id=s.user_id
+        AND c.channel='telegram' AND c.external_chat_id=s.chat_id
+      JOIN user_identities i ON i.user_id=s.user_id AND i.provider='telegram' AND i.external_id=s.chat_id
+      WHERE s.user_id=$1 AND s.chat_id=$2`, [actor.userId, chatId]);
+    if (!result.rowCount) fail('JOB_AUTOMATION_UNAVAILABLE');
+    return { userId: actor.userId, conversationId: result.rows[0].id, chatId, channel: 'telegram' };
+  }
+  route('GET','/jobs/automation',async request=>{
+    const actor=await requirePermission(request,'jobs');
+    const result=await jobAutomation().get({scope:await automationScope(actor)});
+    await requirePermission(request,'jobs');return {ok:true,...result};
+  });
+  route('POST','/jobs/automation',async request=>{
+    const actor=await requirePermission(request,'jobs',true);
+    const parsed=z.strictObject({enabled:z.boolean(),expectedRevision:z.number().int().min(0)}).safeParse(request.body);
+    if(!parsed.success)fail('invalid_request');
+    const result=await jobAutomation().setEnabled({scope:await automationScope(actor),...parsed.data});
+    await requirePermission(request,'jobs');return {ok:true,...result};
+  });
   route('GET','/jobs/resumes',async request=>{
     const actor=await requirePermission(request,'jobs');const result=await jobResumes().get(actor.userId);
     await requirePermission(request,'jobs');return {ok:true,...result};

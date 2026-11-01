@@ -19,6 +19,9 @@ async function createJobPostgresFixture() {
       const sql = await fs.readFile(path.join(__dirname, '../../src/db/migrations', name), 'utf8');
       await pool.query(sql.replace(/^CREATE EXTENSION[^;]+;\s*/gm, ''));
     }
+    for (const name of ['054_job_automation.sql', '055_job_usage_cost_basis.sql']) {
+      await pool.query(await fs.readFile(path.join(__dirname, '../../src/db/migrations', name), 'utf8'));
+    }
     const owner = (await pool.query("INSERT INTO users(display_name,role) VALUES('Fixture owner','owner') RETURNING id")).rows[0].id;
     const stranger = (await pool.query("INSERT INTO users(display_name,role) VALUES('Fixture member','member') RETURNING id")).rows[0].id;
     const conversation = (await pool.query("INSERT INTO conversations(user_id,channel,external_chat_id) VALUES($1,'telegram','101') RETURNING id", [owner])).rows[0].id;

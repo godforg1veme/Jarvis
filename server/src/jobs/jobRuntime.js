@@ -30,6 +30,9 @@ const { JobResumeRepository } = require('./jobResumeRepository');
 const { JobResumeService } = require('./jobResumeService');
 const { JobResumeWorker } = require('./jobResumeWorker');
 const { JobResumeContextService } = require('./jobResumeContextService');
+const { JobAutomationRepository } = require('./jobAutomationRepository');
+const { JobAutomationService } = require('./jobAutomationService');
+const { JobAutomationWorker } = require('./jobAutomationWorker');
 
 function createJobRuntime({ config, pool, interactions, send, sendPhoto, fetchImpl, applicationAdapter = null, accessService = null }) {
   if (!config.jobSearchEnabled) return null;
@@ -64,15 +67,24 @@ function createJobRuntime({ config, pool, interactions, send, sendPhoto, fetchIm
   const resumeContextService = new JobResumeContextService({ pool, browserClient, accessService: jobsAccessService });
   const usageRepository = new JobUsageRepository(pool);
   const deliveryRepository = new JobDeliveryRepository(pool, { accessService: jobsAccessService });
+  const modelAdapter = new JobModelAdapter({ config, fetchImpl });
+  const automationRepository = new JobAutomationRepository(pool, { accessService: jobsAccessService });
+  const automationService = new JobAutomationService({ pool, repository: automationRepository, searchRepository,
+    resumeContextService, accessService: jobsAccessService,
+    available: Boolean(modelAdapter.available && browserClient && applicationAdapter?.capabilities?.applicantApply) });
   const draftService = new JobDraftService({ pool, searchRepository, profileRepository, draftRepository, usageRepository,
-    modelAdapter: new JobModelAdapter({ config, fetchImpl }), accessService: jobsAccessService, resumeContextService });
+    modelAdapter, accessService: jobsAccessService, resumeContextService });
   const settingsService = new JobSettingsService({ pool, searchRepository, profileRepository, accessService: jobsAccessService });
   const applicationRepository = new JobApplicationRepository(pool, { accessService: jobsAccessService });
   const historyRepository=new JobHistoryRepository(pool,{accessService: jobsAccessService});
   const historySync=new JobHistorySyncRepository(pool,historyRepository,{accessService: jobsAccessService});
   const historyWorker=browserClient?new JobHistoryWorker({repository:historySync,client:browserClient}):null;
   const historyService=new JobHistoryTelegram({repository:historyRepository,syncRepository:historySync,available:Boolean(browserClient)});
-  const applicationService = new JobApplicationService({ pool, repository: applicationRepository, searchRepository, adapter: applicationAdapter, historyRepository, accessService: jobsAccessService });
+  const applicationService = new JobApplicationService({ pool, repository: applicationRepository, searchRepository,
+    adapter: applicationAdapter, historyRepository, accessService: jobsAccessService, automationRepository });
+  const automationWorker = new JobAutomationWorker({ pool, repository: automationRepository, automationService,
+    searchRepository, profileRepository, resumeContextService, modelAdapter, draftService, applicationService,
+    usageRepository, accessService: jobsAccessService });
   if (config.jobCaptchaTelegram && !config.jobCaptchaToken) throw new Error('JOB_CAPTCHA_CONFIG_INVALID');
   let captchaService = null, captchaWorker = null;
   if (config.jobCaptchaTelegram && config.jobCaptchaToken) {
@@ -84,16 +96,16 @@ function createJobRuntime({ config, pool, interactions, send, sendPhoto, fetchIm
   }
   const telegramService = new JobTelegramService({ pool, searchRepository, profileRepository, draftRepository,
     usageRepository, interactions, draftService, settingsService, applicationService, connectionService, captchaService, historyService, resumeService,
-    accessService: jobsAccessService, ownerTelegramId: config.operationsOwnerTelegramId, loginLinkDelivery,
+    accessService: jobsAccessService, ownerTelegramId: config.operationsOwnerTelegramId, loginLinkDelivery, automationService,
     jobPublicOrigin: config.miniAppEnabled ? config.miniAppPublicOrigin : '' });
   const deliveryWorker = new JobDeliveryWorker({ pool, searchRepository, deliveryRepository, send, accessService: jobsAccessService,
-    captchaEnabled: Boolean(captchaService), captchaAutomatic: config.jobCaptchaAutomatic === true });
+    captchaEnabled: Boolean(captchaService), captchaAutomatic: config.jobCaptchaAutomatic === true, automationService });
   const recoveryWorker = new JobRecoveryWorker({ pool, applicationRepository });
-  const close = createResourceCloser(Object.entries({ deliveryWorker, recoveryWorker, captchaWorker, historyWorker, connectionSessionService, resumeWorker })
+  const close = createResourceCloser(Object.entries({ deliveryWorker, recoveryWorker, captchaWorker, historyWorker, connectionSessionService, resumeWorker, automationWorker })
     .filter(([, worker]) => worker).map(([name, worker]) => ({ name, close: () => worker.stop() })));
   return { captchaService, telegramService, deliveryWorker, applicationService, applicationRepository, historyWorker, historyRepository, historySync,
-    connectionSessionService, loginLinkDelivery, resumeService, resumeWorker,
-    async start() { await recoveryWorker.start(); connectionSessionService?.start(); deliveryWorker.start(); captchaWorker?.start(); historyWorker?.start(); await resumeWorker?.start(); },
+    connectionSessionService, loginLinkDelivery, resumeService, resumeWorker, automationService, automationWorker,
+    async start() { await recoveryWorker.start(); connectionSessionService?.start(); deliveryWorker.start(); captchaWorker?.start(); historyWorker?.start(); await resumeWorker?.start(); if (automationService.available) automationWorker.start(); },
     close };
 }
 module.exports = { createJobRuntime };

@@ -1,6 +1,6 @@
 const { assertJobScope, jobError } = require('./jobSchemas');
 const { parseJobCallback } = require('./jobTelegramCallbacks');
-const { response, button, homeView, cardView, draftView, listView } = require('./jobTelegramViews');
+const { response, button, homeView, automaticSearchView, cardView, draftView, listView } = require('./jobTelegramViews');
 const { parseSettingsEdit, parseProfileEdit } = require('./jobSettingsService');
 const { JobLetterFlow } = require('./jobLetterFlow');
 const { JobSettingsPanel } = require('./jobSettingsPanel');
@@ -32,6 +32,7 @@ function publicJobFailure(error) {
     JOB_MODEL_INVALID_OUTPUT: 'Ответ модели не прошёл проверку. Предыдущий черновик сохранён.',
     JOB_MODEL_INVALID_FACTS: 'Модель использовала неподтверждённые сведения. Письмо не принято.',
     JOB_REVISION_CONFLICT: 'Данные изменились. Открой актуальную карточку или черновик.',
+    JOB_AUTOMATION_UNAVAILABLE: 'Автопоиск сейчас недоступен. Проверь подключение HH, выбранное резюме и модель.',
     JOB_DRAFT_RESUME_STALE: 'Резюме изменилось или привязка письма неизвестна. Выбери вариант письма и создай его заново.',
     JOB_GENERATION_BUSY: 'Этот запрос уже обрабатывается. Второй вызов модели не запущен.',
     JOB_GENERATION_OUTCOME_UNKNOWN: 'Генерация была прервана, её стоимость ещё уточняется. Этот запрос повторно не запускается. Можно отдельно запросить новый вариант письма.',
@@ -57,7 +58,7 @@ class JobTelegramService {
       if(!['rs_ok','rs_status'].includes(parsed.action))await this.pool.query(`UPDATE job_confirmations SET status='cancelled'
         WHERE user_id=$1 AND conversation_id=$2 AND chat_id=$3 AND kind='resume' AND frozen->>'purpose'='change' AND status='pending'`,
       [scope.userId,scope.conversationId,scope.chatId]);
-      if (['menu', 'back', 'draft', 'cancel', 'regenerate', 'edit', 'manual_edit', 'translate', 'prepare', 'base_letter', 'base', 'improved', 'custom', 'custom_ai'].includes(parsed.action)) await this.pool.query(`UPDATE job_confirmations SET status='cancelled'
+      if (['menu', 'back', 'draft', 'cancel', 'regenerate', 'edit', 'manual_edit', 'translate', 'prepare', 'base_letter', 'base', 'improved', 'custom', 'custom_ai', 'auto', 'auto_on', 'auto_off'].includes(parsed.action)) await this.pool.query(`UPDATE job_confirmations SET status='cancelled'
         WHERE user_id=$1 AND conversation_id=$2 AND chat_id=$3 AND kind='apply' AND status='pending'`,
       [scope.userId, scope.conversationId, scope.chatId]);
       return await this.handle({ scope, context, ...parsed });
@@ -67,7 +68,7 @@ class JobTelegramService {
     const search = await this.searchRepository.ensure({ scope });
     const usage = await this.usageRepository.getMonth({ userId: scope.userId });
     const connection = (await this.pool.query('SELECT status,resume_id FROM job_connections WHERE user_id=$1', [scope.userId])).rows[0];
-    return homeView({ search, usage, connection, captchaEnabled: Boolean(this.captchaService), resumeEnabled:Boolean(this.resumePanel) });
+    return homeView({ search, usage, connection, captchaEnabled: Boolean(this.captchaService), resumeEnabled:Boolean(this.resumePanel), automationConfigured:Boolean(this.automationService) });
   }
   async begin(scope, kind, targetId, revision, answer) {
     const interaction = await this.interactions.begin({ ...scope, channel: undefined, kind,
@@ -77,6 +78,13 @@ class JobTelegramService {
   async handle({ scope, context, action, targetId, field, revision, index, page = 0 }) {
     if (action === 'captcha' || action === 'captcha_refresh') return this.captchaService ? this.captchaService.request(scope, action === 'captcha_refresh') : response('Проверка HH через Telegram не настроена.');
     if (action === 'menu' || action === 'back') return this.home(scope);
+    if (action === 'auto' || action === 'auto_on' || action === 'auto_off') {
+      if (!this.automationService) throw jobError('JOB_AUTOMATION_UNAVAILABLE');
+      const state = action === 'auto'
+        ? await this.automationService.get({ scope })
+        : await this.automationService.setEnabled({ scope, enabled: action === 'auto_on', expectedRevision: revision });
+      return automaticSearchView(state);
+    }
     const resume=this.resumePanel&&await this.resumePanel.handle({scope,context,action,targetId,index});
     if(resume)return resume;
     const search = await this.searchRepository.ensure({ scope });

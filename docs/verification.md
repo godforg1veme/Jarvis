@@ -1,5 +1,29 @@
 # Проверки перед выпуском
 
+## Автопоиск с LLM / Autonomous job search
+
+```powershell
+node --test server/test/jobAutomationUi.test.js server/test/jobAutomationWorker.test.js server/test/jobGlmAdapter.test.js server/test/jobVacancyPrompt.test.js
+node --test job-browser/test/hhResumeReader.test.js server/test/jobBrowserClient.test.js
+# Только отдельная тестовая PostgreSQL, JARVIS_JOB_TEST_DATABASE_URL:
+node --test server/test/jobAutomationAcceptance.cjs server/test/jobAutomationIntegrationAcceptance.cjs server/test/jobApplicationsAcceptance.cjs server/test/jobDraftAcceptance.cjs server/test/jobPostgresAcceptance.cjs server/test/jobDeliveryAcceptance.cjs
+npm test --prefix server
+npm test --prefix job-browser
+npm run build --prefix mini-app
+node scripts/testMiniAppClient.cjs
+```
+
+Проверяются owner/member scopes, полное резюме, quiet skip/apply, тесты/анкеты,
+$2 за МСК-месяц, cost basis, CAS/off/revocation, исходный ID и перезапуск.
+Внешние ответы подставные; SSR/частичный DOM запрещены для автооткликов.
+Живые Telegram/HH/GLM проверяются после согласованного выпуска.
+[Результат и ограничения](updates/2026-11-01-hh-autonomous-search-development.md).
+
+These checks cover owner/member isolation, complete resume requirements, quiet
+skip/apply, private form handoff, monthly notices, cost provenance, revocation
+and original-ID recovery. External responses are fixtures; live acceptance
+requires an authorized rollout.
+
 Выбирай проверки по изменённым компонентам. Начинай с узкого набора, затем
 проверяй соседние сценарии. Команды ниже не означают, что проверки уже выполнены.
 Результаты запусков и развёртывания хранятся в [updates](updates/), прежняя

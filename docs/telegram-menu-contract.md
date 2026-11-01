@@ -67,6 +67,38 @@ authorization even if a user types a label or submits callback data directly.
 
 ## Inline controls
 
+### Автопоиск с LLM / Autonomous job search (local, November 1, 2026)
+
+По поручению владельца в личном разделе поиска работы бота и Mini App добавлен
+«Автопоиск с LLM». `job:auto` показывает состояние и объясняет автоотклики;
+`job:auto_on:<revision>` и `job:auto_off:<revision>` устанавливают явное состояние.
+Включение разрешает будущие отклики от выбранного личного резюме без отдельного
+подтверждения каждой вакансии. Согласие привязано к user/conversation/chat,
+резюме и revision подключения; stale/revoked/foreign callbacks не дают полномочий.
+Mini App использует GET/POST `/mini/api/jobs/automation` с проверенными session,
+CSRF, текущим jobs и scope записи поиска, а не переданным клиентом ID.
+
+По умолчанию режим выключен. Включённый режим не доставляет обычные карточки,
+оценки, отказы и успешные автоотклики. Тест/анкета передаётся в личный чат
+со ссылкой на вакансию. Проблемы входа, резюме и неопределённой отправки дают
+личное сообщение без повторного отклика; уведомление о расходах сохраняется.
+Выключение возвращает ручной режим для необработанных вакансий. Уже пропущенные
+автоматикой вакансии не рассылаются задним числом. Отдельное ручное подтверждение
+точного письма прежнее. Отключение не отменяет уже начатый внешний HTTP-запрос.
+Неполный снимок резюме не допускается к автооткликам: режим требует полного
+поддерживаемого DOM-чтения; legacy SSR остаётся только для ручного пути.
+
+The owner approved personal autonomous applications in Telegram and Mini App.
+Explicit revision-bound on/off controls authorize the selected personal resume;
+current access and provenance are rechecked. Routine cards, rejections and success
+messages stay quiet while enabled. Tests/forms and actionable failures go to the
+same user's private chat. Disabling restores manual delivery for unprocessed
+vacancies; rejected cards are not sent retroactively. Manual exact-text confirmation
+is unchanged. In-flight external requests cannot be recalled. Partial resume
+snapshots are rejected in auto mode. This change has not been deployed.
+
+[Implementation, checks and remaining acceptance](updates/2026-11-01-hh-autonomous-search-development.md).
+
 ### Mini App section navigation (local, October 26, 2026)
 
 At the owner's request to resolve the Mini App audit in stages, personal Mini App

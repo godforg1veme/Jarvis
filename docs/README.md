@@ -4,6 +4,15 @@
 
 ## Русский
 
+1 ноября локально подготовлен [автопоиск с LLM](updates/2026-11-01-hh-autonomous-search-development.md):
+личный переключатель в боте/Mini App, правдивый отбор частичных соответствий,
+тихие автоотклики, передача тестов и одно уведомление о $2 за месяц.
+Основная модель — GLM 5.3 Flash через существующий OpenRouter. На VPS не установлен.
+Нужны согласованный выпуск и живая проверка
+полного чтения резюме; неполный SSR-снимок намеренно блокирует автоматику.
+Живые синтетические GLM-пробы прошли. Для GLM обязателен reasoning low;
+описанный ниже режим 28 октября с disabled относится к прежней модели.
+
 27 октября установлена [диагностика чтения резюме HH](updates/2026-10-27-hh-resume-diagnostics-release.md).
 28 октября reader исправлен: сервер прочитал название, опыт и навыки выбранного
 резюме. Защита привязки писем и migration 053 установлены на DE.
@@ -150,6 +159,14 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 Архивы не заменяют действующие правила и новую проверку окружения.
 
 ## English
+
+November 1: [autonomous job search](updates/2026-11-01-hh-autonomous-search-development.md)
+is implemented locally: personal Telegram/Mini App controls, truthful partial-match
+selection, quiet applications, test handoff and one $2 monthly notice. It is not
+deployed. GLM 5.3 Flash uses the existing OpenRouter key. Authorized rollout and live complete-resume reading
+acceptance remain; partial legacy SSR snapshots intentionally block automation.
+Live synthetic GLM probes passed. GLM requires low reasoning; the October 28
+disabled-reasoning policy below describes the previous model.
 
 October 27: [HH resume read diagnostics](updates/2026-10-27-hh-resume-diagnostics-release.md)
 are deployed. On October 28, the fixed reader successfully read the selected

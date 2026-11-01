@@ -27,6 +27,7 @@ test('local resume fixture extracts explicit sections and excludes contact card'
       <aside>Телефон: +7 999 123 45 67</aside>` }));
     await page.goto('https://hh.ru/resume/fixture123');
     const snapshot = await readResumeContent(page, 'fixture123');
+    assert.deepEqual(await readResumeContent(page, 'fixture123', { requireComplete: true }), snapshot);
     assert.equal(snapshot.resumeId, 'fixture123');
     assert.equal(snapshot.grammaticalGender, 'unknown');
     assert.match(snapshot.experience, /Автоматизировала/);
@@ -82,6 +83,15 @@ const validState = (title = 'Product Manager') => ({ applicantResume: {
   experience: [{ position: 'Lead', description: 'Built reporting', id: 42 }],
 } });
 
+test('autonomous reading refuses partial visible resumes instead of silently dropping sections', async t => withBrowser(t, async browser => {
+  const page = await browser.newPage();
+  await page.route('https://hh.ru/resume/partial123', route => route.fulfill({status:200,contentType:'text/html; charset=utf-8',body:
+    '<main><h1>Developer</h1><section><h2>Обо мне</h2><p>Personal project</p></section></main>'}));
+  await page.goto('https://hh.ru/resume/partial123');
+  assert.equal((await readResumeContent(page,'partial123')).summary.includes('Personal project'),true);
+  await assert.rejects(readResumeContent(page,'partial123',{requireComplete:true}),{code:'JOB_HH_RESUME_UNAVAILABLE'});
+}));
+
 async function withBrowser(t, run) {
   let browser;
   try { browser = await chromium.launch({ headless: true, ...(process.platform === 'win32' ? { channel: 'msedge' } : {}) }); }
@@ -110,6 +120,7 @@ test('SSR fallback extracts every supported entry and keeps selected profiles se
     assert.match(snapshot.experience, new RegExp(profile.role));
     assert.match(snapshot.experience, /Built reporting[\s\S]*Second period/);
     assert.equal(snapshot.education, '');
+    await assert.rejects(readResumeContent(page, profile.id, { requireComplete: true }), { code: 'JOB_HH_RESUME_UNAVAILABLE' });
     await page.close();
   }));
 }));
