@@ -16,8 +16,10 @@ the existing `OPENROUTER_API_KEY` for fixed `z-ai/glm-5.3-flash` and retains
 the separate `JARVIS_JOB_BROWSER_APPLY_ENABLED=1`/apply credential boundary.
 Never put actual keys in this file or Git. Server/Mini App, job-browser and
 migrations 054/055 were installed together with owner authorization. Default
-monthly notice threshold is $2 and is informational. The new strict resume RPC
-must be supported by the browser before users enable automation.
+monthly notice threshold is $2 and is informational. The installed browser supports
+strict complete-resume reads from supported DOM or complete bound HH state;
+partial legacy snapshots and unsupported nonempty sections stop automation.
+[Live owner verification and remaining limits](../docs/updates/2026-11-01-hh-session-and-complete-resume-repair.md).
 [Behavior, verification and live acceptance](../docs/updates/2026-11-01-hh-autonomous-search-release.md).
 
 - production directory: `/home/deploy/apps/jarvis`;
@@ -489,21 +491,40 @@ exclusions must remain unchanged. NL receives source updates but runs no job
 collector/browser. Desktop does not need rebuilding for these server changes.
 
 Enabling the feature exposes the Telegram job path, but searches start only
-after that user activates settings. «Подключить HH» verifies the saved login
-and primary resume. Confirm the fact profile/examples before generating letters.
-Letter generation uses the shared automatic OpenRouter queue: verified free
-models first, then configured paid fallback. There is no per-user model setting
-or separate job-model environment variable. Keep the job budget notification
-threshold; it does not stop generation. See the
-[October 23 release](../docs/updates/2026-10-23-jobs-automatic-model-release.md).
-Live acceptance covers
-cards, edits/translation and restart/dedup; any real application requires a
-selected vacancy and an explicit confirmation of the exact letter in Telegram.
-Keep fixture send results separate from that live acceptance.
+after that user activates settings. «Подключить HH» starts the user's personal
+connection flow. Autonomous evaluation and auto-generated letters require the
+complete selected resume. Manual generation may use a supported partial snapshot;
+use confirmed facts and style examples when provided. Facts/examples are optional.
+HH evaluation and letters use fixed `z-ai/glm-5.3-flash` with the existing
+OpenRouter key; the main assistant's model queue is independent. There is no
+per-user model setting or separate job-model environment variable. The default
+`JARVIS_JOB_BUDGET_USD=2` is one informational notice per Moscow calendar month,
+not a spending stop. There is no daily application quota.
 
-Модель для писем выбирает общая автоматическая очередь OpenRouter. Ручной
-настройки модели поиска больше нет; отдельный порог расходов остаётся
-уведомлением. Текущее поведение и проверки описаны в записи выпуска выше.
+Manual sending requires the selected vacancy and exact-letter confirmation.
+Personal Autonomous job search defaults to off; activating it authorizes future
+applications for the selected resume and bound private scope. Current access,
+consent and connection revision are rechecked. Routine cards, skips and successes
+stay quiet; tests/forms and actionable failures go to the user's private chat.
+Do not enable users' automation as part of deployment. The owner completed live
+sign-in and complete-resume reading. Member flows, the new switch inside Telegram
+and the first real autonomous employer application remain for live acceptance.
+Keep fixture send results separate from live evidence.
+[Current release](../docs/updates/2026-11-01-hh-autonomous-search-release.md) and
+[resume verification](../docs/updates/2026-11-01-hh-session-and-complete-resume-repair.md).
+
+Оценка и HH-письма используют фиксированную GLM 5.3 Flash через существующий
+OpenRouter key, независимо от очереди основного чата. Персонального выбора модели
+и отдельной job-model переменной нет. `JARVIS_JOB_BUDGET_USD=2` означает одно
+уведомление за месяц по МСК, без остановки и дневного лимита откликов.
+Ручная отправка требует подтверждения точного письма; личное включение автопоиска
+разрешает будущие отклики от выбранного резюме в привязанном приватном scope.
+Права, согласие и revision перепроверяются. Обычные карточки, отказы и успехи
+не уведомляют; тесты, анкеты и проблемы передаются в личный чат. При выпуске
+автоматику пользователям не включай. Вход и полное чтение проверены у владельца;
+участники, переключатель внутри Telegram и первый реальный автоотклик ещё требуют
+живой приёмки. Подставные результаты отправки её не заменяют. Ссылки выше содержат
+текущий выпуск и доказательства чтения резюме.
 
 ### Human HH CAPTCHA replies through Telegram
 

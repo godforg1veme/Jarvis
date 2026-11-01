@@ -129,15 +129,20 @@ deadline across metadata, fetch and body reads.
 приоритет queued карточек после повторного чтения HH. Длительный свежий обход
 проверяет новую верхнюю часть выдачи, сохраняя старые периоды. Третий проход ежедневно
 сверяет всю выбранную глубину истории, хранит независимый прогресс и сводки пробелов.
-Миграции 047/048 применены; server/collector работают на `20b7a16`. Описание
-выпуска 24 октября ниже сохранено как история.
+Миграции 047/048 применены. Это схема, введённая 25 октября; версии позднейших
+server/collector/browser приведены в [ноябрьском выпуске](updates/2026-11-01-hh-autonomous-search-release.md)
+и [исправлении полного резюме](updates/2026-11-01-hh-session-and-complete-resume-repair.md).
+Описание выпуска 24 октября ниже сохранено как история.
 
 [Three HH lanes](updates/2026-10-25-hh-three-lane-release.md)
 are deployed on DE: five-minute checks with shared filters, independent progress,
 one browser/user lease and queued-card priority after rereading HH. Long fresh
 runs check new heads while retaining older ranges. A third lane reconciles the
 entire selected history range daily with independent progress and gap summaries.
-Migrations 047/048 are applied; server/collector run `20b7a16`.
+Migrations 047/048 are applied. This describes the scheme introduced on October 25;
+later server/collector/browser versions are recorded in the
+[November release](updates/2026-11-01-hh-autonomous-search-release.md) and
+[complete-resume repair](updates/2026-11-01-hh-session-and-complete-resume-repair.md).
 The October 24 release below remains as history.
 
 Публичный HH collector использует календарные окна DD.MM.YYYY по МСК и делит
@@ -297,10 +302,10 @@ TTL 48 часов, максимум 64 записи, доступ только �
 `JARVIS_OPENROUTER_FREE_FIRST` defaults to false. The approved free order is
 fixed; primary/fallback OpenRouter model IDs form the paid pool. This mode uses
 the primary key for the entire queue, without continuing to legacy account or
-Gemini fallbacks. Explicit Vision model selection is independent. HH letters
-use the same FreeFirstProvider queue on request, with the configured global
-paid fallback and no personal model override; see the
-[October 23 release](updates/2026-10-23-jobs-automatic-model-release.md).
+Gemini fallbacks. Explicit Vision model selection is independent. This queue
+serves the main assistant. HH evaluation and letters follow the separate fixed
+model policy below. The [October 23 shared HH queue](updates/2026-10-23-jobs-automatic-model-release.md)
+is historical and was superseded on November 1.
 
 Выпуск от 1 ноября установлен на DE: по выбору владельца оценка
 вакансий и HH-письма используют фиксированную `z-ai/glm-5.3-flash` через существующий

@@ -4,9 +4,9 @@
 
 This runbook covers the Happ subscription, Hysteria2 and VLESS/REALITY on the DE and NL VPN nodes. A subscription URL and client credentials are not changed when a node is demoted or its public Hysteria port pool changes. Do not enable probe timers, alter firewall rules, rotate credentials, restart Hysteria2, or modify DNS as part of diagnosis. Those are separate owner-confirmed operations.
 
-Current operational state (2026-09-24): all four owner-confirmed external
-test-device bindings have fresh healthy proofs. Both ~15-minute probe timers
-were separately enabled by the owner and have completed healthy scheduled
+Recorded acceptance on 2026-09-24: all four owner-confirmed external
+test-device bindings had fresh healthy proofs. Both ~15-minute probe timers
+were separately enabled by the owner and completed healthy scheduled
 runs. NL `vpn-nl.rilora.ru` resolves to its own address and has a DNS-01
 certificate while retaining the old `vpn.rilora.ru` TLS path; both names
 passed strict-TLS real-client probes. An owner-approved NL Xray service-failure
@@ -15,7 +15,8 @@ is the only production repair path exercised on a real failure so far. The
 other node/service combinations have code and simulated-test coverage but not
 their own live outage acceptance. Unattended certificate renewal has not yet
 been observed, and these checks do not establish 99.9% availability. Dated
-rollout notes below describe earlier states and must not be treated as current.
+rollout notes below retain their own acceptance scope. For a current diagnosis,
+check fresh proofs and timer state; this dated baseline is not a live snapshot.
 
 ## Monitoring, notifications, and repair scope
 
@@ -137,17 +138,18 @@ invalid configuration fails closed. Do not infer an exit address from either
 service's listener address. This source/config correction was deployed to both
 production nodes on 2026-09-24 and verified against each peer's independent
 egress. The production Host Agent regression suite and health snapshot passed;
-both VPN stacks stayed active and both probe timers stayed disabled. This does
-not accept any credential-backed path.
+both VPN stacks stayed active and both probe timers stayed disabled during that
+intermediate correction. Later credential acceptance enabled the timers, as
+recorded above. The correction alone did not accept a credential-backed path.
 
 ## Recovery paths and owner confirmation
 
-For a per-port restriction, retain the subscription URL and use the active port list after its refresh. For a broad UDP restriction, choose a VLESS 8443 entry; a server-side port change cannot bypass an access network that blocks all QUIC/UDP. A changed pool, credentials, DNS, firewall, or probe scheduling requires the existing owner-confirmation boundary. Timers stay disabled until the documented dedicated-credential acceptance has succeeded.
+For a per-port restriction, retain the subscription URL and use the active port list after its refresh. For a broad UDP restriction, choose a VLESS 8443 entry; a server-side port change cannot bypass an access network that blocks all QUIC/UDP. A changed pool, credentials, DNS, firewall, or probe scheduling requires the existing owner-confirmation boundary. For a new or revoked installation, timers must remain disabled until the documented dedicated-credential acceptance succeeds. This gate is not a claim that the already accepted timers are currently disabled.
 
-In the deployed server source, each owner-confirmed credential installation counts only after a fresh, node-matched authenticated `vless_tcp_8443` or `hysteria2_udp_hop` check is healthy. Timer activation requires four distinct matching proofs from the latest attempts within 24 hours. Legacy success records without this closed proof, failed rotations, and unknown results do not qualify. The following paragraphs retain dated acceptance history; the current state is at the top of this runbook.
+In the deployed server source, each owner-confirmed credential installation counts only after a fresh, node-matched authenticated `vless_tcp_8443` or `hysteria2_udp_hop` check is healthy. Timer activation requires four distinct matching proofs from the latest attempts within 24 hours. Legacy success records without this closed proof, failed rotations, and unknown results do not qualify. The following paragraphs retain dated acceptance history; the dated accepted baseline is at the top of this runbook; check current proofs separately.
 
 Earlier intermediate acceptance snapshot (2026-09-24; superseded by the
-current status above and the dated rollout records below): one owner-confirmed
+later accepted state above and the dated rollout records below): one owner-confirmed
 NL-to-DE VLESS test credential was installed at that point. Its original
 install/probe action remained
 `unknown`; the systemd attempt failed while loading credentials. A separate

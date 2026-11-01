@@ -4,6 +4,10 @@
 
 ## Русский
 
+1 ноября [сверены действующие руководства](updates/2026-11-01-current-documentation-refresh.md):
+ручной и автоматический HH, модель, расходы и отдельная приёмка профилей.
+
+
 1 ноября на DE установлен [автопоиск с LLM](updates/2026-11-01-hh-autonomous-search-release.md):
 личный переключатель в боте/Mini App, правдивый отбор частичных соответствий,
 тихие автоотклики, передача тестов и одно уведомление о $2 за месяц.
@@ -101,7 +105,7 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 
 23 октября выпущен [орбитальный Mini App и единый дизайн всех внутренних экранов](updates/2026-10-23-mini-app-orbital-release.md). GitHub, Windows и оба VPS синхронизированы; новый DE server healthy. Живое принятие на телефоне остаётся.
 
-Статус на 24 октября 2026 года по записям выпусков. Новую сверку окружения
+Сводка записей выпусков обновлена 1 ноября 2026 года. Новую сверку окружения
 проводи по [руководству по выпуску](release-workflow.md).
 Результат переноса истории и проверки сохранности правил:
 [уплотнение документации](updates/2026-10-23-documentation-consolidation.md).
@@ -110,9 +114,9 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 
 | Направление | Что подтверждено | Что ещё проверить |
 | --- | --- | --- |
-| HH: письма и история | [GLM 5.3 Flash и личный автопоиск](updates/2026-11-01-hh-autonomous-search-release.md) установлены на DE; режим по умолчанию выключен. [Полная история обновляется каждый час](updates/2026-10-22-hh-history-hourly-release.md) у всех подключённых пользователей с действующим доступом, независимо от поиска вакансий; архивные и неподтверждённые приглашения отмечаются отдельно | Реальные нажатия и отправка нового отклика с подтверждением |
-| HH: подключение и резюме | Личные профили по UUID, [вход по временной ссылке](updates/2026-10-21-hh-login-touch-release.md), [пустые фильтры и ввод фраз списком](updates/2026-10-21-empty-job-filters.md), [выбор резюме в боте и автоподнятие по умолчанию](updates/2026-10-22-hh-resume-bot-defaults-release.md). Явный off и остановка unknown сохраняются | Вход участника, клавиатура iPhone, выбор резюме и первое успешное поднятие; первый worker tick дал `not_due` |
-| HH: CAPTCHA и сбор | [Общий ремонт 24 октября](updates/2026-10-24-hh-complete-collection.md) выпущен на DE: branded reader, календарные окна, возобновление, owner/admin/member и уведомления. Обе проверенные CAPTCHA-паузы сняты; новые карточки доставляются. OCR до трёх попыток и остановка unknown сохранены | Полная накопленная выгрузка ещё идёт; следующий CAPTCHA-цикл; точная причина прежнего [403](updates/2026-10-18-hh-captcha-403-investigation.md) не установлена |
+| HH: письма, автопоиск и расходы | [GLM 5.3 Flash и личный автопоиск](updates/2026-11-01-hh-autonomous-search-release.md) установлены на DE. Реальные GLM-пробы прошли; тесты проверяют private scope, тихие отказы/успехи, передачу анкет и одно уведомление при $2 за месяц по МСК. Режим по умолчанию выключен. Почасовая сверка истории планируется независимо от поиска | Переключатель в настоящем Telegram, первый реальный автоотклик, живая передача теста и уведомление при фактическом достижении $2; расписание не доказывает завершённый полный обход |
+| HH: подключение и резюме | Код общий для всех UUID-профилей, изоляция проверена тестами. [Личный вход и полное чтение резюме владельца подтверждены](updates/2026-11-01-hh-session-and-complete-resume-repair.md); установлен reader полного привязанного состояния. Прежнее основное резюме сохранено, server state показал available=true при выключенной автоматике | Реальные входы и полные резюме участников, клавиатура iPhone, первое успешное поднятие. Неподдерживаемые непустые разделы требуют вмешательства; успешная проверка владельца не доказывает работу каждого профиля |
+| HH: CAPTCHA и сбор | [Общий сбор](updates/2026-10-24-hh-complete-collection.md), три прохода и сохранение прогресса установлены; после восстановления входа 1 ноября ограниченный тик свежей очереди завершился без failure code; очередь продолжает обход. OCR ограничен тремя попытками, unknown останавливает отправку | Старый исторический диапазон дал JOB_COLLECTION_WINDOW_EXPIRED; полный backlog не объявлен прочитанным. Следующий CAPTCHA-цикл. HTTP 403 с формой входа 1 ноября не устанавливает причину прежнего CAPTCHA-отказа |
 | Desktop | Установлена 1.0.2; [надёжность запросов и проверка результата по исходному ID](updates/2026-10-20-desktop-reliability-release.md), сверка установленного кода и bundled runtime прошли | Живой чат, микрофон, paired voice и реальные команды; при приёмке прямой Windows HTTPS/WSS был недоступен |
 | Telegram и Mini App | [Роли и личные разрешения](updates/2026-10-18-telegram-mini-app-release.md), [вход без внешнего SDK и удаление «Помощи»](updates/2026-10-18-mini-app-entry-help-removal.md); подпись, TTL и membership проверяются сервером | Реальные owner/admin/member сценарии, Telegram Web cookies и два аккаунта |
 | Operations UI | [Орбитальная панель](updates/2026-10-22-orbital-monitoring-release.md) и [живой фон](updates/2026-10-22-living-sky-release.md) установлены; девять разделов с реальными данными проверены | FPS и нагрузка физического телефона |
@@ -123,7 +127,7 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 | Планы | Облако и Windows — основные части продукта | PWA, server executors, расписания и реальные account connectors |
 
 Последние выпуски HH обновили затронутые компоненты DE server/collector/browser,
-применили миграции 044/045 и синхронизировали исходники обоих VPS. SHA, версии
+применили миграции по 055 включительно и синхронизировали исходники обоих VPS. SHA, версии
 образов и результаты тестов смотри в записи соответствующего выпуска.
 Совпадение исходников не заменяет проверку работающего компонента.
 
@@ -158,6 +162,10 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 Архивы не заменяют действующие правила и новую проверку окружения.
 
 ## English
+
+November 1: [current guides are reconciled](updates/2026-11-01-current-documentation-refresh.md):
+manual/autonomous HH, model policy, spending and separate profile acceptance.
+
 
 November 1: [autonomous job search](updates/2026-11-01-hh-autonomous-search-release.md)
 is deployed on DE: personal Telegram/Mini App controls, truthful partial-match
@@ -262,7 +270,7 @@ The [motion repair](updates/2026-10-23-mini-app-motion-fix.md) is deployed to DE
 
 October 23: the [orbital Mini App and shared design of all interior screens](updates/2026-10-23-mini-app-orbital-release.md) are deployed. GitHub, Windows and both VPS sources match; the new DE server is healthy. Physical phone acceptance remains.
 
-Status as of October 24, 2026, based on release records. Use the
+Release-record summary updated on November 1, 2026. Use the
 [release guide](release-workflow.md) for a fresh environment comparison.
 For history preservation and rule-retention checks, see the
 [documentation consolidation record](updates/2026-10-23-documentation-consolidation.md).
@@ -271,9 +279,9 @@ For history preservation and rule-retention checks, see the
 
 | Area | Verified result | Outstanding checks |
 | --- | --- | --- |
-| HH: letters and history | [GLM 5.3 Flash and personal autonomous search](updates/2026-11-01-hh-autonomous-search-release.md) are deployed on DE; automation defaults to off. [Full history refreshes hourly](updates/2026-10-22-hh-history-hourly-release.md) for all connected users with current access, independently of vacancy search; archived and unconfirmed invitations have separate labels | Real button taps and a newly confirmed application submission |
-| HH: connection and resumes | UUID-scoped profiles, [temporary sign-in links](updates/2026-10-21-hh-login-touch-release.md), [empty filters and multiline phrases](updates/2026-10-21-empty-job-filters.md), [bot resume selection and raising enabled by default](updates/2026-10-22-hh-resume-bot-defaults-release.md). Explicit off and unknown stops remain | Member sign-in, iPhone keyboard, resume selection and the first successful raise; the first worker tick returned `not_due` |
-| HH: CAPTCHA and collection | The [October 24 shared repair](updates/2026-10-24-hh-complete-collection.md) is deployed to DE: branded reader, calendar windows, resumption, owner/admin/member access and notices. Both checked CAPTCHA pauses cleared; new cards are being delivered. Three OCR attempts and unknown stops remain | Full backlog collection is ongoing; next CAPTCHA cycle; the exact cause of the earlier [403](updates/2026-10-18-hh-captcha-403-investigation.md) remains unknown |
+| HH: letters, automation and spending | [GLM 5.3 Flash and personal automation](updates/2026-11-01-hh-autonomous-search-release.md) are deployed on DE. Live GLM probes passed; tests cover private scope, quiet skips/successes, form handoff and one $2 notice per Moscow month. Automation defaults to off. Hourly history reconciliation is scheduled independently of search | The in-Telegram switch, first real autonomous application, live test handoff and a notice at actual $2 spend; a schedule does not prove a completed full scan |
+| HH: connection and resumes | Shared code covers all UUID profiles; isolation is tested. [Personal sign-in and complete resume reading passed for the owner](updates/2026-11-01-hh-session-and-complete-resume-repair.md). The bound-state reader is installed; the original primary was retained. Server state returned available=true with automation off | Real member sign-ins/resumes, iPhone keyboard and first successful raise. Unsupported nonempty sections need intervention; owner acceptance does not establish every profile works |
+| HH: CAPTCHA and collection | [Shared collection](updates/2026-10-24-hh-complete-collection.md), three lanes and durable progress are deployed. After November 1 sign-in recovery, a bounded fresh-queue tick finished without a failure code; collection continues. OCR allows three attempts; unknown stops submission | An old history range returned JOB_COLLECTION_WINDOW_EXPIRED; the full backlog is not accepted. Next CAPTCHA cycle. The November 1 HTTP 403 login page does not establish the cause of earlier CAPTCHA failures |
 | Desktop | Version 1.0.2 installed; [bounded requests and result checks by original ID](updates/2026-10-20-desktop-reliability-release.md), installed-source and bundled-runtime comparisons passed | Live chat, microphone, paired voice and real commands; direct Windows HTTPS/WSS was unavailable during acceptance |
 | Telegram and Mini App | [Roles and personal permissions](updates/2026-10-18-telegram-mini-app-release.md), [entry without the external SDK and Help removal](updates/2026-10-18-mini-app-entry-help-removal.md); server validation of signatures, TTL and membership | Actual owner/admin/member flows, Telegram Web cookies and two accounts |
 | Operations UI | [Orbital monitoring](updates/2026-10-22-orbital-monitoring-release.md) and [living sky](updates/2026-10-22-living-sky-release.md) installed; nine sections checked with real data | Physical-phone frame rate and load |
@@ -284,7 +292,7 @@ For history preservation and rule-retention checks, see the
 | Plans | Cloud and Windows are the main product components | PWA, server executors, schedules and real account connectors |
 
 The latest HH releases updated the affected DE server/collector/browser components,
-applied migrations 044/045 and synchronized both VPS source checkouts. SHAs,
+applied migrations through 055 and synchronized both VPS source checkouts. SHAs,
 image versions and test results belong in the relevant release record.
 Matching sources do not establish that a running component is up to date.
 

@@ -284,6 +284,12 @@ Fresh cards receive outbox priority; sent/unknown cards are not replayed. Incomp
 notices validate their own lane and retain one identity across head refreshes.
 Migrations 047/048 are applied. [Release and checks](updates/2026-10-25-hh-three-lane-release.md).
 
+История модели, 23 октября 2026: очередь писем, описанная в этом абзаце,
+заменена [фиксированной GLM и личным автопоиском 1 ноября](updates/2026-11-01-hh-autonomous-search-release.md).
+Historical model policy: the October 23 letter queue below was superseded by
+the November 1 fixed-GLM release linked above. Its old exact-letter approval
+description applies to manual sending; autonomous mode uses personal activation.
+
 23 октября 2026, по поручению владельца выпущено на DE: пункт «Модель AI»
 полностью удалён из настроек поиска работы. Ручной ID, пресеты, старый текстовый
 ввод `модель = ...` и callbacks поля больше не принимаются. Модель для писем

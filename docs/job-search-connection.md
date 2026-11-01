@@ -1,26 +1,95 @@
 # Подключение поиска работы
 
-## Текущий путь, 23 октября 2026
+## Текущий путь, 1 ноября 2026
 
 Каждый пользователь с действующим правом `jobs` подключает свой HH через
-Mini App и подтверждает основное резюме в исходной сессии. Вход открывает личный
-профиль браузера на DE; username не даёт доступа к чужому аккаунту.
-Текущий контракт: [Mini App](../mini-app/README.md).
+личную временную HTTPS-ссылку бота или Mini App и подтверждает основное резюме.
+Профиль изолирован по UUID; username и роль администратора не открывают чужой
+аккаунт. Права, выбранное резюме и revision перепроверяются сервером.
+[Контракт Mini App](../mini-app/README.md).
 
-История откликов и приглашений обновляется полностью раз в час независимо
-от включения поиска новых вакансий. Архивные и неподтверждённые приглашения
-имеют отдельные подписи. Модель для писем выбирается автоматически; ручного
-пункта и сохранённой персональной модели нет. Отправка письма требует прежнего
-подтверждения точного текста.
-Проверки и установка: [история HH](updates/2026-10-22-hh-history-hourly-release.md),
-[автоматическая модель](updates/2026-10-23-jobs-automatic-model-release.md).
+Оценка вакансий и HH-письма используют фиксированную `z-ai/glm-5.3-flash` через
+существующий `OPENROUTER_API_KEY`, отдельно от очереди основного чата. Ключи не
+нужно присылать в Telegram или чат разработки. Персонального выбора модели нет.
+`JARVIS_JOB_BUDGET_USD=2` — порог одного уведомления за календарный месяц по МСК;
+он не останавливает работу. Дневного лимита откликов нет.
 
-Each user with current `jobs` access connects a personal HH account through
-the Mini App and confirms the primary resume in the originating session.
-The connection opens that user's DE browser profile. History refreshes hourly,
-independently of vacancy search; archived and unconfirmed invitations have
-separate labels. Letters use automatic model selection and retain exact-text
-send confirmation. The links above own the current contract and release results.
+В ручном режиме карточки приходят пользователю, модель вызывается по запросу,
+а отправка требует подтверждения точного письма. Личный «Автопоиск с LLM» по
+умолчанию выключен. Включение разрешает будущие отклики от выбранного резюме
+в привязанном private scope. Отказы и успешные автоотклики не уведомляют;
+тесты, анкеты и проблемы передаются в личный Telegram. Выключение возвращает
+ручную доставку необработанных вакансий. Почасовая сверка истории откликов
+планируется независимо от поиска; расписание не доказывает успешный полный обход.
+
+Код общий для всех профилей; изоляция и ограничения доступа проверены тестами.
+Вход и полное чтение реального резюме подтверждены у владельца. Живые проверки
+участников, переключателя внутри Telegram и первого реального автоотклика открыты.
+[Выпуск](updates/2026-11-01-hh-autonomous-search-release.md) и
+[восстановление входа и полного резюме](updates/2026-11-01-hh-session-and-complete-resume-repair.md).
+
+Each user with current `jobs` permission connects a personal HH account through
+a temporary HTTPS link from the bot or Mini App and confirms the primary resume.
+Profiles are UUID-isolated; usernames and administrator roles grant no access to
+another account. The server rechecks access, selected resume and revision.
+See the Mini App contract linked above.
+
+Vacancy evaluation and HH letters use fixed `z-ai/glm-5.3-flash` with the existing
+OpenRouter key, separately from main chat routing. Never send keys in chat.
+There is no per-user model selector. `JARVIS_JOB_BUDGET_USD=2` triggers one notice
+per Moscow calendar month without stopping work; there is no daily application quota.
+Manual mode delivers cards, invokes the model on request and requires exact-letter
+approval before sending. Personal Autonomous job search defaults to off. Activation
+authorizes future applications for the selected resume and bound private scope.
+Rejections and successful applications stay quiet; tests, forms and actionable
+failures go to the user's private Telegram chat. Disabling restores manual
+handling of unprocessed vacancies. Hourly history reconciliation is scheduled
+independently of search; its schedule does not prove a completed full scan.
+
+The implementation applies to all profiles; tests cover isolation and access.
+Real sign-in and complete-resume reading passed for the owner. Member flows,
+the in-Telegram switch and the first real autonomous application remain open.
+The release and repair records linked above contain evidence and limits.
+
+## Восстановление подключения / Connection recovery
+
+HTTP 403 или заголовок `Server: ddos-guard` сами по себе не доказывают сетевую
+блокировку: HH может показать форму повторного входа на прежнем URL резюме.
+Проверь закрытый статус и тип страницы без вывода cookies, телефона, HTML или
+login ticket. Пароль и SMS-код вводит сам пользователь в личном окне HH.
+Сохраняй профиль и выбранное резюме; не копируй cookies между пользователями.
+
+Если HH требует вход, а Jarvis всё ещё показывает `connected`, это не рабочее
+подключение. Восстановление должно пройти штатный сервис личной login session с
+актуальными правами и подтверждением резюме. Кнопка входа пока не устраняет такую
+устаревшую запись автоматически; этот случай требует ограниченного серверного
+ремонта, как в записи 1 ноября. Не обходи его отключением проверок доступа или
+подменой браузерного UUID. После входа проверь `requireComplete:true`; неподдерживаемые
+непустые разделы курсов/сертификатов остаются причиной остановки, а не пустым резюме.
+
+`JOB_COLLECTION_WINDOW_EXPIRED` относится к диапазону поиска, а не к сессии HH.
+Проверь дату сохранённого прохода и отдельную очередь свежих вакансий. Не отмечай
+непрочитанный диапазон завершённым и не удаляй сохранённый progress/checkpoint,
+чтобы скрыть ошибку. Автопоиск включается лично после восстановления доступа.
+
+HTTP 403 or a `Server: ddos-guard` header alone does not prove a network block:
+HH may show its login form at the existing resume URL. Inspect only closed status
+and page classification, without logging cookies, phone, HTML or login tickets.
+The user enters password/SMS code in their own HH window. Preserve the profile
+and selected resume; never copy cookies between users.
+
+If HH needs login while Jarvis still reports connected, the connection is stale.
+Recovery uses the normal personal login-session service, current access and
+resume confirmation. The login button does not yet repair that stale record
+automatically; this case needs the bounded server repair documented on November 1.
+Do not disable access checks or substitute another browser UUID. Then verify
+`requireComplete:true`. Unsupported nonempty course/certificate sections must
+stop reading rather than be replaced with empty fields.
+
+`JOB_COLLECTION_WINDOW_EXPIRED` concerns a saved search range, not the HH session.
+Check that range and the independent fresh queue. Do not mark unread ranges
+complete or delete progress/checkpoints to hide failure. Automation requires
+personal activation after access is restored.
 
 ## История первого подключения, 15 октября 2026
 
@@ -52,8 +121,8 @@ send confirmation. The links above own the current contract and release results.
 выключенным. «Подключить HH» сверяет уже выполненный вход и выбранное основное
 резюме, сохраняет только метаданные в PG. Сборщик получает только read credential.
 Единый send/recovery E2E с PostgreSQL и Chromium прошёл на DE. Настоящий отклик
-ещё не отправлялся. [Текущий результат](updates/2026-10-15-job-search-development.md)
-и [параметры браузера](../job-browser/README.md) являются актуальным путём;
+ещё не отправлялся. [Результат этого этапа](updates/2026-10-15-job-search-development.md)
+и [параметры браузера](../job-browser/README.md) описывают тот этап; текущий путь приведён выше;
 OAuth-инструкции ниже сохраняют только историю.
 
 Состояние на 15 октября 2026: функция выпущена на DE после явного разрешения
@@ -62,7 +131,10 @@ OAuth-инструкции ниже сохраняют только истори
 описывает оставшиеся действия владельца для включения поиска и live-приёмки.
 API соискателя не используется.
 
-## Что уже настроено
+## История: настройка OpenRouter, 23 октября 2026
+
+Этот снимок заменён ноябрьской политикой выше. This snapshot was superseded by
+the November policy above. The $3 threshold below describes the old deployment.
 
 OpenRouter использует существующий `OPENROUTER_API_KEY`. Его значение не нужно
 присылать в Telegram или чат разработки. Выпущен [автоматический выбор модели](updates/2026-10-23-jobs-automatic-model-release.md):

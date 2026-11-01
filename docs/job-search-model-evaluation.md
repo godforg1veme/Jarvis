@@ -2,13 +2,16 @@
 
 Исторический результат от 15 октября 2026. Ручной выбор, описанный в решении
 ниже, заменён [автоматической очередью 23 октября](updates/2026-10-23-jobs-automatic-model-release.md).
-Сравнение сохраняется как результат того прогона; текущая доступность и цены
-определяются проверенным каталогом OpenRouter при работе очереди.
+Сравнение сохраняется как результат того прогона и не описывает действующую модель.
+С 1 ноября HH использует
+[фиксированную GLM 5.3 Flash](updates/2026-11-01-hh-autonomous-search-release.md);
+правила цены и провайдера приведены в записи выпуска.
 
 Historical evaluation from October 15, 2026. The manual-selection decision below
 was superseded by the automatic queue deployed on October 23, linked above.
-These results describe that evaluation run; the router checks current model
-availability and pricing through the OpenRouter catalog.
+These results describe that evaluation run, not the active model. Since November 1,
+HH uses [fixed GLM 5.3 Flash](updates/2026-11-01-hh-autonomous-search-release.md);
+the release record defines its provider and price rules.
 
 15 октября 2026, отдельные платные запросы через существующий ключ OpenRouter.
 Рабочая модель обычного чата Jarvis и настройки VPS не менялись.
