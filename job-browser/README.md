@@ -1,5 +1,14 @@
 # HH browser: чтение и проверка формы
 
+1 ноября восстановлены вход и полное чтение выбранного резюме. Reader поддерживает
+привязанное полное HH state; неполный legacy SSR по-прежнему блокирует автоматику.
+[Проверки и установка](../docs/updates/2026-11-01-hh-session-and-complete-resume-repair.md).
+
+November 1: sign-in and complete selected-resume reading are restored. The reader
+supports complete bound HH state and rejects partial legacy snapshots in auto mode.
+[Verification and deployment](../docs/updates/2026-11-01-hh-session-and-complete-resume-repair.md).
+
+
 Изолированный пакет для замены недоступного API соискателя. Реализованы чтение
 поиска, вакансий, собственных резюме и безопасная проверка формы. Сборщик
 подключён через приватный RPC. Подтверждённая отправка и read-only восстановление

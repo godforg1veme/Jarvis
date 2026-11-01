@@ -9,8 +9,8 @@
 тихие автоотклики, передача тестов и одно уведомление о $2 за месяц.
 GLM 5.3 Flash проверен через существующий OpenRouter; reasoning low обязателен.
 Исходники обоих VPS синхронизированы, сервер healthy, режим выключен по умолчанию.
-Живая HH-проба вернула ACCESS_DENIED; полное резюме и первый автоотклик ещё не
-подтверждены. Неполный SSR-снимок блокирует автоматику.
+[Вход HH восстановлен, полное резюме проверено](updates/2026-11-01-hh-session-and-complete-resume-repair.md).
+Первый реальный автоотклик ещё не подтверждён. Неполный снимок блокирует автоматику.
 
 27 октября установлена [диагностика чтения резюме HH](updates/2026-10-27-hh-resume-diagnostics-release.md).
 28 октября reader исправлен: сервер прочитал название, опыт и навыки выбранного
@@ -164,8 +164,8 @@ is deployed on DE: personal Telegram/Mini App controls, truthful partial-match
 selection, quiet applications, test handoff and one $2 monthly notice. GLM 5.3 Flash
 passed live probes with the existing OpenRouter key; low reasoning is required.
 Both VPS sources are synchronized, server is healthy, automation defaults to off.
-The live HH probe returned ACCESS_DENIED; complete resume reading and the first
-autonomous application remain unverified. Partial SSR snapshots block automation.
+[HH sign-in and complete resume reading are verified](updates/2026-11-01-hh-session-and-complete-resume-repair.md).
+The first autonomous application remains unverified. Partial snapshots block automation.
 
 October 27: [HH resume read diagnostics](updates/2026-10-27-hh-resume-diagnostics-release.md)
 are deployed. On October 28, the fixed reader successfully read the selected

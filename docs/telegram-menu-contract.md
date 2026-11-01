@@ -86,7 +86,8 @@ CSRF, текущим jobs и scope записи поиска, а не перед
 автоматикой вакансии не рассылаются задним числом. Отдельное ручное подтверждение
 точного письма прежнее. Отключение не отменяет уже начатый внешний HTTP-запрос.
 Неполный снимок резюме не допускается к автооткликам: режим требует полного
-поддерживаемого DOM-чтения; legacy SSR остаётся только для ручного пути.
+поддерживаемого DOM или полного структурированного состояния, привязанного
+к выбранному резюме; неполный legacy SSR остаётся только для ручного пути.
 
 The owner approved personal autonomous applications in Telegram and Mini App.
 Explicit revision-bound on/off controls authorize the selected personal resume;
@@ -95,8 +96,10 @@ messages stay quiet while enabled. Tests/forms and actionable failures go to the
 same user's private chat. Disabling restores manual delivery for unprocessed
 vacancies; rejected cards are not sent retroactively. Manual exact-text confirmation
 is unchanged. In-flight external requests cannot be recalled. Partial resume
-snapshots are rejected in auto mode. Deployed on DE; live HH and in-Telegram
-switch acceptance remain open. / Установлено на DE; живая приёмка HH и кнопки открыта.
+snapshots are rejected in auto mode; complete bound structured state is supported.
+[Live complete-resume reading passed / Полное живое резюме проверено](updates/2026-11-01-hh-session-and-complete-resume-repair.md).
+In-Telegram switch and first-application acceptance remain open. /
+Приёмка переключателя и первого автоотклика остаётся открытой.
 
 [Implementation, checks and remaining acceptance](updates/2026-11-01-hh-autonomous-search-release.md).
 

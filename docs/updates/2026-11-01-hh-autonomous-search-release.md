@@ -2,6 +2,9 @@
 
 1 ноября 2026 / November 1, 2026.
 
+Более новый результат: [вход и полное резюме восстановлены](2026-11-01-hh-session-and-complete-resume-repair.md).
+Newer result: [session and complete resume restored](2026-11-01-hh-session-and-complete-resume-repair.md).
+
 ## Русский
 
 По поручению владельца выпуск опубликован в GitHub main и установлен на DE.

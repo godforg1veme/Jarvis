@@ -9,7 +9,8 @@
 обновить разрешение. При выключении возвращается ручная доставка. Тесты и ошибки
 приходят в личный Telegram; $2 за месяц вызывают одно уведомление без остановки.
 [Проверки и ограничения](../docs/updates/2026-11-01-hh-autonomous-search-release.md).
-По умолчанию выключен. Живая приёмка HH и кнопки внутри Telegram остаётся открытой.
+По умолчанию выключен. [Вход и полное резюме HH проверены](../docs/updates/2026-11-01-hh-session-and-complete-resume-repair.md).
+Первый автоотклик и переключатель внутри Telegram ещё требуют живой приёмки.
 
 27 октября завершён [этап 5](../docs/updates/2026-10-27-mini-app-stage-five-release.md):
 подтверждённые загрузка/удаление документов, подключение/отключение устройств и
@@ -181,7 +182,8 @@ authorizes personal applications from the selected resume and offers renewed
 consent after a resume change. Disabling restores manual delivery. Tests and
 actionable failures go to private Telegram; one $2 monthly notice does not stop
 processing. [Checks and limits](../docs/updates/2026-11-01-hh-autonomous-search-release.md).
-It defaults to off. Live HH and in-Telegram switch acceptance remain open.
+It defaults to off. [HH sign-in and complete reading passed](../docs/updates/2026-11-01-hh-session-and-complete-resume-repair.md).
+The first application and in-Telegram switch remain for live acceptance.
 
 October 27: [stage 5](../docs/updates/2026-10-27-mini-app-stage-five-release.md)
 is complete: confirmed document upload/deletion, device pairing/revocation and
