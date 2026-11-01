@@ -27,7 +27,7 @@ function resumeSnapshotSchema(value, resumeId) {
 
 async function readResumeContent(page, resumeId, { requireComplete = false } = {}) {
   if (!ID.test(resumeId)) fail('invalid_id');
-  const raw = await page.evaluate(selectedId => {
+  const raw = await page.evaluate(({ selectedId, requireComplete }) => {
     const pathname = new URL(location.href).pathname;
     if (location.origin !== 'https://hh.ru' || pathname !== `/resume/${selectedId}`)
       return { failure: 'wrong_page' };
@@ -106,6 +106,90 @@ async function readResumeContent(page, resumeId, { requireComplete = false } = {
     };
     const titles = stringArray(candidate.title);
     const skills = stringArray(candidate.skills);
+    // The authenticated resume editor renders career cards without h2/h3 headings.
+    // Its bound initial state is complete only when every career field has an
+    // explicit, recognized shape. Keep all other state, including contacts, inside
+    // the browser context.
+    if (requireComplete) {
+      const required = ['experience', 'keySkills', 'resumeApplicantSkills', 'skills', 'educationLevel', 'primaryEducation', 'elementaryEducation',
+        'additionalEducation', 'attestationEducation', 'certificate', 'externalCertificates',
+        'availableExternalCertificates', 'language', 'employment', 'employmentForms',
+        'workFormats', 'workSchedule', 'relocation', 'businessTripReadiness', 'travelTime'];
+      if (candidate._attributes?.hash !== selectedId || !Array.isArray(candidate.hiddenFields)
+        || candidate.hiddenFields.length !== 0 || !titles?.length || !skills
+        || required.some(key => !Array.isArray(candidate[key]))
+        || root.querySelector('[aria-busy="true"]') || title[0] !== titles.join(' '))
+        return { failure: 'incomplete_content' };
+      // These optional fields have no observed complete schema yet. Never drop
+      // nonempty entries and call the result a full resume.
+      if (['additionalEducation', 'attestationEducation', 'certificate', 'externalCertificates',
+        'availableExternalCertificates'].some(key => candidate[key].length))
+        return { failure: 'ssr_shape' };
+      const keySkills = stringArray(candidate.keySkills);
+      const preferences = ['employment', 'employmentForms', 'workFormats', 'workSchedule',
+        'relocation', 'businessTripReadiness', 'travelTime'].map(key => [key, stringArray(candidate[key])]);
+      if (!keySkills || preferences.some(([, values]) => !values)) return { failure: 'ssr_shape' };
+      const boundedText = value => typeof value === 'string' && value.length <= 12000;
+      const date = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+        && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
+      const applicantSkills = [];
+      for (const item of candidate.resumeApplicantSkills) {
+        if (!item || typeof item !== 'object' || Array.isArray(item)
+          || !boundedText(item.name) || !item.name.trim()) return { failure: 'ssr_shape' };
+        let level = '';
+        if (item.level !== null && item.level !== undefined) {
+          if (typeof item.level === 'string' && boundedText(item.level)) level = item.level;
+          else if (Number.isInteger(item.level) && item.level >= 0 && item.level <= 100) level = String(item.level);
+          else if (typeof item.level === 'object' && !Array.isArray(item.level)
+            && boundedText(item.level.name) && item.level.name.trim()) level = item.level.name;
+          else return { failure: 'ssr_shape' };
+        }
+        applicantSkills.push(`${item.name.trim()}${level ? ` (уровень: ${level})` : ''}`);
+      }
+      const experience = [];
+      for (const item of candidate.experience) {
+        if (!item || typeof item !== 'object' || Array.isArray(item)
+          || !boundedText(item.position) || !item.position.trim()
+          || !boundedText(item.description) || !boundedText(item.companyName)
+          || !date(item.startDate) || !(item.endDate === null || date(item.endDate) && item.endDate >= item.startDate))
+          return { failure: 'ssr_shape' };
+        experience.push([item.position.trim(), item.companyName.trim(),
+          `${item.startDate} — ${item.endDate || 'по настоящее время'}`, item.description.trim()]
+          .filter(Boolean).join('\n'));
+      }
+      const educationLevels = stringArray(candidate.educationLevel);
+      if (!educationLevels) return { failure: 'ssr_shape' };
+      const education = educationLevels.length ? [`Уровень образования: ${educationLevels.join(', ')}`] : [];
+      for (const item of candidate.primaryEducation) {
+        if (!item || typeof item !== 'object' || Array.isArray(item)
+          || !boundedText(item.name) || !boundedText(item.organization) || !boundedText(item.result)
+          || !boundedText(item.educationLevel)
+          || !Number.isInteger(item.year) || item.year < 1900 || item.year > 2200)
+          return { failure: 'ssr_shape' };
+        education.push([item.name.trim(), item.organization.trim(), item.result.trim(), String(item.year), item.educationLevel]
+          .filter(Boolean).join(' · '));
+      }
+      for (const item of candidate.elementaryEducation) {
+        if (!item || typeof item !== 'object' || Array.isArray(item)
+          || !boundedText(item.name) || !Number.isInteger(item.year) || item.year < 1900 || item.year > 2200)
+          return { failure: 'ssr_shape' };
+        education.push([item.name.trim(), String(item.year)].filter(Boolean).join(' · '));
+      }
+      const language = [];
+      for (const item of candidate.language) {
+        if (!item || typeof item !== 'object' || Array.isArray(item)
+          || !Number.isInteger(item.id) || item.id < 1 || item.id > 9999
+          || !boundedText(item.degree) || !/^[A-Za-zА-Яа-я0-9_.-]{1,30}$/.test(item.degree))
+          return { failure: 'ssr_shape' };
+        language.push(`${{ 34: 'Русский', 57: 'Английский' }[item.id] || `Язык HH #${item.id}`} · ${item.degree}`);
+      }
+      const summary = [skills.join('\n'),
+        language.length ? `Языки: ${language.join(', ')}` : '',
+        ...preferences.filter(([, values]) => values.length).map(([key, values]) => `${key}: ${values.join(', ')}`)]
+        .filter(Boolean).join('\n\n');
+      return { title: titles.join(' '), blocks: { experience: experience.join('\n\n'),
+        skills: [...new Set([...keySkills, ...applicantSkills])].join(', '), education: education.join('\n\n'), summary }, complete: true };
+    }
     if (!titles || titles.length === 0 || !skills || !Array.isArray(candidate.experience))
       return { failure: 'ssr_shape' };
     const experience = [];
@@ -119,7 +203,7 @@ async function readResumeContent(page, resumeId, { requireComplete = false } = {
     }
     return { title: titles.join(' '), blocks: { experience: experience.join('\n\n'), skills: skills.join(', '),
       education: '', summary: '' } };
-  }, resumeId);
+  }, { selectedId: resumeId, requireComplete });
   if (raw?.failure) fail(raw.failure);
   if (!raw || typeof raw.title !== 'string' || !raw.blocks || typeof raw.blocks !== 'object') fail('invalid_shape');
   // The legacy SSR fallback does not prove education/about coverage. Never

@@ -83,6 +83,75 @@ const validState = (title = 'Product Manager') => ({ applicantResume: {
   experience: [{ position: 'Lead', description: 'Built reporting', id: 42 }],
 } });
 
+const completeState = (id = 'fixture123') => ({ applicantResume: {
+  _attributes: { hash: id }, hiddenFields: [], title: [{ string: 'Разработчик AI-систем' }],
+  experience: [
+    { position: 'Разработчик', companyName: 'Команда А', startDate: '2023-01-01', endDate: '2024-02-01', description: 'Создал голосовой интерфейс' },
+    { position: 'Инженер', companyName: 'Команда Б', startDate: '2024-03-01', endDate: null, description: 'Собрал LLM routing' },
+  ],
+  keySkills: [{ string: 'Node.js' }, { string: 'PostgreSQL' }],
+  resumeApplicantSkills: [{ name: 'API design', level: null }, { name: 'PostgreSQL', level: { id: 'advanced', name: 'Продвинутый', rank: 3 } }],
+  skills: [{ string: 'Разрабатываю настольную AI-систему' }],
+  educationLevel: [{ string: 'Высшее' }],
+  primaryEducation: [{ name: 'Университет', organization: 'Факультет ИТ', result: 'Программная инженерия', year: 2021, educationLevel: 'Высшее' }],
+  elementaryEducation: [{ name: 'Школа', year: 2017 }],
+  additionalEducation: [], attestationEducation: [], certificate: [], externalCertificates: [],
+  availableExternalCertificates: [], language: [{ id: 57, degree: 'B2' }],
+  employment: [{ string: 'full' }], employmentForms: [], workFormats: [], workSchedule: [],
+  relocation: [], businessTripReadiness: [], travelTime: [],
+  email: [{ string: 'hidden@example.com' }], phone: [{ formatted: '+7 999 123-45-67' }],
+} });
+
+test('bound HH editor state yields complete career history without contacts', async t => withBrowser(t, async browser => {
+  const page = await browser.newPage();
+  await page.route('https://hh.ru/resume/fixture123', route => route.fulfill({ status: 200,
+    contentType: 'text/html; charset=utf-8', body: `<main><h1>Разработчик AI-систем</h1>
+      <div data-qa="resume-list-card-experience"></div><div data-qa="resume-about-card"></div></main>
+      <template id="HH-Lux-InitialState">${JSON.stringify(completeState())}</template>` }));
+  await page.goto('https://hh.ru/resume/fixture123');
+  const resume = await readResumeContent(page, 'fixture123', { requireComplete: true });
+  assert.match(resume.experience, /Команда А[\s\S]*2023-01-01[\s\S]*голосовой/);
+  assert.match(resume.experience, /Команда Б[\s\S]*2024-03-01[\s\S]*LLM routing/);
+  assert.match(resume.skills, /Node.js, PostgreSQL, API design/);
+  assert.match(resume.skills, /PostgreSQL \(уровень: Продвинутый\)/);
+  assert.match(resume.education, /Высшее[\s\S]*Университет[\s\S]*Факультет ИТ[\s\S]*Школа/);
+  assert.match(resume.summary, /настольную AI-систему[\s\S]*Английский · B2/);
+  assert.doesNotMatch(JSON.stringify(resume), /hidden@example|999 123|"email"|"phone"/);
+  await page.close();
+}));
+
+test('complete HH state requires exact binding and typed career coverage', async t => withBrowser(t, async browser => {
+  const page = await browser.newPage(); let state = completeState();
+  await page.route('https://hh.ru/resume/fixture123', route => route.fulfill({ status: 200,
+    contentType: 'text/html; charset=utf-8', body: `<main><h1>Разработчик AI-систем</h1></main>
+      <template id="HH-Lux-InitialState">${JSON.stringify(state)}</template>` }));
+  const mutate = [
+    value => { value._attributes.hash = 'other'; },
+    value => { value.hiddenFields.push('experience'); },
+    value => { delete value.primaryEducation; },
+    value => { delete value.resumeApplicantSkills; },
+    value => { value.resumeApplicantSkills[1].name = null; },
+    value => { value.resumeApplicantSkills[1].level = { other: 'unknown' }; },
+    value => { value.experience[1].startDate = '2024-02-31'; },
+    value => { value.experience[1].endDate = '2023-01-01'; },
+    value => { value.primaryEducation[0].educationLevel = {}; },
+    value => { value.skills[0].string = 'Контактные данные: hidden@example.com'; },
+    value => { value.experience[1].description = 42; },
+    value => { value.certificate.push({ title: 'Unknown schema' }); },
+  ];
+  for (const change of mutate) {
+    state = completeState(); change(state.applicantResume);
+    await page.goto('https://hh.ru/resume/fixture123');
+    await assert.rejects(readResumeContent(page, 'fixture123', { requireComplete: true }),
+      { code: 'JOB_HH_RESUME_UNAVAILABLE' });
+  }
+  state = completeState(); state.applicantResume.primaryEducation = []; state.applicantResume.elementaryEducation = []; state.applicantResume.educationLevel = []; state.applicantResume.skills = [];
+  await page.goto('https://hh.ru/resume/fixture123');
+  const blankOptional = await readResumeContent(page, 'fixture123', { requireComplete: true });
+  assert.equal(blankOptional.education, ''); assert.equal(blankOptional.summary.includes('настольную'), false);
+  await page.close();
+}));
+
 test('autonomous reading refuses partial visible resumes instead of silently dropping sections', async t => withBrowser(t, async browser => {
   const page = await browser.newPage();
   await page.route('https://hh.ru/resume/partial123', route => route.fulfill({status:200,contentType:'text/html; charset=utf-8',body:
