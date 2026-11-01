@@ -9,6 +9,7 @@ const ASSETS = Object.freeze({
   'app.js': 'text/javascript; charset=utf-8',
   'jobConnect.js': 'text/javascript; charset=utf-8',
   'jobConnection.js': 'text/javascript; charset=utf-8',
+  'jobAutomation.js': 'text/javascript; charset=utf-8',
   'jobResumes.js': 'text/javascript; charset=utf-8',
   'jobResumes.css': 'text/css; charset=utf-8',
   'api.js': 'text/javascript; charset=utf-8',
