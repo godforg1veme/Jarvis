@@ -4,14 +4,13 @@
 
 ## Русский
 
-1 ноября локально подготовлен [автопоиск с LLM](updates/2026-11-01-hh-autonomous-search-development.md):
+1 ноября на DE установлен [автопоиск с LLM](updates/2026-11-01-hh-autonomous-search-release.md):
 личный переключатель в боте/Mini App, правдивый отбор частичных соответствий,
 тихие автоотклики, передача тестов и одно уведомление о $2 за месяц.
-Основная модель — GLM 5.3 Flash через существующий OpenRouter. На VPS не установлен.
-Нужны согласованный выпуск и живая проверка
-полного чтения резюме; неполный SSR-снимок намеренно блокирует автоматику.
-Живые синтетические GLM-пробы прошли. Для GLM обязателен reasoning low;
-описанный ниже режим 28 октября с disabled относится к прежней модели.
+GLM 5.3 Flash проверен через существующий OpenRouter; reasoning low обязателен.
+Исходники обоих VPS синхронизированы, сервер healthy, режим выключен по умолчанию.
+Живая HH-проба вернула ACCESS_DENIED; полное резюме и первый автоотклик ещё не
+подтверждены. Неполный SSR-снимок блокирует автоматику.
 
 27 октября установлена [диагностика чтения резюме HH](updates/2026-10-27-hh-resume-diagnostics-release.md).
 28 октября reader исправлен: сервер прочитал название, опыт и навыки выбранного
@@ -111,7 +110,7 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 
 | Направление | Что подтверждено | Что ещё проверить |
 | --- | --- | --- |
-| HH: письма и история | [Автоматический выбор модели](updates/2026-10-23-jobs-automatic-model-release.md): проверенные бесплатные модели, затем общий платный резерв; ручная настройка удалена. [Полная история обновляется каждый час](updates/2026-10-22-hh-history-hourly-release.md) у всех подключённых пользователей с действующим доступом, независимо от поиска вакансий; архивные и неподтверждённые приглашения отмечаются отдельно | Реальные нажатия и отправка нового отклика с подтверждением |
+| HH: письма и история | [GLM 5.3 Flash и личный автопоиск](updates/2026-11-01-hh-autonomous-search-release.md) установлены на DE; режим по умолчанию выключен. [Полная история обновляется каждый час](updates/2026-10-22-hh-history-hourly-release.md) у всех подключённых пользователей с действующим доступом, независимо от поиска вакансий; архивные и неподтверждённые приглашения отмечаются отдельно | Реальные нажатия и отправка нового отклика с подтверждением |
 | HH: подключение и резюме | Личные профили по UUID, [вход по временной ссылке](updates/2026-10-21-hh-login-touch-release.md), [пустые фильтры и ввод фраз списком](updates/2026-10-21-empty-job-filters.md), [выбор резюме в боте и автоподнятие по умолчанию](updates/2026-10-22-hh-resume-bot-defaults-release.md). Явный off и остановка unknown сохраняются | Вход участника, клавиатура iPhone, выбор резюме и первое успешное поднятие; первый worker tick дал `not_due` |
 | HH: CAPTCHA и сбор | [Общий ремонт 24 октября](updates/2026-10-24-hh-complete-collection.md) выпущен на DE: branded reader, календарные окна, возобновление, owner/admin/member и уведомления. Обе проверенные CAPTCHA-паузы сняты; новые карточки доставляются. OCR до трёх попыток и остановка unknown сохранены | Полная накопленная выгрузка ещё идёт; следующий CAPTCHA-цикл; точная причина прежнего [403](updates/2026-10-18-hh-captcha-403-investigation.md) не установлена |
 | Desktop | Установлена 1.0.2; [надёжность запросов и проверка результата по исходному ID](updates/2026-10-20-desktop-reliability-release.md), сверка установленного кода и bundled runtime прошли | Живой чат, микрофон, paired voice и реальные команды; при приёмке прямой Windows HTTPS/WSS был недоступен |
@@ -160,13 +159,13 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 
 ## English
 
-November 1: [autonomous job search](updates/2026-11-01-hh-autonomous-search-development.md)
-is implemented locally: personal Telegram/Mini App controls, truthful partial-match
-selection, quiet applications, test handoff and one $2 monthly notice. It is not
-deployed. GLM 5.3 Flash uses the existing OpenRouter key. Authorized rollout and live complete-resume reading
-acceptance remain; partial legacy SSR snapshots intentionally block automation.
-Live synthetic GLM probes passed. GLM requires low reasoning; the October 28
-disabled-reasoning policy below describes the previous model.
+November 1: [autonomous job search](updates/2026-11-01-hh-autonomous-search-release.md)
+is deployed on DE: personal Telegram/Mini App controls, truthful partial-match
+selection, quiet applications, test handoff and one $2 monthly notice. GLM 5.3 Flash
+passed live probes with the existing OpenRouter key; low reasoning is required.
+Both VPS sources are synchronized, server is healthy, automation defaults to off.
+The live HH probe returned ACCESS_DENIED; complete resume reading and the first
+autonomous application remain unverified. Partial SSR snapshots block automation.
 
 October 27: [HH resume read diagnostics](updates/2026-10-27-hh-resume-diagnostics-release.md)
 are deployed. On October 28, the fixed reader successfully read the selected
@@ -272,7 +271,7 @@ For history preservation and rule-retention checks, see the
 
 | Area | Verified result | Outstanding checks |
 | --- | --- | --- |
-| HH: letters and history | [Automatic model selection](updates/2026-10-23-jobs-automatic-model-release.md): verified free models, then global paid fallback; manual selection is removed. [Full history refreshes hourly](updates/2026-10-22-hh-history-hourly-release.md) for all connected users with current access, independently of vacancy search; archived and unconfirmed invitations have separate labels | Real button taps and a newly confirmed application submission |
+| HH: letters and history | [GLM 5.3 Flash and personal autonomous search](updates/2026-11-01-hh-autonomous-search-release.md) are deployed on DE; automation defaults to off. [Full history refreshes hourly](updates/2026-10-22-hh-history-hourly-release.md) for all connected users with current access, independently of vacancy search; archived and unconfirmed invitations have separate labels | Real button taps and a newly confirmed application submission |
 | HH: connection and resumes | UUID-scoped profiles, [temporary sign-in links](updates/2026-10-21-hh-login-touch-release.md), [empty filters and multiline phrases](updates/2026-10-21-empty-job-filters.md), [bot resume selection and raising enabled by default](updates/2026-10-22-hh-resume-bot-defaults-release.md). Explicit off and unknown stops remain | Member sign-in, iPhone keyboard, resume selection and the first successful raise; the first worker tick returned `not_due` |
 | HH: CAPTCHA and collection | The [October 24 shared repair](updates/2026-10-24-hh-complete-collection.md) is deployed to DE: branded reader, calendar windows, resumption, owner/admin/member access and notices. Both checked CAPTCHA pauses cleared; new cards are being delivered. Three OCR attempts and unknown stops remain | Full backlog collection is ongoing; next CAPTCHA cycle; the exact cause of the earlier [403](updates/2026-10-18-hh-captcha-403-investigation.md) remains unknown |
 | Desktop | Version 1.0.2 installed; [bounded requests and result checks by original ID](updates/2026-10-20-desktop-reliability-release.md), installed-source and bundled-runtime comparisons passed | Live chat, microphone, paired voice and real commands; direct Windows HTTPS/WSS was unavailable during acceptance |

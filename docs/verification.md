@@ -16,13 +16,14 @@ node scripts/testMiniAppClient.cjs
 Проверяются owner/member scopes, полное резюме, quiet skip/apply, тесты/анкеты,
 $2 за МСК-месяц, cost basis, CAS/off/revocation, исходный ID и перезапуск.
 Внешние ответы подставные; SSR/частичный DOM запрещены для автооткликов.
-Живые Telegram/HH/GLM проверяются после согласованного выпуска.
-[Результат и ограничения](updates/2026-11-01-hh-autonomous-search-development.md).
+GLM и установленная публичная Mini App проверены при выпуске. Живая приёмка HH
+и кнопки внутри Telegram остаётся открытой.
+[Результат и ограничения](updates/2026-11-01-hh-autonomous-search-release.md).
 
 These checks cover owner/member isolation, complete resume requirements, quiet
 skip/apply, private form handoff, monthly notices, cost provenance, revocation
-and original-ID recovery. External responses are fixtures; live acceptance
-requires an authorized rollout.
+and original-ID recovery. External responses are fixtures. Live GLM and public
+Mini App checks passed during rollout; HH and in-Telegram switch acceptance remain open.
 
 Выбирай проверки по изменённым компонентам. Начинай с узкого набора, затем
 проверяй соседние сценарии. Команды ниже не означают, что проверки уже выполнены.

@@ -302,21 +302,22 @@ use the same FreeFirstProvider queue on request, with the configured global
 paid fallback and no personal model override; see the
 [October 23 release](updates/2026-10-23-jobs-automatic-model-release.md).
 
-Локальное изменение от 1 ноября, ещё не выпущенное: по выбору владельца оценка
+Выпуск от 1 ноября установлен на DE: по выбору владельца оценка
 вакансий и HH-письма используют фиксированную `z-ai/glm-5.3-flash` через существующий
 OpenRouter key, с сортировкой провайдеров по цене, strict JSON и reasoning low,
 обязательным для GLM. Внутренний текст reasoning не попадает в ответ.
 FreeFirst основного чата не меняется. Стоимость берётся из usage OpenRouter;
-отсутствующая сумма остаётся unknown.
-[Проверки и текущий статус](updates/2026-11-01-hh-autonomous-search-development.md).
+отсутствующая сумма остаётся unknown. Автоматика по умолчанию выключена;
+полное чтение живого резюме и первый автоотклик ещё не подтверждены.
+[Проверки и текущий статус](updates/2026-11-01-hh-autonomous-search-release.md).
 
-Local November 1 change, not deployed: the owner selected fixed GLM 5.3 Flash
+November 1 release, deployed on DE: the owner selected fixed GLM 5.3 Flash
 for vacancy evaluation and HH letters through the existing OpenRouter key.
 Price-sorted providers must support strict output and low reasoning, required
 by GLM; internal reasoning text is excluded from output.
 Main chat FreeFirst is unchanged; costs use OpenRouter usage, with missing
-amounts remaining unknown. The October 23 deployed policy above is superseded
-only after this local change receives release authorization.
+amounts remaining unknown. This supersedes the October 23 HH model policy above.
+Automation defaults to off; live complete-resume and first-application acceptance remain open.
 
 Refresh happens on use after 15 minutes; it updates metadata, not the allowlist.
 Provider price ceilings protect zero-price routing even between refreshes.

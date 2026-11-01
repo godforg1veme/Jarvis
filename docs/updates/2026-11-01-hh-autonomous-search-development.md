@@ -1,6 +1,10 @@
 # Автопоиск с LLM / Autonomous job search
 
-1 ноября 2026. Локальная ветка `codex/hh-truthful-reframing`. Не опубликовано.
+История локальной разработки от 1 ноября 2026. Заменена более новым
+[результатом выпуска](2026-11-01-hh-autonomous-search-release.md).
+
+Historical local development record, November 1, 2026. Superseded by the
+[deployed release](2026-11-01-hh-autonomous-search-release.md).
 
 ## Русский
 

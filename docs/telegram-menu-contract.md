@@ -67,7 +67,7 @@ authorization even if a user types a label or submits callback data directly.
 
 ## Inline controls
 
-### Автопоиск с LLM / Autonomous job search (local, November 1, 2026)
+### Автопоиск с LLM / Autonomous job search (deployed, November 1, 2026)
 
 По поручению владельца в личном разделе поиска работы бота и Mini App добавлен
 «Автопоиск с LLM». `job:auto` показывает состояние и объясняет автоотклики;
@@ -95,9 +95,10 @@ messages stay quiet while enabled. Tests/forms and actionable failures go to the
 same user's private chat. Disabling restores manual delivery for unprocessed
 vacancies; rejected cards are not sent retroactively. Manual exact-text confirmation
 is unchanged. In-flight external requests cannot be recalled. Partial resume
-snapshots are rejected in auto mode. This change has not been deployed.
+snapshots are rejected in auto mode. Deployed on DE; live HH and in-Telegram
+switch acceptance remain open. / Установлено на DE; живая приёмка HH и кнопки открыта.
 
-[Implementation, checks and remaining acceptance](updates/2026-11-01-hh-autonomous-search-development.md).
+[Implementation, checks and remaining acceptance](updates/2026-11-01-hh-autonomous-search-release.md).
 
 ### Mini App section navigation (local, October 26, 2026)
 
