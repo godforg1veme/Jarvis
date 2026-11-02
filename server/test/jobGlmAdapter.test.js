@@ -35,7 +35,7 @@ test('GLM evaluation uses the same model/key and returns only the validated deci
     body=JSON.parse(init.body);return completion(JSON.stringify({ decision: 'apply',
       directionMatched: true, reasonCode: 'DIRECTION_FIT', rationale: 'Fixture direction matches' }));}});
   const result=await adapter.evaluate(input);
-  assert.equal(body.model,JOB_MODEL);assert.equal(body.max_tokens,1024);
+  assert.equal(body.model,JOB_MODEL);assert.equal(body.max_tokens,6000);
   assert.deepEqual(body.response_format.json_schema.schema.properties.decision.enum,['apply','skip']);
   assert.deepEqual(body.response_format.json_schema.schema.properties.reasonCode.enum,
     ['DIRECTION_FIT','OUT_OF_DIRECTION','INSUFFICIENT_FIT','MANDATORY_REQUIREMENT','USER_CONSTRAINT','UNCERTAIN']);

@@ -2,6 +2,13 @@
 
 ## Контекст HH и ответы работодателю / HH context and employer answers
 
+Локальный ремонт лимита оценки после выпуска: 24/24 профильных и 916 серверных
+тестов прошли, 2 PostgreSQL-проверки пропущены; отдельная вымышленная GLM-проба
+вернула валидное решение. [Причина и ограничения](updates/2026-11-02-hh-evaluation-token-budget.md).
+Local post-release evaluation-cap repair: 24/24 focused and 916 server tests passed,
+two PostgreSQL checks skipped; a separate fictional GLM probe returned a valid
+decision. The linked record distinguishes local changes from the installed release.
+
 Выпущено на DE 2 ноября: [результаты и ограничения](updates/2026-11-02-hh-context-and-answers-release.md).
 916 серверных тестов прошли; две проверки отдельно прошли с PostgreSQL.
 Telegram 78/78, Linux browser/driver 122/122, изолированные PostgreSQL-наборы 45/45.

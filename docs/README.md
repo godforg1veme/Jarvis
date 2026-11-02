@@ -4,6 +4,11 @@
 
 ## Русский
 
+2 ноября после выпуска обнаружен [недостаточный лимит reasoning при оценке HH](updates/2026-11-02-hh-evaluation-token-budget.md).
+Для вакансии 138512145 запрос дошёл до модели, но весь лимит 1024 токена ушёл
+на reasoning. Локально лимит увеличен до 6000; 24 профильных и 916 серверных
+тестов прошли. Исправление ещё не установлено; исходная unknown-операция не повторялась.
+
 2 ноября на DE [исправлен отбор HH и добавлены ответы работодателю](updates/2026-11-02-hh-context-and-answers-release.md):
 полный контекст фильтров, проверка направления, защита от выдуманных намерений и
 поддерживаемые нативные вопросы HH. Server/browser healthy, миграции 056/057
@@ -168,6 +173,11 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 Архивы не заменяют действующие правила и новую проверку окружения.
 
 ## English
+
+November 2: a [too-small HH evaluation reasoning allowance](updates/2026-11-02-hh-evaluation-token-budget.md)
+was found after release. Vacancy 138512145 reached the model, but reasoning used
+the entire 1024-token cap. A local 6000-token repair passed 24 focused and 916
+server tests. It is not deployed; the original unknown operation was not retried.
 
 November 2: [HH selection and employer answers](updates/2026-11-02-hh-context-and-answers-release.md)
 are deployed on DE: complete filter context, direction checks, unsupported-intent

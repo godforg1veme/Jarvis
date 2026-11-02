@@ -57,7 +57,9 @@ class JobModelAdapter {
       finishReason: choice.finish_reason, usage, requestId, model: JOB_MODEL };
   }
   async evaluate(input) {
-    const result = await this.generate({ messages: buildVacancyPrompt(input), maxTokens: 1024, responseFormat: DECISION_FORMAT });
+    // The cap includes GLM's required reasoning, even when it is excluded from
+    // visible output. A 1024-token allowance can end before the decision JSON.
+    const result = await this.generate({ messages: buildVacancyPrompt(input), maxTokens: 6000, responseFormat: DECISION_FORMAT });
     try { return { ...parseVacancyDecision(result.text, result.finishReason), usage: result.usage, requestId: result.requestId }; }
     catch (error) { throw Object.assign(error, { modelUsage: result.usage, modelRequestId: result.requestId }); }
   }
