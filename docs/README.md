@@ -4,6 +4,14 @@
 
 ## Русский
 
+2 ноября [браузеру HH выделены 3 CPU после сравнения с 1 и 2 CPU](updates/2026-11-02-hh-throughput.md):
+при переходе с 1 на 2 CPU среднее чтение полного резюме сократилось с 22,55 до 9,34 секунды.
+При 3 CPU получено 9,69 секунды против 10,82 в новой контрольной серии при 2 CPU;
+устойчивый дополнительный выигрыш пока не доказан.
+Кэш резюме на 60 секунд подготовлен локально: 921 серверный тест и отдельно
+9 профильных с PostgreSQL прошли. Код кэша ещё не установлен; новая ошибка модели
+до изменения CPU помешала сравнению общего темпа откликов.
+
 2 ноября после выпуска обнаружен [недостаточный лимит reasoning при оценке HH](updates/2026-11-02-hh-evaluation-token-budget.md).
 Для вакансии 138512145 запрос дошёл до модели, но весь лимит 1024 токена ушёл
 на reasoning. Лимит увеличен до 6000 и установлен на DE; 24 профильных и 916 серверных
@@ -173,6 +181,14 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 Архивы не заменяют действующие правила и новую проверку окружения.
 
 ## English
+
+On November 2, [the HH browser received 3 CPUs after comparison with 1 and 2 CPUs](updates/2026-11-02-hh-throughput.md):
+at 2 CPUs, mean complete-resume read time fell from 22.55 to 9.34 seconds.
+Three CPUs averaged 9.69 seconds against 10.82 in a new 2-CPU control series;
+a sustained extra benefit remains unproven. A 60-second resume
+cache is prepared locally: 921 server tests and separately 9 focused PostgreSQL
+tests passed. The cache is not deployed; a new model error before the CPU change
+prevented comparing overall application throughput.
 
 November 2: a [too-small HH evaluation reasoning allowance](updates/2026-11-02-hh-evaluation-token-budget.md)
 was found after release. Vacancy 138512145 reached the model, but reasoning used
