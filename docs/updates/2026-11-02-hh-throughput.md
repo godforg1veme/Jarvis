@@ -70,10 +70,34 @@ GitHub и исходники VPS этим изменением не обновл
 пользователей, отзыв доступа и смена подключения во время чтения, лимит записей.
 Тестовая БД и закрытая Docker-сеть удалены после проверки.
 
-Код и документация остаются локально до поручения на публикацию. Для установки
-кэша требуется выпустить server; browser image и Desktop менять не требуется.
+После этих проверок владелец поручил оставить 3 CPU и установить изменения.
+Код кэша выпущен на DE; browser image и Desktop не менялись.
 Отбор вакансий, распознавание формы и причина новой ошибки модели в эту задачу
 не входят и остаются отдельными незакрытыми вопросами.
+
+### Выпуск
+
+Код `2c8d0dfce324c33271f27a7fadd6a863943a6439` опубликован в GitHub main.
+DE server использует `jarvis-hh-throughput-server:2c8d0df` из immutable release
+`/home/deploy/releases/jarvis-2c8d0df-hh-throughput`; замена завершена
+2 ноября в 14:45:42 МСК. Windows и исходники обоих VPS синхронизированы.
+
+Source/release guard, preflight и CAPTCHA-конфигурация прошли. Все 384 файла
+src/shared в образе совпали с опубликованным кодом. Полный набор в новом образе
+с публичными исходниками/fixtures: 921 passed, 2 PostgreSQL skipped.
+Первый запуск тестов с одним test-каталогом выявил недостающие соседние fixtures;
+после добавления полного публичного дерева набор прошёл без ошибок.
+
+Server healthy, restart count 0; внутренние live/ready и публичные curl-smoke
+прошли с HTTP 200. Окружение и mounts совпали, inode секрета сохранён,
+семь остальных контейнеров не менялись. Browser сохранил профиль и лимит 3 CPU.
+Сверка установленного сервера проверила 386 файлов и Compose inputs.
+NL получил исходники; Host Agent, VPN и Desktop не менялись. Общая Desktop-сверка
+по-прежнему отмечает только отсутствующий неиспользуемый клиентом
+`shared/jobQuestionnaire.js`, известный по предыдущему выпуску.
+
+Кэш действует в работающем сервисе для будущих обращений. Ускорение полного
+автоматического отклика после установки пока отдельно не измерено.
 
 ## English
 
@@ -147,7 +171,31 @@ includes TTL, completeness, copying, failures, concurrent requests, user isolati
 access revocation and connection changes during a read, and bounded entries.
 The test database and internal Docker network were removed after validation.
 
-Code and documentation remain local pending publication authorization. Installing
-the cache requires a server release; the browser image and Desktop need no update.
+After these checks, the owner authorized keeping 3 CPUs and deploying the changes.
+The cache is now deployed on DE; the browser image and Desktop did not change.
 Vacancy selection, form recognition and the cause of the new model error are
 outside this task and remain open.
+
+### Deployment
+
+Code `2c8d0dfce324c33271f27a7fadd6a863943a6439` was published to GitHub main.
+DE server uses `jarvis-hh-throughput-server:2c8d0df` from immutable release
+`/home/deploy/releases/jarvis-2c8d0df-hh-throughput`; cutover completed on
+November 2 at 14:45:42 Moscow time. Windows and both VPS source checkouts are synchronized.
+
+Source/release guards, preflight and CAPTCHA configuration passed. All 384
+src/shared image files matched published code. The complete suite in the new image
+with public source/fixtures passed 921 tests, with two PostgreSQL skips.
+The first test attempt mounted only the test directory and exposed missing
+neighboring fixtures; the complete public source tree resolved those failures.
+
+Server is healthy with zero restarts; internal live/ready and public curl smoke
+checks passed with HTTP 200. Environment and mounts match, the secret inode was
+preserved, and seven other containers were retained. The browser retained its
+profile and 3-CPU limit. Installed-server verification checked 386 files and
+Compose inputs. NL received source only; Host Agent, VPN and Desktop were unchanged.
+The broad Desktop check still flags only the missing, unused-by-client
+`shared/jobQuestionnaire.js`, known from the previous release.
+
+The running service now uses the cache for future requests. Complete automatic
+application throughput after deployment has not been measured separately.

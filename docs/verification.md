@@ -3,10 +3,11 @@
 ## Скорость HH и кэш резюме / HH throughput and resume cache
 
 [Замеры и статус установки](updates/2026-11-02-hh-throughput.md): 3 CPU уже на DE после сравнения 1/2/3;
-кэш пока локально. `npm test --prefix server`: 921 passed, 2 skipped.
+кэш установлен на DE. `npm test --prefix server`: 921 passed, 2 skipped; тот же результат в новом образе.
 `node --test server/test/jobResumeContext.test.js` с отдельной PostgreSQL: 9/9.
 Live CPU comparison and cache probe are documented in the linked result; cache
-deployment remains pending. The database checks used an isolated Docker PostgreSQL.
+is deployed on DE, with healthy server and public live/ready HTTP 200.
+The database checks used an isolated Docker PostgreSQL.
 
 ## Контекст HH и ответы работодателю / HH context and employer answers
 

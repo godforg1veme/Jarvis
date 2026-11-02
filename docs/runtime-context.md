@@ -354,14 +354,14 @@ are applied and server/browser are healthy. A real new questionnaire remains
 unverified. Unknown outcomes retain their original ID without resubmission.
 
 2 ноября лимит HH browser на DE увеличен до 3 CPU без перезапуска после замеров 1/2/3 CPU.
-Подготовленный локально `JobResumeContextService` повторно использует снимок
+Установленный на DE `JobResumeContextService` повторно использует снимок
 60 секунд (до 32 записей), с ключом user/resume/connection revision/completeness
-и свежей проверкой прав и подключения при каждом вызове. Код кэша ещё не выпущен.
+и свежей проверкой прав и подключения при каждом вызове. Код кэша выпущен как `2c8d0df`.
 [Замеры, проверки и ограничения](updates/2026-11-02-hh-throughput.md).
-November 2: the DE HH browser now has 3 CPUs without a restart after 1/2/3 CPU comparisons. The locally
-prepared resume service reuses snapshots for 60 seconds (up to 32 entries), keyed
+November 2: the DE HH browser now has 3 CPUs without a restart after 1/2/3 CPU comparisons. The deployed
+resume service reuses snapshots for 60 seconds (up to 32 entries), keyed
 by user/resume/connection revision/completeness, with fresh access and connection
-checks on every call. Cache deployment remains pending; see the linked evidence.
+checks on every call. Cache code `2c8d0df` is deployed on DE; see the linked evidence.
 
 Refresh happens on use after 15 minutes; it updates metadata, not the allowlist.
 Provider price ceilings protect zero-price routing even between refreshes.
