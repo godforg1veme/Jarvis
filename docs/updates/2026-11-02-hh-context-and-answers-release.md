@@ -2,12 +2,12 @@
 
 [Русский](#русский) | [English](#english)
 
-Позднее 2 ноября: подготовлен [локальный ремонт лимита оценки](2026-11-02-hh-evaluation-token-budget.md)
-после отказа по вакансии 138512145. Он ещё не установлен; ниже сохранён результат выпуска.
+Позднее 2 ноября: установлен [ремонт лимита оценки](2026-11-02-hh-evaluation-token-budget.md)
+после отказа по вакансии 138512145. Ниже сохранён исходный результат выпуска.
 
-Later on November 2: a [local evaluation-cap repair](2026-11-02-hh-evaluation-token-budget.md)
-was prepared after vacancy 138512145 failed evaluation. It is not deployed;
-the original release result is retained below.
+Later on November 2: an [evaluation-cap repair](2026-11-02-hh-evaluation-token-budget.md)
+was deployed after vacancy 138512145 failed evaluation.
+The original release result is retained below.
 
 ## Русский
 

@@ -326,6 +326,13 @@ amounts remaining unknown. This supersedes the October 23 HH model policy above.
 Automation defaults to off; [live complete-resume reading passed](updates/2026-11-01-hh-session-and-complete-resume-repair.md).
 The first autonomous application remains unverified.
 
+После диагностики 2 ноября [лимит оценки увеличен до 6000 токенов](updates/2026-11-02-hh-evaluation-token-budget.md)
+и установлен на DE: обязательный reasoning учитывается внутри max_tokens даже
+при исключении из видимого ответа. Исходная unknown-операция не повторяется.
+Following November 2 diagnosis, the [6000-token evaluation allowance](updates/2026-11-02-hh-evaluation-token-budget.md)
+is deployed on DE: required reasoning consumes max_tokens even when excluded
+from visible output. The original unknown operation is not retried.
+
 2 ноября на DE установлен [полный контекст HH и ответы работодателю](updates/2026-11-02-hh-context-and-answers-release.md).
 Оценщик получает настройки поиска, результаты обычных фильтров, полную вакансию,
 резюме, факты и базовое письмо. Направление работы проверяется до сходства навыков;
