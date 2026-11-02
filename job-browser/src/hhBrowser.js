@@ -21,6 +21,7 @@ class HhBrowser {
     operationTimeoutMs = 80000, onTimeout = () => {} }) {
     if (!context || typeof context.newPage !== 'function') throw failure('JOB_BROWSER_CONTEXT_REQUIRED');
     this.context = context; this.now = now; this.tail = Promise.resolve(); this.capabilities = CAPABILITIES;
+    this.foregroundQueue = []; this.backgroundQueue = []; this.draining = false; this.foregroundBurst = 0;
     this.primaryResumeId = primaryResumeId;
     this.captchaRecovery = captchaRecovery;
     this.captchaDispatch = captchaDispatch;
@@ -33,15 +34,34 @@ class HhBrowser {
     this.loginExpiresAt = 0; this.loginNextSequence = 1; this.loginGestureAt = 0; this.loginMainStatus = 0;
     this.loginExpiryTimer = null;
   }
-  // One persistent profile, one active read. A rejected operation must not poison the queue.
-  run(fn) {
-    const pending = this.tail.then(async () => {
-      this.activeOperations++;
-      try { return await bounded(fn, this.operationTimeoutMs); }
-      catch (error) { if (error.code === 'JOB_BROWSER_OPERATION_TIMEOUT') this.onTimeout(); throw error; }
-      finally { this.activeOperations--; }
+  // One persistent profile, one active operation. History yields to queued vacancy work.
+  run(fn, { background = false } = {}) {
+    const pending = new Promise((resolve, reject) => {
+      (background ? this.backgroundQueue : this.foregroundQueue).push({ fn, resolve, reject });
     });
-    this.tail = pending.catch(() => {}); return pending;
+    if (!this.draining) {
+      this.draining = true;
+      this.tail = this.drainQueue();
+    }
+    return pending;
+  }
+  async drainQueue() {
+    try {
+      while (this.foregroundQueue.length || this.backgroundQueue.length) {
+        const takeBackground = this.backgroundQueue.length
+          && (!this.foregroundQueue.length || this.foregroundBurst >= 4);
+        const task = (takeBackground ? this.backgroundQueue : this.foregroundQueue).shift();
+        this.foregroundBurst = takeBackground ? 0 : this.backgroundQueue.length ? this.foregroundBurst + 1 : 0;
+        this.activeOperations++;
+        try { task.resolve(await bounded(task.fn, this.operationTimeoutMs)); }
+        catch (error) {
+          if (error.code === 'JOB_BROWSER_OPERATION_TIMEOUT') {
+            try { this.onTimeout(); } catch {}
+          }
+          task.reject(error);
+        } finally { this.activeOperations--; }
+      }
+    } finally { this.draining = false; }
   }
   isBusy() { return this.activeOperations > 0; }
   hasLoginSession() { return Boolean(this.loginSessionId && ['waiting','captcha','authenticated'].includes(this.loginState)); }
@@ -316,7 +336,7 @@ class HhBrowser {
       const resumes = await this.read('https://hh.ru/applicant/resumes', 'authenticated', readResumes);
       if (!this.primaryResumeId || !resumes.some(r => r.id === this.primaryResumeId)) throw failure('JOB_HH_RESUME_UNAVAILABLE');
       return this.read(`https://hh.ru/applicant/negotiations?filter=${section}&page=${page}`, 'history', p => readHistoryPage(p, {section,page}));
-    });
+    }, { background: true });
   }
   inspect({ externalId, resumeId }) {
     return this.run(() => this.inspectNow({ externalId, resumeId }));
