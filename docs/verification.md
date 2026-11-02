@@ -1,5 +1,29 @@
 # Проверки перед выпуском
 
+## Приоритет очереди HH / HH queue priority
+
+[Установлено на DE 2 ноября](updates/2026-11-02-hh-browser-priority.md):
+Linux/Chromium 132/132; в новом browser image 19/19; изолированные PG/Chromium
+сквозные 11/11; серверные RPC/history/automation 17/17. Пропусков в этих наборах нет.
+Живая read-only проба подтвердила обгон истории; история тоже завершилась.
+Полный реальный цикл после кэша измерен по сохранённым попыткам. Автоотклики
+на момент выпуска выключены владельцем; новые живые отправки не запускались.
+The deployed queue passed the linked Linux, image, integration and server checks
+without skips. Live read-only ordering passed; complete post-cache cycles use
+saved real attempts. The owner's disabled automatic-application toggle was preserved.
+
+```powershell
+node --test job-browser/test/hhBrowserQueue.test.js job-browser/test/browserHealth.test.js
+node --test server/test/jobBrowserClient.test.js server/test/jobHistory.test.js server/test/jobAutomationWorker.test.js
+```
+
+Linux с Chromium sandbox и отдельной PostgreSQL / Linux with Chromium sandbox
+and isolated PostgreSQL:
+
+```bash
+node --test --test-concurrency=1 test/jobAutomationIntegrationAcceptance.cjs test/jobQuestionBrowserAcceptance.cjs test/jobBrowserApplicationsAcceptance.cjs
+```
+
 ## Скорость HH и кэш резюме / HH throughput and resume cache
 
 [Замеры и статус установки](updates/2026-11-02-hh-throughput.md): 3 CPU уже на DE после сравнения 1/2/3;

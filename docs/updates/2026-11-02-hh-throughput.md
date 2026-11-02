@@ -4,6 +4,9 @@
 
 ## Русский
 
+Продолжение: [приоритет очереди и полный цикл](2026-11-02-hh-browser-priority.md)
+установлены позднее 2 ноября. Эта запись сохраняет исходные замеры CPU и кэша.
+
 2 ноября по поручению владельца лимит DE HH browser увеличен с 1 до 2 CPU
 через `docker update`, без перезапуска контейнера или сессии. На хосте 6 CPU.
 Лимит сохранён в приватных Compose overlays обоих действующих release-каталогов;
@@ -100,6 +103,9 @@ NL получил исходники; Host Agent, VPN и Desktop не менял
 автоматического отклика после установки пока отдельно не измерено.
 
 ## English
+
+Follow-up: [queue priority and complete-cycle measurements](2026-11-02-hh-browser-priority.md)
+were deployed later on November 2. This record preserves the original CPU and cache results.
 
 On November 2, the owner requested increasing the DE HH browser limit from 1 to
 2 CPUs. `docker update` applied it without restarting the container or session.

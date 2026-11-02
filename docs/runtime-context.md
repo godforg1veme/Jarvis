@@ -363,6 +363,15 @@ resume service reuses snapshots for 60 seconds (up to 32 entries), keyed
 by user/resume/connection revision/completeness, with fresh access and connection
 checks on every call. Cache code `2c8d0df` is deployed on DE; see the linked evidence.
 
+С 2 ноября browser `3f9206a` использует две очереди на профиль: history фоновая,
+остальные операции обычные. Одна операция активна; ожидающая история обслуживается
+после четырёх обычных задач. `tail` ждёт обе очереди. Уже начатые операции не
+прерываются; RPC не принимает приоритет от клиента. [Приёмка и замеры](updates/2026-11-02-hh-browser-priority.md).
+November 2 browser `3f9206a` uses per-profile normal/background queues, with history
+in background. One operation runs at a time; waiting history runs after four normal
+tasks. `tail` drains both queues. Active work is not interrupted, and public RPC
+accepts no priority setting. See the linked acceptance record and measurements.
+
 Refresh happens on use after 15 minutes; it updates metadata, not the allowlist.
 Provider price ceilings protect zero-price routing even between refreshes.
 A missing fresh catalog fails closed. Tool-capable requests never retry after

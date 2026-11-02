@@ -1,5 +1,17 @@
 # HH browser: чтение и проверка формы
 
+2 ноября установлен [приоритет вакансий перед историей](../docs/updates/2026-11-02-hh-browser-priority.md).
+Очереди разделены по профилю; одна операция активна, FIFO внутри каждого класса.
+История уступает обычным операциям, но обслуживается после четырёх таких задач,
+пока ожидает. Активная операция не прерывается; `tail` ждёт обе очереди.
+Приоритет задаётся внутри browser, без расширения публичного RPC.
+
+November 2: [vacancy work has priority over history](../docs/updates/2026-11-02-hh-browser-priority.md).
+Each profile has separate normal/background queues and one active operation,
+with FIFO inside each class. History yields but runs after four normal tasks
+while waiting. Active work is not interrupted; `tail` drains both queues.
+Priority is internal to the browser; public RPC is unchanged.
+
 2 ноября на DE установлены [контекст отбора и нативные ответы HH](../docs/updates/2026-11-02-hh-context-and-answers-release.md).
 Поддерживаются текст и выбор одного/нескольких вариантов в штатном HH test flow.
 Браузер сверяет сохранённую анкету, точные ответы, hidden test identity и текущий

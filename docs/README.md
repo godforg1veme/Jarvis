@@ -4,6 +4,14 @@
 
 ## Русский
 
+2 ноября [закрыт пункт 4 ускорения HH](updates/2026-11-02-hh-browser-priority.md):
+история уступает ожидающим вакансиям с обслуживанием после четырёх обычных задач.
+В живой read-only пробе вакансия завершилась за 12,1 с вместо 18,1 с; история тоже
+завершилась. CPU 3, кэш установлен; 132 Linux-проверки, 19 в новом образе и
+11 сквозных прошли. Browser/server healthy. Полный цикл после кэша измерен;
+новые автоотклики выключены личным переключателем. Старый DOM-сбой истории
+предшествует выпуску и записан отдельно.
+
 2 ноября [браузеру HH выделены 3 CPU после сравнения с 1 и 2 CPU](updates/2026-11-02-hh-throughput.md):
 при переходе с 1 на 2 CPU среднее чтение полного резюме сократилось с 22,55 до 9,34 секунды.
 При 3 CPU получено 9,69 секунды против 10,82 в новой контрольной серии при 2 CPU;
@@ -181,6 +189,14 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 Архивы не заменяют действующие правила и новую проверку окружения.
 
 ## English
+
+On November 2, [HH performance item 4 was completed](updates/2026-11-02-hh-browser-priority.md):
+history yields to queued vacancy work, with service after four normal tasks.
+A live read-only probe completed the vacancy in 12.1 s versus 18.1 s; history also
+finished. CPU limit is 3 and caching is deployed; 132 Linux checks, 19 in the new
+image and 11 integration tests passed. Browser/server are healthy. Complete cycles
+after caching were measured; new automatic applications are off via the personal
+toggle. An older history DOM failure predates deployment and is recorded separately.
 
 On November 2, [the HH browser received 3 CPUs after comparison with 1 and 2 CPUs](updates/2026-11-02-hh-throughput.md):
 at 2 CPUs, mean complete-resume read time fell from 22.55 to 9.34 seconds.
