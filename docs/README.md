@@ -4,6 +4,11 @@
 
 ## Русский
 
+2 ноября [локально исправлен отбор HH и добавлены ответы работодателю](updates/2026-11-02-hh-context-and-answers-development.md):
+полный контекст фильтров, проверка направления, защита от выдуманных намерений и
+нативные вопросы HH. Изменения не опубликованы; результаты тестов и границы
+живой проверки записаны отдельно.
+
 1 ноября [сверены действующие руководства](updates/2026-11-01-current-documentation-refresh.md):
 ручной и автоматический HH, модель, расходы и отдельная приёмка профилей.
 
@@ -162,6 +167,11 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 Архивы не заменяют действующие правила и новую проверку окружения.
 
 ## English
+
+November 2: [local HH selection and employer-answer changes](updates/2026-11-02-hh-context-and-answers-development.md)
+add complete filter context, direction checks, unsupported-intent guards and
+native HH questions. Nothing is published; test results and live-verification
+limits are recorded separately.
 
 November 1: [current guides are reconciled](updates/2026-11-01-current-documentation-refresh.md):
 manual/autonomous HH, model policy, spending and separate profile acceptance.

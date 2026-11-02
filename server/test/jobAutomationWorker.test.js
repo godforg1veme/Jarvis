@@ -20,6 +20,8 @@ function harness(decision, applicationStatus = 'sent') {
     async claimCandidate() { return item; },
     async update(value) { calls.push(['update', value.status]); return { status: value.status }; },
     async enqueueAttention(value) { calls.push(['attention', value.code]); },
+    async saveEvaluation(value) { calls.push(['evaluation', value.evaluation]); return { id: value.itemId }; },
+    async finalizeKnownSkip(value) { calls.push(['update', 'skipped', value.evaluatedSearchRevision]); return { searchRevisionChanged: false }; },
     async backoff() { calls.push(['backoff']); },
   };
   const worker = new JobAutomationWorker({
@@ -31,17 +33,21 @@ function harness(decision, applicationStatus = 'sent') {
     accessService: { repository: { async get() { return { blocked: false, permissions: ['jobs'] }; } } },
     automationService: { async assertCurrent() { calls.push(['consent']); } },
     searchRepository: {
-      async getSettings() { return { settings: { budgetUsd: 2 } }; },
+      async getSettings() { return { revision: 1, settings: { budgetUsd: 2, queries: ['integration developer'] } }; },
       async getVacancy() { return { id: VACANCY, revision: 1, snapshot: {
         title: 'Adjacent role', description: 'Need transferable skills', archived: false } }; },
     },
-    profileRepository: { async ensure() { return { revision: 1, profile: { confirmed: true, facts: [], examples: [] } }; } },
+    profileRepository: { async ensure() { return { revision: 1, profile: { confirmed: true,
+      baseLetter: 'I build integrations', facts: [], examples: [] } }; } },
     resumeContextService: { async getSelected() { return resumeContext; } },
     modelAdapter: { async evaluate(input) {
       calls.push(['evaluate', input.resumeContext.snapshot.experience]);
-      return { decision, usage: { cost: 0.001 }, requestId: 'model-1' };
+      return { decision, directionMatched: true,
+        reasonCode: decision === 'apply' ? 'DIRECTION_FIT' : 'INSUFFICIENT_FIT',
+        rationale: 'Fixture role considered', usage: { cost: 0.001 }, requestId: 'model-1' };
     } },
-    draftService: { async generate(input) { calls.push(['draft', input.requestId]); return { id: DRAFT }; } },
+    draftService: { async generate(input) { calls.push(['draft', input.requestId, input.sourceText]);
+      return { id: DRAFT, text: 'My personal AI project is relevant.' }; } },
     applicationService: { async submitAutomatic(input) {
       calls.push(['submit', input.automationRevision]); return { status: applicationStatus, operationId: null };
     } },
@@ -60,11 +66,25 @@ test('a rejected vacancy stays silent and never prepares an application', async 
   assert.ok(calls.some(x => x[0] === 'update' && x[1] === 'skipped'));
 });
 
+test('a current hard exclusion stops before model expense and submission', async () => {
+  const { worker, item, calls } = harness('apply');
+  worker.searchRepository.getSettings = async () => ({ revision: 2,
+    settings: { budgetUsd: 2, queries: ['developer'], exclusions: ['real estate'] } });
+  worker.searchRepository.getVacancy = async () => ({ revision: 1, filter_revision: 2,
+    snapshot: { title: 'Real estate sales', description: 'Uses AI', archived: false } });
+  await worker.process(item);
+  assert.ok(calls.some(x => x[0] === 'evaluation' && x[1].reasonCode === 'USER_CONSTRAINT'));
+  assert.ok(calls.some(x => x[0] === 'update' && x[1] === 'skipped'));
+  assert.deepEqual(calls.filter(x => ['usage','evaluate','draft','submit'].includes(x[0])), []);
+});
+
 test('transferable experience may be applied and a test hands off to the owner', async () => {
   const { worker, item, calls } = harness('apply', 'manual_required');
   await worker.process(item);
   assert.ok(calls.some(x => x[0] === 'evaluate' && x[1] === 'Personal desktop AI project'));
   assert.ok(calls.some(x => x[0] === 'submit' && x[1] === 2));
+  assert.ok(calls.some(x => x[0] === 'draft' && x[2] === 'I build integrations'));
+  assert.ok(calls.some(x => x[0] === 'evaluation' && x[1].directionMatched === true));
   assert.deepEqual(calls.filter(x => x[0] === 'attention'), [['attention','MANUAL_REQUIRED']]);
 });
 
@@ -74,6 +94,16 @@ test('revoked consent prevents model expense and application', async () => {
   await worker.process(item);
   assert.deepEqual(calls.filter(x => ['usage','evaluate','draft','submit'].includes(x[0])), []);
   assert.ok(calls.some(x => x[0] === 'update' && x[1] === 'failed'));
+});
+
+test('a search revision changed during evaluation cannot create a letter from the stale decision', async () => {
+  const {worker,item,calls}=harness('apply');
+  let revision=1;
+  worker.searchRepository.getSettings=async()=>({revision,settings:{budgetUsd:2}});
+  const evaluate=worker.modelAdapter.evaluate;
+  worker.modelAdapter.evaluate=async input=>{const value=await evaluate(input);revision=2;return value;};
+  await worker.process(item);
+  assert.equal(calls.some(call=>['draft','submit'].includes(call[0])),false);
 });
 
 test('a resume read failure before model invocation waits safely and can resume', async () => {
@@ -92,4 +122,23 @@ test('an interrupted model or draft never claims that an application was submitt
   assert.ok(calls.some(x=>x[0]==='update'&&x[1]==='unknown'));
   assert.deepEqual(calls.filter(x=>x[0]==='attention'),[['attention','PROCESSING_UNKNOWN']]);
   assert.ok(!calls.some(x=>x[0]==='submit'));
+});
+
+test('unknown required personal answer hands off without a draft or submit', async () => {
+  const { worker, item, calls } = harness('apply');
+  worker.draftService.generate = async () => { throw Object.assign(new Error('needs answer'),
+    { code: 'JOB_APPLICANT_ANSWER_REQUIRED' }); };
+  await worker.process(item);
+  assert.ok(calls.some(x => x[0] === 'update' && x[1] === 'manual_required'));
+  assert.deepEqual(calls.filter(x => x[0] === 'attention'), [['attention','MANUAL_REQUIRED']]);
+  assert.ok(!calls.some(x => x[0] === 'submit'));
+});
+
+test('invented first-person career commitment stops before submit', async () => {
+  const { worker, item, calls } = harness('apply');
+  worker.draftService.generate = async () => ({ id: DRAFT,
+    text: 'Рассматриваю недвижимость как основную профессию.' });
+  await worker.process(item);
+  assert.ok(calls.some(x => x[0] === 'update' && x[1] === 'manual_required'));
+  assert.ok(!calls.some(x => x[0] === 'submit'));
 });

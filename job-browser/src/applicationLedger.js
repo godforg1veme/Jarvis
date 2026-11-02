@@ -3,6 +3,7 @@ const { constants } = require('node:fs');
 const { createHash, randomUUID } = require('node:crypto');
 const path = require('node:path');
 const { UUID } = require('./rpcProtocol');
+const { normalizeQuestionnaire, normalizeAnswers, STOP_REASONS } = require('../../shared/jobQuestionnaire');
 const hash = (value) => createHash('sha256').update(value).digest('hex');
 const failure = (code = 'JOB_BROWSER_LEDGER_UNAVAILABLE') => Object.assign(new Error(code), { code });
 const HASH = /^[a-f\d]{64}$/;
@@ -60,28 +61,41 @@ class ApplicationLedger {
     }
     return fresh;
   }
-  identity({ userId, operationId, externalId, resumeId }) {
+  identity({ userId, operationId, externalId, resumeId, questionnaire, answers }) {
     if (userId !== this.ownerId || !UUID.test(operationId || '') || typeof externalId !== 'string'
       || !/^\d{1,20}$/.test(externalId) || typeof resumeId !== 'string' || !/^[a-zA-Z0-9]{1,100}$/.test(resumeId)) throw failure('JOB_BROWSER_ACCESS_DENIED');
-    return { version: 1, ownerId: this.ownerId, operationId,
+    if ((questionnaire === undefined) !== (answers === undefined)) throw failure('JOB_HH_INVALID_QUESTIONNAIRE');
+    const binding = questionnaire === undefined ? null : (() => {
+      const q = normalizeQuestionnaire(questionnaire);
+      const a = normalizeAnswers(q, answers);
+      return { questionnaireHash: q.hash, answerHash: hash(JSON.stringify(a)) };
+    })();
+    return { version: binding ? 2 : 1, ownerId: this.ownerId, operationId,
       operationHash: hash(JSON.stringify([this.ownerId, operationId])),
-      pairHash: hash(JSON.stringify([this.ownerId, externalId, resumeId])) };
+      pairHash: hash(JSON.stringify([this.ownerId, externalId, resumeId])), ...binding };
   }
   validateClaim(value) {
-    if (!value || Object.keys(value).sort().join(',') !== 'letterHash,operationHash,operationId,ownerId,pairHash,version'
-      || value.version !== 1 || value.ownerId !== this.ownerId || !UUID.test(value.operationId || '')
+    const keys = value?.version === 2
+      ? 'answerHash,letterHash,operationHash,operationId,ownerId,pairHash,questionnaireHash,version'
+      : 'letterHash,operationHash,operationId,ownerId,pairHash,version';
+    if (!value || Object.keys(value).sort().join(',') !== keys
+      || ![1, 2].includes(value.version) || value.ownerId !== this.ownerId || !UUID.test(value.operationId || '')
       || !HASH.test(value.pairHash || '') || !HASH.test(value.letterHash || '')
+      || (value.version === 2 && (!HASH.test(value.questionnaireHash || '') || !HASH.test(value.answerHash || '')))
       || value.operationHash !== hash(JSON.stringify([this.ownerId, value.operationId]))) throw failure();
     return value;
   }
-  same(left, right) { return ['ownerId', 'operationId', 'operationHash', 'pairHash', 'letterHash'].every((key) => left[key] === right[key]); }
+  same(left, right) { return ['version', 'ownerId', 'operationId', 'operationHash', 'pairHash', 'letterHash',
+    'questionnaireHash', 'answerHash'].every((key) => left[key] === right[key]); }
   async result(identity) {
     const result = await this.read('result', identity.operationHash);
     if (!result) return { outcome: 'unknown' };
     if (!this.same(this.validateClaim(result.claim), identity)
       || !['sent', 'failed', 'manual_required', 'already_applied'].includes(result.outcome)
       || (result.outcome === 'sent' && !/^[\w-]{1,128}$/.test(result.externalId || ''))) throw failure();
-    return { outcome: result.outcome, verified: true, ...(result.outcome === 'sent' ? { externalId: result.externalId } : {}) };
+    return { outcome: result.outcome, verified: true,
+      ...(result.outcome === 'sent' ? { externalId: result.externalId } : {}),
+      ...(STOP_REASONS.has(result.reasonCode) ? { reasonCode: result.reasonCode } : {}) };
   }
   async reserve(input) {
     const identity = this.identity(input);
@@ -106,7 +120,9 @@ class ApplicationLedger {
     if (!operation) return { outcome: 'unknown' };
     const claim = this.validateClaim(operation);
     if (claim.pairHash !== identity.pairHash) throw failure('JOB_BROWSER_OPERATION_CHANGED');
-    if (input.letter !== undefined && (typeof input.letter !== 'string' || hash(input.letter) !== claim.letterHash)) throw failure('JOB_BROWSER_OPERATION_CHANGED');
+    if (!this.same(claim, { ...identity, letterHash: claim.letterHash })
+      || (input.letter !== undefined && (typeof input.letter !== 'string' || hash(input.letter) !== claim.letterHash)))
+      throw failure('JOB_BROWSER_OPERATION_CHANGED');
     const pair = await this.read('pair', identity.pairHash);
     if (!pair) return { outcome: 'unknown' };
     if (!this.same(this.validateClaim(pair), claim)) return { outcome: 'unknown' };
@@ -118,7 +134,8 @@ class ApplicationLedger {
     const pair = await this.read('pair', identity.pairHash);
     if (operation) {
       const claim = this.validateClaim(operation);
-      if (claim.pairHash !== identity.pairHash || (input.letter !== undefined && hash(input.letter) !== claim.letterHash)) throw failure('JOB_BROWSER_OPERATION_CHANGED');
+      if (!this.same(claim, { ...identity, letterHash: claim.letterHash })
+        || (input.letter !== undefined && hash(input.letter) !== claim.letterHash)) throw failure('JOB_BROWSER_OPERATION_CHANGED');
     }
     if (pair) this.validateClaim(pair);
     return Boolean(operation || pair);
@@ -131,7 +148,9 @@ class ApplicationLedger {
     if (result?.verified !== true || !['sent', 'failed', 'manual_required', 'already_applied'].includes(result.outcome)
       || (result.outcome === 'sent' && !/^[\w-]{1,128}$/.test(result.externalId || ''))) return { outcome: 'unknown' };
     await this.write('result', claim.operationHash, { claim, outcome: result.outcome,
-      ...(result.outcome === 'sent' ? { externalId: result.externalId } : {}) });
+      ...(result.outcome === 'sent' ? { externalId: result.externalId } : {}),
+      ...(result.outcome === 'manual_required' && STOP_REASONS.has(result.reasonCode)
+        ? { reasonCode: result.reasonCode } : {}) });
     return this.result(claim);
   }
 }

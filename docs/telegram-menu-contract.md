@@ -103,6 +103,35 @@ In-Telegram switch and first-application acceptance remain open. /
 
 [Implementation, checks and remaining acceptance](updates/2026-11-01-hh-autonomous-search-release.md).
 
+### Контекст и ответы HH / HH context and answers (local, November 2, 2026)
+
+По согласованию владельца в текущей задаче автоматический режим учитывает
+полные условия обычных фильтров и целевое направление, резюме, факты и базовое
+письмо. Вопросы, которые просят раскрыть в письме, обрабатываются при генерации.
+Нативные текстовые вопросы HH и выбор одного/нескольких вариантов проходят
+через сохранённую анкету и точные ответы. Согласие действует только в личном
+включённом автопоиске; ручной путь не получает скрытых ответов.
+
+Неизвестные личные сведения, внешние анкеты, файлы, CAPTCHA и неподдерживаемые
+виды тестов передаются пользователю с конкретной причиной остановки. Старый
+результат без причины не объявляется тестом или изменением формы. Описание в
+`job:auto` поясняет ответы; labels, rows, callback grammar, guided kinds и
+owner/member scopes прежние. Unknown сохраняет исходный ID без повторной
+отправки. [Результаты и ограничения](updates/2026-11-02-hh-context-and-answers-development.md).
+Этот раздел описывает локальные изменения, не установленную версию.
+
+The owner approved complete filter/direction context and automatic employer
+answers in this task. In-letter questions are handled during letter generation;
+native HH text and single/multiple choices use a saved questionnaire and exact
+answers. Consent applies only to personal enabled automation. Manual applications
+do not silently generate answers. Missing personal facts, external forms, files,
+CAPTCHA and unsupported tests require private handoff with a truthful reason;
+legacy results without a cause remain unknown. `job:auto` explains the behavior;
+labels, rows, callback grammar, guided kinds and owner/member scopes are unchanged.
+Unknown preserves its original ID without resubmission. This is local-only work;
+[checks and limitations](updates/2026-11-02-hh-context-and-answers-development.md)
+do not establish deployment.
+
 ### Mini App section navigation (local, October 26, 2026)
 
 At the owner's request to resolve the Mini App audit in stages, personal Mini App

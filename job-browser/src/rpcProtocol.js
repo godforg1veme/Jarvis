@@ -1,6 +1,12 @@
+const { normalizeQuestionnaire, normalizeAnswers } = require('../../shared/jobQuestionnaire');
 const UUID = /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i;
 const exact = (value, keys) => value && typeof value === 'object' && !Array.isArray(value)
   && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+function validQuestionnairePayload(args) {
+  try { const questionnaire = normalizeQuestionnaire(args.questionnaire);
+    normalizeAnswers(questionnaire, args.answers); return true; }
+  catch { return false; }
+}
 function validEvent(event) {
   if (!event || typeof event !== 'object' || Array.isArray(event)) return false;
   if (event.type === 'pointer') return exact(event, ['type','action','button','x','y'])
@@ -43,10 +49,12 @@ function validRequest(value, ownerId = null) {
     && typeof args.resumeId === 'string' && /^[a-zA-Z0-9]{1,100}$/.test(args.resumeId);
   if (value.operation === 'history') return exact(args, ['section','page']) && ['active','archived'].includes(args.section)
     && Number.isInteger(args.page) && args.page >= 0 && args.page < 1000;
-  if (['submit', 'reconcile'].includes(value.operation)) return exact(args, ['operationId', 'externalId', 'resumeId', 'letter'])
+  if (['submit', 'reconcile'].includes(value.operation)) return (exact(args, ['operationId', 'externalId', 'resumeId', 'letter'])
+    || exact(args, ['operationId', 'externalId', 'resumeId', 'letter', 'questionnaire', 'answers']))
     && UUID.test(args.operationId || '') && typeof args.externalId === 'string' && /^\d{1,20}$/.test(args.externalId)
     && typeof args.resumeId === 'string' && /^[a-zA-Z0-9]{1,100}$/.test(args.resumeId)
-    && typeof args.letter === 'string' && args.letter.trim().length > 0 && args.letter.length <= 10000;
+    && typeof args.letter === 'string' && args.letter.trim().length > 0 && args.letter.length <= 10000
+    && (!Object.hasOwn(args, 'questionnaire') || validQuestionnairePayload(args));
   if (['resumes', 'connection'].includes(value.operation)) return exact(args, []);
   if (value.operation === 'inspect') return exact(args, ['externalId', 'resumeId'])
     && typeof args.externalId === 'string' && /^\d{1,20}$/.test(args.externalId)

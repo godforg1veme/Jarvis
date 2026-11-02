@@ -1,0 +1,8 @@
+**
+!job-browser/
+!job-browser/package.json
+!job-browser/package-lock.json
+!job-browser/src/
+!job-browser/src/**
+!shared/
+!shared/jobQuestionnaire.js

@@ -19,6 +19,7 @@ const { createJobRuntime } = require('../src/jobs/jobRuntime');
 const { JobSearchRepository } = require('../src/jobs/jobSearchRepository');
 const { JobProfileRepository } = require('../src/jobs/jobProfileRepository');
 const { JobDraftRepository } = require('../src/jobs/jobDraftRepository');
+const { configuredOwnerJobAccess } = require('../src/jobs/configuredOwnerJobAccess');
 
 test('confirmed Telegram path → PG intent → write RPC → native Chromium UI; restart reconciles exact letter without another POST', async () => {
   const f = await createJobPostgresFixture();
@@ -27,6 +28,8 @@ test('confirmed Telegram path → PG intent → write RPC → native Chromium UI
   const token = randomBytes(32).toString('hex'), applyToken = randomBytes(32).toString('hex');
   let browser, context, rpc, runtime;
   try {
+    await f.pool.query("INSERT INTO user_identities(user_id,provider,external_id) VALUES($1,'telegram','101')",[f.owner]);
+    const accessService=configuredOwnerJobAccess(f.pool,'101');
     browser = await chromium.launch({ headless: true, chromiumSandbox: true });
     context = await browser.newContext({ serviceWorkers: 'block' });
     const fixture = await installApplicationFixture(context, { resumeId, async onPost() {
@@ -45,7 +48,7 @@ test('confirmed Telegram path → PG intent → write RPC → native Chromium UI
       submit: (input) => hh.run(() => guarded.submit(input)), reconcile: (input) => hh.run(() => guarded.reconcile(input)),
     } });
     rpc.listen(0, '127.0.0.1'); await once(rpc, 'listening');
-    const config = { jobSearchEnabled: true, jobBrowserUrl: 'http://job-browser:8080', jobBrowserOwnerId: f.owner,
+    const config = { jobSearchEnabled: true, operationsOwnerTelegramId:'101', jobBrowserUrl: 'http://job-browser:8080', jobBrowserOwnerId: f.owner,
       jobBrowserToken: token, jobBrowserApplyToken: applyToken, jobBrowserApplyEnabled: true };
     const create = () => createJobRuntime({ config, pool: f.pool, send: async () => {}, fetchImpl: (url, options) => {
       assert.equal(url, 'http://job-browser:8080/rpc');
@@ -57,7 +60,7 @@ test('confirmed Telegram path → PG intent → write RPC → native Chromium UI
       chatType: 'private', chatId: '101', telegramUserId: '101' };
     const cb = (data, override = {}) => jobs().handleCallback(data, { ...ctx, ...override });
     assert.match((await cb('job:connect')).answer, /Основное резюме/);
-    const search = new JobSearchRepository(f.pool), profiles = new JobProfileRepository(f.pool), drafts = new JobDraftRepository(f.pool);
+    const search = new JobSearchRepository(f.pool,{accessService}), profiles = new JobProfileRepository(f.pool,{accessService}), drafts = new JobDraftRepository(f.pool,{accessService});
     await profiles.replace({ scope: f.scope, expectedRevision: 0, profile: { confirmed: true,
       facts: [{ id: 'automation', text: 'Подтверждённый опыт автоматизации.', confirmed: true }], examples: [] } });
     const prepare = async (externalId) => {
@@ -65,7 +68,8 @@ test('confirmed Telegram path → PG intent → write RPC → native Chromium UI
       const vacancy = await search.upsertVacancy({ externalId, snapshot });
       await search.recordMatch({ userId: f.owner, vacancyId: vacancy.id, filterRevision: 1 });
       const draft = await drafts.append({ scope: f.scope, vacancyId: vacancy.id, profileRevision: 1,
-        vacancyRevision: vacancy.revision, text: letter, facts: ['automation'] });
+        vacancyRevision: vacancy.revision, text: letter, facts: ['automation'],resumeId,
+        connectionRevision:(await f.pool.query('SELECT revision FROM job_connections WHERE user_id=$1',[f.owner])).rows[0].revision });
       const reply = await cb(`job:send:${draft.id}`);
       assert.ok(reply.answer.includes(letter));
       assert.equal(reply.buttons?.[0]?.[0]?.text, 'Подтвердить отправку');

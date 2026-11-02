@@ -8,7 +8,9 @@ class GuardedSubmission {
   identity(input) {
     if (input?.userId !== this.ownerId || input.resumeId !== this.primaryResumeId || !UUID.test(input.operationId || '')
       || typeof input.externalId !== 'string' || !/^\d{1,20}$/.test(input.externalId)) throw Object.assign(new Error('JOB_BROWSER_ACCESS_DENIED'), { code: 'JOB_BROWSER_ACCESS_DENIED' });
-    return { userId: input.userId, operationId: input.operationId, externalId: input.externalId, resumeId: input.resumeId };
+    return { userId: input.userId, operationId: input.operationId, externalId: input.externalId,
+      resumeId: input.resumeId, ...(input.questionnaire === undefined ? {} : {
+        questionnaire: input.questionnaire, answers: input.answers }) };
   }
   run(fn) { const pending = this.tail.then(fn); this.tail = pending.catch(() => {}); return pending; }
   submit(input) {
@@ -22,7 +24,8 @@ class GuardedSubmission {
       try {
         prepared = await this.driver.prepare({ ...identity, letter: input.letter });
         if (prepared?.ready !== true) {
-          return { outcome: 'manual_required', verified: true };
+          return { outcome: 'manual_required', verified: true,
+            reasonCode: prepared?.reasonCode || 'JOB_HH_FORM_CHANGED' };
         }
         // Read-only preparation finishes first. Durable claims must exist before the final click.
         const reserved = await this.ledger.reserve({ ...identity, letter: input.letter });

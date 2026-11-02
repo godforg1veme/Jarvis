@@ -1,6 +1,8 @@
 const { jobError } = require('./jobSchemas');
 const { readBoundedJson } = require('./boundedHttp');
 const { historySchema, itemSchema } = require('./jobHistorySchema');
+const { normalizeQuestionnaire, normalizeAnswers } = require('../../../shared/jobQuestionnaire');
+const { STOP_REASONS } = require('./jobStopReasons');
 const UUID = /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i;
 const CAPABILITIES = Object.freeze({ dateWindows: true, dateWindowGranularity: 'moscow_day', maxPages: 1000 });
 function validInputFields(fields, width, height) {
@@ -68,6 +70,10 @@ class JobBrowserClient {
   async request(userId, operation, args) {
     if (!UUID.test(userId || '')) throw jobError('JOB_BROWSER_ACCESS_DENIED');
     const writing = ['submit', 'reconcile'].includes(operation);
+    if (writing && (args.questionnaire !== undefined || args.answers !== undefined)) {
+      const questionnaire = normalizeQuestionnaire(args.questionnaire);
+      args = { ...args, questionnaire, answers: normalizeAnswers(questionnaire, args.answers) };
+    }
     const raising = ['raise_resume','raise_resume_status'].includes(operation);
     if (raising && !this.resumeToken) throw jobError('JOB_BROWSER_ACCESS_DENIED');
     if (writing && !this.applyToken) throw jobError('JOB_BROWSER_ACCESS_DENIED');
@@ -129,6 +135,7 @@ class JobBrowserClient {
     if (writing && (!value || !['unknown', 'sent', 'failed', 'manual_required', 'already_applied'].includes(value.outcome)
       || (value.outcome !== 'unknown' && value.verified !== true)
       || (value.outcome === 'sent' && !/^[1-9]\d{0,19}$/.test(value.externalId || '')))) throw jobError('JOB_HH_INVALID_RESPONSE');
+    if (writing && value.reasonCode != null && !Object.hasOwn(STOP_REASONS, value.reasonCode)) throw jobError('JOB_HH_INVALID_RESPONSE');
     if (operation === 'search' && (!Array.isArray(value?.items) || value.items.length > 20
       || !Number.isInteger(value.pages) || value.pages < 0 || value.pages > 50000
       || !Number.isInteger(value.found) || value.found < 0 || value.found > 1000000
@@ -145,6 +152,12 @@ class JobBrowserClient {
     }
     if (operation === 'inspect' && (!value || typeof value.resumeAvailable !== 'boolean' || typeof value.manualRequired !== 'boolean'
       || (value.vacancy?.externalId !== args.externalId && !(value.resumeAvailable === false && value.manualRequired === true && value.vacancy === null)))) throw jobError('JOB_HH_INVALID_RESPONSE');
+    if (operation === 'inspect' && value.questionnaire != null) {
+      if (value.reasonCode !== 'JOB_HH_QUESTIONS_REQUIRED' || value.manualRequired !== true || value.resumeAvailable !== true)
+        throw jobError('JOB_HH_INVALID_RESPONSE');
+      try { value.questionnaire = normalizeQuestionnaire(value.questionnaire); }
+      catch { throw jobError('JOB_HH_INVALID_RESPONSE'); }
+    }
     if(operation==='inspect'&&value.existingApplication){
       const known=itemSchema.safeParse(value.existingApplication);
       if(!known.success||known.data.vacancyId!==args.externalId||known.data.resumeHash!==args.resumeId||known.data.topicId!==value.existingApplicationId)throw jobError('JOB_HH_INVALID_RESPONSE');

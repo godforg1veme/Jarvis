@@ -10,7 +10,7 @@ test('chat and job paths share core while job keeps its output contract', () => 
   const messages = buildJobPrompt({ vacancy: { title: 'Engineer' }, profile });
   assert.ok(messages[0].content.includes(CORE_INSTRUCTIONS));
   assert.ok(messages[0].content.includes(COVER_LETTER_INSTRUCTIONS));
-  assert.match(messages[0].content, /Return only JSON with keys text and factIds/);
+  assert.match(messages[0].content, /Return only JSON with keys status, text and factIds/);
   assert.match(messages[0].content, /Write in en/);
   assert.doesNotMatch(messages[0].content, /Focus on a continuing practice/);
   assert.equal(parseJobLetter('{"text":"A valid draft","factIds":[]}', profile).text, 'A valid draft');
@@ -40,4 +40,28 @@ test('missing resume stays absent and invalid context is rejected before model c
   assert.equal(JSON.parse(buildJobPrompt(input)[1].content).selectedResume, null);
   assert.throws(() => buildJobPrompt({ ...input, resumeContext: { snapshot: { summary: 'x'.repeat(60001) } } }),
     { code: 'JOB_INVALID_RESUME_CONTEXT' });
+});
+
+test('letter receives complete vacancy, search preferences and filter context', () => {
+  const snapshot = { resumeId: 'fixture', title: 'Developer', experience: 'Built APIs', skills: 'Node.js',
+    education: '', summary: '', grammaticalGender: 'unknown' };
+  const vacancy = { title: 'Engineer', description: 'What salary and work format do you prefer?',
+    salary: { from: 200000, currency: 'RUR' }, city: 'Москва', workFormat: 'hybrid',
+    employment: 'full', experience: '3-6', publishedAt: '2026-11-01T10:00:00Z' };
+  const searchSettings = { queries: ['AI developer'], targetRub: 250000, remote: true,
+    officeCity: 'Москва', exclusions: ['cold calls'] };
+  const filterResult = { include: true, reasonCodes: [], annotations: ['SALARY_UNKNOWN'] };
+  const input = { vacancy, profile, searchSettings, filterResult,
+    matchAnnotations: ['REMOTE_ELIGIBILITY_UNKNOWN'] };
+  const manual = JSON.parse(buildJobPrompt(input)[1].content);
+  assert.deepEqual(manual.vacancy, vacancy);
+  assert.deepEqual(manual.searchSettings, searchSettings);
+  assert.deepEqual(manual.filterResult, filterResult);
+  assert.deepEqual(manual.matchAnnotations, ['REMOTE_ELIGIBILITY_UNKNOWN']);
+  const automatic = JSON.parse(buildJobPrompt({ ...input,
+    resumeContext: { resumeId: 'fixture', connectionRevision: 1, snapshot } })[1].content);
+  assert.deepEqual(automatic.selectedResume, snapshot);
+  assert.deepEqual(automatic.vacancy, vacancy);
+  assert.deepEqual(automatic.searchSettings, searchSettings);
+  assert.match(buildJobPrompt(input)[0].content, /searchSettings as the applicant's current job-search preferences/);
 });

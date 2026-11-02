@@ -7,8 +7,12 @@ const JOB_MODEL = 'z-ai/glm-5.3-flash';
 const JOB_MODEL_PRICE_CAP = Object.freeze({ prompt: 0.15, completion: 0.5, request: 0 });
 const DECISION_FORMAT = Object.freeze({ type: 'json_schema', json_schema: {
   name: 'job_vacancy_decision', strict: true, schema: { type: 'object',
-    properties: { decision: { type: 'string', enum: ['apply','skip'] } },
-    required: ['decision'], additionalProperties: false },
+    properties: { decision: { type: 'string', enum: ['apply','skip'] },
+      directionMatched: { type: 'boolean' },
+      reasonCode: { type: 'string', enum: ['DIRECTION_FIT','OUT_OF_DIRECTION','INSUFFICIENT_FIT',
+        'MANDATORY_REQUIREMENT','USER_CONSTRAINT','UNCERTAIN'] },
+      rationale: { type: 'string' } },
+    required: ['decision','directionMatched','reasonCode','rationale'], additionalProperties: false },
 } });
 
 function providerUsage(value) {

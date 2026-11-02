@@ -3,6 +3,7 @@ const { cardView, attentionView } = require('./jobTelegramViews');
 const { captchaNoticeView } = require('./jobCaptchaNotices');
 const { collectionNoticeView } = require('./jobCollectionNotices');
 const { assertJobScope } = require('./jobSchemas');
+const { manualStopMessage } = require('./jobStopReasons');
 class JobDeliveryWorker {
   constructor({ pool, searchRepository, deliveryRepository, send, captchaEnabled = false, captchaAutomatic = false, intervalMs = 2000, accessService = null, automationService = null }) {
     Object.assign(this, { pool, searchRepository, deliveryRepository, send, captchaEnabled, captchaAutomatic, intervalMs, accessService, automationService });
@@ -44,7 +45,7 @@ class JobDeliveryWorker {
             if (!consent || search.conversation_id !== scope.conversationId || search.chat_id !== scope.chatId)
               throw new Error('unavailable');
             const messages = {
-              MANUAL_REQUIRED: 'Для отклика на эту вакансию нужно пройти тест или заполнить дополнительные поля. Открой вакансию и заверши отклик вручную.',
+              MANUAL_REQUIRED: manualStopMessage(delivery.payload.failureCode),
               LOGIN_REQUIRED: 'Автопоиску нужен повторный вход в твой HH-профиль. Открой «Поиск работы → Подключить HH».',
               RESULT_UNKNOWN: 'Результат автоотклика пока неизвестен. Повторная отправка заблокирована. Проверь исходный отклик в разделе «Отклики».',
               PROCESSING_UNKNOWN: 'Обработка вакансии прервана. Автоматический отклик не подтверждён. Открой вакансию для ручной проверки; неопределённая операция автоматически не повторяется.',

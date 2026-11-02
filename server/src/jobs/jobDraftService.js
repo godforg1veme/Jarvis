@@ -2,6 +2,7 @@ const { assertJobScope, uuid, jobError } = require('./jobSchemas');
 const { createHash } = require('node:crypto');
 const { jobTransaction } = require('./jobTransaction');
 const { buildJobPrompt, parseJobLetter } = require('./jobPrompt');
+const { evaluateVacancy } = require('./jobFilters');
 
 class JobDraftService {
   constructor({ pool, searchRepository, profileRepository, draftRepository, usageRepository, modelAdapter, now = () => new Date(), accessService = null, resumeContextService = null }) {
@@ -62,7 +63,9 @@ class JobDraftService {
     if (previous && (!previous.resume_id || !previous.connection_revision
       || previous.resume_id !== resumeContext?.resumeId || previous.connection_revision !== resumeContext?.connectionRevision))
       throw jobError('JOB_DRAFT_RESUME_STALE');
+    const filterResult = evaluateVacancy({ vacancy: vacancy.snapshot, settings: settings.settings });
     const messages = buildJobPrompt({ vacancy: vacancy.snapshot, profile: profile.profile, instruction, language, sourceText, resumeContext,
+      searchSettings: settings.settings, filterResult, matchAnnotations: vacancy.annotations || [],
       previousText: continuingDraft ? previous?.text || '' : '' });
     const inputHash = createHash('sha256').update(JSON.stringify({ mode, sourceText, instruction, language, replaceCurrentDraftId })).digest('hex');
     const task = await jobTransaction(this.pool, async (client) => {

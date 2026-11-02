@@ -1,5 +1,37 @@
 # Проверки перед выпуском
 
+## Контекст HH и ответы работодателю / HH context and employer answers
+
+Локальные изменения 2 ноября и фактические результаты:
+[запись разработки](updates/2026-11-02-hh-context-and-answers-development.md).
+Local November 2 changes and actual results are recorded there; nothing is deployed.
+
+```powershell
+node --test server/test/jobVacancyPrompt.test.js server/test/jobModelAdapter.test.js server/test/jobAutomationWorker.test.js server/test/jobQuestionAnswers.test.js
+node --test job-browser/test/jobQuestionnaire.test.js job-browser/test/hhApplicationForm.test.js job-browser/test/submissionProtocol.test.js
+npm test --prefix server
+```
+
+С отдельной тестовой PostgreSQL (`JARVIS_JOB_TEST_DATABASE_URL`), никогда production:
+Use an isolated PostgreSQL database, never production:
+
+```powershell
+node --test --test-concurrency=1 server/test/jobQuestionAnswersAcceptance.cjs server/test/jobAutomationIntegrationAcceptance.cjs server/test/jobAutomationAcceptance.cjs server/test/jobApplicationsAcceptance.cjs server/test/jobTelegramAcceptance.cjs server/test/jobResumeContext.test.js
+```
+
+Linux/Chromium checks use the existing acceptance image with current source and
+shared modules. They require the existing sandbox configuration and isolated DB:
+
+```bash
+node --test --test-concurrency=1 job-browser/test/applicationLedger.test.js job-browser/test/hhApplicationDriverAcceptance.cjs
+node --test server/test/jobQuestionBrowserAcceptance.cjs server/test/jobBrowserApplicationsAcceptance.cjs
+```
+
+Проверяй новый build context от корня: `docker build -f job-browser/Dockerfile .`.
+Verify the root browser build context; its Dockerfile-specific allowlist excludes
+unrelated files and secrets. Fixtures never send real HH applications. A live
+model probe does not prove native HH submission or future selection accuracy.
+
 ## Автопоиск с LLM / Autonomous job search
 
 ```powershell

@@ -63,6 +63,8 @@ test('migration files are ordered and narrowly named', () => {
     '053_job_draft_resume_context.sql',
     '054_job_automation.sql',
     '055_job_usage_cost_basis.sql',
+    '056_job_selection_context.sql',
+    '057_job_questionnaire_answers.sql',
   ]);
 });
 

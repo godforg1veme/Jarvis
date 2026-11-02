@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { OpenAiCompatibleProvider } = require('../src/providers/openAiCompatibleProvider');
-const { buildJobPrompt, parseJobLetter } = require('../src/jobs/jobPrompt');
+const { buildJobPrompt, parseJobLetter, assertAutomaticLetterTruth } = require('../src/jobs/jobPrompt');
 
 test('provider exposes usage without changing text-only callers', async () => {
   const provider = new OpenAiCompatibleProvider({ name: 'openrouter', model: 'fixture', baseUrl: 'https://openrouter.ai/api/v1',
@@ -22,6 +22,14 @@ test('job prompt separates untrusted content and rejects invented references and
   assert.deepEqual(parseJobLetter('{"text":"Letter","factIds":["project"]}', profile), { text: 'Letter', factIds: ['project'] });
   assert.throws(() => parseJobLetter('{"text":"Letter","factIds":["invented"]}', profile));
   assert.throws(() => parseJobLetter('{"text":"Letter","factIds":[],"send":true}', profile));
+  assert.match(messages[0].content, /answer them there/);
+  assert.match(messages[0].content, /career change, relocation, schedule, pay acceptance/);
+  assert.deepEqual(parseJobLetter('{"status":"ready","text":"Answer: RAG retrieves relevant context.","factIds":[]}', profile),
+    { text: 'Answer: RAG retrieves relevant context.', factIds: [] });
+  assert.throws(() => parseJobLetter('{"status":"needs_applicant_answer","text":"","factIds":[]}', profile),
+    { code: 'JOB_APPLICANT_ANSWER_REQUIRED' });
+  assert.throws(() => parseJobLetter('{"status":"needs_applicant_answer","text":"placeholder","factIds":[]}', profile),
+    { code: 'JOB_MODEL_INVALID_OUTPUT' });
 });
 
 
@@ -48,4 +56,26 @@ test('empty truncated structured output preserves billable usage while plain cha
   assert.equal(result.requestId, 'truncated-request');
   assert.throws(() => parseJobLetter(result.text, { facts: [] }, result), { code: 'JOB_MODEL_INVALID_OUTPUT' });
   await assert.rejects(provider.answer({ text: 'fixture' }), /invalid response/);
+});
+
+test('automatic letter may use a supported career commitment but rejects invented intent', () => {
+  const resumeContext = { snapshot: { title: 'Engineer', experience: 'Built AI systems',
+    skills: 'LLM', education: '', summary: '' } };
+  const profile = { baseLetter: 'Рассматриваю внедрение ИИ как основную работу.', facts: [] };
+  assert.doesNotThrow(() => assertAutomaticLetterTruth({ text: 'Рассматриваю внедрение ИИ как основную работу.',
+    resumeContext, profile }));
+  assert.throws(() => assertAutomaticLetterTruth({
+    text: 'Рассматриваю недвижимость как основную профессию.', resumeContext, profile,
+  }), { code: 'JOB_LETTER_UNSUPPORTED_INTENT' });
+  assert.throws(() => assertAutomaticLetterTruth({
+    text: 'Рассматриваю недвижимость как основную профессию.', resumeContext,
+    profile: { baseLetter: 'Не рассматриваю недвижимость как основную профессию.', facts: [] },
+  }), { code: 'JOB_LETTER_UNSUPPORTED_INTENT' });
+  assert.throws(() => assertAutomaticLetterTruth({
+    text: 'Готов рассматривать недвижимость как основную профессию.', resumeContext,
+    profile: { baseLetter: 'Не очень готов рассматривать недвижимость как основную профессию.', facts: [] },
+  }), { code: 'JOB_LETTER_UNSUPPORTED_INTENT' });
+  assert.doesNotThrow(() => assertAutomaticLetterTruth({
+    text: 'Интересна ваша работа с аналитикой и AI-инструментами.', resumeContext, profile,
+  }));
 });

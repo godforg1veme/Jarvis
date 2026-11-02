@@ -16,6 +16,7 @@ const { JobDeliveryRepository } = require('../src/jobs/jobDeliveryRepository');
 const { JobDeliveryWorker } = require('../src/jobs/jobDeliveryWorker');
 const { JobUsageRepository } = require('../src/jobs/jobUsageRepository');
 const { JobModelAdapter, JOB_MODEL } = require('../src/jobs/jobModelAdapter');
+const resumeMarker = value => value.replace(/\d/g, digit => 'abcdefghij'[Number(digit)]);
 
 async function fixture({ decision = 'apply', manual = false, modelOverride = null } = {}) {
   const f = await createJobPostgresFixture();
@@ -31,8 +32,8 @@ async function fixture({ decision = 'apply', manual = false, modelOverride = nul
   const deliveries = new JobDeliveryRepository(f.pool, { accessService });
   const usage = new JobUsageRepository(f.pool);
   const resumes = new JobResumeContextService({ pool: f.pool, accessService, browserClient: { forUser(userId) {
-    return { async readResume({resumeId,requireComplete}) { assert.equal(requireComplete,true); return { resumeId, title: `Profile ${userId}`,
-      experience: 'Project one\n' + 'Confirmed project detail. '.repeat(400) + '\nLast project for ' + userId,
+    return { async readResume({resumeId,requireComplete}) { assert.equal(requireComplete,true); return { resumeId, title: `Profile ${resumeMarker(userId)}`,
+      experience: 'Project one\n' + 'Confirmed project detail. '.repeat(400) + '\nLast project for ' + resumeMarker(userId),
       skills: 'Node.js', education: 'Engineering', summary: 'Practical automation', grammaticalGender: 'unknown' }; } };
   } } });
   const automation = new JobAutomationRepository(f.pool, { accessService });
@@ -40,7 +41,9 @@ async function fixture({ decision = 'apply', manual = false, modelOverride = nul
     resumeContextService: resumes, accessService, available: true });
   const calls = { evaluations: [], letters: [], submits: [], messages: [] };
   const model = modelOverride || {
-    async evaluate(input) { calls.evaluations.push(input); return { decision, usage: {cost:0.001}, requestId: 'fixture-evaluation' }; },
+    async evaluate(input) { calls.evaluations.push(input); return { decision, directionMatched: true,
+      reasonCode: decision === 'apply' ? 'DIRECTION_FIT' : 'INSUFFICIENT_FIT',
+      rationale: 'Fixture decision', usage: {cost:0.001}, requestId: 'fixture-evaluation' }; },
     async generate({messages}) { const data = JSON.parse(messages[1].content); calls.letters.push(data);
       return { text: JSON.stringify({ text: `Experience of ${data.selectedResume.resumeId}`, factIds: ['fact_1'] }), finishReason:'stop', usage:{cost:0.001} }; },
   };
@@ -50,7 +53,8 @@ async function fixture({ decision = 'apply', manual = false, modelOverride = nul
   const appService = new JobApplicationService({ pool:f.pool,
     repository:new JobApplicationRepository(f.pool,{accessService}), searchRepository:search,
     accessService, automationRepository:automation, adapter:{capabilities:{applicantApply:true},
-      async inspect({externalId}) {return {resumeAvailable:true,manualRequired:manual,vacancy:snapshots.get(externalId)};},
+      async inspect({externalId}) {return {resumeAvailable:true,manualRequired:manual,
+        reasonCode:manual?'JOB_HH_FORM_CHANGED':null,vacancy:snapshots.get(externalId)};},
       async submit(args) {calls.submits.push(args);return {outcome:'sent',verified:true,externalId:`sent-${args.externalId}`};},
     } });
   const worker = new JobAutomationWorker({ pool:f.pool, repository:automation, automationService:service,
@@ -82,7 +86,7 @@ test('real PG: owner and member auto-apply with their complete own resume and st
     await f.worker.tick();await f.worker.tick();await f.worker.tick();
     assert.equal(f.calls.submits.length,2);
     for(const evaluation of f.calls.evaluations){
-      assert.ok(evaluation.resumeContext.snapshot.experience.endsWith(evaluation.userId));
+      assert.ok(evaluation.resumeContext.snapshot.experience.endsWith(resumeMarker(evaluation.userId)));
       assert.equal(evaluation.profile.facts[0].text,`Project of ${evaluation.userId}`);
       assert.equal(f.calls.submits.find(s=>s.userId===evaluation.userId).resumeId,evaluation.resumeContext.resumeId);
     }
@@ -109,12 +113,54 @@ test('real PG: skips never generate letters or send applications or notification
   }finally{await f.close();}
 });
 
+test('real PG: a known model skip is reconsidered only after search revision changes',async()=>{
+  const f=await fixture({decision:'skip'});try{
+    await f.worker.tick();await f.worker.tick();
+    const before=f.calls.evaluations.length;
+    await f.worker.tick();assert.equal(f.calls.evaluations.length,before);
+    const old=await f.search.getSettings({userId:f.owner});
+    const newer=await f.search.saveSettings({scope:f.scope,expectedRevision:old.revision,
+      settings:{...old.settings,queries:['developer','AI engineer']}});
+    const match=(await f.pool.query('SELECT vacancy_id FROM job_matches WHERE user_id=$1',[f.owner])).rows[0];
+    await f.search.recordMatch({userId:f.owner,vacancyId:match.vacancy_id,filterRevision:newer.revision});
+    await f.worker.tick();
+    assert.equal(f.calls.evaluations.length,before+1);
+    const item=(await f.pool.query('SELECT status,evaluation_request_id,evaluation FROM job_automation_items WHERE user_id=$1',[f.owner])).rows[0];
+    assert.equal(item.status,'skipped');assert.equal(item.evaluation.revisions.search,newer.revision);
+    assert.match(item.evaluation_request_id,/auto-evaluate:/);
+    await f.pool.query("UPDATE job_automation_items SET status='unknown' WHERE user_id=$1",[f.owner]);
+    const latest=await f.search.saveSettings({scope:f.scope,expectedRevision:newer.revision,
+      settings:{...newer.settings,queries:['developer','AI engineer','integration']}});
+    await f.search.recordMatch({userId:f.owner,vacancyId:match.vacancy_id,filterRevision:latest.revision});
+    await f.worker.tick();assert.equal(f.calls.evaluations.length,before+1);
+  }finally{await f.close();}
+});
+
+test('real PG: a known hard-filter skip can be reconsidered after preferences change',async()=>{
+  const f=await fixture();try{
+    const old=await f.search.getSettings({userId:f.owner});
+    const excluded=await f.search.saveSettings({scope:f.scope,expectedRevision:old.revision,
+      settings:{...old.settings,exclusions:['Role 0']}});
+    const match=(await f.pool.query('SELECT vacancy_id FROM job_matches WHERE user_id=$1',[f.owner])).rows[0];
+    await f.search.recordMatch({userId:f.owner,vacancyId:match.vacancy_id,filterRevision:excluded.revision});
+    await f.worker.tick();await f.worker.tick();
+    const skipped=(await f.pool.query('SELECT status,evaluation FROM job_automation_items WHERE user_id=$1',[f.owner])).rows[0];
+    assert.equal(skipped.status,'skipped');assert.equal(skipped.evaluation.source,'filter');
+    const allowed=await f.search.saveSettings({scope:f.scope,expectedRevision:excluded.revision,
+      settings:{...excluded.settings,exclusions:[]}});
+    await f.search.recordMatch({userId:f.owner,vacancyId:match.vacancy_id,filterRevision:allowed.revision});
+    await f.worker.tick();
+    assert.equal(f.calls.evaluations.filter(x=>x.userId===f.owner).length,1);
+    assert.equal(f.calls.submits.filter(x=>x.userId===f.owner).length,1);
+  }finally{await f.close();}
+});
+
 test('real PG: tests and forms hand off privately using canonical links despite tracking URLs',async()=>{
   const f=await fixture({manual:true});try{
     await f.worker.tick();await f.worker.tick();await f.deliveryWorker.tick();await f.deliveryWorker.tick();
     assert.equal(f.calls.submits.length,0);assert.equal(f.calls.messages.length,2);
     assert.deepEqual(f.calls.messages.map(m=>m.chatId).sort(),['101','202']);
-    for(const message of f.calls.messages){assert.match(message.answer,/тест или заполнить/);assert.match(message.answer,/https:\/\/hh.ru\/vacancy\/700[01]$/);assert.doesNotMatch(message.answer,/tracking/);}
+    for(const message of f.calls.messages){assert.match(message.answer,/Форма HH отличается/);assert.match(message.answer,/https:\/\/hh.ru\/vacancy\/700[01]$/);assert.doesNotMatch(message.answer,/tracking|тест или заполнить/);}
     await f.deliveryWorker.tick();assert.equal(f.calls.messages.length,2,'handoffs deduplicate');
   }finally{await f.close();}
 });
@@ -156,7 +202,8 @@ test('real PG: GLM OpenRouter evaluation and letters share actual per-user cost 
     const data=JSON.parse(body.messages[1].content);
     return Response.json({id:`fixture-glm-${requests.length}`,model:JOB_MODEL,
       usage:{cost:evaluation?1.1:0.91},choices:[{finish_reason:'stop',message:{content:JSON.stringify(evaluation?
-        {decision:'apply'}:{text:`Experience of ${data.selectedResume.resumeId}`,factIds:['fact_1']})}}]});
+        {decision:'apply',directionMatched:true,reasonCode:'DIRECTION_FIT',rationale:'Fixture direction'}
+        :{status:'ready',text:`Experience of ${data.selectedResume.resumeId}`,factIds:['fact_1']})}}]});
   }});
   const f=await fixture({modelOverride:model});try{
     await f.worker.tick();await f.worker.tick();

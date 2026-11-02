@@ -19,6 +19,7 @@ const { createTelegramAccessPolicy } = require('../src/telegram/accessPolicy');
 const { once } = require('node:events');
 const { createRpcServer } = require('../../job-browser/src/rpcServer');
 const { JobBrowserClient } = require('../src/jobs/jobBrowserClient');
+const { JobResumeContextService } = require('../src/jobs/jobResumeContextService');
 const { JobBrowserConnectionService } = require('../src/jobs/jobBrowserConnectionService');
 const { MENU } = require('../src/telegram/telegramMenu');
 const { configuredOwnerJobAccess } = require('../src/jobs/configuredOwnerJobAccess');
@@ -28,6 +29,9 @@ test('real message/menu handlers + PG: guided retries, consumption, scopes, draf
   const token = crypto.randomBytes(32).toString('hex');
   const rpc = createRpcServer({ ownerId: f.owner, token, browser: { async connection() {
     connectionReads++; return { resumeId: selectedResume, title: 'Основное fixture резюме' };
+  }, async resumeContent({resumeId}) {
+    assert.equal(resumeId,selectedResume);
+    return {resumeId,title:'AI Engineer',experience:'Fixture automation project',skills:'Node.js',education:'',summary:'',grammaticalGender:'unknown'};
   } } });
   rpc.listen(0, '127.0.0.1'); await once(rpc, 'listening');
   try {
@@ -36,13 +40,15 @@ test('real message/menu handlers + PG: guided retries, consumption, scopes, draf
     const search = new JobSearchRepository(f.pool, { accessService }), profiles = new JobProfileRepository(f.pool, { accessService }), drafts = new JobDraftRepository(f.pool, { accessService }), usage = new JobUsageRepository(f.pool);
     const interactions = new TelegramInteractionRepository(f.pool);
     const settingsService = new JobSettingsService({ pool: f.pool, searchRepository: search, profileRepository: profiles, accessService });
+    const browserClient = new JobBrowserClient({ownerId:f.owner,token,
+      baseUrl:`http://127.0.0.1:${rpc.address().port}`,allowTestHttp:true});
+    const resumeContextService = new JobResumeContextService({pool:f.pool,browserClient,accessService});
     const draftService = new JobDraftService({ pool: f.pool, searchRepository: search, profileRepository: profiles,
-      draftRepository: drafts, usageRepository: usage, accessService,
+      draftRepository: drafts, usageRepository: usage, accessService, resumeContextService,
       modelAdapter: { async generate() { calls++; return { text: JSON.stringify({ text: `Private fixture letter ${calls}`, factIds: ['fact_1'] }), usage: { cost: 0.001 } }; } } });
     const jobs = new JobTelegramService({ pool: f.pool, searchRepository: search, profileRepository: profiles,
       draftRepository: drafts, usageRepository: usage, draftService, settingsService, interactions, accessService, ownerTelegramId: '101',
-      connectionService: new JobBrowserConnectionService({ pool: f.pool, browserClient: new JobBrowserClient({ ownerId: f.owner,
-        token, baseUrl: `http://127.0.0.1:${rpc.address().port}`, allowTestHttp: true }), accessService }) });
+      connectionService: new JobBrowserConnectionService({ pool: f.pool, browserClient, accessService }) });
     const menu = new TelegramMenuService({ interactions, jobSearchService: jobs, accessService, ownerTelegramId: '101' });
     const messages = new TelegramMessageService({ accessPolicy: createTelegramAccessPolicy(['101', '202']),
       updateRepository: new TelegramUpdateRepository(f.pool), userRepository: new UserRepository(f.pool),

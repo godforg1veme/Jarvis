@@ -114,7 +114,7 @@ class JobSearchRepository {
   }
 
   async getVacancy({ userId, vacancyId }) {
-    return (await this.pool.query(`SELECT v.*,m.saved,m.hidden,m.annotations FROM job_vacancies v
+    return (await this.pool.query(`SELECT v.*,m.saved,m.hidden,m.annotations,m.filter_revision FROM job_vacancies v
       JOIN job_matches m ON m.vacancy_id=v.id WHERE v.id=$1 AND m.user_id=$2`,
     [uuid.parse(vacancyId), uuid.parse(userId)])).rows[0] || null;
   }

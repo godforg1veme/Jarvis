@@ -33,8 +33,8 @@ services:
   job-browser:
     profiles: [job-search-de]
     build:
-      context: ../job-browser
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: job-browser/Dockerfile
     init: true
     user: pwuser
     restart: unless-stopped

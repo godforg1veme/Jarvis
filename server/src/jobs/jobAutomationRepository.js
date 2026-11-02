@@ -2,6 +2,7 @@ const crypto = require('node:crypto');
 const { uuid, assertJobScope, assertUserJobAccess, jobError } = require('./jobSchemas');
 const { jobTransaction } = require('./jobTransaction');
 const { moscowIso } = require('../../../shared/time');
+const { normalizeStopReason } = require('./jobStopReasons');
 
 class JobAutomationRepository {
   constructor(pool, { accessService = null } = {}) { this.pool = pool; this.accessService = accessService; }
@@ -75,7 +76,14 @@ class JobAutomationRepository {
           AND c.status='connected' AND c.resume_id=a.resume_id AND c.revision=a.connection_revision
           AND s.settings->>'activated'='true' AND s.settings->>'paused'='false'
           AND a.next_attempt_at<=now()
-          AND (i.id IS NULL OR i.status='pending')
+          AND (i.id IS NULL OR i.status='pending' OR (i.status='skipped'
+            AND i.evaluation->>'decision'='skip'
+            AND i.evaluation->>'source' IN ('filter','model')
+            AND (i.evaluation->'revisions'->>'search') ~ '^[0-9]+$'
+            AND (i.evaluation->'revisions'->>'search')::integer < s.revision
+            AND i.draft_id IS NULL AND i.operation_id IS NULL
+            AND NOT EXISTS (SELECT 1 FROM job_drafts d WHERE d.user_id=i.user_id AND d.vacancy_id=i.vacancy_id)
+            AND NOT EXISTS (SELECT 1 FROM job_applications app WHERE app.user_id=i.user_id AND app.vacancy_id=i.vacancy_id)))
           AND NOT EXISTS (SELECT 1 FROM job_automation_items old
             WHERE old.user_id=a.user_id AND old.vacancy_id=m.vacancy_id
               AND old.status IN ('evaluating','generating','submitting','unknown'))
@@ -85,8 +93,19 @@ class JobAutomationRepository {
         catch { continue; }
         const id = candidate.item_id || crypto.randomUUID();
         const item = candidate.item_id
-          ? (await client.query(`UPDATE job_automation_items SET status='evaluating',updated_at=now()
-             WHERE id=$1 AND status='pending' RETURNING *`, [id])).rows[0]
+          ? (await client.query(`UPDATE job_automation_items i SET status='evaluating',
+               evaluation_request_id=CASE WHEN i.status='skipped' THEN $2 ELSE i.evaluation_request_id END,
+               updated_at=now()
+             FROM job_searches s WHERE i.id=$1 AND s.user_id=i.user_id
+               AND (i.status='pending' OR (i.status='skipped'
+                 AND i.evaluation->>'decision'='skip'
+                 AND i.evaluation->>'source' IN ('filter','model')
+                 AND (i.evaluation->'revisions'->>'search') ~ '^[0-9]+$'
+                 AND (i.evaluation->'revisions'->>'search')::integer < s.revision
+                 AND i.draft_id IS NULL AND i.operation_id IS NULL
+                 AND NOT EXISTS (SELECT 1 FROM job_drafts d WHERE d.user_id=i.user_id AND d.vacancy_id=i.vacancy_id)
+                 AND NOT EXISTS (SELECT 1 FROM job_applications app WHERE app.user_id=i.user_id AND app.vacancy_id=i.vacancy_id)))
+             RETURNING i.*`, [id, `auto-evaluate:${id}:${crypto.randomUUID()}`])).rows[0]
           : (await client.query(`INSERT INTO job_automation_items
              (id,user_id,vacancy_id,automation_revision,status,evaluation_request_id,draft_request_id)
              VALUES($1,$2,$3,$4,'evaluating',$5,$6)
@@ -149,8 +168,28 @@ class JobAutomationRepository {
       draft_id=COALESCE($3,draft_id),operation_id=COALESCE($4,operation_id),updated_at=now()
       WHERE id=$1 AND status=$5 RETURNING *`, [uuid.parse(itemId), status, draftId, operationId, from])).rows[0] || null;
   }
+  async saveEvaluation({ itemId, evaluation }) {
+    if (!evaluation || typeof evaluation !== 'object' || JSON.stringify(evaluation).length > 4000)
+      throw jobError('JOB_MODEL_INVALID_OUTPUT');
+    const row = (await this.pool.query(`UPDATE job_automation_items SET evaluation=$2::jsonb,updated_at=now()
+      WHERE id=$1 AND status='evaluating' RETURNING id`, [uuid.parse(itemId), evaluation])).rows[0];
+    if (!row) throw jobError('JOB_REVISION_CONFLICT');
+    return row;
+  }
 
-  async enqueueAttention({ scope, vacancyId, automationRevision, code }) {
+  async finalizeKnownSkip({ itemId, evaluatedSearchRevision }) {
+    return jobTransaction(this.pool, async client => {
+      const row = (await client.query(`SELECT i.id,i.evaluation,s.revision AS search_revision
+        FROM job_automation_items i JOIN job_searches s ON s.user_id=i.user_id
+        WHERE i.id=$1 AND i.status='evaluating' FOR UPDATE OF i,s`, [uuid.parse(itemId)])).rows[0];
+      if (!row || row.evaluation?.decision !== 'skip'
+        || row.evaluation?.revisions?.search !== evaluatedSearchRevision) throw jobError('JOB_REVISION_CONFLICT');
+      await client.query("UPDATE job_automation_items SET status='skipped',updated_at=now() WHERE id=$1", [itemId]);
+      return { searchRevisionChanged: row.search_revision !== evaluatedSearchRevision };
+    });
+  }
+
+  async enqueueAttention({ scope, vacancyId, automationRevision, code, reasonCode = null }) {
     if (!['MANUAL_REQUIRED','LOGIN_REQUIRED','RESULT_UNKNOWN','PROCESSING_UNKNOWN','MODEL_UNAVAILABLE','RESUME_UNAVAILABLE'].includes(code)) throw jobError('JOB_INVALID_ACTION');
     // A lost HH connection still needs a private handover. Bind the notice to
     // the original consent/chat, while the delivery worker rechecks access.
@@ -163,12 +202,13 @@ class JobAutomationRepository {
     return (await this.pool.query(`INSERT INTO job_deliveries(user_id,vacancy_id,kind,dedup_key,payload)
       SELECT $1::uuid,$2::uuid,'attention',$3,jsonb_build_object('reason',$4::text,'code',$5::text,
         'vacancyId',($2::uuid)::text,'conversationId',$6::text,'chatId',$7::text,
-        'automationRevision',$8::integer)
+        'automationRevision',$8::integer,'failureCode',$9::text)
       WHERE ($2::uuid IS NULL OR EXISTS(SELECT 1 FROM job_matches WHERE user_id=$1 AND vacancy_id=$2::uuid))
       ON CONFLICT(user_id,dedup_key) DO NOTHING RETURNING id`, [scope.userId, vacancyId,
       `attention:auto:${code}:${['MODEL_UNAVAILABLE','RESUME_UNAVAILABLE','LOGIN_REQUIRED'].includes(code)
         ? moscowIso().slice(0,10) : vacancyId || 'system'}:${automationRevision}`, kind, code,
-      scope.conversationId, scope.chatId, automationRevision])).rows[0] || null;
+      scope.conversationId, scope.chatId, automationRevision,
+      code === 'MANUAL_REQUIRED' && reasonCode ? normalizeStopReason(reasonCode) : null])).rows[0] || null;
   }
 
   async backoff({ scope, automationRevision, minutes = 15 }) {

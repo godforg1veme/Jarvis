@@ -249,7 +249,7 @@ class HhBrowser {
       const zeroCandidate = expected === 'search' && signal.state === 'unknown'
         && response?.status() === 200 && current.pathname === '/search/vacancy';
       const formCandidate = expected === 'application' && signal.state === 'unknown'
-        && response?.status() === 200 && current.pathname === '/applicant/vacancy_response';
+        && response?.status() === 200 && ['/applicant/vacancy_response', '/applicant/vacancy_response/test'].includes(current.pathname);
       const privacyCandidate = (expected === 'resume_privacy' || expected === 'resume_content') && signal.state === 'unknown'
         && response?.status() === 200 && /^\/resume\/[a-zA-Z0-9]+$/.test(current.pathname);
       const historyCandidate = expected === 'history' && signal.state === 'unknown'
@@ -335,7 +335,10 @@ class HhBrowser {
     const privacy = await this.read(`https://hh.ru/resume/${resumeId}`, 'resume_privacy', (page) => readResumePrivacy(page, { resumeId }));
     const permission = evaluatePrivacy({ privacy, employerId: details.employerId });
     if (!permission.allowed) return { vacancy: details.vacancy, resumeAvailable: true, manualRequired: true, reasonCode: permission.reasonCode };
-    const state = await this.read(`https://hh.ru/applicant/vacancy_response?vacancyId=${externalId}`, 'application',
+    const formUrl = details.vacancy.manualRequired
+      ? `https://hh.ru/applicant/vacancy_response/test?vacancyId=${externalId}`
+      : `https://hh.ru/applicant/vacancy_response?vacancyId=${externalId}`;
+    const state = await this.read(formUrl, 'application',
       (page) => readApplicationForm(page, { externalId: String(externalId), resumeId, resumes }));
     return { vacancy: details.vacancy, ...state };
   }

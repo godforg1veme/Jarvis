@@ -5,6 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { ApplicationLedger } = require('../src/applicationLedger');
+const { normalizeQuestionnaire } = require('../../shared/jobQuestionnaire');
 
 test('Linux durable ledger: concurrent claims click once, restart/new IDs cannot repeat unknown; confirmed results are immutable',
   { skip: process.platform !== 'linux' }, async () => {
@@ -50,3 +51,29 @@ test('Linux ledger fails closed for partial files, unsafe permissions and symlin
     await assert.rejects(new ApplicationLedger({ root: linkedRoot, ownerId }).lookup(input), { code: 'JOB_BROWSER_LEDGER_UNAVAILABLE' });
   } finally { await fs.rm(parent, { recursive: true, force: true }); }
 });
+
+test('Linux ledger binds exact question answers and reason without storing answer text',
+  { skip: process.platform !== 'linux' }, async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'jarvis-job-question-ledger-')); await fs.chmod(root, 0o700);
+    const ownerId = randomUUID(), questionnaire = normalizeQuestionnaire({ questions: [
+      { id: 'experience', label: 'Какие проекты?', type: 'text', required: true, maxLength: 2000, options: [] },
+    ] });
+    const input = { userId: ownerId, operationId: randomUUID(), externalId: '123', resumeId: 'fixtureResume',
+      letter: 'Одобренный текст', questionnaire, answers: [{ id: 'experience', value: 'Мой проект с RAG' }] };
+    const ledger = new ApplicationLedger({ root, ownerId });
+    try {
+      assert.equal((await ledger.reserve(input)).execute, true);
+      assert.deepEqual(await ledger.lookup(input), { outcome: 'unknown' });
+      await assert.rejects(ledger.lookup({ ...input, answers: [{ id: 'experience', value: 'Другой ответ' }] }),
+        { code: 'JOB_BROWSER_OPERATION_CHANGED' });
+      assert.equal((await ledger.reserve({ ...input, operationId: randomUUID() })).execute, false);
+      const stopped = { outcome: 'manual_required', verified: true, reasonCode: 'JOB_HH_FORM_CHANGED' };
+      assert.deepEqual(await ledger.finish(input, stopped), stopped);
+      assert.deepEqual(await ledger.lookup(input), stopped);
+      for (const name of await fs.readdir(root)) {
+        const text = await fs.readFile(path.join(root, name), 'utf8');
+        assert.ok(!text.includes(input.answers[0].value));
+        assert.ok(!text.includes(input.letter));
+      }
+    } finally { await fs.rm(root, { recursive: true, force: true }); }
+  });

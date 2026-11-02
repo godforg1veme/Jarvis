@@ -1,5 +1,9 @@
 const { trackWorker } = require('../lifecycle');
 const { assertJobScope, jobError } = require('./jobSchemas');
+const { evaluateVacancy } = require('./jobFilters');
+const { assertAutomaticLetterTruth } = require('./jobPrompt');
+const DECISION_REASONS = new Set(['DIRECTION_FIT', 'OUT_OF_DIRECTION', 'INSUFFICIENT_FIT',
+  'MANDATORY_REQUIREMENT', 'USER_CONSTRAINT', 'UNCERTAIN']);
 
 class JobAutomationWorker {
   constructor({ pool, repository, automationService, searchRepository, profileRepository,
@@ -42,8 +46,9 @@ class JobAutomationWorker {
         if (status === 'sent' || status === 'already_applied' || status === 'manual_required' || status === 'failed') {
           await this.repository.resolveUnknown({ itemId: item.id, operationId,
             status: status === 'already_applied' ? 'sent' : status });
-          if (status === 'manual_required') await this.repository.enqueueAttention({ scope,
-            vacancyId: item.vacancy_id, automationRevision: item.automation_revision, code: 'MANUAL_REQUIRED' });
+          if (status === 'manual_required' || (status === 'failed' && result.failureCode === 'JOB_AUTOMATION_PRECHECK_FAILED')) await this.repository.enqueueAttention({ scope,
+            vacancyId: item.vacancy_id, automationRevision: item.automation_revision, code: 'MANUAL_REQUIRED',
+            reasonCode: result.failureCode });
           return;
         }
       }
@@ -72,6 +77,14 @@ class JobAutomationWorker {
       const previous = (await this.pool.query('SELECT id FROM job_applications WHERE user_id=$1 AND vacancy_id=$2 LIMIT 1',
         [scope.userId, item.vacancy_id])).rows[0];
       if (previous) { await this.repository.update({ itemId: item.id, from: phase, status: 'skipped' }); return; }
+      const filterResult = evaluateVacancy({ vacancy: vacancy.snapshot, settings: settings.settings });
+      if (!filterResult.include) {
+        await this.repository.saveEvaluation({ itemId: item.id, evaluation: { decision: 'skip',
+          directionMatched: false, reasonCode: 'USER_CONSTRAINT', rationale: 'Existing search filter excluded vacancy',
+          source: 'filter', filterResult, revisions: { search: settings.revision,
+            filter: vacancy.filter_revision, vacancy: vacancy.revision, automation: item.automation_revision } } });
+        await this.repository.finalizeKnownSkip({ itemId: item.id, evaluatedSearchRevision: settings.revision }); return;
+      }
       const profile = await this.profileRepository.ensure({ scope });
       const resumeContext = await this.resumeContextService.getSelected({ scope, requireComplete: true });
       if (!resumeContext) throw jobError('JOB_HH_RESUME_UNAVAILABLE');
@@ -84,7 +97,8 @@ class JobAutomationWorker {
       try {
         modelInvoked = true;
         evaluation = await this.modelAdapter.evaluate({ vacancy: vacancy.snapshot, profile: profile.profile,
-          resumeContext, settings: settings.settings, requestId: item.evaluation_request_id, userId: scope.userId });
+          resumeContext, settings: settings.settings, filterResult,
+          matchAnnotations: vacancy.annotations || [], requestId: item.evaluation_request_id, userId: scope.userId });
       } catch (error) {
         if (error?.modelUsage?.cost != null) await this.usageRepository.record({ userId: scope.userId,
           requestId: item.evaluation_request_id, providerRequestId: error.modelRequestId || null,
@@ -94,32 +108,58 @@ class JobAutomationWorker {
       await this.usageRepository.record({ userId: scope.userId, requestId: item.evaluation_request_id,
         providerRequestId: evaluation?.requestId || null, costUsd: evaluation?.usage?.cost ?? null,
         costBasis: evaluation?.usage?.costBasis || 'provider', outcome: 'success' });
-      if (!evaluation || !['apply','skip'].includes(evaluation.decision)) throw jobError('JOB_MODEL_INVALID_OUTPUT');
+      if (!evaluation || !['apply','skip'].includes(evaluation.decision)
+        || typeof evaluation.directionMatched !== 'boolean' || !DECISION_REASONS.has(evaluation.reasonCode)
+        || typeof evaluation.rationale !== 'string' || !evaluation.rationale.trim()
+        || evaluation.rationale.length > 240
+        || (evaluation.decision === 'apply') !== (evaluation.directionMatched
+          && evaluation.reasonCode === 'DIRECTION_FIT')
+        || (!evaluation.directionMatched && evaluation.reasonCode !== 'OUT_OF_DIRECTION'))
+        throw jobError('JOB_MODEL_INVALID_OUTPUT');
+      await this.repository.saveEvaluation({ itemId: item.id, evaluation: {
+        decision: evaluation.decision, directionMatched: evaluation.directionMatched,
+        reasonCode: evaluation.reasonCode, rationale: evaluation.rationale, source: 'model', filterResult,
+        revisions: { search: settings.revision, filter: vacancy.filter_revision,
+          vacancy: vacancy.revision, profile: profile.revision,
+          connection: resumeContext.connectionRevision, automation: item.automation_revision },
+      } });
       if (evaluation.decision === 'skip') {
-        await this.repository.update({ itemId: item.id, from: phase, status: 'skipped' }); return;
+        await this.repository.finalizeKnownSkip({ itemId: item.id, evaluatedSearchRevision: settings.revision }); return;
       }
+      if ((await this.searchRepository.getSettings({ userId: scope.userId }))?.revision !== settings.revision)
+        throw jobError('JOB_REVISION_CONFLICT');
       await this.automationService.assertCurrent({ scope, revision: item.automation_revision,
         resumeId: resumeContext.resumeId, connectionRevision: resumeContext.connectionRevision });
       await this.repository.update({ itemId: item.id, from: phase, status: 'generating' });
       phase = 'generating';
       const draft = await this.draftService.generate({ scope, vacancyId: item.vacancy_id,
-        requestId: item.draft_request_id, mode: 'improved', expectedProfileRevision: profile.revision,
+        requestId: item.draft_request_id, mode: 'improved', sourceText: profile.profile.baseLetter,
+        expectedProfileRevision: profile.revision,
         expectedVacancyRevision: vacancy.revision, requireCompleteResume: true });
+      assertAutomaticLetterTruth({ text: draft.text, resumeContext, profile: profile.profile });
       await this.automationService.assertCurrent({ scope, revision: item.automation_revision,
         resumeId: resumeContext.resumeId, connectionRevision: resumeContext.connectionRevision });
       await this.repository.update({ itemId: item.id, from: phase, status: 'submitting', draftId: draft.id });
       phase = 'submitting';
       const result = await this.applicationService.submitAutomatic({ scope, draftId: draft.id,
-        automationRevision: item.automation_revision });
+        automationRevision: item.automation_revision, expectedSearchRevision: settings.revision ?? null });
       const status = result.status === 'sent' || result.status === 'already_applied' ? 'sent'
         : result.status === 'manual_required' ? 'manual_required'
           : result.status === 'unknown' || result.status === 'sending' ? 'unknown' : 'failed';
       await this.repository.update({ itemId: item.id, from: phase, status, operationId: result.operationId });
-      if (status === 'manual_required') await this.repository.enqueueAttention({ scope,
-        vacancyId: item.vacancy_id, automationRevision: item.automation_revision, code: 'MANUAL_REQUIRED' });
+      if (status === 'manual_required' || (status === 'failed' && result.failureCode === 'JOB_AUTOMATION_PRECHECK_FAILED')) await this.repository.enqueueAttention({ scope,
+        vacancyId: item.vacancy_id, automationRevision: item.automation_revision, code: 'MANUAL_REQUIRED',
+        reasonCode: result.failureCode });
       else if (status === 'unknown') await this.repository.enqueueAttention({ scope,
         vacancyId: item.vacancy_id, automationRevision: item.automation_revision, code: 'RESULT_UNKNOWN' });
     } catch (error) {
+      if (['JOB_APPLICANT_ANSWER_REQUIRED', 'JOB_LETTER_UNSUPPORTED_INTENT'].includes(error?.code)
+        && phase === 'generating') {
+        await this.repository.update({ itemId: item.id, from: phase, status: 'manual_required' });
+        try { await this.repository.enqueueAttention({ scope, vacancyId: item.vacancy_id,
+          automationRevision: item.automation_revision, code: 'MANUAL_REQUIRED', reasonCode: error.code }); } catch {}
+        return;
+      }
       const code = ['JOB_HH_LOGIN_REQUIRED','JOB_HH_NOT_CONNECTED'].includes(error?.code) ? 'LOGIN_REQUIRED'
         : ['JOB_HH_RESUME_UNAVAILABLE','JOB_DRAFT_RESUME_STALE'].includes(error?.code) ? 'RESUME_UNAVAILABLE'
           : ['JOB_MODEL_UNAVAILABLE','JOB_MODEL_NOT_CONFIGURED','JOB_MODEL_INVALID_OUTPUT','JOB_MODEL_INVALID_FACTS'].includes(error?.code)

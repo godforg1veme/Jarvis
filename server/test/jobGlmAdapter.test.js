@@ -32,12 +32,16 @@ test('GLM uses existing OpenRouter key, fixed model, strict output, price sortin
 test('GLM evaluation uses the same model/key and returns only the validated decision',async()=>{
   let body;
   const adapter=new JobModelAdapter({config:{openrouterApiKey:'fixture'},fetchImpl:async(url,init)=>{
-    body=JSON.parse(init.body);return completion('{"decision":"apply"}');}});
+    body=JSON.parse(init.body);return completion(JSON.stringify({ decision: 'apply',
+      directionMatched: true, reasonCode: 'DIRECTION_FIT', rationale: 'Fixture direction matches' }));}});
   const result=await adapter.evaluate(input);
   assert.equal(body.model,JOB_MODEL);assert.equal(body.max_tokens,1024);
   assert.deepEqual(body.response_format.json_schema.schema.properties.decision.enum,['apply','skip']);
+  assert.deepEqual(body.response_format.json_schema.schema.properties.reasonCode.enum,
+    ['DIRECTION_FIT','OUT_OF_DIRECTION','INSUFFICIENT_FIT','MANDATORY_REQUIREMENT','USER_CONSTRAINT','UNCERTAIN']);
   assert.deepEqual(JSON.parse(body.messages[1].content).selectedResume,input.resumeContext.snapshot);
-  assert.equal(result.decision,'apply');assert.equal(result.usage.cost,0.001);
+  assert.equal(result.decision,'apply');assert.equal(result.reasonCode,'DIRECTION_FIT');
+  assert.equal(result.usage.cost,0.001);
 });
 
 test('missing cost stays unknown while zero cost remains a provider receipt',()=>{

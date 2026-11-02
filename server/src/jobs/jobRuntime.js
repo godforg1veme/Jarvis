@@ -15,6 +15,7 @@ const { JobTelegramService } = require('./jobTelegramService');
 const { JobDeliveryWorker } = require('./jobDeliveryWorker');
 const { JobApplicationRepository } = require('./jobApplicationRepository');
 const { JobApplicationService } = require('./jobApplicationService');
+const { JobQuestionAnswerService } = require('./jobQuestionAnswerService');
 const { JobRecoveryWorker } = require('./jobRecovery');
 const { JobBrowserClient } = require('./jobBrowserClient');
 const { JobBrowserConnectionService } = require('./jobBrowserConnectionService');
@@ -80,8 +81,10 @@ function createJobRuntime({ config, pool, interactions, send, sendPhoto, fetchIm
   const historySync=new JobHistorySyncRepository(pool,historyRepository,{accessService: jobsAccessService});
   const historyWorker=browserClient?new JobHistoryWorker({repository:historySync,client:browserClient}):null;
   const historyService=new JobHistoryTelegram({repository:historyRepository,syncRepository:historySync,available:Boolean(browserClient)});
+  const questionAnswerService = new JobQuestionAnswerService({ pool, accessService: jobsAccessService,
+    automationRepository, searchRepository, profileRepository, resumeContextService, modelAdapter, usageRepository });
   const applicationService = new JobApplicationService({ pool, repository: applicationRepository, searchRepository,
-    adapter: applicationAdapter, historyRepository, accessService: jobsAccessService, automationRepository });
+    adapter: applicationAdapter, historyRepository, accessService: jobsAccessService, automationRepository, questionAnswerService });
   const automationWorker = new JobAutomationWorker({ pool, repository: automationRepository, automationService,
     searchRepository, profileRepository, resumeContextService, modelAdapter, draftService, applicationService,
     usageRepository, accessService: jobsAccessService });

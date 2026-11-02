@@ -1,6 +1,7 @@
 const crypto = require('node:crypto');
 const { uuid, assertJobScope, jobError } = require('./jobSchemas');
 const { jobTransaction } = require('./jobTransaction');
+const { normalizeQuestionnaire, normalizeAnswers } = require('../../../shared/jobQuestionnaire');
 
 class JobApplicationRepository {
   constructor(pool, { now = () => new Date(), accessService = null } = {}) { this.pool = pool; this.now = now; this.accessService = accessService; }
@@ -74,8 +75,13 @@ class JobApplicationRepository {
       return { operation, execute: true };
     });
   }
-  async claimAutomatic({ scope, draftId, automationRevision }) {
+  async claimAutomatic({ scope, draftId, automationRevision, expectedSearchRevision = null, questionnaire = null, answers = null, questionnaireContext = null }) {
     if (!Number.isInteger(automationRevision) || automationRevision < 1) throw jobError('JOB_AUTOMATION_UNAVAILABLE');
+    if (questionnaire !== null) {
+      questionnaire = normalizeQuestionnaire(questionnaire);
+      answers = normalizeAnswers(questionnaire, answers);
+      if (!questionnaireContext || questionnaireContext.automationRevision !== automationRevision) throw jobError('JOB_REVISION_CONFLICT');
+    } else if (answers !== null || questionnaireContext !== null) throw jobError('JOB_INVALID_APPLICATION_RESULT');
     return jobTransaction(this.pool, async client => {
       await client.query("SELECT pg_advisory_xact_lock(hashtext('jarvis-access-admin'))");
       await assertJobScope(client, scope, this.accessService);
@@ -96,17 +102,30 @@ class JobApplicationRepository {
       const search = (await client.query('SELECT revision FROM job_searches WHERE user_id=$1', [scope.userId])).rows[0];
       if (row.match_hidden || row.match_filter_revision !== search?.revision)
         throw jobError('JOB_REVISION_CONFLICT');
+      if (expectedSearchRevision !== null && search.revision !== expectedSearchRevision) throw jobError('JOB_REVISION_CONFLICT');
+      if (questionnaireContext && (questionnaireContext.profileRevision !== row.profile_revision
+        || questionnaireContext.vacancyRevision !== row.vacancy_revision || questionnaireContext.searchRevision !== search.revision
+        || questionnaireContext.resumeId !== row.resume_id || questionnaireContext.connectionRevision !== row.connection_revision))
+        throw jobError('JOB_REVISION_CONFLICT');
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`job-draft:${scope.userId}:${row.vacancy_id}`]);
       const existing = (await client.query(`SELECT * FROM job_applications WHERE user_id=$1 AND vacancy_id=$2
         AND (resume_id=$3 OR status IN ('sending','unknown')) ORDER BY created_at LIMIT 1`,
       [scope.userId, row.vacancy_id, row.resume_id])).rows[0];
       if (existing) return { operation: existing, execute: false };
       const operation = (await client.query(`INSERT INTO job_applications(user_id,vacancy_id,resume_id,draft_id,
-        confirmation_id,automation_revision,operation_id,approved_text,status)
-        VALUES($1,$2,$3,$4,NULL,$5,$6,$7,'sending') RETURNING *`,
-      [scope.userId,row.vacancy_id,row.resume_id,row.id,automationRevision,crypto.randomUUID(),row.text])).rows[0];
+        confirmation_id,automation_revision,operation_id,approved_text,status,questionnaire,questionnaire_answers,questionnaire_context)
+        VALUES($1,$2,$3,$4,NULL,$5,$6,$7,'sending',$8,$9,$10) RETURNING *`,
+      [scope.userId,row.vacancy_id,row.resume_id,row.id,automationRevision,crypto.randomUUID(),row.text,
+        questionnaire, answers === null ? null : JSON.stringify(answers), questionnaireContext])).rows[0];
       return { operation, execute: true };
     });
+  }
+  async findAutomaticForDraft({ scope, draftId }) {
+    await assertJobScope(this.pool, scope, this.accessService);
+    return (await this.pool.query(`SELECT a.* FROM job_applications a JOIN job_drafts d
+      ON d.user_id=a.user_id AND d.vacancy_id=a.vacancy_id
+      WHERE d.id=$1 AND d.user_id=$2 AND (a.resume_id=d.resume_id OR a.status IN ('sending','unknown'))
+      ORDER BY a.created_at LIMIT 1`, [uuid.parse(draftId), scope.userId])).rows[0] || null;
   }
   async get({ scope, operationId }) {
     await assertJobScope(this.pool, scope, this.accessService);

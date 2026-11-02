@@ -6,9 +6,11 @@ const { prepareApplicationPage } = require('./hhApplication');
 const { validateSubmissionRequest, normalizeSubmissionReceipt } = require('./submissionProtocol');
 const { readApplicationReference, verifyChatLetter } = require('./applicationProof');
 const {visibleAppliedAction}=require('./existingApplication');
+const { normalizeQuestionnaire, normalizeAnswers, STOP_REASONS }=require('../../shared/jobQuestionnaire');
 
 const unknown = () => ({ outcome: 'unknown' });
-const manual = () => ({ outcome: 'manual_required', verified: true });
+const manual = (reasonCode = 'JOB_HH_FORM_CHANGED') => ({ outcome: 'manual_required', verified: true,
+  reasonCode: STOP_REASONS.has(reasonCode) ? reasonCode : 'JOB_HH_FORM_CHANGED' });
 
 class HhApplicationDriver {
   constructor({ browser, dispatch = (route) => route.continue(), responseTimeoutMs = 25000 }) {
@@ -17,9 +19,18 @@ class HhApplicationDriver {
   }
   async prepare(input) {
     const hh = this.browser, inspected = await hh.inspectNow(input);
-    if (!inspected.resumeAvailable || inspected.manualRequired || inspected.vacancy.archived) return { ready: false };
+    const questionnaireMatches = (() => {
+      try { return input.questionnaire !== undefined && inspected.questionnaire?.hash === normalizeQuestionnaire(input.questionnaire).hash
+        && !!normalizeAnswers(input.questionnaire, input.answers); } catch { return false; }
+    })();
+    if (!inspected.resumeAvailable || (inspected.manualRequired && !(inspected.reasonCode === 'JOB_HH_QUESTIONS_REQUIRED' && questionnaireMatches))
+      || inspected.vacancy.archived) return { ready: false, reasonCode: inspected.reasonCode || 'JOB_HH_FORM_CHANGED' };
+    if (!inspected.manualRequired && input.questionnaire !== undefined) return { ready: false, reasonCode: 'JOB_HH_FORM_CHANGED' };
     const resumes = await hh.read('https://hh.ru/applicant/resumes', 'authenticated', readResumes);
-    const opened = await hh.open(`https://hh.ru/applicant/vacancy_response?vacancyId=${input.externalId}`, 'application');
+    const formUrl = inspected.reasonCode === 'JOB_HH_QUESTIONS_REQUIRED'
+      ? `https://hh.ru/applicant/vacancy_response/test?vacancyId=${input.externalId}`
+      : `https://hh.ru/applicant/vacancy_response?vacancyId=${input.externalId}`;
+    const opened = await hh.open(formUrl, 'application');
     try {
       const state = await prepareApplicationPage(opened.page, { ...input, resumes });
       return { ...state, page: opened.page, resumes, releaseNavigationGuard: opened.releaseReadGuard };
@@ -27,27 +38,34 @@ class HhApplicationDriver {
   }
   async clickAndVerify({ prepared, ...input }) {
     const hh = this.browser, page = prepared.page;
-    if (!page || !prepared.ready) return manual();
+    if (!page || !prepared.ready) return manual(prepared.reasonCode);
     // Refresh the employer and privacy policy before the only permitted mutation.
     const source = await hh.read(`https://hh.ru/vacancy/${input.externalId}`, 'vacancy', async (node) => ({
       vacancy: await readVacancyPage(node, input.externalId), employerId: await readEmployerId(node),
       applied: await visibleAppliedAction(node),
     }));
-    if (source.vacancy.archived || source.applied) return manual();
+    if (source.vacancy.archived || source.applied) return manual(source.applied ? 'JOB_HH_ALREADY_APPLIED' : 'JOB_HH_NOT_FOUND');
+    if (source.vacancy.manualRequired && input.questionnaire === undefined) return manual('JOB_HH_TEST_REQUIRED');
     const privacy = await hh.read(`https://hh.ru/resume/${input.resumeId}`, 'resume_privacy',
       (node) => readResumePrivacy(node, { resumeId: input.resumeId }));
-    if (!evaluatePrivacy({ privacy, employerId: source.employerId }).allowed) return manual();
+    const permission = evaluatePrivacy({ privacy, employerId: source.employerId });
+    if (!permission.allowed) return manual(STOP_REASONS.has(permission.reasonCode) ? permission.reasonCode : 'JOB_HH_PRIVACY_DENIED');
     const state = await readApplicationForm(page, { ...input, resumes: prepared.resumes });
-    if (state.manualRequired || await page.locator('textarea[data-qa="vacancy-response-popup-form-letter-input"]').inputValue() !== input.letter) return manual();
+    if (input.questionnaire === undefined ? state.manualRequired
+      : state.reasonCode !== 'JOB_HH_QUESTIONS_REQUIRED' || state.questionnaire?.hash !== input.questionnaire.hash)
+      return manual(state.reasonCode);
+    if (await page.locator('textarea[data-qa="vacancy-response-popup-form-letter-input"]').inputValue() !== input.letter)
+      return manual('JOB_HH_LETTER_CHANGED');
     const action = await page.locator('[data-qa="vacancy-response-submit-popup"]').evaluate((button) => {
-      const form = button.closest('form'); return form ? { method: form.method, url: form.action } : null;
+      const form = button.closest('form'); return form ? { method: form.method, url: form.action, present: true } : null;
     });
     let target; try { target = new URL(action?.url); } catch { return manual(); }
-    if (action.method !== 'post' || target.origin !== 'https://hh.ru' || target.pathname !== '/applicant/vacancy_response'
+    if (!action?.present || (!input.questionnaire && action.method !== 'post') || target.origin !== 'https://hh.ru'
+      || target.pathname !== (input.questionnaire ? '/applicant/vacancy_response/test' : '/applicant/vacancy_response')
       || target.username || target.password || target.hash || target.searchParams.size !== 1
       || target.searchParams.get('vacancyId') !== input.externalId) return manual();
 
-    let approvedRequest = null, permitted = 0, armed = false;
+    let approvedRequest = null, permitted = 0, armed = false, blockedMutation = false;
     let sawRequest;
     const requestSeen = new Promise((resolve) => { sawRequest = resolve; });
     const guard = async (route) => {
@@ -56,7 +74,7 @@ class HhApplicationDriver {
       try {
         if (!armed || permitted || request.frame() !== page.mainFrame() || !validateSubmissionRequest({
           url: request.url(), method: request.method(), contentType: request.headers()['content-type'], body: request.postDataBuffer(),
-        }, input)) return route.abort();
+        }, { ...input, nativeStartTime: prepared.nativeStartTime })) { if (!['GET','HEAD','OPTIONS'].includes(request.method())) blockedMutation = true; return route.abort(); }
         permitted++; approvedRequest = request;
         sawRequest();
         // A page-level continue bypasses the context's read-only fallback for this exact request only.
@@ -72,7 +90,7 @@ class HhApplicationDriver {
       await page.locator('[data-qa="vacancy-response-submit-popup"]').click({ timeout: 10000 }).catch(() => {});
       if (!permitted) await Promise.race([requestSeen, page.waitForTimeout(3000)]);
       armed = false;
-      if (!permitted) return manual();
+      if (!permitted) return manual(blockedMutation ? 'JOB_HH_SUBMISSION_BLOCKED' : 'JOB_HH_FORM_CHANGED');
       const response = await receipt;
       if (!response || response.status() < 200 || response.status() >= 300) return unknown();
       const headers = response.headers();
@@ -86,6 +104,9 @@ class HhApplicationDriver {
   }
   async readResult(input) {
     if (typeof input.letter !== 'string' || !input.letter.trim() || input.letter.length > 10000) return unknown();
+    // The existing HH chat proof establishes the letter but cannot establish
+    // the exact questionnaire answers after an uncertain submission.
+    if (input.questionnaire !== undefined) return unknown();
     const opened = await this.browser.open(`https://hh.ru/vacancy/${input.externalId}`, 'vacancy'), page = opened.page;
     try {
       const reference = await readApplicationReference(page, input);
