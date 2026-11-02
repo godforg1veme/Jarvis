@@ -1,5 +1,26 @@
 # HH browser: чтение и проверка формы
 
+2 ноября на DE установлены [контекст отбора и нативные ответы HH](../docs/updates/2026-11-02-hh-context-and-answers-release.md).
+Поддерживаются текст и выбор одного/нескольких вариантов в штатном HH test flow.
+Браузер сверяет сохранённую анкету, точные ответы, hidden test identity и текущий
+startTime перед единственным POST. Внешние анкеты, файлы, медиа, CAPTCHA и
+неизвестные поля требуют вмешательства. Unknown не повторяется под новым ID.
+Сборка: `docker build -f job-browser/Dockerfile .` из корня репозитория;
+`job-browser/Dockerfile.dockerignore` допускает browser source/package и общий
+`shared/jobQuestionnaire.js`. Не расширяй контекст на приватные настройки.
+Протокол подтверждён публичным JS HH и Chromium-фикстурами; реальная отправка
+новой анкеты ещё не проверена.
+
+November 2: [selection context and native HH answers](../docs/updates/2026-11-02-hh-context-and-answers-release.md)
+are deployed on DE. Text and single/multiple choices use the native HH test flow.
+The browser checks the saved questionnaire, exact answers, hidden test identity
+and current startTime before one POST. External forms, files, media, CAPTCHA and
+unknown fields require intervention. Unknown keeps its original ID. Build from
+the repository root with `docker build -f job-browser/Dockerfile .`; the Docker
+context allowlist includes browser source/package and `shared/jobQuestionnaire.js`.
+Keep private configuration outside the context. Public HH JS and Chromium fixtures
+verify the protocol; a real new questionnaire submission remains unverified.
+
 1 ноября восстановлены вход и полное чтение выбранного резюме. Reader поддерживает
 привязанное полное HH state; неполный legacy SSR по-прежнему блокирует автоматику.
 [Проверки и установка](../docs/updates/2026-11-01-hh-session-and-complete-resume-repair.md).

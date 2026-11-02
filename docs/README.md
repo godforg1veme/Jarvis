@@ -4,10 +4,11 @@
 
 ## Русский
 
-2 ноября [локально исправлен отбор HH и добавлены ответы работодателю](updates/2026-11-02-hh-context-and-answers-development.md):
+2 ноября на DE [исправлен отбор HH и добавлены ответы работодателю](updates/2026-11-02-hh-context-and-answers-release.md):
 полный контекст фильтров, проверка направления, защита от выдуманных намерений и
-нативные вопросы HH. Изменения не опубликованы; результаты тестов и границы
-живой проверки записаны отдельно.
+поддерживаемые нативные вопросы HH. Server/browser healthy, миграции 056/057
+применены; исходники обоих VPS синхронизированы. Реальная отправка новой анкеты
+ещё не проверена; Desktop не менялся.
 
 1 ноября [сверены действующие руководства](updates/2026-11-01-current-documentation-refresh.md):
 ручной и автоматический HH, модель, расходы и отдельная приёмка профилей.
@@ -110,7 +111,7 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 
 23 октября выпущен [орбитальный Mini App и единый дизайн всех внутренних экранов](updates/2026-10-23-mini-app-orbital-release.md). GitHub, Windows и оба VPS синхронизированы; новый DE server healthy. Живое принятие на телефоне остаётся.
 
-Сводка записей выпусков обновлена 1 ноября 2026 года. Новую сверку окружения
+Сводка записей выпусков обновлена 2 ноября 2026 года. Новую сверку окружения
 проводи по [руководству по выпуску](release-workflow.md).
 Результат переноса истории и проверки сохранности правил:
 [уплотнение документации](updates/2026-10-23-documentation-consolidation.md).
@@ -119,7 +120,7 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 
 | Направление | Что подтверждено | Что ещё проверить |
 | --- | --- | --- |
-| HH: письма, автопоиск и расходы | [GLM 5.3 Flash и личный автопоиск](updates/2026-11-01-hh-autonomous-search-release.md) установлены на DE. Реальные GLM-пробы прошли; тесты проверяют private scope, тихие отказы/успехи, передачу анкет и одно уведомление при $2 за месяц по МСК. Режим по умолчанию выключен. Почасовая сверка истории планируется независимо от поиска | Переключатель в настоящем Telegram, первый реальный автоотклик, живая передача теста и уведомление при фактическом достижении $2; расписание не доказывает завершённый полный обход |
+| HH: письма, автопоиск и расходы | [Полный контекст и ответы HH](updates/2026-11-02-hh-context-and-answers-release.md) установлены на DE; миграции 056/057, server/browser healthy. GLM учитывает направление, фильтры, резюме и базовое письмо; поддерживаемые нативные вопросы проходят через сохранённые точные ответы. Личное согласие и unknown сохраняются | Живая новая анкета, owner/member и новый текст Telegram; первое реальное автодействие нельзя считать проверенным по фикстурам |
 | HH: подключение и резюме | Код общий для всех UUID-профилей, изоляция проверена тестами. [Личный вход и полное чтение резюме владельца подтверждены](updates/2026-11-01-hh-session-and-complete-resume-repair.md); установлен reader полного привязанного состояния. Прежнее основное резюме сохранено, server state показал available=true при выключенной автоматике | Реальные входы и полные резюме участников, клавиатура iPhone, первое успешное поднятие. Неподдерживаемые непустые разделы требуют вмешательства; успешная проверка владельца не доказывает работу каждого профиля |
 | HH: CAPTCHA и сбор | [Общий сбор](updates/2026-10-24-hh-complete-collection.md), три прохода и сохранение прогресса установлены; после восстановления входа 1 ноября ограниченный тик свежей очереди завершился без failure code; очередь продолжает обход. OCR ограничен тремя попытками, unknown останавливает отправку | Старый исторический диапазон дал JOB_COLLECTION_WINDOW_EXPIRED; полный backlog не объявлен прочитанным. Следующий CAPTCHA-цикл. HTTP 403 с формой входа 1 ноября не устанавливает причину прежнего CAPTCHA-отказа |
 | Desktop | Установлена 1.0.2; [надёжность запросов и проверка результата по исходному ID](updates/2026-10-20-desktop-reliability-release.md), сверка установленного кода и bundled runtime прошли | Живой чат, микрофон, paired voice и реальные команды; при приёмке прямой Windows HTTPS/WSS был недоступен |
@@ -168,10 +169,11 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 
 ## English
 
-November 2: [local HH selection and employer-answer changes](updates/2026-11-02-hh-context-and-answers-development.md)
-add complete filter context, direction checks, unsupported-intent guards and
-native HH questions. Nothing is published; test results and live-verification
-limits are recorded separately.
+November 2: [HH selection and employer answers](updates/2026-11-02-hh-context-and-answers-release.md)
+are deployed on DE: complete filter context, direction checks, unsupported-intent
+guards and supported native HH questions. Server/browser are healthy, migrations
+056/057 are applied, and both VPS sources are synchronized. A real new
+questionnaire submission remains unverified; Desktop code is unchanged.
 
 November 1: [current guides are reconciled](updates/2026-11-01-current-documentation-refresh.md):
 manual/autonomous HH, model policy, spending and separate profile acceptance.
@@ -280,7 +282,7 @@ The [motion repair](updates/2026-10-23-mini-app-motion-fix.md) is deployed to DE
 
 October 23: the [orbital Mini App and shared design of all interior screens](updates/2026-10-23-mini-app-orbital-release.md) are deployed. GitHub, Windows and both VPS sources match; the new DE server is healthy. Physical phone acceptance remains.
 
-Release-record summary updated on November 1, 2026. Use the
+Release-record summary updated on November 2, 2026. Use the
 [release guide](release-workflow.md) for a fresh environment comparison.
 For history preservation and rule-retention checks, see the
 [documentation consolidation record](updates/2026-10-23-documentation-consolidation.md).
@@ -289,7 +291,7 @@ For history preservation and rule-retention checks, see the
 
 | Area | Verified result | Outstanding checks |
 | --- | --- | --- |
-| HH: letters, automation and spending | [GLM 5.3 Flash and personal automation](updates/2026-11-01-hh-autonomous-search-release.md) are deployed on DE. Live GLM probes passed; tests cover private scope, quiet skips/successes, form handoff and one $2 notice per Moscow month. Automation defaults to off. Hourly history reconciliation is scheduled independently of search | The in-Telegram switch, first real autonomous application, live test handoff and a notice at actual $2 spend; a schedule does not prove a completed full scan |
+| HH: letters, automation and spending | [Complete context and HH answers](updates/2026-11-02-hh-context-and-answers-release.md) deployed on DE; migrations 056/057, healthy server/browser. GLM receives direction, filters, resume and base letter; supported native questions use saved exact answers. Personal consent and original unknown IDs are retained | A live new questionnaire, owner/member and updated Telegram text; fixtures do not establish real autonomous sending |
 | HH: connection and resumes | Shared code covers all UUID profiles; isolation is tested. [Personal sign-in and complete resume reading passed for the owner](updates/2026-11-01-hh-session-and-complete-resume-repair.md). The bound-state reader is installed; the original primary was retained. Server state returned available=true with automation off | Real member sign-ins/resumes, iPhone keyboard and first successful raise. Unsupported nonempty sections need intervention; owner acceptance does not establish every profile works |
 | HH: CAPTCHA and collection | [Shared collection](updates/2026-10-24-hh-complete-collection.md), three lanes and durable progress are deployed. After November 1 sign-in recovery, a bounded fresh-queue tick finished without a failure code; collection continues. OCR allows three attempts; unknown stops submission | An old history range returned JOB_COLLECTION_WINDOW_EXPIRED; the full backlog is not accepted. Next CAPTCHA cycle. The November 1 HTTP 403 login page does not establish the cause of earlier CAPTCHA failures |
 | Desktop | Version 1.0.2 installed; [bounded requests and result checks by original ID](updates/2026-10-20-desktop-reliability-release.md), installed-source and bundled-runtime comparisons passed | Live chat, microphone, paired voice and real commands; direct Windows HTTPS/WSS was unavailable during acceptance |

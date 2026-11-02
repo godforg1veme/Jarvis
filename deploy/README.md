@@ -505,7 +505,7 @@ Manual sending requires the selected vacancy and exact-letter confirmation.
 Personal Autonomous job search defaults to off; activating it authorizes future
 applications for the selected resume and bound private scope. Current access,
 consent and connection revision are rechecked. Routine cards, skips and successes
-stay quiet; tests/forms and actionable failures go to the user's private chat.
+stay quiet; unsupported tests/forms and actionable failures go to the user's private chat.
 Do not enable users' automation as part of deployment. The owner completed live
 sign-in and complete-resume reading. Member flows, the new switch inside Telegram
 and the first real autonomous employer application remain for live acceptance.
@@ -520,11 +520,31 @@ OpenRouter key, независимо от очереди основного ча
 Ручная отправка требует подтверждения точного письма; личное включение автопоиска
 разрешает будущие отклики от выбранного резюме в привязанном приватном scope.
 Права, согласие и revision перепроверяются. Обычные карточки, отказы и успехи
-не уведомляют; тесты, анкеты и проблемы передаются в личный чат. При выпуске
+не уведомляют; неподдерживаемые тесты, анкеты и проблемы передаются в личный чат. При выпуске
 автоматику пользователям не включай. Вход и полное чтение проверены у владельца;
 участники, переключатель внутри Telegram и первый реальный автоотклик ещё требуют
 живой приёмки. Подставные результаты отправки её не заменяют. Ссылки выше содержат
 текущий выпуск и доказательства чтения резюме.
+
+2 ноября [полный контекст и ответы HH установлены на DE](../docs/updates/2026-11-02-hh-context-and-answers-release.md).
+При выпуске обновляются server, job-browser и job-collector; миграции 056/057
+применяются сервером при запуске. Сохраняй текущие env, внешний HH profile volume,
+OCR socket и inode bind-mounted секретов. Не включай личную автоматику при выпуске.
+Browser build context теперь корень репозитория; его отдельный Dockerfile.dockerignore
+разрешает только browser source/package и shared/jobQuestionnaire.js. Используй
+проверенный immutable release; отдельно сверяй код работающего collector.
+Desktop не импортирует новый модуль; общая inventory-проверка shared сообщает
+его отсутствие в EXE. Реальная новая анкета остаётся отдельной живой приёмкой.
+
+November 2: [complete context and HH answers are deployed on DE](../docs/updates/2026-11-02-hh-context-and-answers-release.md).
+Update server, job-browser and job-collector; server startup applies migrations
+056/057. Preserve current environment, external HH profile volume, OCR socket
+and bind-mounted secret inodes. Do not activate personal automation during release.
+Browser build context is now the repository root, with its Dockerfile.dockerignore
+allowlisting browser source/package and shared/jobQuestionnaire.js. Use a verified
+immutable release and compare the running collector code separately. Desktop
+does not import the new module; broad shared inventory reports its absence in
+the EXE. A real new questionnaire remains a separate live acceptance check.
 
 ### Human HH CAPTCHA replies through Telegram
 

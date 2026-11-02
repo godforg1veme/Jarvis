@@ -1,5 +1,9 @@
 # HH: контекст отбора и ответы / Selection context and answers
 
+2 ноября: установлен [более новый выпуск](2026-11-02-hh-context-and-answers-release.md). Ниже сохранён результат разработки до публикации.
+
+November 2: superseded by the [deployed release](2026-11-02-hh-context-and-answers-release.md). The pre-publication development record is preserved below.
+
 ## Русский
 
 Локальная разработка по согласованной владельцем

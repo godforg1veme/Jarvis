@@ -326,6 +326,26 @@ amounts remaining unknown. This supersedes the October 23 HH model policy above.
 Automation defaults to off; [live complete-resume reading passed](updates/2026-11-01-hh-session-and-complete-resume-repair.md).
 The first autonomous application remains unverified.
 
+2 ноября на DE установлен [полный контекст HH и ответы работодателю](updates/2026-11-02-hh-context-and-answers-release.md).
+Оценщик получает настройки поиска, результаты обычных фильтров, полную вакансию,
+резюме, факты и базовое письмо. Направление работы проверяется до сходства навыков;
+причина решения и версии сохраняются приватно. Та же фиксированная GLM отвечает
+на поддерживаемые нативные вопросы HH в личном включённом автопоиске. Анкета и
+точные ответы сохраняются до отправки; права, согласие и версии перепроверяются.
+Неизвестные личные факты и неподдерживаемые формы передаются пользователю.
+Миграции 056/057 применены, server/browser healthy; реальная отправка новой
+анкеты ещё не проверена. Unknown сохраняет исходный ID без повторной отправки.
+
+November 2: [complete HH context and employer answers](updates/2026-11-02-hh-context-and-answers-release.md)
+are deployed on DE. Evaluation receives search settings, ordinary filter results,
+full vacancy, resume, facts and base letter. Direction precedes transferable skills;
+decision reasons and versions are stored privately. The same fixed GLM answers
+supported native HH questions in personally enabled automation. Exact answers
+are saved before sending; access, consent and versions are rechecked. Missing
+personal facts and unsupported forms require user intervention. Migrations 056/057
+are applied and server/browser are healthy. A real new questionnaire remains
+unverified. Unknown outcomes retain their original ID without resubmission.
+
 Refresh happens on use after 15 minutes; it updates metadata, not the allowlist.
 Provider price ceilings protect zero-price routing even between refreshes.
 A missing fresh catalog fails closed. Tool-capable requests never retry after

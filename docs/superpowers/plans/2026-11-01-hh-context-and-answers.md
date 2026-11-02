@@ -1,5 +1,8 @@
 # HH context and answers implementation plan
 
+2 ноября: [реализовано и установлено на DE](../../updates/2026-11-02-hh-context-and-answers-release.md).
+November 2: [implemented and deployed on DE](../../updates/2026-11-02-hh-context-and-answers-release.md).
+
 **Goal:** Implement the owner-approved [design](../specs/2026-11-01-hh-context-and-answers-design.md).
 **Architecture:** A shared bounded questionnaire contract joins browser discovery,
 server answer generation and immutable submission identity. Existing filtering

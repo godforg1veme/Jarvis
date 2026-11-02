@@ -103,7 +103,7 @@ In-Telegram switch and first-application acceptance remain open. /
 
 [Implementation, checks and remaining acceptance](updates/2026-11-01-hh-autonomous-search-release.md).
 
-### Контекст и ответы HH / HH context and answers (local, November 2, 2026)
+### Контекст и ответы HH / HH context and answers (deployed on DE, November 2, 2026)
 
 По согласованию владельца в текущей задаче автоматический режим учитывает
 полные условия обычных фильтров и целевое направление, резюме, факты и базовое
@@ -117,8 +117,9 @@ In-Telegram switch and first-application acceptance remain open. /
 результат без причины не объявляется тестом или изменением формы. Описание в
 `job:auto` поясняет ответы; labels, rows, callback grammar, guided kinds и
 owner/member scopes прежние. Unknown сохраняет исходный ID без повторной
-отправки. [Результаты и ограничения](updates/2026-11-02-hh-context-and-answers-development.md).
-Этот раздел описывает локальные изменения, не установленную версию.
+отправки. [Выпуск, проверки и ограничения](updates/2026-11-02-hh-context-and-answers-release.md).
+Установлено на DE 2 ноября; живые варианты анкеты и новый текст Telegram
+ещё требуют приёмки.
 
 The owner approved complete filter/direction context and automatic employer
 answers in this task. In-letter questions are handled during letter generation;
@@ -128,9 +129,9 @@ do not silently generate answers. Missing personal facts, external forms, files,
 CAPTCHA and unsupported tests require private handoff with a truthful reason;
 legacy results without a cause remain unknown. `job:auto` explains the behavior;
 labels, rows, callback grammar, guided kinds and owner/member scopes are unchanged.
-Unknown preserves its original ID without resubmission. This is local-only work;
-[checks and limitations](updates/2026-11-02-hh-context-and-answers-development.md)
-do not establish deployment.
+Unknown preserves its original ID without resubmission. Deployed on DE November 2;
+[release checks and limitations](updates/2026-11-02-hh-context-and-answers-release.md)
+keep live questionnaires and updated Telegram text as outstanding acceptance.
 
 ### Mini App section navigation (local, October 26, 2026)
 

@@ -2,9 +2,14 @@
 
 ## Контекст HH и ответы работодателю / HH context and employer answers
 
-Локальные изменения 2 ноября и фактические результаты:
-[запись разработки](updates/2026-11-02-hh-context-and-answers-development.md).
-Local November 2 changes and actual results are recorded there; nothing is deployed.
+Выпущено на DE 2 ноября: [результаты и ограничения](updates/2026-11-02-hh-context-and-answers-release.md).
+916 серверных тестов прошли; две проверки отдельно прошли с PostgreSQL.
+Telegram 78/78, Linux browser/driver 122/122, изолированные PostgreSQL-наборы 45/45.
+Оба сквозных fixture-сценария прошли; реальная отправка анкеты ещё не проверена.
+Deployed on DE November 2: the release record separates test evidence from live
+acceptance. Server 916 passed (two separately passed with PostgreSQL), Telegram
+78/78, Linux browser/driver 122/122, isolated PostgreSQL suites 45/45; both E2E
+fixtures passed. A real questionnaire submission remains unverified.
 
 ```powershell
 node --test server/test/jobVacancyPrompt.test.js server/test/jobModelAdapter.test.js server/test/jobAutomationWorker.test.js server/test/jobQuestionAnswers.test.js

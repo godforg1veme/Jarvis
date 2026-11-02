@@ -1,5 +1,8 @@
 # HH: полный контекст отбора и ответы / Complete selection context and answers
 
+2 ноября: [реализовано и установлено на DE](../../updates/2026-11-02-hh-context-and-answers-release.md).
+November 2: [implemented and deployed on DE](../../updates/2026-11-02-hh-context-and-answers-release.md).
+
 ## Русский
 
 Согласовано владельцем в текущей задаче 1 ноября 2026: исправить нерелевантный
