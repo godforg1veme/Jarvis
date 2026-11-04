@@ -4,6 +4,11 @@
 
 ## Русский
 
+4 ноября [сведены итоги HH по всему чату](updates/2026-11-04-hh-chat-status.md):
+пункты 1, 3 и 4 установлены; пункт 2 разобран частично, пункт 5 остаётся открытым.
+В сводке собраны замеры, ответы на нативные вопросы, исправление лимита модели,
+версии компонентов, ограничения и результат сверки GitHub/Windows/DE/NL.
+
 4 ноября на DE [закрыт пункт 1: отбор HH по основным обязанностям](updates/2026-11-02-hh-core-role-relevance.md).
 Модель указывает профессию, направление и цитаты; сервер проверяет их до письма.
 Исходные продажи недвижимости и обычная поддержка отклонены, четыре AI-примера
@@ -196,6 +201,11 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 Архивы не заменяют действующие правила и новую проверку окружения.
 
 ## English
+
+November 4: [the HH chat overview](updates/2026-11-04-hh-chat-status.md) records
+items 1, 3 and 4 as deployed, item 2 as partly investigated and item 5 as open.
+It links measurements, native answers, the model allowance repair, component
+versions, limits and the GitHub/Windows/DE/NL verification result.
 
 November 4: [HH item 1, primary-duty relevance](updates/2026-11-02-hh-core-role-relevance.md),
 is deployed on DE. The model supplies profession, direction and quotations;

@@ -1,5 +1,10 @@
 # HH: релевантность по основным обязанностям / Primary-duty relevance
 
+[Русский](#русский) | [English](#english)
+
+Состояние всех поручений: [итоги HH-чата](2026-11-04-hh-chat-status.md).
+Status of all requests: [HH chat overview](2026-11-04-hh-chat-status.md).
+
 Разработка начата 2 ноября; итоговые проверки выполнены 4 ноября 2026.
 Development started November 2; final checks ran November 4, 2026.
 
