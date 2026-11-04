@@ -28,9 +28,35 @@ class JobAutomationWorker {
       }
       const interrupted = await this.repository.recoverInterrupted();
       for (const item of interrupted) await this.recover(item);
+      if (this.repository.claimReconciliation) {
+        const due = await this.repository.claimReconciliation();
+        if (due) await this.reconcileDue(due);
+      }
       const item = await this.repository.claimCandidate();
       if (item) await this.process(item);
     } finally { this.running = false; }
+  }
+
+  async reconcileDue(operation) {
+    const scope = { userId: operation.user_id, conversationId: operation.origin_conversation_id,
+      chatId: operation.origin_chat_id, channel: 'telegram' };
+    try {
+      // This method must never call process(), submitAutomatic() or generate().
+      const result = await this.applicationService.reconcile({ scope, operationId: operation.operation_id });
+      if (operation.item_id && ['sent','already_applied','manual_required','failed'].includes(result.applicationStatus)) {
+        await this.repository.resolveUnknown({ itemId: operation.item_id, operationId: operation.operation_id,
+          status: result.applicationStatus === 'already_applied' ? 'sent' : result.applicationStatus });
+      }
+    } catch {
+      // Revocation, unavailable source and insufficient proof preserve unknown.
+    } finally {
+      const finished = await this.repository.finishReconciliation({ operationId: operation.operation_id,
+        token: operation.reconciliation_token });
+      if (finished?.status === 'unknown' && finished.reconciliation_attempts >= 6) {
+        await this.repository.enqueueAttention({ scope, vacancyId: operation.vacancy_id,
+          automationRevision: operation.automation_revision, code: 'RESULT_CHECK_EXHAUSTED' }).catch(() => {});
+      }
+    }
   }
 
   async recover(item) {
@@ -133,7 +159,8 @@ class JobAutomationWorker {
       const draft = await this.draftService.generate({ scope, vacancyId: item.vacancy_id,
         requestId: item.draft_request_id, mode: 'improved', sourceText: profile.profile.baseLetter,
         expectedProfileRevision: profile.revision,
-        expectedVacancyRevision: vacancy.revision, requireCompleteResume: true });
+        expectedVacancyRevision: vacancy.revision, requireCompleteResume: true,
+        automationRevision: item.automation_revision });
       assertAutomaticLetterTruth({ text: draft.text, resumeContext, profile: profile.profile });
       await this.automationService.assertCurrent({ scope, revision: item.automation_revision,
         resumeId: resumeContext.resumeId, connectionRevision: resumeContext.connectionRevision });
@@ -144,13 +171,33 @@ class JobAutomationWorker {
       const status = result.status === 'sent' || result.status === 'already_applied' ? 'sent'
         : result.status === 'manual_required' ? 'manual_required'
           : result.status === 'unknown' || result.status === 'sending' ? 'unknown' : 'failed';
-      await this.repository.update({ itemId: item.id, from: phase, status, operationId: result.operationId });
+      await this.repository.update({ itemId: item.id, from: phase, status, operationId: result.operationId,
+        failurePhase: status === 'unknown' ? 'confirmation'
+          : result.failureCode === 'JOB_HH_PREPARATION_FAILED' ? 'preparation' : null,
+        failureCode: result.failureCode || null });
       if (status === 'manual_required' || (status === 'failed' && result.failureCode === 'JOB_AUTOMATION_PRECHECK_FAILED')) await this.repository.enqueueAttention({ scope,
         vacancyId: item.vacancy_id, automationRevision: item.automation_revision, code: 'MANUAL_REQUIRED',
         reasonCode: result.failureCode });
       else if (status === 'unknown') await this.repository.enqueueAttention({ scope,
         vacancyId: item.vacancy_id, automationRevision: item.automation_revision, code: 'RESULT_UNKNOWN' });
     } catch (error) {
+      const failurePhase = phase === 'evaluating' ? 'evaluation' : phase === 'generating' ? 'generation' : 'submission';
+      if (phase !== 'submitting' && ['JOB_AUTOMATION_UNAVAILABLE','JOB_REVISION_CONFLICT'].includes(error?.code)) {
+        await this.repository.update({ itemId: item.id, from: phase, status: 'skipped',
+          failurePhase, failureCode: error.code });
+        return;
+      }
+      const invalidLetter = phase === 'generating' && error?.code === 'JOB_LETTER_VALIDATION_FAILED';
+      const invalidEvaluation = phase === 'evaluating'
+        && ['JOB_MODEL_INVALID_OUTPUT','JOB_MODEL_INVALID_FACTS'].includes(error?.code);
+      if (invalidLetter || invalidEvaluation) {
+        const reason = invalidLetter ? 'JOB_LETTER_VALIDATION_FAILED' : 'JOB_MODEL_EVALUATION_INVALID';
+        await this.repository.update({ itemId: item.id, from: phase, status: 'manual_required',
+          failurePhase, failureCode: reason });
+        await this.repository.enqueueAttention({ scope, vacancyId: item.vacancy_id,
+          automationRevision: item.automation_revision, code: 'MANUAL_REQUIRED', reasonCode: reason }).catch(() => {});
+        return;
+      }
       if (['JOB_APPLICANT_ANSWER_REQUIRED', 'JOB_LETTER_UNSUPPORTED_INTENT'].includes(error?.code)
         && phase === 'generating') {
         await this.repository.update({ itemId: item.id, from: phase, status: 'manual_required' });
@@ -160,12 +207,14 @@ class JobAutomationWorker {
       }
       const code = ['JOB_HH_LOGIN_REQUIRED','JOB_HH_NOT_CONNECTED'].includes(error?.code) ? 'LOGIN_REQUIRED'
         : ['JOB_HH_RESUME_UNAVAILABLE','JOB_DRAFT_RESUME_STALE'].includes(error?.code) ? 'RESUME_UNAVAILABLE'
-          : ['JOB_MODEL_UNAVAILABLE','JOB_MODEL_NOT_CONFIGURED','JOB_MODEL_INVALID_OUTPUT','JOB_MODEL_INVALID_FACTS'].includes(error?.code)
+          : ['JOB_MODEL_UNAVAILABLE','JOB_MODEL_NOT_CONFIGURED','JOB_MODEL_INVALID_OUTPUT','JOB_MODEL_INVALID_FACTS',
+            'JOB_GENERATION_OUTCOME_UNKNOWN','JOB_GENERATION_BUSY'].includes(error?.code)
             ? 'MODEL_UNAVAILABLE' : null;
       const pending = phase === 'evaluating' && !modelInvoked && code === 'RESUME_UNAVAILABLE';
       const unknown = !(phase === 'evaluating' && !modelInvoked);
       await this.repository.update({ itemId: item.id, from: phase,
-        status: pending ? 'pending' : unknown ? 'unknown' : 'failed' });
+        status: pending ? 'pending' : unknown ? 'unknown' : 'failed', failurePhase,
+        failureCode: /^JOB_[A-Z_]{1,70}$/.test(error?.code || '') ? error.code : 'JOB_PROCESSING_FAILED' });
       if (code) {
         try {
           if (code === 'MODEL_UNAVAILABLE' || code === 'RESUME_UNAVAILABLE')

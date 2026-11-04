@@ -1,5 +1,34 @@
 # Проверки перед выпуском
 
+## HH: состояния и восстановление / States and recovery (local)
+
+[Локальный ремонт 4 ноября](updates/2026-11-04-hh-autonomy-recovery-development.md):
+938 серверных unit tests, 2 DB-only skip; Linux/Chromium 131/131;
+отдельные PG/RPC/Chromium 32/32; дополнительно ledger 3/3. GET-проверка точного
+письма подтверждена на существующем собственном отклике без POST/WebSocket.
+После независимой ревизии исправлены разрывы application/item и обход denied
+scope: дополнительно PG recovery 8/8, applications/model 13/13, automation 12/12.
+Новый код не установлен; новая реальная отправка и native lost-receipt proof
+не подтверждены.
+Local repair: 938 server unit tests passed with two DB-only skips, Linux/
+Chromium 131/131, isolated PG/RPC/Chromium 32/32 and three extra ledger checks.
+An existing own application's exact letter passed read-only GET verification.
+Independent review is complete. Status atomicity and denied-scope traversal fixes
+passed another 8 recovery, 13 applications/model and 12 automation PG checks.
+The code is not deployed; a new live send and native questionnaire lost-receipt
+proof remain unverified.
+
+```powershell
+npm test --prefix server
+npm test --prefix job-browser
+```
+
+С отдельной тестовой PostgreSQL / With a disposable PostgreSQL:
+
+```bash
+node --test --test-concurrency=1 server/test/jobResultRecoveryAcceptance.cjs server/test/jobDraftAcceptance.cjs server/test/jobApplicationsAcceptance.cjs server/test/jobAutomationAcceptance.cjs server/test/jobAutomationIntegrationAcceptance.cjs server/test/jobQuestionBrowserAcceptance.cjs server/test/jobBrowserApplicationsAcceptance.cjs
+```
+
 ## HH withoutTest
 
 [Ремонт 4 ноября](updates/2026-11-04-hh-without-test-release.md): Windows —

@@ -9,6 +9,20 @@ async function installApplicationFixture(context, { resumeId, onPost, nativeTest
       const req = route.request(), url = new URL(req.url());
       if (url.origin === 'https://chatik.hh.ru' && req.method() === 'GET') {
         state.chatRequests++;
+        if (url.pathname === '/chatik/api/chat_data') {
+          const chatId = url.searchParams.get('chatId'), id = chatId === '555' ? '123' : '124';
+          const topic = id === '123' ? 444 : 445;
+          const resources = { NEGOTIATION_TOPIC: [String(topic)], VACANCY: [id], RESUME: ['222'], RESPONSE_LETTER: ['777'] };
+          return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+            chat: { id: Number(chatId), currentParticipantId: 'applicant-1', resources,
+              messages: { items: [{ chatId: Number(chatId), participantId: 'applicant-1', resources,
+                workflowTransition: { topicId: topic },
+                text: state.wrongRecoveredLetter ? 'Другой текст' : state.letters.get(id) || '' }] } },
+            resources: { negotiation_topics: { [topic]: { topicId: topic, vacancyId: Number(id), resumeId: 222 } },
+              resumes: { 222: { id: 222, hash: resumeId } }, vacancies: { [id]: { vacancyId: Number(id) } },
+              participants: { 'applicant-1': { key: 'applicant-1', isCurrentUser: true } } },
+          }) });
+        }
         const id = url.pathname === '/chat/555' ? '123' : '124';
         const letter = state.wrongRecoveredLetter ? 'Другой текст' : state.letters.get(id) || '';
         return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body:

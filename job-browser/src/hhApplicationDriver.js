@@ -5,10 +5,11 @@ const { readResumePrivacy, readEmployerId, evaluatePrivacy } = require('./hhPriv
 const { prepareApplicationPage } = require('./hhApplication');
 const { validateSubmissionRequest, normalizeSubmissionReceipt } = require('./submissionProtocol');
 const { readApplicationReference, verifyChatLetter } = require('./applicationProof');
+const { verifyChatData } = require('./chatApplicationProof');
 const {visibleAppliedAction}=require('./existingApplication');
 const { normalizeQuestionnaire, normalizeAnswers, STOP_REASONS }=require('../../shared/jobQuestionnaire');
 
-const unknown = () => ({ outcome: 'unknown' });
+const unknown = (reasonCode) => ({ outcome: 'unknown', ...(reasonCode ? { reasonCode } : {}) });
 const manual = (reasonCode = 'JOB_HH_FORM_CHANGED') => ({ outcome: 'manual_required', verified: true,
   reasonCode: STOP_REASONS.has(reasonCode) ? reasonCode : 'JOB_HH_FORM_CHANGED' });
 
@@ -92,14 +93,17 @@ class HhApplicationDriver {
       armed = false;
       if (!permitted) return manual(blockedMutation ? 'JOB_HH_SUBMISSION_BLOCKED' : 'JOB_HH_FORM_CHANGED');
       const response = await receipt;
-      if (!response || response.status() < 200 || response.status() >= 300) return unknown();
+      if (!response) return unknown('JOB_HH_RECEIPT_TIMEOUT');
+      if (response.status() < 200 || response.status() >= 300) return unknown('JOB_HH_RECEIPT_HTTP');
       const headers = response.headers();
-      if (!/^application\/json(?:;|$)/i.test(headers['content-type'] || '') || Number(headers['content-length'] || 0) > 1048576) return unknown();
+      if (!/^application\/json(?:;|$)/i.test(headers['content-type'] || '') || Number(headers['content-length'] || 0) > 1048576) return unknown('JOB_HH_RECEIPT_FORMAT');
       const bytes = await response.body();
-      if (bytes.length > 1048576) return unknown();
-      let value; try { value = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)); } catch { return unknown(); }
-      return normalizeSubmissionReceipt(value, input);
-    } catch { return unknown(); }
+      if (bytes.length > 1048576) return unknown('JOB_HH_RECEIPT_FORMAT');
+      let value; try { value = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)); }
+      catch { return unknown('JOB_HH_RECEIPT_FORMAT'); }
+      const result = normalizeSubmissionReceipt(value, input);
+      return result.outcome === 'unknown' ? unknown('JOB_HH_RECEIPT_SCHEMA') : result;
+    } catch { return unknown('JOB_HH_RECEIPT_READ_FAILED'); }
     finally { armed = false; await page.unroute('**/*', guard).catch(() => {}); }
   }
   async readResult(input) {
@@ -125,6 +129,9 @@ class HhApplicationDriver {
         await page.waitForTimeout(100);
       }
       if (!frame) return unknown();
+      if (await frame.evaluate(verifyChatData, { reference, input: {
+        externalId: input.externalId, resumeId: input.resumeId, letter: input.letter,
+      } })) return { outcome: 'sent', verified: true, externalId: reference.topicId };
       await frame.locator('[data-qa="chat-bubble-title"]').first().waitFor({ state: 'attached', timeout: 5000 });
       return await verifyChatLetter(frame, input) ? { outcome: 'sent', verified: true, externalId: reference.topicId } : unknown();
     } catch { return unknown(); }

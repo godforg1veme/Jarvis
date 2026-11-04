@@ -65,6 +65,7 @@ test('migration files are ordered and narrowly named', () => {
     '055_job_usage_cost_basis.sql',
     '056_job_selection_context.sql',
     '057_job_questionnaire_answers.sql',
+    '058_job_result_reconciliation.sql',
   ]);
 });
 

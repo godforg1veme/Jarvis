@@ -4,6 +4,13 @@
 
 ## Русский
 
+4 ноября локально подготовлен [общий ремонт восстановления автооткликов](updates/2026-11-04-hh-autonomy-recovery-development.md):
+точное письмо существующего отклика подтверждено читающим GET без WebSocket;
+добавлены состояния отказа, ограниченная сверка исходного ID и одна repair
+генерация невалидного письма. Новый код и миграция 058 ещё не опубликованы и
+не установлены. Независимая ревизия завершена, найденные разрывы статусов
+исправлены. Новая реальная отправка остаётся открытой.
+
 4 ноября на DE установлен [точечный ремонт отправки HH](updates/2026-11-04-hh-without-test-release.md):
 общий для всех аккаунтов валидатор принимает фактический `withoutTest=no`;
 `yes`, чужие данные и непорученные ответы отклоняются. Linux/Chromium 128/128,
@@ -209,6 +216,13 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 Архивы не заменяют действующие правила и новую проверку окружения.
 
 ## English
+
+November 4: [shared automatic-application recovery](updates/2026-11-04-hh-autonomy-recovery-development.md)
+is prepared locally. A read-only GET verified an existing application's exact
+letter without WebSocket. Failure states, bounded original-ID reconciliation
+and one invalid-letter repair are implemented. The new code and migration 058
+are not published or deployed. Independent review is complete; the reported
+status gaps are fixed. A new live send remains open.
 
 November 4: [the focused HH submission repair](updates/2026-11-04-hh-without-test-release.md)
 is deployed on DE. The common validator accepts the observed `withoutTest=no`

@@ -1,7 +1,7 @@
 const { jobError } = require('./jobSchemas');
 const { readBoundedJson } = require('./boundedHttp');
 const { historySchema, itemSchema } = require('./jobHistorySchema');
-const { normalizeQuestionnaire, normalizeAnswers } = require('../../../shared/jobQuestionnaire');
+const { normalizeQuestionnaire, normalizeAnswers, UNKNOWN_RESULT_REASONS } = require('../../../shared/jobQuestionnaire');
 const { STOP_REASONS } = require('./jobStopReasons');
 const UUID = /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i;
 const CAPABILITIES = Object.freeze({ dateWindows: true, dateWindowGranularity: 'moscow_day', maxPages: 1000 });
@@ -135,7 +135,8 @@ class JobBrowserClient {
     if (writing && (!value || !['unknown', 'sent', 'failed', 'manual_required', 'already_applied'].includes(value.outcome)
       || (value.outcome !== 'unknown' && value.verified !== true)
       || (value.outcome === 'sent' && !/^[1-9]\d{0,19}$/.test(value.externalId || '')))) throw jobError('JOB_HH_INVALID_RESPONSE');
-    if (writing && value.reasonCode != null && !Object.hasOwn(STOP_REASONS, value.reasonCode)) throw jobError('JOB_HH_INVALID_RESPONSE');
+    if (writing && value.reasonCode != null && !(value.outcome === 'unknown'
+      ? UNKNOWN_RESULT_REASONS.has(value.reasonCode) : Object.hasOwn(STOP_REASONS, value.reasonCode))) throw jobError('JOB_HH_INVALID_RESPONSE');
     if (operation === 'search' && (!Array.isArray(value?.items) || value.items.length > 20
       || !Number.isInteger(value.pages) || value.pages < 0 || value.pages > 50000
       || !Number.isInteger(value.found) || value.found < 0 || value.found > 1000000

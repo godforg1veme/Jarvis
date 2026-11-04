@@ -9,7 +9,9 @@ const STOP_REASONS = new Set(['JOB_HH_QUESTIONS_REQUIRED', 'JOB_HH_TEST_REQUIRED
   'JOB_HH_EXTERNAL_ACTION', 'JOB_HH_FORM_CHANGED', 'JOB_HH_RESUME_HIDDEN',
   'JOB_HH_RESUME_UNAVAILABLE', 'JOB_HH_CAPTCHA_REQUIRED', 'JOB_HH_SUBMISSION_BLOCKED',
   'JOB_HH_PRIVACY_DENIED', 'JOB_HH_ALREADY_APPLIED', 'JOB_HH_LETTER_TOO_LONG',
-  'JOB_HH_LETTER_CHANGED', 'JOB_HH_NOT_FOUND']);
+  'JOB_HH_LETTER_CHANGED', 'JOB_HH_NOT_FOUND', 'JOB_HH_PREPARATION_FAILED']);
+const UNKNOWN_RESULT_REASONS = new Set(['JOB_HH_RECEIPT_TIMEOUT', 'JOB_HH_RECEIPT_HTTP',
+  'JOB_HH_RECEIPT_FORMAT', 'JOB_HH_RECEIPT_SCHEMA', 'JOB_HH_RECEIPT_READ_FAILED']);
 const fail = (code) => Object.assign(new Error(code), { code });
 const exact = (value, keys) => value && typeof value === 'object' && !Array.isArray(value)
   && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
@@ -109,4 +111,4 @@ function normalizeAnswers(questionnaire, value) {
   return answers;
 }
 
-module.exports = { normalizeQuestionnaire, normalizeAnswers, STOP_REASONS };
+module.exports = { normalizeQuestionnaire, normalizeAnswers, STOP_REASONS, UNKNOWN_RESULT_REASONS };

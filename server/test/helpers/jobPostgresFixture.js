@@ -20,7 +20,7 @@ async function createJobPostgresFixture() {
       await pool.query(sql.replace(/^CREATE EXTENSION[^;]+;\s*/gm, ''));
     }
     for (const name of ['054_job_automation.sql', '055_job_usage_cost_basis.sql',
-      '056_job_selection_context.sql', '057_job_questionnaire_answers.sql']) {
+      '056_job_selection_context.sql', '057_job_questionnaire_answers.sql', '058_job_result_reconciliation.sql']) {
       await pool.query(await fs.readFile(path.join(__dirname, '../../src/db/migrations', name), 'utf8'));
     }
     const owner = (await pool.query("INSERT INTO users(display_name,role) VALUES('Fixture owner','owner') RETURNING id")).rows[0].id;

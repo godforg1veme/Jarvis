@@ -113,10 +113,12 @@ class JobApplicationRepository {
       [scope.userId, row.vacancy_id, row.resume_id])).rows[0];
       if (existing) return { operation: existing, execute: false };
       const operation = (await client.query(`INSERT INTO job_applications(user_id,vacancy_id,resume_id,draft_id,
-        confirmation_id,automation_revision,operation_id,approved_text,status,questionnaire,questionnaire_answers,questionnaire_context)
-        VALUES($1,$2,$3,$4,NULL,$5,$6,$7,'sending',$8,$9,$10) RETURNING *`,
+        confirmation_id,automation_revision,operation_id,approved_text,status,questionnaire,questionnaire_answers,questionnaire_context,
+        origin_conversation_id,origin_chat_id,origin_connection_revision)
+        VALUES($1,$2,$3,$4,NULL,$5,$6,$7,'sending',$8,$9,$10,$11,$12,$13) RETURNING *`,
       [scope.userId,row.vacancy_id,row.resume_id,row.id,automationRevision,crypto.randomUUID(),row.text,
-        questionnaire, answers === null ? null : JSON.stringify(answers), questionnaireContext])).rows[0];
+        questionnaire, answers === null ? null : JSON.stringify(answers), questionnaireContext,
+        scope.conversationId, scope.chatId, row.connection_revision])).rows[0];
       return { operation, execute: true };
     });
   }
@@ -133,11 +135,11 @@ class JobApplicationRepository {
       JOIN job_vacancies v ON v.id=a.vacancy_id WHERE a.user_id=$1 AND a.operation_id=$2`,
     [scope.userId, uuid.parse(operationId)])).rows[0] || null;
   }
-  async finish({ userId, operationId, status, externalId = null, failureCode = null }) {
+  async finish({ userId, operationId, status, externalId = null, failureCode = null, client = null }) {
     if (!['sent', 'failed', 'unknown', 'manual_required', 'already_applied'].includes(status)) throw jobError('JOB_INVALID_APPLICATION_STATUS');
     if (externalId != null && (typeof externalId !== 'string' || !/^[\w-]{1,128}$/.test(externalId))) throw jobError('JOB_INVALID_APPLICATION_RESULT');
     if (failureCode != null && !/^JOB_[A-Z_]{1,70}$/.test(failureCode)) throw jobError('JOB_INVALID_APPLICATION_RESULT');
-    return (await this.pool.query(`UPDATE job_applications SET status=$1,external_id=COALESCE($2,external_id),
+    return (await (client || this.pool).query(`UPDATE job_applications SET status=$1,external_id=COALESCE($2,external_id),
       failure_code=$3,updated_at=now() WHERE user_id=$4 AND operation_id=$5 AND status IN ('sending','unknown') RETURNING *`,
     [status, externalId, failureCode, uuid.parse(userId), uuid.parse(operationId)])).rows[0] || null;
   }

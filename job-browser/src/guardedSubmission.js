@@ -20,7 +20,7 @@ class GuardedSubmission {
       const stored = await this.ledger.lookup(input);
       if (stored.outcome !== 'unknown') return stored;
       if (await this.ledger.hasClaim(input)) return { execute: false, outcome: 'unknown' };
-      let prepared;
+      let prepared, claimAttempted = false;
       try {
         prepared = await this.driver.prepare({ ...identity, letter: input.letter });
         if (prepared?.ready !== true) {
@@ -28,11 +28,16 @@ class GuardedSubmission {
             reasonCode: prepared?.reasonCode || 'JOB_HH_FORM_CHANGED' };
         }
         // Read-only preparation finishes first. Durable claims must exist before the final click.
+        claimAttempted = true;
         const reserved = await this.ledger.reserve({ ...identity, letter: input.letter });
         if (!reserved.execute) return reserved;
         const result = await this.driver.clickAndVerify({ ...identity, letter: input.letter, prepared });
         return await this.ledger.finish(identity, result);
-      } catch { return { outcome: 'unknown' }; }
+      } catch {
+        return claimAttempted ? { outcome: 'unknown' } : {
+          outcome: 'manual_required', verified: true, reasonCode: 'JOB_HH_PREPARATION_FAILED',
+        };
+      }
       finally { try { await this.driver.close?.(prepared); } catch {} }
     });
   }

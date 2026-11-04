@@ -5,6 +5,17 @@ const { once } = require('node:events');
 const { JobBrowserClient } = require('../src/jobs/jobBrowserClient');
 const { createRpcServer } = require('../../job-browser/src/rpcServer');
 
+test('unknown application results accept only closed receipt diagnostics', async () => {
+  const ownerId = randomUUID(); let reasonCode = 'JOB_HH_RECEIPT_TIMEOUT';
+  const client = new JobBrowserClient({ ownerId, token: randomBytes(32).toString('hex'),
+    applyToken: randomBytes(32).toString('hex'), fetchImpl: async () => Response.json({ ok: true,
+      value: { outcome: 'unknown', reasonCode } }) });
+  const input = { userId: ownerId, operationId: randomUUID(), externalId: '123', resumeId: 'fixtureResume', letter: 'Approved' };
+  assert.equal((await client.asApplicationAdapter().submit(input)).reasonCode, reasonCode);
+  reasonCode = 'UNRECOGNIZED_DIAGNOSTIC';
+  await assert.rejects(client.asApplicationAdapter().submit(input), { code: 'JOB_HH_INVALID_RESPONSE' });
+});
+
 test('resume content uses read credential and validates bounded private snapshot', async () => {
   const ownerId = randomUUID(), memberId = randomUUID(), token = randomBytes(32).toString('hex');
   const snapshot = { resumeId: 'selected', title: 'Аналитик', experience: 'Анализ данных',

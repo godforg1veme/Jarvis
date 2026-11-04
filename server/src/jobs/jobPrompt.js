@@ -31,7 +31,8 @@ const outputSchema = z.object({ status: z.enum(['ready', 'needs_applicant_answer
 const JOB_LETTER_RESPONSE_FORMAT = Object.freeze({ type: 'json_schema', json_schema: {
   name: 'job_cover_letter', strict: true, schema: {
     type: 'object', properties: { status: { type: 'string', enum: ['ready', 'needs_applicant_answer'] },
-      text: { type: 'string' }, factIds: { type: 'array', items: { type: 'string' } } },
+      text: { type: 'string', maxLength: 10000 },
+      factIds: { type: 'array', maxItems: 80, items: { type: 'string', maxLength: 40 } } },
     required: ['status', 'text', 'factIds'], additionalProperties: false,
   },
 } });
@@ -83,12 +84,21 @@ function parseJobLetter(raw, profile, { finishReason = null } = {}) {
   if (typeof raw !== 'string' || raw.length > 100000) throw invalidOutput('size');
   let data;
   try { data = JSON.parse(raw); } catch { throw invalidOutput('json'); }
-  try { data = outputSchema.parse(data); } catch { throw invalidOutput('schema'); }
+  const parsed = outputSchema.safeParse(data);
+  if (!parsed.success) {
+    const error = invalidOutput('schema');
+    const field = parsed.error.issues[0]?.path?.[0];
+    error.validationField = ['text', 'factIds', 'status'].includes(field) ? field : 'object';
+    throw error;
+  }
+  data = parsed.data;
   if (data.status === 'needs_applicant_answer') {
-    if (data.text || data.factIds.length) throw invalidOutput('schema');
+    if (data.text || data.factIds.length) throw Object.assign(invalidOutput('schema'), {
+      validationField: data.text ? 'text' : 'factIds',
+    });
     throw jobError('JOB_APPLICANT_ANSWER_REQUIRED');
   }
-  if (!data.text.trim()) throw invalidOutput('schema');
+  if (!data.text.trim()) throw Object.assign(invalidOutput('schema'), { validationField: 'text' });
   data.text = data.text.trim();
   const ids = new Set(profile.facts.map((f) => f.id));
   if (data.factIds.some((id) => !ids.has(id))) throw jobError('JOB_MODEL_INVALID_FACTS');

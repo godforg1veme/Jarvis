@@ -18,12 +18,16 @@ test('Linux durable ledger: concurrent claims click once, restart/new IDs cannot
       assert.equal((await create().reserve(input)).execute, false);
       assert.equal((await create().reserve({ ...input, operationId: randomUUID() })).execute, false);
       assert.deepEqual(await create().lookup(input), { outcome: 'unknown' });
+      assert.deepEqual(await create().finish(input, { outcome: 'unknown', reasonCode: 'JOB_HH_RECEIPT_TIMEOUT' }),
+        { outcome: 'unknown', reasonCode: 'JOB_HH_RECEIPT_TIMEOUT' });
+      assert.deepEqual(await create().lookup(input), { outcome: 'unknown' }, 'diagnostic does not create a terminal result');
       await assert.rejects(create().reserve({ ...input, letter: `${input.letter} ` }), { code: 'JOB_BROWSER_OPERATION_CHANGED' });
       await assert.rejects(create().reserve({ ...input, externalId: '124' }), { code: 'JOB_BROWSER_OPERATION_CHANGED' });
       await assert.rejects(create().reserve({ ...input, userId: randomUUID() }), { code: 'JOB_BROWSER_ACCESS_DENIED' });
       assert.deepEqual(await create().finish(input, { outcome: 'sent', externalId: 'fixture-topic' }), { outcome: 'unknown' });
       const confirmed = { outcome: 'sent', verified: true, externalId: 'fixture-topic' };
       assert.deepEqual(await create().finish(input, confirmed), confirmed);
+      assert.deepEqual(await create().finish(input, { outcome: 'unknown', reasonCode: 'JOB_HH_RECEIPT_TIMEOUT' }), confirmed);
       assert.deepEqual(await create().finish(input, { outcome: 'failed', verified: true }), confirmed);
       assert.deepEqual(await create().lookup(input), confirmed);
       const files = await fs.readdir(root);

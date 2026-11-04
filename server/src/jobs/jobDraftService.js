@@ -1,8 +1,9 @@
 const { assertJobScope, uuid, jobError } = require('./jobSchemas');
 const { createHash } = require('node:crypto');
 const { jobTransaction } = require('./jobTransaction');
-const { buildJobPrompt, parseJobLetter } = require('./jobPrompt');
+const { buildJobPrompt } = require('./jobPrompt');
 const { evaluateVacancy } = require('./jobFilters');
+const { generateLetter, validationReason } = require('./jobLetterGeneration');
 
 class JobDraftService {
   constructor({ pool, searchRepository, profileRepository, draftRepository, usageRepository, modelAdapter, now = () => new Date(), accessService = null, resumeContextService = null }) {
@@ -40,7 +41,7 @@ class JobDraftService {
     });
   }
   async generate({ scope, vacancyId, requestId, parentDraftId = null, replaceCurrentDraftId = null, instruction = '', language = 'auto', mode, sourceText,
-    expectedProfileRevision, expectedVacancyRevision, requireCompleteResume = false }) {
+    expectedProfileRevision, expectedVacancyRevision, requireCompleteResume = false, automationRevision = null }) {
     await assertJobScope(this.pool, scope, this.accessService);
     uuid.parse(vacancyId);
     if (typeof requestId !== 'string' || !requestId || requestId.length > 150) throw jobError('JOB_INVALID_REQUEST');
@@ -95,11 +96,39 @@ class JobDraftService {
     if (!claimed.rowCount) throw jobError(task.status === 'failed' ? 'JOB_GENERATION_FAILED' : 'JOB_GENERATION_BUSY');
     try {
       await assertJobScope(this.pool, scope, this.accessService);
-      await this.usageRepository.record({ userId: scope.userId, requestId, outcome: 'pending', occurredAt: this.now() });
-      const result = await this.modelAdapter.generate({ messages });
-      await this.usageRepository.record({ userId: scope.userId, requestId, providerRequestId: result.requestId,
-        costUsd: result.usage?.cost ?? null, costBasis: result.usage?.costBasis || 'provider', outcome: 'success', occurredAt: this.now() });
-      const letter = parseJobLetter(result.text, profile.profile, { finishReason: result.finishReason });
+      const letter = await generateLetter({ messages, profile: profile.profile, requestId,
+        allowRepair: requireCompleteResume && Number.isInteger(automationRevision),
+        beforeCall: async ({ attempt, usageId }) => {
+          await assertJobScope(this.pool, scope, this.accessService);
+          if (Number.isInteger(automationRevision)) {
+            const consent = await this.pool.query(`SELECT 1 FROM job_automations a
+              JOIN job_connections c ON c.user_id=a.user_id JOIN job_searches s ON s.user_id=a.user_id
+              WHERE a.user_id=$1 AND a.enabled AND a.revision=$2 AND a.conversation_id=$3 AND a.chat_id=$4
+                AND c.status='connected' AND c.resume_id=a.resume_id AND c.revision=a.connection_revision
+                AND c.resume_id=$5 AND c.revision=$6 AND s.revision=$7
+                AND s.conversation_id=a.conversation_id AND s.chat_id=a.chat_id
+                AND s.settings->>'activated'='true' AND s.settings->>'paused'='false'`,
+            [scope.userId, automationRevision, scope.conversationId, scope.chatId,
+              resumeContext?.resumeId, resumeContext?.connectionRevision, settings.revision]);
+            if (!consent.rowCount) throw jobError('JOB_AUTOMATION_UNAVAILABLE');
+          }
+          if (attempt) {
+            const claimedRepair = await this.pool.query(`UPDATE job_tasks
+              SET payload=payload||'{"repairInvoked":true}'::jsonb WHERE id=$1 AND status='running'
+              AND NOT (payload ? 'repairInvoked') RETURNING id`, [task.id]);
+            if (!claimedRepair.rowCount) throw jobError('JOB_GENERATION_OUTCOME_UNKNOWN');
+          }
+          await this.usageRepository.record({ userId: scope.userId, requestId: usageId,
+            outcome: 'pending', occurredAt: this.now() });
+        },
+        invoke: input => this.modelAdapter.generate(input),
+        onInvalid: value => this.pool.query(`UPDATE job_tasks SET payload=payload||$2::jsonb
+          WHERE id=$1 AND status='running'`, [task.id, { modelValidationFailure: value.reason,
+          modelValidationField: value.field, validationAttempt: value.attempt + 1 }]),
+        record: ({ usageId, result }) => this.usageRepository.record({ userId: scope.userId,
+          requestId: usageId, providerRequestId: result.requestId, costUsd: result.usage?.cost ?? null,
+          costBasis: result.usage?.costBasis || 'provider', outcome: 'success', occurredAt: this.now() }),
+      });
       if (resumeContext) await this.resumeContextService.assertCurrent({ scope, resumeId: resumeContext.resumeId,
         connectionRevision: resumeContext.connectionRevision });
       const draft = await this.draftRepository.append({ scope, vacancyId, parentDraftId, profileRevision: profile.revision,
@@ -108,14 +137,18 @@ class JobDraftService {
       await this.pool.query("UPDATE job_tasks SET status='complete',result_id=$1 WHERE id=$2", [draft.id, task.id]);
       return draft;
     } catch (error) {
-      if (error.modelUsage) await this.usageRepository.record({ userId: scope.userId, requestId,
+      if (error.modelUsage) await this.usageRepository.record({ userId: scope.userId, requestId: error.letterUsageId || requestId,
         providerRequestId: error.modelRequestId, costUsd: error.modelUsage.cost ?? null,
         costBasis: error.modelUsage.costBasis || 'provider', outcome: 'failed', occurredAt: this.now() });
-      const validationFailure = error.code === 'JOB_MODEL_INVALID_FACTS' ? 'facts'
-        : error.code === 'JOB_MODEL_INVALID_OUTPUT'
-          && ['truncated', 'filtered', 'size', 'json', 'schema'].includes(error.validationReason) ? error.validationReason : null;
-      await this.pool.query("UPDATE job_tasks SET status='failed',payload=payload||$2::jsonb WHERE id=$1 AND status='running'",
-        [task.id, validationFailure ? { modelValidationFailure: validationFailure } : {}]);
+      const validationFailure = validationReason(error)
+        || (error.code === 'JOB_LETTER_VALIDATION_FAILED' ? error.validationReason : null);
+      const uncertainCall = Boolean(error.letterUsageId && !validationFailure)
+        || error.code === 'JOB_GENERATION_OUTCOME_UNKNOWN';
+      const metadata = uncertainCall ? { modelCallOutcome: 'unknown', modelValidationFailure: null }
+        : validationFailure ? { modelValidationFailure: validationFailure,
+          modelValidationField: ['text','factIds','status','object'].includes(error.validationField) ? error.validationField : null } : {};
+      await this.pool.query("UPDATE job_tasks SET status=$3,payload=payload||$2::jsonb WHERE id=$1 AND status='running'",
+        [task.id, metadata, uncertainCall ? 'unknown' : 'failed']);
       throw error;
     } finally {
       await this.usageRepository.claimBudgetNotice({ userId: scope.userId, now: this.now(), thresholdUsd: settings.settings.budgetUsd });

@@ -3,7 +3,7 @@ const { constants } = require('node:fs');
 const { createHash, randomUUID } = require('node:crypto');
 const path = require('node:path');
 const { UUID } = require('./rpcProtocol');
-const { normalizeQuestionnaire, normalizeAnswers, STOP_REASONS } = require('../../shared/jobQuestionnaire');
+const { normalizeQuestionnaire, normalizeAnswers, STOP_REASONS, UNKNOWN_RESULT_REASONS } = require('../../shared/jobQuestionnaire');
 const hash = (value) => createHash('sha256').update(value).digest('hex');
 const failure = (code = 'JOB_BROWSER_LEDGER_UNAVAILABLE') => Object.assign(new Error(code), { code });
 const HASH = /^[a-f\d]{64}$/;
@@ -145,6 +145,10 @@ class ApplicationLedger {
     const claim = this.validateClaim(await this.read('operation', identity.operationHash));
     const pair = this.validateClaim(await this.read('pair', identity.pairHash));
     if (claim.pairHash !== identity.pairHash || !this.same(claim, pair)) throw failure('JOB_BROWSER_OPERATION_CHANGED');
+    const existing = await this.result(claim);
+    if (existing.outcome !== 'unknown') return existing;
+    if (result?.outcome === 'unknown') return { outcome: 'unknown',
+      ...(UNKNOWN_RESULT_REASONS.has(result.reasonCode) ? { reasonCode: result.reasonCode } : {}) };
     if (result?.verified !== true || !['sent', 'failed', 'manual_required', 'already_applied'].includes(result.outcome)
       || (result.outcome === 'sent' && !/^[\w-]{1,128}$/.test(result.externalId || ''))) return { outcome: 'unknown' };
     await this.write('result', claim.operationHash, { claim, outcome: result.outcome,

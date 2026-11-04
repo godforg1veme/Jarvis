@@ -95,7 +95,42 @@ test('revoked consent prevents model expense and application', async () => {
   worker.automationService.assertCurrent = async () => { throw Object.assign(new Error('revoked'), { code: 'JOB_AUTOMATION_UNAVAILABLE' }); };
   await worker.process(item);
   assert.deepEqual(calls.filter(x => ['usage','evaluate','draft','submit'].includes(x[0])), []);
-  assert.ok(calls.some(x => x[0] === 'update' && x[1] === 'failed'));
+  assert.ok(calls.some(x => x[0] === 'update' && x[1] === 'skipped'));
+});
+
+test('known exhausted letter validation hands off before HH instead of quarantining as unknown send', async () => {
+  const { worker, item, calls } = harness('apply');
+  worker.draftService.generate = async () => { throw Object.assign(Error(), { code: 'JOB_LETTER_VALIDATION_FAILED' }); };
+  await worker.process(item);
+  assert.equal(calls.some(c => c[0] === 'submit'), false);
+  assert.ok(calls.some(c => c[0] === 'update' && c[1] === 'manual_required'));
+  assert.deepEqual(calls.filter(c => c[0] === 'attention'), [['attention', 'MANUAL_REQUIRED']]);
+  assert.equal(calls.some(c => c[0] === 'update' && c[1] === 'unknown'), false);
+});
+
+test('read-only reconciliation uses only the original operation and releases its lease', async () => {
+  const calls = [];
+  const worker = new JobAutomationWorker({ repository: {
+    async resolveUnknown(x) { calls.push(['resolved',x]); }, async finishReconciliation(x) { calls.push(['lease',x]); },
+  }, applicationService: { async reconcile(x) { calls.push(['read',x]); return { applicationStatus: 'sent' }; },
+    async submitAutomatic() { assert.fail('submit forbidden during reconciliation'); } },
+  automationService: { async assertCurrent() { assert.fail('read verification must not re-enable consent'); } } });
+  await worker.reconcileDue({ user_id: USER, origin_conversation_id: CONVERSATION,
+    origin_chat_id: '123', operation_id: DRAFT, item_id: ITEM, reconciliation_token: VACANCY });
+  assert.deepEqual(calls.map(c => c[0]), ['read','resolved','lease']);
+  assert.equal(calls[0][1].operationId, DRAFT); assert.equal(calls[2][1].token, VACANCY);
+});
+
+test('exhausted reads produce one closed manual-check attention without another action', async () => {
+  const calls = [];
+  const worker = new JobAutomationWorker({ repository: {
+    async finishReconciliation() { return { status: 'unknown', reconciliation_attempts: 6 }; },
+    async enqueueAttention(x) { calls.push(x); }, async resolveUnknown() { assert.fail('unproven result'); },
+  }, applicationService: { async reconcile() { return { applicationStatus: 'unknown' }; } } });
+  await worker.reconcileDue({ user_id: USER, origin_conversation_id: CONVERSATION, origin_chat_id: '123',
+    operation_id: DRAFT, item_id: ITEM, reconciliation_token: VACANCY, vacancy_id: VACANCY, automation_revision: 2 });
+  assert.equal(calls.length, 1); assert.equal(calls[0].code, 'RESULT_CHECK_EXHAUSTED');
+  assert.equal(calls[0].scope.userId, USER);
 });
 
 test('a search revision changed during evaluation cannot create a letter from the stale decision', async () => {

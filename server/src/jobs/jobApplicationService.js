@@ -1,18 +1,24 @@
 const { assertJobScope, jobError } = require('./jobSchemas');
 const { response, button } = require('./jobTelegramViews');
-const { normalizeQuestionnaire, normalizeAnswers } = require('../../../shared/jobQuestionnaire');
+const { normalizeQuestionnaire, normalizeAnswers, UNKNOWN_RESULT_REASONS } = require('../../../shared/jobQuestionnaire');
 const { normalizeStopReason, manualStopMessage } = require('./jobStopReasons');
+const { jobTransaction } = require('./jobTransaction');
+const { synchronizeApplicationItem } = require('./jobAutomationRepository');
 
 function applicationView(operation) {
-  const text = { sending: 'Отправка обрабатывается. Повторный отклик не запущен.',
+  const text = operation.status === 'unknown' && operation.failure_code === 'JOB_RECONCILIATION_EXHAUSTED'
+    ? 'Автоматические проверки завершены без достаточного подтверждения. Повторный отклик заблокирован; нужна ручная проверка исходного отклика.'
+    : { sending: 'Отправка обрабатывается. Повторный отклик не запущен.',
     sent: 'Отклик отправлен. Источник подтвердил результат.',
     unknown: 'Результат отправки пока неизвестен. Повторный отклик заблокирован до проверки исходной операции.',
-    failed: 'Источник отклонил отправку. Успешный отклик не подтверждён.',
+    failed: operation.failure_code === 'JOB_AUTOMATION_PRECHECK_FAILED'
+      ? manualStopMessage(operation.failure_code) : 'Источник отклонил отправку. Успешный отклик не подтверждён.',
     already_applied: 'В источнике уже есть отклик на эту вакансию. Повторный не отправлен.',
     manual_required: manualStopMessage(operation.failure_code) }[operation.status];
   if (!text) throw jobError('JOB_INVALID_APPLICATION_STATUS');
   const buttons = [];
-  if (['sending', 'unknown'].includes(operation.status)) buttons.push([button('Проверить результат', 'confirm', operation.confirmation_id)]);
+  if (['sending', 'unknown'].includes(operation.status) && operation.confirmation_id)
+    buttons.push([button('Проверить результат', 'confirm', operation.confirmation_id)]);
   buttons.push([button('В поиск работы', 'menu')]);
   return { ...response(text, buttons), applicationStatus: operation.status, operationId: operation.operation_id,
     failureCode: operation.failure_code || null };
@@ -159,19 +165,40 @@ class JobApplicationService {
       return { status: result.outcome,
         ...(result.outcome === 'manual_required' ? { failureCode: normalizeStopReason(result.reasonCode || result.failureCode) } : {}) };
     }
-    return { status: 'unknown', failureCode: 'JOB_SUBMISSION_OUTCOME_UNKNOWN' };
+    return { status: 'unknown', failureCode: result?.outcome === 'unknown' && UNKNOWN_RESULT_REASONS.has(result.reasonCode)
+      ? result.reasonCode : 'JOB_SUBMISSION_OUTCOME_UNKNOWN' };
   }
   async reconcile({ scope, operationId }) {
     await this.requireAdapter({ scope });
     const operation = await this.repository.get({ scope, operationId });
     if (!operation) throw jobError('JOB_NOT_FOUND');
     if (!['unknown', 'sending'].includes(operation.status)) return applicationView(operation);
+    const checkOrigin = async (db = this.pool) => {
+      await assertJobScope(db, scope, this.accessService);
+      if (operation.automation_revision != null) {
+        if (operation.origin_conversation_id !== scope.conversationId || operation.origin_chat_id !== scope.chatId)
+          throw jobError('JOB_SCOPE_DENIED');
+        const connection = (await db.query('SELECT status,resume_id,revision FROM job_connections WHERE user_id=$1 FOR SHARE',
+          [scope.userId])).rows[0];
+        if (connection?.status !== 'connected' || connection.resume_id !== operation.resume_id
+          || connection.revision !== operation.origin_connection_revision) throw jobError('JOB_REVISION_CONFLICT');
+      }
+    };
+    await checkOrigin();
     let result;
     try { result = await this.adapter.reconcile({ userId: scope.userId, operationId,
       externalId: operation.vacancy_external_id, resumeId: operation.resume_id, letter: operation.approved_text,
       ...this.questionPayload(operation) }); }
     catch { return applicationView({ ...operation, status: 'unknown' }); }
-    const saved = await this.repository.finish({ userId: scope.userId, operationId, ...this.validResult(result) });
+    const saved = await jobTransaction(this.pool, async client => {
+      await checkOrigin(client);
+      const normalized = this.validResult(result);
+      if (normalized.status === 'unknown' && normalized.failureCode === 'JOB_SUBMISSION_OUTCOME_UNKNOWN'
+        && operation.failure_code) normalized.failureCode = operation.failure_code;
+      const saved = await this.repository.finish({ userId: scope.userId, operationId, ...normalized, client });
+      if (saved) await synchronizeApplicationItem(client, saved);
+      return saved;
+    });
     return applicationView(saved || operation);
   }
 }

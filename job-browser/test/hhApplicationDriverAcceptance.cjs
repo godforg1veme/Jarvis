@@ -52,7 +52,7 @@ test('actual driver + Chromium + Linux journal: native request/receipt, lost ack
     assert.equal((await send(first)).outcome, 'sent'); assert.equal(fixture.posts, 1);
     fixture.loseAcknowledgement = true;
     const second = { ...first, operationId: randomUUID(), externalId: '124' };
-    assert.deepEqual(await send(second), { outcome: 'unknown' }); assert.equal(fixture.posts, 2);
+    assert.deepEqual(await send(second), { outcome: 'unknown', reasonCode: 'JOB_HH_RECEIPT_TIMEOUT' }); assert.equal(fixture.posts, 2);
     assert.equal((await send(second)).outcome, 'unknown'); assert.equal(fixture.posts, 2);
     assert.deepEqual(await hh.run(() => create().reconcile(second)), { outcome: 'unknown' }); assert.equal(fixture.posts, 2);
     assert.ok(fixture.chatRequests > 0, 'negative recovery actually reads the HH-shaped chat source');

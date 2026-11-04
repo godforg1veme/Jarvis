@@ -4,6 +4,17 @@ const { jobTransaction } = require('./jobTransaction');
 const { moscowIso } = require('../../../shared/time');
 const { normalizeStopReason } = require('./jobStopReasons');
 
+async function synchronizeApplicationItem(client, application) {
+  if (application.automation_revision == null
+    || !['sent','already_applied','manual_required','failed'].includes(application.status)) return;
+  await client.query(`UPDATE job_automation_items SET status=$5,
+    operation_id=$4,failure_phase=NULL,failure_code=$6,updated_at=now()
+    WHERE user_id=$1 AND vacancy_id=$2 AND automation_revision=$3
+      AND status IN ('submitting','unknown') AND (operation_id IS NULL OR operation_id=$4)`,
+  [application.user_id,application.vacancy_id,application.automation_revision,application.operation_id,
+    application.status === 'already_applied' ? 'sent' : application.status,application.failure_code]);
+}
+
 class JobAutomationRepository {
   constructor(pool, { accessService = null } = {}) { this.pool = pool; this.accessService = accessService; }
 
@@ -136,6 +147,63 @@ class JobAutomationRepository {
     return rows;
   }
 
+  async claimReconciliation() {
+    return jobTransaction(this.pool, async client => {
+      // Repair interrupted local bookkeeping even after consent or connection changes.
+      // These results were already verified; this never contacts HH or sends anything.
+      const known = (await client.query(`SELECT app.* FROM job_applications app
+        JOIN job_automation_items i ON i.user_id=app.user_id AND i.vacancy_id=app.vacancy_id
+          AND i.automation_revision=app.automation_revision
+        WHERE app.status IN ('sent','already_applied','manual_required','failed')
+          AND i.status IN ('submitting','unknown')
+          AND (i.operation_id IS NULL OR i.operation_id=app.operation_id)
+          AND app.origin_conversation_id IS NOT NULL AND app.origin_chat_id IS NOT NULL
+          AND ($1::uuid IS NULL OR app.id>$1)
+        ORDER BY app.id LIMIT 20 FOR UPDATE OF i SKIP LOCKED`, [this.terminalScanAfter || null])).rows;
+      // Advance through denied scopes without modifying their private state.
+      // A full pass wraps on the next tick; this cursor grants no authority.
+      this.terminalScanAfter = known.length ? known[known.length - 1].id : null;
+      for (const app of known) {
+        try { await assertJobScope(client, { userId: app.user_id,
+          conversationId: app.origin_conversation_id, chatId: app.origin_chat_id, channel: 'telegram' }, this.accessService); }
+        catch { continue; }
+        await synchronizeApplicationItem(client, app);
+      }
+      const rows = (await client.query(`SELECT app.*,i.id AS item_id
+        FROM job_applications app JOIN job_connections c ON c.user_id=app.user_id
+        LEFT JOIN job_automation_items i ON i.user_id=app.user_id AND i.vacancy_id=app.vacancy_id
+          AND i.automation_revision=app.automation_revision
+        WHERE app.status='unknown' AND app.automation_revision IS NOT NULL
+          AND app.origin_conversation_id IS NOT NULL AND app.origin_chat_id IS NOT NULL
+          AND c.status='connected' AND c.resume_id=app.resume_id
+          AND c.revision=app.origin_connection_revision AND app.reconciliation_attempts<6
+          AND app.reconciliation_after<=now()
+          AND (app.reconciliation_lease_until IS NULL OR app.reconciliation_lease_until<now())
+        ORDER BY app.reconciliation_after,app.created_at LIMIT 20 FOR UPDATE OF app SKIP LOCKED`)).rows;
+      for (const row of rows) {
+        try { await assertJobScope(client, { userId: row.user_id,
+          conversationId: row.origin_conversation_id, chatId: row.origin_chat_id, channel: 'telegram' }, this.accessService); }
+        catch { continue; }
+        const token = crypto.randomUUID();
+        return (await client.query(`UPDATE job_applications SET reconciliation_attempts=reconciliation_attempts+1,
+          reconciliation_token=$2,reconciliation_lease_until=now()+interval '5 minutes'
+          WHERE id=$1 RETURNING *, $3::uuid AS item_id`, [row.id, token, row.item_id])).rows[0];
+      }
+      return null;
+    });
+  }
+
+  async finishReconciliation({ operationId, token }) {
+    // The service has already stored a verified result if it obtained proof.
+    return (await this.pool.query(`UPDATE job_applications SET reconciliation_token=NULL,
+      reconciliation_lease_until=NULL,reconciliation_after=now()+
+        (CASE reconciliation_attempts WHEN 1 THEN 1 WHEN 2 THEN 3 WHEN 3 THEN 10 ELSE 30 END * interval '1 minute'),
+      failure_code=CASE WHEN status='unknown' AND reconciliation_attempts>=6
+        THEN 'JOB_RECONCILIATION_EXHAUSTED' ELSE failure_code END
+      WHERE operation_id=$1 AND reconciliation_token=$2 RETURNING status,reconciliation_attempts`,
+    [uuid.parse(operationId),uuid.parse(token)])).rows[0] || null;
+  }
+
   async claimPrerequisites() {
     return (await this.pool.query(`WITH pending AS (
       SELECT a.user_id FROM job_automations a
@@ -161,12 +229,15 @@ class JobAutomationRepository {
     [uuid.parse(itemId),status,operationId])).rows[0] || null;
   }
 
-  async update({ itemId, status, from, draftId = null, operationId = null }) {
+  async update({ itemId, status, from, draftId = null, operationId = null, failurePhase = null, failureCode = null }) {
     if (!['pending','skipped','generating','submitting','sent','manual_required','unknown','failed'].includes(status)
       || !['evaluating','generating','submitting'].includes(from)) throw jobError('JOB_INVALID_ACTION');
+    if (failurePhase !== null && !['evaluation','generation','preparation','submission','confirmation'].includes(failurePhase)) throw jobError('JOB_INVALID_ACTION');
+    if (failureCode !== null && !/^JOB_[A-Z_]{1,70}$/.test(failureCode)) throw jobError('JOB_INVALID_ACTION');
     return (await this.pool.query(`UPDATE job_automation_items SET status=$2,
-      draft_id=COALESCE($3,draft_id),operation_id=COALESCE($4,operation_id),updated_at=now()
-      WHERE id=$1 AND status=$5 RETURNING *`, [uuid.parse(itemId), status, draftId, operationId, from])).rows[0] || null;
+      draft_id=COALESCE($3,draft_id),operation_id=COALESCE($4,operation_id),updated_at=now(),
+      failure_phase=$6,failure_code=$7
+      WHERE id=$1 AND status=$5 RETURNING *`, [uuid.parse(itemId), status, draftId, operationId, from, failurePhase, failureCode])).rows[0] || null;
   }
   async saveEvaluation({ itemId, evaluation }) {
     if (!evaluation || typeof evaluation !== 'object' || JSON.stringify(evaluation).length > 4000)
@@ -190,7 +261,7 @@ class JobAutomationRepository {
   }
 
   async enqueueAttention({ scope, vacancyId, automationRevision, code, reasonCode = null }) {
-    if (!['MANUAL_REQUIRED','LOGIN_REQUIRED','RESULT_UNKNOWN','PROCESSING_UNKNOWN','MODEL_UNAVAILABLE','RESUME_UNAVAILABLE'].includes(code)) throw jobError('JOB_INVALID_ACTION');
+    if (!['MANUAL_REQUIRED','LOGIN_REQUIRED','RESULT_UNKNOWN','RESULT_CHECK_EXHAUSTED','PROCESSING_UNKNOWN','MODEL_UNAVAILABLE','RESUME_UNAVAILABLE'].includes(code)) throw jobError('JOB_INVALID_ACTION');
     // A lost HH connection still needs a private handover. Bind the notice to
     // the original consent/chat, while the delivery worker rechecks access.
     await assertJobScope(this.pool, scope, this.accessService);
@@ -220,4 +291,4 @@ class JobAutomationRepository {
   }
 }
 
-module.exports = { JobAutomationRepository };
+module.exports = { JobAutomationRepository, synchronizeApplicationItem };

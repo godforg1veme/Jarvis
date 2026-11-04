@@ -573,6 +573,24 @@ expiry и deduplication прежние. Ответ владельца по-пр�
 
 ## Access control and time
 
+Локальный ремонт 4 ноября по поручению владельца: [состояния и восстановление HH](updates/2026-11-04-hh-autonomy-recovery-development.md).
+Путь worker → attention outbox → private Telegram delivery различает отказ
+письма до HH, неизвестную квитанцию и исчерпанные читающие проверки. Сверка
+не повторяет отправку; два невалидных письма передаются на проверку текста.
+Ручное подтверждение точного письма, callbacks, guided kinds и owner/member
+scope сохраняются. Для автоматической операции без confirmation UUID не
+выдаётся несуществующий `confirm:null`; остаётся существующий возврат в меню.
+Новый код пока не опубликован и не установлен.
+
+Local November 4 repair, authorized by the owner: [HH states and recovery](updates/2026-11-04-hh-autonomy-recovery-development.md).
+The worker → attention outbox → private Telegram path distinguishes pre-HH
+letter failure, an uncertain receipt and exhausted read-only checks.
+Reconciliation never resends; two invalid letters require text review. Manual
+exact-letter confirmation, callback grammar, guided kinds and owner/member
+scope remain. Automatic operations lacking a confirmation UUID no longer emit
+invalid `confirm:null`; the existing menu return remains. This code is not
+published or deployed.
+
 HH collection recovery, 24 October 2026: public search and CAPTCHA handover use
 current jobs permission for owner/admin/member and the user's own private chat;
 a connected HH account is not required for public collection. One durable
