@@ -6,6 +6,9 @@
 
 ### Статус
 
+Более новый результат: [выпуск и десятиминутная проверка](2026-11-04-hh-autonomy-recovery-release.md).
+Ниже сохранён результат разработки до выпуска.
+
 Локальная разработка в `codex/hh-autonomy-recovery`, от `b5056d0`.
 Новый код не опубликован и не установлен на VPS. Production-настройки,
 личные переключатели и исходные операции при разработке не менялись;
@@ -104,6 +107,9 @@ runtime не менялся и не использует изменённый sh
 ## English
 
 ### Status
+
+Newer result: [rollout and ten-minute observation](2026-11-04-hh-autonomy-recovery-release.md).
+The development result below is preserved as the pre-rollout record.
 
 Local development on `codex/hh-autonomy-recovery`, based on `b5056d0`.
 The new code is neither published nor installed on either VPS. Production

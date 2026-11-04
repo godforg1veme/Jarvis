@@ -1,6 +1,6 @@
 # Проверки перед выпуском
 
-## HH: состояния и восстановление / States and recovery (local)
+## HH: состояния и восстановление / States and recovery
 
 [Локальный ремонт 4 ноября](updates/2026-11-04-hh-autonomy-recovery-development.md):
 938 серверных unit tests, 2 DB-only skip; Linux/Chromium 131/131;
@@ -8,15 +8,17 @@
 письма подтверждена на существующем собственном отклике без POST/WebSocket.
 После независимой ревизии исправлены разрывы application/item и обход denied
 scope: дополнительно PG recovery 8/8, applications/model 13/13, automation 12/12.
-Новый код не установлен; новая реальная отправка и native lost-receipt proof
-не подтверждены.
+[Выпуск установлен на DE](updates/2026-11-04-hh-autonomy-recovery-release.md).
+За десять минут подтверждены новый обычный отклик и восстановление прежнего,
+оба без повтора; новая native lost-receipt proof не подтверждена.
 Local repair: 938 server unit tests passed with two DB-only skips, Linux/
 Chromium 131/131, isolated PG/RPC/Chromium 32/32 and three extra ledger checks.
 An existing own application's exact letter passed read-only GET verification.
 Independent review is complete. Status atomicity and denied-scope traversal fixes
 passed another 8 recovery, 13 applications/model and 12 automation PG checks.
-The code is not deployed; a new live send and native questionnaire lost-receipt
-proof remain unverified.
+[The rollout is deployed on DE](updates/2026-11-04-hh-autonomy-recovery-release.md).
+Ten minutes verified a new ordinary application and recovery of an earlier one
+without resending; new native questionnaire lost-receipt proof remains unverified.
 
 ```powershell
 npm test --prefix server
