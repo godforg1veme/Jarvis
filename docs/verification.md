@@ -1,5 +1,23 @@
 # Проверки перед выпуском
 
+## HH: форма и первичная квитанция / Form and primary receipt
+
+[Выпуск 853d4cf](updates/2026-11-04-hh-form-receipt-release.md): server 941 passed,
+2 DB-only skips; PostgreSQL 20/20, Linux/Chromium 134/134, установленный browser
+image 8/8. Живое десятиминутное окно: один новый отклик подтверждён поздней
+сверкой, первичное чтение тела ответа всё ещё BODY_FAILED. Нативная форма и
+отмена при submitting проверены fixtures/PG, новая живая отправка анкеты и
+отмена на этой границе не подтверждены. После окна отмечен один необъяснённый
+перезапуск browser.
+
+[Rollout 853d4cf](updates/2026-11-04-hh-form-receipt-release.md): server 941 passed,
+two DB-only skips; PostgreSQL 20/20, Linux/Chromium 134/134, installed browser
+image 8/8. The live ten-minute window produced one new application verified by
+later reconciliation; primary receipt body reading still returned BODY_FAILED.
+Native forms and cancellation at submitting passed fixtures/PG; a new live
+questionnaire submission and cancellation at that boundary remain unverified.
+One unexplained browser restart occurred after the window.
+
 ## HH: состояния и восстановление / States and recovery
 
 [Локальный ремонт 4 ноября](updates/2026-11-04-hh-autonomy-recovery-development.md):

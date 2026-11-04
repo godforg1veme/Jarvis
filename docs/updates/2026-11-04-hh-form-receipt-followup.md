@@ -4,6 +4,8 @@
 
 ## Русский
 
+Более новый результат: [установка и живое наблюдение](2026-11-04-hh-form-receipt-release.md). Ниже сохранён локальный результат до выпуска.
+
 Локальный ремонт после [десятиминутного наблюдения](2026-11-04-hh-autonomy-recovery-release.md),
 ветка `codex/hh-receipt-cancellation`, база `d9c63e3`. Новые изменения ещё
 не опубликованы и не установлены. Реальных откликов на этом этапе не отправляли.
@@ -58,6 +60,8 @@ production БД и настройки в этом этапе не менялис
 личным согласием. Старые неизвестные операции не переотправлять.
 
 ## English
+
+Newer result: [installation and live observation](2026-11-04-hh-form-receipt-release.md). The local pre-rollout result is preserved below.
 
 Local follow-up to the [ten-minute observation](2026-11-04-hh-autonomy-recovery-release.md),
 branch `codex/hh-receipt-cancellation`, based on `d9c63e3`. The changes are not
