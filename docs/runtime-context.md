@@ -372,6 +372,26 @@ in background. One operation runs at a time; waiting history runs after four nor
 tasks. `tail` drains both queues. Active work is not interrupted, and public RPC
 accepts no priority setting. See the linked acceptance record and measurements.
 
+С 4 ноября [отбор по основным обязанностям](updates/2026-11-02-hh-core-role-relevance.md)
+требует directionAssessment: основная профессия, точный запрос настроек,
+core/tool_only/adjacent/unclear и цитаты. Переносимые навыки рассматриваются
+после направления; обычная работа с GPT как инструментом не считается AI-профессией.
+Adapter и worker проверяют запрос и цитаты до письма. Неясность даёт известный
+skip UNCERTAIN без общей паузы; tool_only/adjacent — OUT_OF_DIRECTION.
+Приватно сохраняются оценка и selectionPolicyVersion=2. Одна GLM, прежние 6000
+токенов и отсутствие повторов сохранены. Цитаты подтверждают источник, смысл
+определяет LLM; возможны консервативные ложные пропуски. Старые операции не меняются.
+Since November 4, [primary-duty selection](updates/2026-11-02-hh-core-role-relevance.md)
+requires directionAssessment: primary profession, exact settings query,
+core/tool_only/adjacent/unclear and quotations. Transferable skills follow direction
+alignment; incidental GPT use does not establish an AI occupation. Adapter and
+worker verify query membership and source quotes before drafting. Ambiguity yields
+a known UNCERTAIN skip without global backoff; tool_only/adjacent yields
+OUT_OF_DIRECTION. Private evaluation stores selectionPolicyVersion=2. One GLM
+call, the 6000-token limit and no retries remain. Quotations ground the source;
+the model judges semantics, so conservative false negatives remain possible.
+Historical operations are unchanged.
+
 Refresh happens on use after 15 minutes; it updates metadata, not the allowlist.
 Provider price ceilings protect zero-price routing even between refreshes.
 A missing fresh catalog fails closed. Tool-capable requests never retry after

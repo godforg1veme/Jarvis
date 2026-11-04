@@ -657,6 +657,31 @@ npm run dist:win
 python scripts/testFasterWhisperQuality.py
 ```
 
+HH primary-duty relevance (2026-11-04):
+
+```powershell
+node --test server/test/jobVacancyPrompt.test.js server/test/jobGlmAdapter.test.js server/test/jobAutomationWorker.test.js
+# Disposable PostgreSQL only, with JARVIS_JOB_TEST_DATABASE_URL:
+node --test --test-concurrency=1 server/test/jobAutomationIntegrationAcceptance.cjs server/test/jobAutomationAcceptance.cjs server/test/jobResumeContext.test.js server/test/jobVacancyPrompt.test.js server/test/jobGlmAdapter.test.js server/test/jobAutomationWorker.test.js
+```
+
+Полный server: 930 passed, две PostgreSQL-проверки пропущены без отдельной БД;
+в образе тот же результат. Изолированный набор с PostgreSQL: 49/49. Проверены
+основные обязанности до письма, известный skip без общей паузы, query/quote grounding,
+пустые и выдуманные цитаты, Unicode, поздние обязанности и owner/member.
+Живые модельные пробы: исходные четыре неподходящие карточки пропущены; четыре
+AI-примера приняты. В расширенной серии 10/11, отдельная поздняя цитата 1/1:
+остаточная изменчивость раскрыта в [результате](updates/2026-11-02-hh-core-role-relevance.md).
+Реальные отклики не отправлялись, ручной сеанс и личный выключатель сохранены.
+Full server and image suites: 930 passed, two DB-dependent checks skipped;
+isolated PostgreSQL suite: 49/49. Coverage includes primary duties before drafting,
+known skips without global backoff, query/quote grounding, empty/fabricated quotes,
+Unicode, late duties and owner/member isolation. Live model probes rejected the
+four original irrelevant cards and accepted four AI examples. The extended series
+passed 10/11; a separate late-quote diagnostic passed 1/1. Remaining variability is
+disclosed in the linked record. No live applications were sent; manual HH session
+and the personal off switch were preserved.
+
 Cloud server:
 
 ```powershell

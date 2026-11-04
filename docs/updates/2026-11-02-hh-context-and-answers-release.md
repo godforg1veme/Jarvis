@@ -1,5 +1,8 @@
 # HH: контекст отбора и ответы / Selection context and answers release
 
+Последующее усиление 4 ноября: [проверка основных обязанностей](2026-11-02-hh-core-role-relevance.md).
+Follow-up on November 4: [primary-duty relevance gate](2026-11-02-hh-core-role-relevance.md).
+
 [Русский](#русский) | [English](#english)
 
 Позднее 2 ноября: установлен [ремонт лимита оценки](2026-11-02-hh-evaluation-token-budget.md)

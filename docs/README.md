@@ -4,6 +4,13 @@
 
 ## Русский
 
+4 ноября на DE [закрыт пункт 1: отбор HH по основным обязанностям](updates/2026-11-02-hh-core-role-relevance.md).
+Модель указывает профессию, направление и цитаты; сервер проверяет их до письма.
+Исходные продажи недвижимости и обычная поддержка отклонены, четыре AI-примера
+приняты. Server healthy: 930 тестов, отдельно 49 с PostgreSQL. Остаточный ложный
+пропуск длинной карточки раскрыт в результате. Browser сохранён с 3 CPU;
+автоотклики выключены, старые операции не менялись. Исходники обоих VPS обновлены.
+
 2 ноября [закрыт пункт 4 ускорения HH](updates/2026-11-02-hh-browser-priority.md):
 история уступает ожидающим вакансиям с обслуживанием после четырёх обычных задач.
 В живой read-only пробе вакансия завершилась за 12,1 с вместо 18,1 с; история тоже
@@ -189,6 +196,14 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 Архивы не заменяют действующие правила и новую проверку окружения.
 
 ## English
+
+November 4: [HH item 1, primary-duty relevance](updates/2026-11-02-hh-core-role-relevance.md),
+is deployed on DE. The model supplies profession, direction and quotations;
+the server verifies them before drafting. Original real-estate sales and ordinary
+support were rejected; four AI examples were accepted. Server is healthy:
+930 tests plus 49 isolated PostgreSQL checks passed. A remaining long-card false
+negative is disclosed in the record. Browser retains 3 CPUs; automatic applications
+remain off and historical operations are unchanged. Both VPS sources are updated.
 
 On November 2, [HH performance item 4 was completed](updates/2026-11-02-hh-browser-priority.md):
 history yields to queued vacancy work, with service after four normal tasks.

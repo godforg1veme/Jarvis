@@ -69,7 +69,21 @@ RAG поддержки, n8n/Make с LLM и AI-внедрение/обучени�
 проверка цитаты подтверждает источник, но сама по себе не доказывает релевантность.
 Проблемы формы (пункт 2) и классификации ошибок (пункт 5) сюда не входят.
 
-Фактическая установка и проверка записываются после выпуска.
+### Выпуск
+
+4 ноября в 14:27:52 МСК на DE установлен код
+`062edcfd482f401ed42847324c83f0bfb93bb646`, образ
+`jarvis-hh-relevance-server:062edcf`, immutable release
+`/home/deploy/releases/jarvis-062edcf-hh-relevance`.
+Server healthy, публичные live/ready — HTTP 200; 384 установленным файлам
+server/src и shared соответствует принятый код. Семь остальных контейнеров,
+окружение, mounts и inode секрета сохранены. Browser остаётся
+`jarvis-hh-priority-browser:3f9206a`, healthy, 3 CPU; ручной сеанс не перезапускался.
+Состояния 3285 автоматических операций и личное согласие совпали до/после;
+автоотклики остаются выключены, revision 4. Исходники Windows, DE и NL
+синхронизированы через GitHub main. Desktop не менялся.
+Известное прежнее отличие Desktop: отсутствует неиспользуемый
+`shared/jobQuestionnaire.js`; оно не относится к серверной доработке.
 
 ## English
 
@@ -137,4 +151,17 @@ Personal automatic applications remain off. The model judges duty semantics;
 quotation checks establish source grounding, not semantic relevance by themselves.
 Form failures (item 2) and error classification (item 5) are separate work.
 
-Actual installation and verification will be recorded after deployment.
+### Deployment
+
+Code `062edcfd482f401ed42847324c83f0bfb93bb646` was installed on DE on
+November 4 at 14:27:52 Moscow time as `jarvis-hh-relevance-server:062edcf`,
+from immutable release `/home/deploy/releases/jarvis-062edcf-hh-relevance`.
+Server is healthy; public live/ready return HTTP 200. All 384 installed
+server/src and shared files match the accepted code. Seven other containers,
+environment, mounts and the secret inode were preserved. Browser remains
+`jarvis-hh-priority-browser:3f9206a`, healthy, with 3 CPUs; the manual session
+was not restarted. All 3285 automation-item states and personal consent matched
+before/after; automatic applications remain off at revision 4. Windows, DE and
+NL sources are synchronized through GitHub main. Desktop was unchanged.
+Its previously known payload difference is the absent unused
+`shared/jobQuestionnaire.js`, unrelated to this server change.
