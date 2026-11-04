@@ -49,6 +49,14 @@ source guard прошёл на всех трёх узлах. На DE устан�
 Остальные компоненты и Desktop не пересобирались. На NL обновлены исходники;
 отдельного HH browser на NL нет.
 
+Итоговая сверка: чистые GitHub main, Windows и source DE/NL совпали;
+установленные 51 browser-файл и 386 server-файлов соответствуют source.
+Host Agent на обоих узлах совпал по 17 файлам, службы active. Общий `--check`
+вернул только прежний `DESKTOP_PAYLOAD_DIFFERS`: в Desktop 1.0.2 отсутствует
+один ранее известный неиспользуемый shared-файл, остальные 146, package и native/
+wake runtime совпадают. Этот серверный ремонт Desktop не меняет и не требует
+его переустановки.
+
 ### Пять минут на реальном аккаунте
 
 Окно 15:02:52–15:07:52 МСК прошло на аккаунте владельца. Выключенное состояние
@@ -143,6 +151,14 @@ and started after the new browser check. Browser/server are healthy; browser
 restart count is 0; public live/ready returned HTTP 200. Other components and
 Desktop were not rebuilt. NL received source updates and has no separate HH
 browser runtime.
+
+Final verification matched clean GitHub main, Windows and DE/NL source
+checkouts. All 51 installed browser files and 386 server files match source;
+both Host Agents match 17 files and their services are active. The overall
+`--check` returned only the pre-existing `DESKTOP_PAYLOAD_DIFFERS`: Desktop
+1.0.2 lacks one previously known unused shared file; its other 146 files,
+package and native/wake runtimes match. This server-side repair does not change
+Desktop or require reinstalling it.
 
 ### Five minutes on the real account
 
