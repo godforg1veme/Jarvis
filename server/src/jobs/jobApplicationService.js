@@ -97,7 +97,20 @@ class JobApplicationService {
     const saved = await this.repository.finish({ userId: scope.userId, operationId: operation.operation_id, ...valid });
     return applicationView(saved || operation);
   }
-  async submitAutomatic({ scope, draftId, automationRevision, expectedSearchRevision = null }) {
+  async submitAutomatic(input) {
+    const checkpoint = { claimAttempted: false };
+    try { return await this.submitAutomaticAttempt(input, checkpoint); }
+    catch (error) {
+      if ((checkpoint.claimAttempted && error?.applicationClaimNotAttempted !== true)
+        || error?.code !== 'JOB_AUTOMATION_UNAVAILABLE') throw error;
+      // A previous original operation must remain visible even when new consent was revoked.
+      const previous = await this.repository.findAutomaticForDraft({ scope: input.scope, draftId: input.draftId });
+      if (previous) return { status: ['sending','unknown'].includes(previous.status) ? 'unknown' : previous.status,
+        operationId: previous.operation_id, failureCode: previous.failure_code || null };
+      return { status: 'cancelled', operationId: null, failureCode: error.code };
+    }
+  }
+  async submitAutomaticAttempt({ scope, draftId, automationRevision, expectedSearchRevision = null }, checkpoint) {
     await this.requireAdapter({ scope });
     if (!this.automationRepository) throw jobError('JOB_AUTOMATION_UNAVAILABLE');
     await this.automationRepository.assertCurrent({ scope, revision: automationRevision });
@@ -116,6 +129,7 @@ class JobApplicationService {
         return { status: 'manual_required', operationId: null, failureCode: 'JOB_HH_FORM_CHANGED' };
       await this.questionAnswerService.assertCurrent({ scope, draftId, automationRevision, versions: preparedAnswers.versions });
     } else if (blocked) return { status: blocked.outcome, operationId: null, failureCode: blocked.failureCode || null };
+    checkpoint.claimAttempted = true;
     const { operation, execute } = await this.repository.claimAutomatic({ scope, draftId, automationRevision,
       expectedSearchRevision,
       ...(preparedAnswers ? { questionnaire: preparedAnswers.questionnaire, answers: preparedAnswers.answers,

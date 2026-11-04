@@ -168,11 +168,12 @@ class JobAutomationWorker {
       phase = 'submitting';
       const result = await this.applicationService.submitAutomatic({ scope, draftId: draft.id,
         automationRevision: item.automation_revision, expectedSearchRevision: settings.revision ?? null });
-      const status = result.status === 'sent' || result.status === 'already_applied' ? 'sent'
+      const status = result.status === 'cancelled' ? 'skipped'
+        : result.status === 'sent' || result.status === 'already_applied' ? 'sent'
         : result.status === 'manual_required' ? 'manual_required'
           : result.status === 'unknown' || result.status === 'sending' ? 'unknown' : 'failed';
       await this.repository.update({ itemId: item.id, from: phase, status, operationId: result.operationId,
-        failurePhase: status === 'unknown' ? 'confirmation'
+        failurePhase: result.status === 'cancelled' ? 'preparation' : status === 'unknown' ? 'confirmation'
           : result.failureCode === 'JOB_HH_PREPARATION_FAILED' ? 'preparation' : null,
         failureCode: result.failureCode || null });
       if (status === 'manual_required' || (status === 'failed' && result.failureCode === 'JOB_AUTOMATION_PRECHECK_FAILED')) await this.repository.enqueueAttention({ scope,

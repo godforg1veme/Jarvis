@@ -63,7 +63,8 @@ function inspectForm(raw, { externalId, resumeId, resumes }) {
   if (['login_required', 'access_denied'].includes(signal.state)) return result;
   if (!Array.isArray(raw.resumeTitles) || raw.resumeTitles.length !== 1 || normalize(raw.resumeTitles[0]) !== normalize(selected.title)) return result;
   if (raw.hiddenResumeWarning) return { ...result, reasonCode: 'JOB_HH_RESUME_HIDDEN' };
-  if (url.origin === 'https://hh.ru' && url.pathname === '/applicant/vacancy_response/test'
+  if (url.origin === 'https://hh.ru' && (url.pathname === '/applicant/vacancy_response/test'
+      || (url.pathname === '/applicant/vacancy_response' && raw.nativeTest))
     && url.searchParams.getAll('vacancyId').length === 1
     && url.searchParams.get('vacancyId') === externalId) {
     return inspectNativeTest(raw);

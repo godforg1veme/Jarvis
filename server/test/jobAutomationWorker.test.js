@@ -61,6 +61,13 @@ function harness(decision, applicationStatus = 'sent') {
   return { worker, item, calls };
 }
 
+test('known cancellation during submission preparation skips silently', async () => {
+  const { worker, item, calls } = harness('apply', 'cancelled');
+  await worker.process(item);
+  assert.ok(calls.some(x => x[0] === 'update' && x[1] === 'skipped'));
+  assert.equal(calls.some(x => x[0] === 'attention'), false);
+});
+
 test('a rejected vacancy stays silent and never prepares an application', async () => {
   const { worker, item, calls } = harness('skip');
   await worker.process(item);

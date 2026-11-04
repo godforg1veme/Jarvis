@@ -4,6 +4,8 @@
 
 ## Русский
 
+Локально исправлены [анкета на обычном адресе HH, гонка квитанции и учёт отмены](updates/2026-11-04-hh-form-receipt-followup.md). Проверено: server 941, PG 20/20, Linux/Chromium 134/134; независимая ревизия завершена. Этот следующий этап ещё не установлен.
+
 4 ноября [общий ремонт восстановления автооткликов установлен на DE](updates/2026-11-04-hh-autonomy-recovery-release.md):
 server/browser/collector `bdf416e`, миграция 058; source Windows/DE/NL совпадает.
 За десять минут подтверждён один новый отклик и восстановлен один прежний без
@@ -217,6 +219,8 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 Архивы не заменяют действующие правила и новую проверку окружения.
 
 ## English
+
+A local follow-up fixes [native questions on the ordinary HH path, a receipt race and cancellation accounting](updates/2026-11-04-hh-form-receipt-followup.md). Verified: server 941, PG 20/20, Linux/Chromium 134/134; independent review completed. This next stage is not yet deployed.
 
 November 4: [shared automatic-application recovery is deployed on DE](updates/2026-11-04-hh-autonomy-recovery-release.md):
 server/browser/collector `bdf416e`, migration 058; Windows/DE/NL sources match.

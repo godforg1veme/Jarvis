@@ -144,8 +144,22 @@ test('real PG: autonomous sending uses consent, saves one operation and rejects 
       } finally { gate.release(); }
       await f.pool.query("INSERT INTO user_identities(user_id,provider,external_id) VALUES($1,'telegram','101')", [f.owner]);
       await automation.setEnabled({ scope: f.scope, enabled: false, expectedRevision: 1 });
-      await assert.rejects(applications.submitAutomatic({ scope: f.scope, draftId: staleDraft.id,
-        automationRevision: 1 }), { code: 'JOB_AUTOMATION_UNAVAILABLE' });
+      assert.deepEqual(await applications.submitAutomatic({ scope: f.scope, draftId: staleDraft.id,
+        automationRevision: 1 }), { status: 'cancelled', operationId: null, failureCode: 'JOB_AUTOMATION_UNAVAILABLE' });
+      assert.equal((await applications.submitAutomatic({ scope: f.scope, draftId: draft.id,
+        automationRevision: 1 })).status, 'sent', 'revocation cannot hide a saved result');
+      const enabled = await automation.setEnabled({ scope: f.scope, enabled: true, expectedRevision: 2,
+        resumeId: 'resume-a', connectionRevision: 1 });
+      const inspect = adapter.inspect;
+      adapter.inspect = async (...args) => {
+        const result = await inspect(...args);
+        await automation.setEnabled({ scope: f.scope, enabled: false, expectedRevision: enabled.revision });
+        return result;
+      };
+      assert.deepEqual(await applications.submitAutomatic({ scope: f.scope, draftId: raceDraft.id,
+        automationRevision: enabled.revision }), { status: 'cancelled', operationId: null,
+        failureCode: 'JOB_AUTOMATION_UNAVAILABLE' });
+      assert.equal((await f.pool.query('SELECT count(*)::int n FROM job_applications')).rows[0].n, 1);
       assert.equal(sends, 1);
     } finally { await f.close(); }
   });

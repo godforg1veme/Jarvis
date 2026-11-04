@@ -82,7 +82,8 @@ class JobApplicationRepository {
       answers = normalizeAnswers(questionnaire, answers);
       if (!questionnaireContext || questionnaireContext.automationRevision !== automationRevision) throw jobError('JOB_REVISION_CONFLICT');
     } else if (answers !== null || questionnaireContext !== null) throw jobError('JOB_INVALID_APPLICATION_RESULT');
-    return jobTransaction(this.pool, async client => {
+    let insertionAttempted = false;
+    try { return await jobTransaction(this.pool, async client => {
       await client.query("SELECT pg_advisory_xact_lock(hashtext('jarvis-access-admin'))");
       await assertJobScope(client, scope, this.accessService);
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`job-owner:${scope.userId}`]);
@@ -112,6 +113,7 @@ class JobApplicationRepository {
         AND (resume_id=$3 OR status IN ('sending','unknown')) ORDER BY created_at LIMIT 1`,
       [scope.userId, row.vacancy_id, row.resume_id])).rows[0];
       if (existing) return { operation: existing, execute: false };
+      insertionAttempted = true;
       const operation = (await client.query(`INSERT INTO job_applications(user_id,vacancy_id,resume_id,draft_id,
         confirmation_id,automation_revision,operation_id,approved_text,status,questionnaire,questionnaire_answers,questionnaire_context,
         origin_conversation_id,origin_chat_id,origin_connection_revision)
@@ -120,7 +122,11 @@ class JobApplicationRepository {
         questionnaire, answers === null ? null : JSON.stringify(answers), questionnaireContext,
         scope.conversationId, scope.chatId, row.connection_revision])).rows[0];
       return { operation, execute: true };
-    });
+    }); } catch (error) {
+      if (!insertionAttempted && error?.code === 'JOB_AUTOMATION_UNAVAILABLE')
+        error.applicationClaimNotAttempted = true;
+      throw error;
+    }
   }
   async findAutomaticForDraft({ scope, draftId }) {
     await assertJobScope(this.pool, scope, this.accessService);

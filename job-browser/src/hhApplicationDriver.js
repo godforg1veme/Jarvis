@@ -3,7 +3,8 @@ const { readResumes, readVacancyPage } = require('./hhPageReader');
 const { readApplicationForm } = require('./hhApplicationForm');
 const { readResumePrivacy, readEmployerId, evaluatePrivacy } = require('./hhPrivacy');
 const { prepareApplicationPage } = require('./hhApplication');
-const { validateSubmissionRequest, normalizeSubmissionReceipt } = require('./submissionProtocol');
+const { validateSubmissionRequest } = require('./submissionProtocol');
+const { captureSubmissionReceipt } = require('./submissionReceipt');
 const { readApplicationReference, verifyChatLetter } = require('./applicationProof');
 const { verifyChatData } = require('./chatApplicationProof');
 const {visibleAppliedAction}=require('./existingApplication');
@@ -28,7 +29,7 @@ class HhApplicationDriver {
       || inspected.vacancy.archived) return { ready: false, reasonCode: inspected.reasonCode || 'JOB_HH_FORM_CHANGED' };
     if (!inspected.manualRequired && input.questionnaire !== undefined) return { ready: false, reasonCode: 'JOB_HH_FORM_CHANGED' };
     const resumes = await hh.read('https://hh.ru/applicant/resumes', 'authenticated', readResumes);
-    const formUrl = inspected.reasonCode === 'JOB_HH_QUESTIONS_REQUIRED'
+    const formUrl = inspected.vacancy.manualRequired
       ? `https://hh.ru/applicant/vacancy_response/test?vacancyId=${input.externalId}`
       : `https://hh.ru/applicant/vacancy_response?vacancyId=${input.externalId}`;
     const opened = await hh.open(formUrl, 'application');
@@ -62,7 +63,8 @@ class HhApplicationDriver {
     });
     let target; try { target = new URL(action?.url); } catch { return manual(); }
     if (!action?.present || (!input.questionnaire && action.method !== 'post') || target.origin !== 'https://hh.ru'
-      || target.pathname !== (input.questionnaire ? '/applicant/vacancy_response/test' : '/applicant/vacancy_response')
+      || (input.questionnaire ? !['/applicant/vacancy_response/test','/applicant/vacancy_response'].includes(target.pathname)
+        || target.pathname !== new URL(page.url()).pathname : target.pathname !== '/applicant/vacancy_response')
       || target.username || target.password || target.hash || target.searchParams.size !== 1
       || target.searchParams.get('vacancyId') !== input.externalId) return manual();
 
@@ -85,24 +87,15 @@ class HhApplicationDriver {
     await prepared.releaseReadGuard();
     await prepared.releaseNavigationGuard();
     await page.route('**/*', guard);
-    const receipt = page.waitForResponse((response) => approvedRequest !== null && response.request() === approvedRequest, { timeout: this.responseTimeoutMs }).catch(() => null);
+    const receipt = captureSubmissionReceipt({ page, request: () => approvedRequest,
+      timeoutMs: this.responseTimeoutMs, input });
     try {
       armed = true;
       await page.locator('[data-qa="vacancy-response-submit-popup"]').click({ timeout: 10000 }).catch(() => {});
       if (!permitted) await Promise.race([requestSeen, page.waitForTimeout(3000)]);
       armed = false;
       if (!permitted) return manual(blockedMutation ? 'JOB_HH_SUBMISSION_BLOCKED' : 'JOB_HH_FORM_CHANGED');
-      const response = await receipt;
-      if (!response) return unknown('JOB_HH_RECEIPT_TIMEOUT');
-      if (response.status() < 200 || response.status() >= 300) return unknown('JOB_HH_RECEIPT_HTTP');
-      const headers = response.headers();
-      if (!/^application\/json(?:;|$)/i.test(headers['content-type'] || '') || Number(headers['content-length'] || 0) > 1048576) return unknown('JOB_HH_RECEIPT_FORMAT');
-      const bytes = await response.body();
-      if (bytes.length > 1048576) return unknown('JOB_HH_RECEIPT_FORMAT');
-      let value; try { value = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)); }
-      catch { return unknown('JOB_HH_RECEIPT_FORMAT'); }
-      const result = normalizeSubmissionReceipt(value, input);
-      return result.outcome === 'unknown' ? unknown('JOB_HH_RECEIPT_SCHEMA') : result;
+      return await receipt;
     } catch { return unknown('JOB_HH_RECEIPT_READ_FAILED'); }
     finally { armed = false; await page.unroute('**/*', guard).catch(() => {}); }
   }

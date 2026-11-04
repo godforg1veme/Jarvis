@@ -63,6 +63,12 @@ test('observed HH test route admits only bounded native task controls and stable
   const result = inspectForm(raw, args);
   assert.equal(result.reasonCode, 'JOB_HH_QUESTIONS_REQUIRED');
   assert.deepEqual(result.questionnaire.questions.map(q => q.id), ['task_7', 'task_8_text']);
+  const inline = { ...raw, url: 'https://hh.ru/applicant/vacancy_response?vacancyId=123' };
+  assert.deepEqual(inspectForm(inline, args).questionnaire, result.questionnaire);
+  assert.equal(inspectForm({ ...inline, url: 'https://other.invalid/applicant/vacancy_response?vacancyId=123' }, args).questionnaire, undefined);
+  assert.equal(inspectForm({ ...inline, url: 'https://hh.ru/applicant/vacancy_response?vacancyId=456' }, args).questionnaire, undefined);
+  assert.equal(inspectForm({ ...inline, nativeTest: { ...nativeTest, fields: [...nativeTest.fields,
+    { tag: 'INPUT', type: 'hidden', name: 'resume_hash', value: 'other' }] } }, args).reasonCode, 'JOB_HH_TEST_REQUIRED');
   assert.equal(inspectForm({ ...raw, nativeTest: { ...nativeTest, externalLink: true } }, args).reasonCode, 'JOB_HH_EXTERNAL_ACTION');
   assert.equal(inspectForm({ ...raw, nativeTest: { ...nativeTest, unsupportedMedia: true } }, args).reasonCode, 'JOB_HH_TEST_REQUIRED');
   assert.equal(inspectForm({ ...raw, hiddenResumeWarning:true }, args).reasonCode,'JOB_HH_RESUME_HIDDEN');

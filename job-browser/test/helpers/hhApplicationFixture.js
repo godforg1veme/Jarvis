@@ -1,7 +1,7 @@
 // HH-shaped UI fixture; every request is fulfilled locally or aborted.
 const { parseFields } = require('../../src/submissionProtocol');
 async function installApplicationFixture(context, { resumeId, onPost, nativeTestId = null,
-  nativeMultiple = false, nativeQuestionLabel = 'Выберите вариант' } = {}) {
+  nativeMultiple = false, inlineNative = false, nativeQuestionLabel = 'Выберите вариант' } = {}) {
   const state = { posts: 0, chatRequests: 0, loseAcknowledgement: false, changeCountryVisibility: false,
     wrongRecoveredLetter: true, applied: new Set(), letters: new Map(), lastFields: null };
   const html = (value) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -59,12 +59,13 @@ async function installApplicationFixture(context, { resumeId, onPost, nativeTest
             resources: [{ type: 'RESPONSE_LETTER', id: 1 }] }] } } } };
         body = `<script type="application/ld+json">${JSON.stringify({ '@type': 'JobPosting', title: 'Junior AI Engineer', datePosted: '2026-10-15T10:00:00+03:00' })}</script>
           <div data-qa="vacancy-description">Автоматизация AI</div><div data-qa="vacancy-company"><a href="/employer/900">Fixture</a></div>
-          ${id === nativeTestId ? '<a data-qa="vacancy-response-link-test" href="/applicant/vacancy_response/test?vacancyId='+id+'">Пройти тест</a>' : ''}
+          ${id === nativeTestId && !inlineNative ? '<a data-qa="vacancy-response-link-test" href="/applicant/vacancy_response/test?vacancyId='+id+'">Пройти тест</a>' : ''}
           ${state.applied.has(id) ? `<template id="HH-Lux-InitialState">${JSON.stringify(sourceState)}</template>
             <button data-qa="vacancy-response-link-view-topic" onclick="const frame=document.createElement('iframe');frame.src='https://chatik.hh.ru/chat/${chatId}';this.after(frame)">Смотреть отклик</button>` : ''}`;
-      } else if (url.pathname === '/applicant/vacancy_response/test' && url.searchParams.get('vacancyId') === nativeTestId) {
+      } else if (url.pathname === (inlineNative ? '/applicant/vacancy_response' : '/applicant/vacancy_response/test')
+        && url.searchParams.get('vacancyId') === nativeTestId) {
         body = `<div data-qa="resume-title">Основное резюме</div>
-          <form method="post" action="/applicant/vacancy_response/test?vacancyId=${nativeTestId}">
+          <form method="post" action="/applicant/vacancy_response${inlineNative ? '' : '/test'}?vacancyId=${nativeTestId}">
           <div data-qa="test-description">Ответьте на вопросы работодателя.</div>
           <h2 data-qa="employer-asking-for-test">Вопросы</h2>
           <input type="hidden" name="uidPk" value="42"><input type="hidden" name="guid" value="abc-123">

@@ -63,14 +63,14 @@ test('actual driver + Chromium + Linux journal: native request/receipt, lost ack
   } finally { await context?.close(); await browser?.close(); await fs.rm(root, { recursive: true, force: true }); }
 });
 
-test('HH test route: inspect stable native questions, fill exact answers, validate one outgoing POST and receipt', async () => {
+for (const inlineNative of [false, true]) test(`HH native questions on ${inlineNative ? 'ordinary' : 'test'} route: exact answers and one POST`, async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'jarvis-native-test-')); await fs.chmod(root, 0o700);
   const ownerId = randomUUID(), resumeId = 'fixtureResume';
   let browser, context;
   try {
     browser = await chromium.launch({ headless: true, chromiumSandbox: true });
     context = await browser.newContext({ serviceWorkers: 'block' });
-    const fixture = await installApplicationFixture(context, { resumeId, nativeTestId: '126' });
+    const fixture = await installApplicationFixture(context, { resumeId, nativeTestId: '126', inlineNative });
     const hh = new HhBrowser({ context, primaryResumeId: resumeId });
     const inspected = await hh.inspect({ externalId: '126', resumeId });
     assert.equal(inspected.reasonCode, 'JOB_HH_QUESTIONS_REQUIRED');
