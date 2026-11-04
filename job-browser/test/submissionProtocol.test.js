@@ -33,17 +33,22 @@ test('native HH test request binds stable test, current start time and exact sin
 test('HH request guard binds exact letter/resume/vacancy and forbids visibility changes, tests, files and duplicate fields', async () => {
   const approved = { externalId: '123', resumeId: 'fixtureResume', letter: 'Точный текст\nAI & автоматизация.' };
   const fields = { vacancy_id: '123', resume_hash: approved.resumeId, letter: approved.letter,
-    lux: 'true', ignore_postponed: 'true', withoutTest: 'yes', incomplete: 'false',
+    lux: 'true', ignore_postponed: 'true', withoutTest: 'no', incomplete: 'false',
     mark_applicant_visible_in_vacancy_country: 'false', country_ids: '[]', hhtmFromLabel: '', hhtmSourceLabel: '' };
-  const request = async (changes = {}, extras = []) => {
-    const form = new FormData(); for (const [key, value] of Object.entries({ ...fields, ...changes })) form.append(key, value);
+  const request = async (changes = {}, extras = [], encoding = 'multipart') => {
+    const values = { ...fields, ...changes };
+    const form = encoding === 'urlencoded' ? new URLSearchParams() : new FormData();
+    for (const [key, value] of Object.entries(values)) if (value !== undefined) form.append(key, value);
     for (const [key, value] of extras) form.append(key, value);
     const data = new Request('https://hh.ru/applicant/vacancy_response/popup', { method: 'POST', body: form });
     return { url: data.url, method: data.method, contentType: data.headers.get('content-type'), body: Buffer.from(await data.arrayBuffer()) };
   };
   assert.equal(validateSubmissionRequest(await request(), approved), true);
+  assert.equal(validateSubmissionRequest(await request({}, [], 'urlencoded'), approved), true);
   for (const changed of [{ letter: `${approved.letter} ` }, { resume_hash: 'otherResume' }, { vacancy_id: '124' },
-    { mark_applicant_visible_in_vacancy_country: 'true' }, { country_ids: '[113]' }, { withoutTest: 'no' }, { unexpected: 'value' }]) {
+    { mark_applicant_visible_in_vacancy_country: 'true' }, { country_ids: '[113]' },
+    { withoutTest: 'yes' }, { withoutTest: 'true' }, { withoutTest: undefined },
+    { uidPk: '42' }, { task_7: '11' }, { unexpected: 'value' }]) {
     assert.equal(validateSubmissionRequest(await request(changed), approved), false);
   }
   assert.equal(validateSubmissionRequest(await request({}, [['letter', approved.letter]]), approved), false);

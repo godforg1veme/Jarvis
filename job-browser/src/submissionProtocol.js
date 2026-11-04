@@ -58,7 +58,7 @@ function validateSubmissionRequest({ url, method, contentType, body }, { externa
   // FormData canonically encodes text line breaks as CRLF; no other whitespace is changed.
   if (!fields || fields.get('vacancy_id') !== externalId || fields.get('resume_hash') !== resumeId || fields.get('letter')?.replace(/\r\n/g, '\n') !== letter
     || fields.get('lux') !== 'true' || fields.get('ignore_postponed') !== 'true'
-    || fields.get('withoutTest') !== (questionnaire ? 'no' : 'yes')
+    || fields.get('withoutTest') !== 'no'
     || !['true', 'false'].includes(fields.get('incomplete'))
     || fields.get('mark_applicant_visible_in_vacancy_country') !== 'false' || fields.get('country_ids') !== '[]') return false;
   const allowed = new Set(['vacancy_id', 'resume_hash', 'letter', 'lux', 'ignore_postponed', 'withoutTest',

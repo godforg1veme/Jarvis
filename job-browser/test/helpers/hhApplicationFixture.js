@@ -83,7 +83,7 @@ async function installApplicationFixture(context, { resumeId, onPost, nativeTest
           };
           document.querySelector('form').onsubmit=async(event)=>{event.preventDefault();const data=new FormData();
             const values={vacancy_id:'${id}',resume_hash:'${resumeId}',letter:document.querySelector('textarea').value,lux:true,
-              ignore_postponed:true,withoutTest:'yes',incomplete:false,mark_applicant_visible_in_vacancy_country:${state.changeCountryVisibility},country_ids:'[]',hhtmFromLabel:'',hhtmSourceLabel:''};
+              ignore_postponed:true,withoutTest:'no',incomplete:false,mark_applicant_visible_in_vacancy_country:${state.changeCountryVisibility},country_ids:'[]',hhtmFromLabel:'',hhtmSourceLabel:''};
             for(const [key,value] of Object.entries(values)) data.append(key,String(value));
             await fetch('/applicant/vacancy_response/popup',{method:'POST',body:data}).catch(()=>{});
           };</script>`;
