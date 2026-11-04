@@ -18,18 +18,18 @@
 
 ## Выполнение и приёмка
 
-- [ ] Исправить `job-browser/src/submissionProtocol.js`, обычную fixture
+- [x] Исправить `job-browser/src/submissionProtocol.js`, обычную fixture
   `job-browser/test/helpers/hhApplicationFixture.js` и регрессионные проверки
   `job-browser/test/submissionProtocol.test.js`.
-- [ ] Проверить multipart и urlencoded с `no`; отклонение `yes`, отсутствующего
+- [x] Проверить multipart и urlencoded с `no`; отклонение `yes`, отсутствующего
   и неизвестного флага, чужих vacancy/resume/letter и непорученных ответов.
-- [ ] Выполнить browser suite, Linux Chromium и изолированные PG acceptance;
+- [x] Выполнить browser suite, Linux Chromium и изолированные PG acceptance;
   независимо проверить границу исполнения перед публикацией.
-- [ ] Опубликовать проверенный commit в main. Синхронизировать чистые source
+- [x] Опубликовать проверенный commit в main. Синхронизировать чистые source
   Windows/DE/NL, проверить source guard и отдельный immutable release.
-- [ ] Пересобрать и заменить только HH browser на DE, сохранив env, volumes,
+- [x] Пересобрать и заменить только HH browser на DE, сохранив env, volumes,
   sandbox, 3 CPU и 1 GiB. Сверить health и установленный код.
-- [ ] Наблюдать пять минут действующую личную автоматику. Не включать чужие
+- [x] Наблюдать пять минут действующую личную автоматику. Не включать чужие
   аккаунты, не создавать новые ID для старых операций. Сохранить сводные
   результаты и оставшиеся дефекты без приватных данных в release record.
 

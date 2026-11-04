@@ -4,6 +4,14 @@
 
 ## Русский
 
+4 ноября на DE установлен [точечный ремонт отправки HH](updates/2026-11-04-hh-without-test-release.md):
+общий для всех аккаунтов валидатор принимает фактический `withoutTest=no`;
+`yes`, чужие данные и непорученные ответы отклоняются. Linux/Chromium 128/128,
+изолированные PG/RPC/Chromium 12/12; browser/server healthy. В пятиминутном
+окне — 25 пропусков и 0 новых отправок; успешный живой отклик не подтверждён.
+Личный переключатель возвращён в off; старые операции сохранены. В отчёте
+записаны восемь `UNCERTAIN`, статус отмены перед LLM и недостающая диагностика.
+
 4 ноября [сведены итоги HH по всему чату](updates/2026-11-04-hh-chat-status.md):
 пункты 1, 3 и 4 установлены; пункт 2 разобран частично, пункт 5 остаётся открытым.
 В сводке собраны замеры, ответы на нативные вопросы, исправление лимита модели,
@@ -201,6 +209,15 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 Архивы не заменяют действующие правила и новую проверку окружения.
 
 ## English
+
+November 4: [the focused HH submission repair](updates/2026-11-04-hh-without-test-release.md)
+is deployed on DE. The common validator accepts the observed `withoutTest=no`
+for all accounts; `yes`, different bound data and unapproved answers are
+rejected. Linux/Chromium passed 128/128 and isolated PG/RPC/Chromium 12/12;
+browser/server are healthy. Five-minute observation produced 25 skips and no
+new sends, so a successful live application remains unverified. The personal
+switch was restored to off and old operations were preserved. The report tracks
+eight `UNCERTAIN` results, pre-LLM cancellation status and missing diagnostics.
 
 November 4: [the HH chat overview](updates/2026-11-04-hh-chat-status.md) records
 items 1, 3 and 4 as deployed, item 2 as partly investigated and item 5 as open.

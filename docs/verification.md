@@ -1,5 +1,30 @@
 # Проверки перед выпуском
 
+## HH withoutTest
+
+[Ремонт 4 ноября](updates/2026-11-04-hh-without-test-release.md): Windows —
+114 passed, 11 Linux-only skipped; Linux/Chromium — 128/128 без пропусков;
+изолированные PostgreSQL/RPC/Chromium — 12/12 без пропусков; новый образ — 6/6.
+Обычная форма отправляет `withoutTest=no`. Проверяются multipart/urlencoded,
+запрет `yes`, отсутствие флага, непорученные поля анкеты, owner/member и
+восстановление без повторного POST. Живые результаты записаны отдельно в отчёте.
+The November 4 repair passed 128 Linux/Chromium and 12 isolated PG/RPC/Chromium
+checks without skips, plus 6 inside the release image. Windows passed 114 with
+11 Linux-only skips. Live results are recorded separately in the linked report.
+
+```powershell
+node --test job-browser/test/submissionProtocol.test.js job-browser/test/hhApplicationForm.test.js
+npm test --prefix job-browser
+```
+
+На Linux с Chromium sandbox и отдельной тестовой PostgreSQL:
+On Linux with the Chromium sandbox and a disposable PostgreSQL:
+
+```bash
+node --test --test-concurrency=1 job-browser/test/*.test.js job-browser/test/hhApplicationDriverAcceptance.cjs
+node --test --test-concurrency=1 server/test/jobAutomationIntegrationAcceptance.cjs server/test/jobQuestionBrowserAcceptance.cjs server/test/jobBrowserApplicationsAcceptance.cjs
+```
+
 ## Приоритет очереди HH / HH queue priority
 
 [Установлено на DE 2 ноября](updates/2026-11-02-hh-browser-priority.md):

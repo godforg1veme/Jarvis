@@ -1,5 +1,19 @@
 # HH browser: чтение и проверка формы
 
+4 ноября установлен [ремонт проверки withoutTest](../docs/updates/2026-11-04-hh-without-test-release.md).
+Общий валидатор требует `withoutTest=no` как для обычного отклика, так и для
+поддерживаемой анкеты; `yes` запрещён. Наличие вопросов определяется проверкой
+формы, а не этим флагом. Непорученные test identity/ответы в обычном отклике
+отклоняются. Точные vacancy/resume/letter, scope и запрет повторов сохраняются
+для всех аккаунтов.
+
+November 4: [withoutTest validation repair](../docs/updates/2026-11-04-hh-without-test-release.md)
+is deployed. The common validator requires `withoutTest=no` for ordinary
+applications and supported questionnaires; `yes` is rejected. Form inspection
+determines whether questions exist. Unapproved test identity/answers in an
+ordinary application are rejected. Exact vacancy/resume/letter, scope and
+duplicate protections remain in place for all accounts.
+
 2 ноября установлен [приоритет вакансий перед историей](../docs/updates/2026-11-02-hh-browser-priority.md).
 Очереди разделены по профилю; одна операция активна, FIFO внутри каждого класса.
 История уступает обычным операциям, но обслуживается после четырёх таких задач,
