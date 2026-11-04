@@ -35,7 +35,7 @@ function harness(decision, applicationStatus = 'sent') {
     searchRepository: {
       async getSettings() { return { revision: 1, settings: { budgetUsd: 2, queries: ['integration developer'] } }; },
       async getVacancy() { return { id: VACANCY, revision: 1, snapshot: {
-        title: 'Adjacent role', description: 'Need transferable skills', archived: false } }; },
+        title: 'Integration developer', description: 'Build integrations for internal services.', archived: false } }; },
     },
     profileRepository: { async ensure() { return { revision: 1, profile: { confirmed: true,
       baseLetter: 'I build integrations', facts: [], examples: [] } }; } },
@@ -44,6 +44,8 @@ function harness(decision, applicationStatus = 'sent') {
       calls.push(['evaluate', input.resumeContext.snapshot.experience]);
       return { decision, directionMatched: true,
         reasonCode: decision === 'apply' ? 'DIRECTION_FIT' : 'INSUFFICIENT_FIT',
+        directionAssessment: { primaryOccupation: 'Integration developer', targetQuery: 'integration developer',
+          relationship: 'core', dutiesQuotes: ['Build integrations for internal services.'] },
         rationale: 'Fixture role considered', usage: { cost: 0.001 }, requestId: 'model-1' };
     } },
     draftService: { async generate(input) { calls.push(['draft', input.requestId, input.sourceText]);
@@ -141,4 +143,60 @@ test('invented first-person career commitment stops before submit', async () => 
   await worker.process(item);
   assert.ok(calls.some(x => x[0] === 'update' && x[1] === 'manual_required'));
   assert.ok(!calls.some(x => x[0] === 'submit'));
+});
+
+test('incidental AI tools cannot authorize a letter even when an adapter returns apply', async () => {
+  for (const [occupation, description] of [
+    ['Real estate sales', 'Sell apartments and close property deals. Use AI tools to write client messages.'],
+    ['Technical support', 'Configure LDAP, Jira, office PCs and Linux servers. Use AI tools to diagnose incidents.'],
+    ['Cardiology sales', 'Visit doctors and promote pharmaceutical products. Use AI to prepare reports.'],
+  ]) {
+    const { worker, item, calls } = harness('apply');
+    worker.searchRepository.getSettings = async () => ({ revision: 1, settings: { queries: ['AI engineer'] } });
+    worker.searchRepository.getVacancy = async () => ({ revision: 1,
+      snapshot: { title: occupation, description, archived: false } });
+    worker.modelAdapter.evaluate = async () => ({ decision: 'apply', directionMatched: true,
+      reasonCode: 'DIRECTION_FIT', rationale: 'Transferable client support experience and AI tools',
+      directionAssessment: { primaryOccupation: occupation, targetQuery: 'AI engineer',
+        relationship: 'tool_only', dutiesQuotes: [description.split('. ')[0] + '.'] },
+      usage: { cost: 0.001 }, requestId: 'fixture-billed' });
+    await worker.process(item);
+    const saved = calls.find(x => x[0] === 'evaluation')?.[1];
+    assert.equal(saved?.decision, 'skip');
+    assert.equal(saved.reasonCode, 'OUT_OF_DIRECTION');
+    assert.equal(saved.selectionPolicyVersion, 2);
+    assert.equal(saved.directionAssessment.relationship, 'tool_only');
+    assert.ok(calls.some(x => x[0] === 'usage' && x[1] === 'success'));
+    assert.ok(calls.some(x => x[0] === 'update' && x[1] === 'skipped'));
+    assert.equal(calls.some(x => ['draft', 'submit', 'backoff', 'attention'].includes(x[0])), false);
+  }
+});
+
+test('fabricated duty or unrelated search direction becomes a known skip before the letter', async () => {
+  for (const mismatch of ['quote', 'query']) {
+    const { worker, item, calls } = harness('apply');
+    worker.modelAdapter.evaluate = async () => ({ decision: 'apply', directionMatched: true,
+      reasonCode: 'DIRECTION_FIT', rationale: 'Fixture direction', directionAssessment: {
+        primaryOccupation: 'Integration developer', relationship: 'core',
+        targetQuery: mismatch === 'query' ? 'property sales' : 'integration developer',
+        dutiesQuotes: [mismatch === 'quote' ? 'Build RAG agents that are absent from the vacancy.'
+          : 'Build integrations for internal services.'],
+      }, usage: { cost: 0.001 }, requestId: 'fixture-billed' });
+    await worker.process(item);
+    const saved = calls.find(x => x[0] === 'evaluation')?.[1];
+    assert.equal(saved?.decision, 'skip');
+    assert.equal(saved.reasonCode, 'UNCERTAIN');
+    assert.equal(saved.directionAssessment.relationship, 'unclear');
+    assert.equal(calls.some(x => ['draft', 'submit', 'backoff', 'attention'].includes(x[0])), false);
+  }
+});
+
+test('grounded selection evidence is stored before any letter or submission', async () => {
+  const { worker, item, calls } = harness('apply');
+  await worker.process(item);
+  const index = calls.findIndex(x => x[0] === 'evaluation');
+  assert.ok(index >= 0 && index < calls.findIndex(x => x[0] === 'draft'));
+  assert.equal(calls[index][1].selectionPolicyVersion, 2);
+  assert.deepEqual(calls[index][1].directionAssessment.dutiesQuotes, ['Build integrations for internal services.']);
+  assert.ok(calls.some(x => x[0] === 'submit'));
 });

@@ -43,6 +43,8 @@ async function fixture({ decision = 'apply', manual = false, modelOverride = nul
   const model = modelOverride || {
     async evaluate(input) { calls.evaluations.push(input); return { decision, directionMatched: true,
       reasonCode: decision === 'apply' ? 'DIRECTION_FIT' : 'INSUFFICIENT_FIT',
+      directionAssessment: { primaryOccupation: 'Developer', targetQuery: 'developer',
+        relationship: 'core', dutiesQuotes: ['Build integrations for internal services.'] },
       rationale: 'Fixture decision', usage: {cost:0.001}, requestId: 'fixture-evaluation' }; },
     async generate({messages}) { const data = JSON.parse(messages[1].content); calls.letters.push(data);
       return { text: JSON.stringify({ text: `Experience of ${data.selectedResume.resumeId}`, factIds: ['fact_1'] }), finishReason:'stop', usage:{cost:0.001} }; },
@@ -69,7 +71,7 @@ async function fixture({ decision = 'apply', manual = false, modelOverride = nul
     await profiles.replace({scope,expectedRevision:0,profile:{confirmed:true,facts:[{id:'fact_1',text:`Project of ${scope.userId}`,confirmed:true}],examples:[]}});
     await f.pool.query("INSERT INTO job_connections(user_id,resume_id,status) VALUES($1,$2,'connected')",[scope.userId,`resume${index}`]);
     const externalId = `700${index}`;
-    const snapshot={externalId,title:`Role ${index}`,company:'Fixture',description:'Related project experience welcome',
+    const snapshot={externalId,title:`Role ${index}`,company:'Fixture',description:'Build integrations for internal services.',
       url:`https://hh.ru/vacancy/${externalId}?tracking=fixture`,publishedAt:'2026-10-31T00:00:00Z',archived:false};
     snapshots.set(externalId,snapshot);
     const vacancy = await search.upsertVacancy({externalId,snapshot});
@@ -92,6 +94,9 @@ test('real PG: owner and member auto-apply with their complete own resume and st
     }
     await f.deliveryWorker.tick();assert.equal(f.calls.messages.length,0);
     assert.equal((await f.pool.query("SELECT count(*)::int n FROM job_applications WHERE status='sent'")).rows[0].n,2);
+    const judgments=(await f.pool.query('SELECT evaluation FROM job_automation_items')).rows;
+    assert.ok(judgments.every(x=>x.evaluation.selectionPolicyVersion===2));
+    assert.ok(judgments.every(x=>x.evaluation.directionAssessment.relationship==='core'));
     await f.service.setEnabled({scope:f.scopes[0],enabled:false,expectedRevision:1});
     await f.deliveryWorker.tick();assert.equal(f.calls.messages.length,0,'completed auto applications are not sent as cards after disabling');
     const search=await f.search.getSettings({userId:f.owner});
@@ -100,6 +105,24 @@ test('real PG: owner and member auto-apply with their complete own resume and st
     await f.deliveries.enqueue({userId:f.owner,vacancyId:vacancy.id});
     await f.deliveryWorker.tick();assert.equal(f.calls.messages.length,1,'new unprocessed cards resume after disabling');
     assert.equal(f.calls.messages[0].chatId,'101');
+  }finally{await f.close();}
+});
+
+test('real PG: incidental AI assessment skips both personal scopes without a letter or application',async()=>{
+  const f=await fixture({modelOverride:{async evaluate(){return {
+    decision:'apply',directionMatched:true,reasonCode:'DIRECTION_FIT',rationale:'AI as a daily tool',
+    directionAssessment:{primaryOccupation:'General developer',targetQuery:'developer',relationship:'tool_only',
+      dutiesQuotes:['Build integrations for internal services.']},usage:{cost:0.001},requestId:'fixture-evidence',
+  };},async generate(){throw Error('Incidental role must not generate a letter');}}});
+  try{
+    await f.worker.tick();await f.worker.tick();await f.deliveryWorker.tick();
+    const rows=(await f.pool.query('SELECT status,evaluation FROM job_automation_items ORDER BY user_id')).rows;
+    assert.equal(rows.length,2);
+    assert.ok(rows.every(x=>x.status==='skipped'&&x.evaluation.reasonCode==='OUT_OF_DIRECTION'));
+    assert.ok(rows.every(x=>x.evaluation.directionAssessment.relationship==='tool_only'&&x.evaluation.selectionPolicyVersion===2));
+    assert.equal((await f.pool.query('SELECT count(*)::int n FROM job_drafts')).rows[0].n,0);
+    assert.equal((await f.pool.query('SELECT count(*)::int n FROM job_applications')).rows[0].n,0);
+    assert.equal(f.calls.messages.length,0);
   }finally{await f.close();}
 });
 
@@ -202,7 +225,9 @@ test('real PG: GLM OpenRouter evaluation and letters share actual per-user cost 
     const data=JSON.parse(body.messages[1].content);
     return Response.json({id:`fixture-glm-${requests.length}`,model:JOB_MODEL,
       usage:{cost:evaluation?1.1:0.91},choices:[{finish_reason:'stop',message:{content:JSON.stringify(evaluation?
-        {decision:'apply',directionMatched:true,reasonCode:'DIRECTION_FIT',rationale:'Fixture direction'}
+        {decision:'apply',directionMatched:true,reasonCode:'DIRECTION_FIT',rationale:'Fixture direction',
+          directionAssessment:{primaryOccupation:'Developer',targetQuery:'developer',relationship:'core',
+            dutiesQuotes:['Build integrations for internal services.']}}
         :{status:'ready',text:`Experience of ${data.selectedResume.resumeId}`,factIds:['fact_1']})}}]});
   }});
   const f=await fixture({modelOverride:model});try{

@@ -2,8 +2,7 @@ const { trackWorker } = require('../lifecycle');
 const { assertJobScope, jobError } = require('./jobSchemas');
 const { evaluateVacancy } = require('./jobFilters');
 const { assertAutomaticLetterTruth } = require('./jobPrompt');
-const DECISION_REASONS = new Set(['DIRECTION_FIT', 'OUT_OF_DIRECTION', 'INSUFFICIENT_FIT',
-  'MANDATORY_REQUIREMENT', 'USER_CONSTRAINT', 'UNCERTAIN']);
+const { enforceVacancyDirection } = require('./jobVacancyPrompt');
 
 class JobAutomationWorker {
   constructor({ pool, repository, automationService, searchRepository, profileRepository,
@@ -108,17 +107,16 @@ class JobAutomationWorker {
       await this.usageRepository.record({ userId: scope.userId, requestId: item.evaluation_request_id,
         providerRequestId: evaluation?.requestId || null, costUsd: evaluation?.usage?.cost ?? null,
         costBasis: evaluation?.usage?.costBasis || 'provider', outcome: 'success' });
-      if (!evaluation || !['apply','skip'].includes(evaluation.decision)
-        || typeof evaluation.directionMatched !== 'boolean' || !DECISION_REASONS.has(evaluation.reasonCode)
-        || typeof evaluation.rationale !== 'string' || !evaluation.rationale.trim()
-        || evaluation.rationale.length > 240
-        || (evaluation.decision === 'apply') !== (evaluation.directionMatched
-          && evaluation.reasonCode === 'DIRECTION_FIT')
-        || (!evaluation.directionMatched && evaluation.reasonCode !== 'OUT_OF_DIRECTION'))
-        throw jobError('JOB_MODEL_INVALID_OUTPUT');
+      // Validate again at the worker boundary: an adapter cannot authorize a
+      // letter using an ungrounded label or an incidental AI-tool mention.
+      evaluation = enforceVacancyDirection({ decision: evaluation?.decision,
+        directionMatched: evaluation?.directionMatched, reasonCode: evaluation?.reasonCode,
+        rationale: evaluation?.rationale, directionAssessment: evaluation?.directionAssessment },
+      { vacancy: vacancy.snapshot, settings: settings.settings });
       await this.repository.saveEvaluation({ itemId: item.id, evaluation: {
         decision: evaluation.decision, directionMatched: evaluation.directionMatched,
         reasonCode: evaluation.reasonCode, rationale: evaluation.rationale, source: 'model', filterResult,
+        directionAssessment: evaluation.directionAssessment, selectionPolicyVersion: 2,
         revisions: { search: settings.revision, filter: vacancy.filter_revision,
           vacancy: vacancy.revision, profile: profile.revision,
           connection: resumeContext.connectionRevision, automation: item.automation_revision },

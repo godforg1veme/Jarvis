@@ -3,7 +3,8 @@ const assert = require('node:assert/strict');
 const { JobModelAdapter, JOB_MODEL, JOB_MODEL_PRICE_CAP, providerUsage } = require('../src/jobs/jobModelAdapter');
 const { createJobRuntime } = require('../src/jobs/jobRuntime');
 
-const input = { vacancy: { title:'Developer',description:'Related project experience welcome' },
+const input = { vacancy: { title:'Developer',description:'Build AI integrations and deploy retrieval systems.' },
+  settings: { queries: ['AI Engineer'] },
   profile: {confirmed:false,facts:[],examples:[]}, resumeContext:{resumeId:'fixture',snapshot:{resumeId:'fixture',
     title:'Developer',experience:'Own integration project',skills:'Node.js',education:'Engineering',summary:'Automation',grammaticalGender:'unknown'}} };
 const completion = (text, extra={}) => Response.json({id:'generation-fixture',model:JOB_MODEL,
@@ -33,15 +34,78 @@ test('GLM evaluation uses the same model/key and returns only the validated deci
   let body;
   const adapter=new JobModelAdapter({config:{openrouterApiKey:'fixture'},fetchImpl:async(url,init)=>{
     body=JSON.parse(init.body);return completion(JSON.stringify({ decision: 'apply',
-      directionMatched: true, reasonCode: 'DIRECTION_FIT', rationale: 'Fixture direction matches' }));}});
+      directionMatched: true, reasonCode: 'DIRECTION_FIT', rationale: 'Fixture direction matches',
+      directionAssessment: { primaryOccupation: 'AI integration developer', targetQuery: 'AI Engineer',
+        relationship: 'core', dutiesQuotes: ['Build AI integrations and deploy retrieval systems.'] } }));}});
   const result=await adapter.evaluate(input);
   assert.equal(body.model,JOB_MODEL);assert.equal(body.max_tokens,6000);
   assert.deepEqual(body.response_format.json_schema.schema.properties.decision.enum,['apply','skip']);
   assert.deepEqual(body.response_format.json_schema.schema.properties.reasonCode.enum,
     ['DIRECTION_FIT','OUT_OF_DIRECTION','INSUFFICIENT_FIT','MANDATORY_REQUIREMENT','USER_CONSTRAINT','UNCERTAIN']);
+  const responseProperties = body.response_format.json_schema.schema.properties;
+  assert.equal(responseProperties.rationale.maxLength, 240);
+  assert.equal(responseProperties.directionAssessment.properties.primaryOccupation.maxLength, 120);
+  assert.equal(responseProperties.directionAssessment.properties.targetQuery.maxLength, 200);
+  assert.equal(responseProperties.directionAssessment.properties.dutiesQuotes.maxItems, 3);
+  assert.equal(responseProperties.directionAssessment.properties.dutiesQuotes.items.maxLength, 240);
+  assert.deepEqual(responseProperties.directionAssessment.properties.dutiesQuotes.items.enum,
+    ['Build AI integrations and deploy retrieval systems.']);
+  assert.deepEqual(responseProperties.directionAssessment.properties.targetQuery.enum, ['AI Engineer', null]);
+  assert.deepEqual(body.response_format.json_schema.schema.properties.directionAssessment.properties.relationship.enum,
+    ['core','tool_only','adjacent','unclear']);
+  assert.deepEqual(body.response_format.json_schema.schema.required,
+    ['decision','directionMatched','reasonCode','rationale','directionAssessment']);
   assert.deepEqual(JSON.parse(body.messages[1].content).selectedResume,input.resumeContext.snapshot);
   assert.equal(result.decision,'apply');assert.equal(result.reasonCode,'DIRECTION_FIT');
+  assert.equal(result.directionAssessment.relationship,'core');
   assert.equal(result.usage.cost,0.001);
+});
+
+test('concurrent evaluations keep user queries and vacancy evidence isolated', async () => {
+  const formats = [];
+  const adapter = new JobModelAdapter({ config: { openrouterApiKey: 'fixture' }, fetchImpl: async (url, init) => {
+    formats.push(JSON.parse(init.body).response_format.json_schema.schema.properties.directionAssessment.properties);
+    return completion(JSON.stringify({ decision: 'skip', directionMatched: false,
+      reasonCode: 'OUT_OF_DIRECTION', rationale: 'Other occupation', directionAssessment: {
+        primaryOccupation: 'Other occupation', targetQuery: null,
+        relationship: 'tool_only', dutiesQuotes: [] } }));
+  } });
+  await Promise.all([
+    adapter.evaluate(input),
+    adapter.evaluate({ ...input, vacancy: { title: 'Support', description: 'Maintain LDAP and Linux systems.' },
+      settings: { queries: ['LLM Trainer'] } }),
+  ]);
+  assert.deepEqual(formats.map(f => f.targetQuery.enum), [['AI Engineer', null], ['LLM Trainer', null]]);
+  assert.deepEqual(formats.map(f => f.dutiesQuotes.items.enum), [
+    ['Build AI integrations and deploy retrieval systems.'], ['Maintain LDAP and Linux systems.'],
+  ]);
+});
+
+test('a real core duty after the bounded candidate list can still authorize the decision', async () => {
+  const duty = 'Build and deploy RAG agents as the main job.';
+  const description = Array.from({ length: 96 }, (_, i) => `Company policy entry ${i} applies.`).join('\n')
+    + `\n${duty}`;
+  let body, calls = 0;
+  const adapter = new JobModelAdapter({ config: { openrouterApiKey: 'fixture' }, fetchImpl: async (url, init) => {
+    calls++; body = JSON.parse(init.body);
+    return completion(JSON.stringify({ decision: 'apply', directionMatched: true, reasonCode: 'DIRECTION_FIT',
+      rationale: 'The primary duty is after the company introduction.', directionAssessment: {
+        primaryOccupation: 'AI Engineer', targetQuery: 'AI Engineer', relationship: 'core', dutiesQuotes: [duty],
+      } }));
+  } });
+  const result = await adapter.evaluate({ ...input, vacancy: { title: 'Engineer', description } });
+  const context = JSON.parse(body.messages[1].content);
+  assert.equal(context.dutyEvidenceComplete, false);
+  assert.equal(context.dutyEvidence.length, 96);
+  assert.equal(context.dutyEvidence.includes(duty), true, 'the late duty is retained in the full-description sample');
+  assert.equal(context.dutyEvidence.includes('Company policy entry 0 applies.'), true);
+  assert.equal(context.vacancy.description, description);
+  const quoteSchema = body.response_format.json_schema.schema.properties.directionAssessment.properties.dutiesQuotes;
+  assert.equal(quoteSchema.items.enum, undefined);
+  assert.equal(quoteSchema.items.minLength, 10);
+  assert.equal(result.decision, 'apply');
+  assert.deepEqual(result.directionAssessment.dutiesQuotes, [duty]);
+  assert.equal(calls, 1);
 });
 
 test('missing cost stays unknown while zero cost remains a provider receipt',()=>{

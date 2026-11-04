@@ -1,7 +1,7 @@
 const { jobError } = require('./jobSchemas');
 const { JOB_LETTER_RESPONSE_FORMAT } = require('./jobPrompt');
 const { readBoundedJson } = require('./boundedHttp');
-const { buildVacancyPrompt, parseVacancyDecision } = require('./jobVacancyPrompt');
+const { buildVacancyPrompt, parseVacancyDecision, buildDutyEvidenceContext } = require('./jobVacancyPrompt');
 
 const JOB_MODEL = 'z-ai/glm-5.3-flash';
 const JOB_MODEL_PRICE_CAP = Object.freeze({ prompt: 0.15, completion: 0.5, request: 0 });
@@ -11,9 +11,29 @@ const DECISION_FORMAT = Object.freeze({ type: 'json_schema', json_schema: {
       directionMatched: { type: 'boolean' },
       reasonCode: { type: 'string', enum: ['DIRECTION_FIT','OUT_OF_DIRECTION','INSUFFICIENT_FIT',
         'MANDATORY_REQUIREMENT','USER_CONSTRAINT','UNCERTAIN'] },
-      rationale: { type: 'string' } },
-    required: ['decision','directionMatched','reasonCode','rationale'], additionalProperties: false },
+      rationale: { type: 'string', minLength: 1, maxLength: 240 },
+      directionAssessment: { type: 'object', properties: {
+        primaryOccupation: { type: 'string', minLength: 1, maxLength: 120 },
+        targetQuery: { type: ['string','null'], maxLength: 200 },
+        relationship: { type: 'string', enum: ['core','tool_only','adjacent','unclear'] },
+        dutiesQuotes: { type: 'array', maxItems: 3, items: { type: 'string', maxLength: 240 } },
+      }, required: ['primaryOccupation','targetQuery','relationship','dutiesQuotes'], additionalProperties: false },
+    },
+    required: ['decision','directionMatched','reasonCode','rationale','directionAssessment'], additionalProperties: false },
 } });
+function decisionFormatFor(input) {
+  const schema = structuredClone(DECISION_FORMAT);
+  const assessment = schema.json_schema.schema.properties.directionAssessment.properties;
+  const { dutyEvidence: quotes, dutyEvidenceComplete } = buildDutyEvidenceContext(input?.vacancy?.description);
+  assessment.dutiesQuotes.items = quotes.length && dutyEvidenceComplete
+    ? { type: 'string', enum: quotes, maxLength: 240 }
+    : { type: 'string', minLength: 10, maxLength: 240 };
+  if (!quotes.length && dutyEvidenceComplete) assessment.dutiesQuotes.maxItems = 0;
+  const queries = Array.isArray(input?.settings?.queries)
+    ? input.settings.queries.filter(q => typeof q === 'string' && q.length <= 200).slice(0, 100) : [];
+  assessment.targetQuery.enum = [...new Set([...queries, null])];
+  return schema;
+}
 
 function providerUsage(value) {
   const cost = Number.isFinite(value?.cost) && value.cost >= 0 ? value.cost : null;
@@ -59,8 +79,9 @@ class JobModelAdapter {
   async evaluate(input) {
     // The cap includes GLM's required reasoning, even when it is excluded from
     // visible output. A 1024-token allowance can end before the decision JSON.
-    const result = await this.generate({ messages: buildVacancyPrompt(input), maxTokens: 6000, responseFormat: DECISION_FORMAT });
-    try { return { ...parseVacancyDecision(result.text, result.finishReason), usage: result.usage, requestId: result.requestId }; }
+    const result = await this.generate({ messages: buildVacancyPrompt(input), maxTokens: 6000,
+      responseFormat: decisionFormatFor(input) });
+    try { return { ...parseVacancyDecision(result.text, result.finishReason, input), usage: result.usage, requestId: result.requestId }; }
     catch (error) { throw Object.assign(error, { modelUsage: result.usage, modelRequestId: result.requestId }); }
   }
 }
