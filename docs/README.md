@@ -4,13 +4,14 @@
 
 ## Русский
 
-[Следующий ремонт HH установлен на DE](updates/2026-11-04-hh-form-receipt-release.md),
-код `853d4cf`: нативные вопросы на обычном адресе, раннее чтение квитанции,
-учёт отмены. Проверено: server 941, PG 20/20, Linux/Chromium 134/134.
-За окно 21:02:33–21:12:33 МСК — один новый отклик, позднее подтверждённый
-читающей сверкой без повтора, 30 пропусков; off восстановлен. Первичная квитанция
-по-прежнему дала BODY_FAILED. При проверке 5 ноября browser healthy, но один
-перезапуск после окна не объяснён. Шесть старых unknown требуют ручной проверки.
+5 ноября [исправлены транспорт квитанции и утечка маршрутов WebSocket](updates/2026-11-05-hh-transport-memory.md),
+код `168d823` установлен на DE; source Windows/DE/NL синхронизирован.
+30-минутный изолированный soak: 8 218 циклов, 0 удержанных WebSocketRoute.
+30 минут на рабочем аккаунте: 4 новых отклика подтверждены первичными
+квитанциями, 0 новых unknown/повторов/перезапусков/OOM. Личный off восстановлен.
+Две анкеты/письма требуют данных кандидата; отмена при выключении корректно
+завершилась без создания операции. Проверено: server 941, PG/RPC 21/21,
+Linux/Chromium 143/143 и два runtime acceptance.
 
 4 ноября [общий ремонт восстановления автооткликов установлен на DE](updates/2026-11-04-hh-autonomy-recovery-release.md):
 server/browser/collector `bdf416e`, миграция 058; source Windows/DE/NL совпадает.
@@ -226,14 +227,15 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 
 ## English
 
-[The next HH repair is deployed on DE](updates/2026-11-04-hh-form-receipt-release.md),
-code `853d4cf`: native questions on the ordinary path, early receipt reading
-and cancellation accounting. Verified: server 941, PG 20/20, Linux/Chromium 134/134.
-The 21:02:33–21:12:33 MSK window produced one new application later verified
-read-only without resending, plus 30 skips; off was restored. Initial receipt
-reading still returned BODY_FAILED. November 5 inspection found browser healthy,
-but one restart after the window remains unexplained. Six old unknown operations
-require manual review.
+November 5: [receipt transport and WebSocket route retention are fixed](updates/2026-11-05-hh-transport-memory.md),
+code `168d823` is deployed on DE; Windows/DE/NL sources are synchronized.
+The 30-minute isolated soak completed 8,218 cycles with zero retained
+WebSocketRoute objects. Thirty minutes on the live account verified four new
+applications through primary receipts, with no new unknown results, repeats,
+restarts or OOM. Personal off was restored. Two questionnaires/letters need
+applicant information; cancellation at disablement correctly created no operation.
+Verified: server 941, PG/RPC 21/21, Linux/Chromium 143/143 and two runtime
+acceptance checks.
 
 November 4: [shared automatic-application recovery is deployed on DE](updates/2026-11-04-hh-autonomy-recovery-release.md):
 server/browser/collector `bdf416e`, migration 058; Windows/DE/NL sources match.

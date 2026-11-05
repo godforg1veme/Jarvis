@@ -1,5 +1,24 @@
 # Проверки перед выпуском
 
+## HH: транспорт и память / Transport and memory (5 November)
+
+[Выпуск 168d823](updates/2026-11-05-hh-transport-memory.md): server 941 passed,
+2 DB-only skips; PG/RPC 21/21, Linux/Chromium 143/143, runtime startup/fatal
+2/2, установленный образ 9/9. Контроль context-only сохраняет 100 WS routes;
+30-минутный page-scoped soak: 8 218 циклов, 0 удержанных WS routes, 45 MiB
+heap после GC. Живые 30 минут: 4 sent с первичной квитанцией и нулём сверок,
+0 новых unknown/повторов/restarts/OOM; off восстановлен. Отмена на границе
+выключения проверена вживую. Успешная новая живая нативная анкета не проверена.
+
+[Rollout 168d823](updates/2026-11-05-hh-transport-memory.md): server 941 passed,
+two DB-only skips; PG/RPC 21/21, Linux/Chromium 143/143, runtime startup/fatal
+2/2 and installed image 9/9. The context-only control retains 100 WS routes;
+the 30-minute page-scoped soak completed 8,218 cycles with zero retained routes
+and 45 MiB heap after GC. Thirty live minutes produced four sent applications
+with primary receipts and zero reconciliation reads; no new unknown results,
+repeats, restarts or OOM. Off was restored; cancellation at disablement was
+verified live. A new successful live native questionnaire remains unverified.
+
 ## HH: форма и первичная квитанция / Form and primary receipt
 
 [Выпуск 853d4cf](updates/2026-11-04-hh-form-receipt-release.md): server 941 passed,

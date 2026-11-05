@@ -4,6 +4,8 @@
 
 ## Русский
 
+Более новый результат: [транспорт и память исправлены 5 ноября](2026-11-05-hh-transport-memory.md). Наблюдение ниже сохранено как история.
+
 ### Установка
 
 По поручению владельца опубликован `853d4cfb2111500244f4f101422db5a5ee736079`.
@@ -63,6 +65,8 @@ server/collector restart count 0. Browser restart count 1, StartedAt
 браузера после выпуска. Автопоиск остаётся off; новое тестовое окно не запускалось.
 
 ## English
+
+Newer result: [transport and memory repaired November 5](2026-11-05-hh-transport-memory.md). The observation below is preserved as history.
 
 ### Installation
 
