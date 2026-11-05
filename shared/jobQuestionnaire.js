@@ -12,7 +12,7 @@ const STOP_REASONS = new Set(['JOB_HH_QUESTIONS_REQUIRED', 'JOB_HH_TEST_REQUIRED
   'JOB_HH_LETTER_CHANGED', 'JOB_HH_NOT_FOUND', 'JOB_HH_PREPARATION_FAILED']);
 const UNKNOWN_RESULT_REASONS = new Set(['JOB_HH_RECEIPT_TIMEOUT', 'JOB_HH_RECEIPT_HTTP',
   'JOB_HH_RECEIPT_FORMAT', 'JOB_HH_RECEIPT_SCHEMA', 'JOB_HH_RECEIPT_READ_FAILED',
-  'JOB_HH_RECEIPT_BODY_FAILED', 'JOB_HH_RECEIPT_META_FAILED']);
+  'JOB_HH_RECEIPT_BODY_FAILED', 'JOB_HH_RECEIPT_META_FAILED', 'JOB_HH_RECEIPT_TRANSPORT_FAILED']);
 const fail = (code) => Object.assign(new Error(code), { code });
 const exact = (value, keys) => value && typeof value === 'object' && !Array.isArray(value)
   && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));

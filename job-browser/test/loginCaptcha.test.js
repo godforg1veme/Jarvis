@@ -12,6 +12,7 @@ function makeHarness() {
     mouse: { async move() {}, async click() {}, async down() {}, async up() {}, async wheel() {} },
     keyboard: { async insertText() {}, async press() {}, async down() {}, async up() {} },
     setViewportSize() {}, setDefaultTimeout() {}, on() {},
+    async routeWebSocket() {},
     async route(_pattern, handler) { handlers.push(handler); },
     async goto(url) { page.currentUrl = url; },
     url() { return page.currentUrl; },

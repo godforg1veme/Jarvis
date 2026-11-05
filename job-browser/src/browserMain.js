@@ -22,6 +22,7 @@ const { CaptchaAttemptStore } = require('./captchaAttemptStore');
 const { ProfileManager } = require('./profileManager');
 const { ResumeRaiseLedger } = require('./resumeRaiseLedger');
 const { raiseResume } = require('./resumeRaise');
+const { startMemoryDiagnostics } = require('./runtimeMemoryDiagnostics');
 
 async function handoverCaptcha({ journal, manual, ownerId, target, error, now = Date.now }) {
   let state = await journal.read();
@@ -141,7 +142,7 @@ async function startBrowser(env = process.env, { onFatal = () => {} } = {}) {
   if (automaticEnabled && !manualEnabled) throw new Error('JOB_CAPTCHA_CONFIG_INVALID');
   if (manualEnabled && (!/^[\x21-\x7e]{32,256}$/.test(manualToken || '') || manualToken === token || manualToken === applyToken)) throw new Error('JOB_MANUAL_CONFIG_INVALID');
   if (!manualEnabled) await assertInactiveWhenDisabled({ root: `${root}/manual-recovery`, ownerId });
-  let context, server, manual, manualPage, broker, health, evidenceTimer, profiles;
+  let context, server, manual, manualPage, broker, health, evidenceTimer, profiles, stopMemoryDiagnostics;
   try {
     context = await chromium.launchPersistentContext(root, { headless: true, chromiumSandbox: true,
       acceptDownloads: false, serviceWorkers: 'block', locale: 'ru-RU' });
@@ -215,14 +216,17 @@ async function startBrowser(env = process.env, { onFatal = () => {} } = {}) {
       await new Promise((resolve, reject) => { broker.once('error', reject); broker.listen(8082, '0.0.0.0', resolve); });
     }
     health.start();
+    stopMemoryDiagnostics = startMemoryDiagnostics({ browsers: () => [browser,
+      ...[...profiles.members.values()].map(item => item.runtime.browser)] });
     return { async close() {
+      stopMemoryDiagnostics();
       clearInterval(evidenceTimer);
       health.close();
       broker?.closeAllConnections();
       if (broker) await new Promise((resolve) => broker.close(resolve));
       await new Promise((resolve) => server.close(resolve)); await profiles?.close(); await browser.tail; await manualPage?.close(); await context.close();
     } };
-  } catch (error) { clearInterval(evidenceTimer); health?.close(); server?.close(); broker?.close(); await profiles?.close().catch(() => {}); await manualPage?.close(); await context?.close(); throw error; }
+  } catch (error) { stopMemoryDiagnostics?.(); clearInterval(evidenceTimer); health?.close(); server?.close(); broker?.close(); await profiles?.close().catch(() => {}); await manualPage?.close(); await context?.close(); throw error; }
 }
 
 if (require.main === module) {

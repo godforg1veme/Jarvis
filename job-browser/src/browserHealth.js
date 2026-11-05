@@ -1,3 +1,5 @@
+const { newGuardedPage } = require('./webSocketGuard');
+
 function bounded(work, timeoutMs) {
   let timer;
   return Promise.race([
@@ -21,7 +23,7 @@ class BrowserHealth {
     if (this.inFlight) return this.inFlight;
     this.inFlight = bounded(async () => {
       // A dedicated blank page cannot race HH navigation or execute HH scripts.
-      const page = await this.context.newPage();
+      const page = await newGuardedPage(this.context);
       try { return await page.evaluate(() => 1) === 1; }
       finally { await page.close(); }
     }, this.timeoutMs).catch(() => false).then(ok => {

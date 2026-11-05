@@ -9,6 +9,7 @@ const { HhBrowser } = require('../src/hhBrowser');
 function fixture() {
   const context = new EventEmitter(), page = new EventEmitter(); let probes = 0, closes = 0;
   page.isClosed = () => false; page.evaluate = async () => { probes++; return 1; };
+  page.routeWebSocket = async () => {};
   page.close = async () => { closes++; };
   context.pages = () => [page]; context.newPage = async () => page;
   return { context, page, counts: () => ({ probes, closes }) };
@@ -35,7 +36,7 @@ test('hung renderer has a bounded probe and fails closed without exposing its er
 test('crashed page is never probed or reused for browser health', async () => {
   const f = fixture(), health = new BrowserHealth({ context: f.context });
   f.page.emit('crash'); let freshClosed = false;
-  f.context.newPage = async () => ({ evaluate: async () => 1, close: async () => { freshClosed = true; } });
+  f.context.newPage = async () => ({ routeWebSocket: async () => {}, evaluate: async () => 1, close: async () => { freshClosed = true; } });
   assert.equal(await health.check(), true); assert.equal(f.counts().probes, 0); assert.equal(freshClosed, true); health.close();
 });
 test('authenticated HTTP health returns 503 for an unusable browser and hides exceptions', async () => {

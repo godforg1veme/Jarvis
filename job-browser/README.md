@@ -59,9 +59,14 @@ supports complete bound HH state and rejects partial legacy snapshots in auto mo
 Изолированный пакет для замены недоступного API соискателя. Реализованы чтение
 поиска, вакансий, собственных резюме и безопасная проверка формы. Сборщик
 подключён через приватный RPC. Подтверждённая отправка и read-only восстановление
-подключены и выпущены на DE; настоящий новый отклик ещё не проверялся.
-[Результат выпуска](../docs/updates/2026-10-15-job-search-release.md).
+подключены и выпущены на DE; новые обычные отклики подтверждены в живых
+проверках 4 ноября. [Результат последней проверки](../docs/updates/2026-11-04-hh-form-receipt-release.md).
 Playwright/Chromium согласованы владельцем 15 октября 2026.
+
+The private RPC supports job/resume reading, guarded submission and read-only
+recovery. New ordinary applications were verified in live checks on November 4;
+see the [latest observation](../docs/updates/2026-11-04-hh-form-receipt-release.md).
+Playwright/Chromium were approved by the owner on October 15, 2026.
 
 ## Восстановление после CAPTCHA
 
@@ -264,6 +269,19 @@ crash/expiry требует явного refresh, ответ и claims не пе
 вкладок, рост памяти и доступный бюджет хоста. Разовый перезапуск не заменяет
 исправление восстановления. [Результат выпуска](../docs/updates/2026-10-16-hh-captcha-resilience-release.md).
 
+Рабочие страницы создаются через `newGuardedPage`: до навигации устанавливается
+page-scoped запрет WebSocket. Контекстный запрет остаётся защитой для остальных
+окон. Это позволяет Playwright освобождать маршруты вместе со страницей;
+контекстные WebSocketRoute иначе могут накапливаться в постоянном профиле.
+`JOB_BROWSER_MEMORY` раз в пять минут выводит только округлённые числовые
+показатели памяти, страниц, очереди и объектов Playwright, без содержимого HH.
+
+Managed pages use `newGuardedPage` to install a page-scoped WebSocket block
+before navigation; the context block remains a backstop for other windows.
+Page-scoped routes are released with their page instead of accumulating in
+the persistent context. Every five minutes, `JOB_BROWSER_MEMORY` emits only
+rounded memory/page/queue/Playwright counts, without HH content.
+
 `JARVIS_JOB_BROWSER_PROFILE_VOLUME` указывает на уже существующий volume
 ручного входа. До выпуска нужно сопоставить owner UUID с реальным владельцем
 Jarvis и выбрать этот volume в закрытом окружении DE. Сессия остаётся на месте.
@@ -294,7 +312,18 @@ DOM дают ошибку с сохранением прогресса, а не 
 В Windows допускается `PLAYWRIGHT_CHANNEL=msedge`; это отдельное свидетельство
 интеграции, а pinned Chromium DE проверяется приведёнными выше acceptance.
 
-## Журнал и подготовка отправки — ещё без live submit
+## Журнал и подтверждение отправки
+
+Единственный проверенный запрос отправляется через `route.fetch` с нулём
+редиректов и повторов. Проверка квитанции читает исходный APIResponse,
+освобождаемый в `finally`; синтетический 204 браузеру не доказывает отправку.
+При потере ответа сохраняется исходный claim и выполняется только читающая
+сверка. Нового POST для неопределённой операции быть не должно.
+
+The single validated request uses `route.fetch` with zero redirects/retries.
+Receipt verification reads the original APIResponse, disposed in `finally`;
+the synthetic browser-facing 204 is not proof. Lost responses retain the
+original claim and permit only read-only reconciliation, never another POST.
 
 `ApplicationLedger` работает на Linux с приватным каталогом 0700 и файлами
 0600. Операция, пара owner/vacancy/resume и хеш точного письма публикуются

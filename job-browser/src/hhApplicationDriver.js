@@ -5,6 +5,7 @@ const { readResumePrivacy, readEmployerId, evaluatePrivacy } = require('./hhPriv
 const { prepareApplicationPage } = require('./hhApplication');
 const { validateSubmissionRequest } = require('./submissionProtocol');
 const { captureSubmissionReceipt } = require('./submissionReceipt');
+const { dispatchApplication } = require('./applicationDispatch');
 const { readApplicationReference, verifyChatLetter } = require('./applicationProof');
 const { verifyChatData } = require('./chatApplicationProof');
 const {visibleAppliedAction}=require('./existingApplication');
@@ -15,7 +16,7 @@ const manual = (reasonCode = 'JOB_HH_FORM_CHANGED') => ({ outcome: 'manual_requi
   reasonCode: STOP_REASONS.has(reasonCode) ? reasonCode : 'JOB_HH_FORM_CHANGED' });
 
 class HhApplicationDriver {
-  constructor({ browser, dispatch = (route) => route.continue(), responseTimeoutMs = 25000 }) {
+  constructor({ browser, dispatch = dispatchApplication, responseTimeoutMs = 25000 }) {
     if (typeof dispatch !== 'function' || !Number.isInteger(responseTimeoutMs) || responseTimeoutMs < 250 || responseTimeoutMs > 30000) throw new Error('JOB_BROWSER_CONFIG_INVALID');
     this.browser = browser; this.dispatch = dispatch; this.responseTimeoutMs = responseTimeoutMs;
   }
@@ -71,6 +72,8 @@ class HhApplicationDriver {
     let approvedRequest = null, permitted = 0, armed = false, blockedMutation = false;
     let sawRequest;
     const requestSeen = new Promise((resolve) => { sawRequest = resolve; });
+    let dispatched;
+    const dispatchResult = new Promise(resolve => { dispatched = resolve; });
     const guard = async (route) => {
       const request = route.request();
       if (['GET', 'HEAD', 'OPTIONS'].includes(request.method())) return allowedRequest(request.url()) ? route.fallback() : route.abort();
@@ -80,9 +83,12 @@ class HhApplicationDriver {
         }, { ...input, nativeStartTime: prepared.nativeStartTime })) { if (!['GET','HEAD','OPTIONS'].includes(request.method())) blockedMutation = true; return route.abort(); }
         permitted++; approvedRequest = request;
         sawRequest();
-        // A page-level continue bypasses the context's read-only fallback for this exact request only.
-        return this.dispatch(route);
-      } catch { return route.abort().catch(() => {}); }
+        const result = await this.dispatch(route, { ...input, nativeStartTime: prepared.nativeStartTime });
+        dispatched(result);
+      } catch {
+        dispatched(unknown('JOB_HH_RECEIPT_TRANSPORT_FAILED'));
+        return route.abort().catch(() => {});
+      }
     };
     await prepared.releaseReadGuard();
     await prepared.releaseNavigationGuard();
@@ -95,7 +101,8 @@ class HhApplicationDriver {
       if (!permitted) await Promise.race([requestSeen, page.waitForTimeout(3000)]);
       armed = false;
       if (!permitted) return manual(blockedMutation ? 'JOB_HH_SUBMISSION_BLOCKED' : 'JOB_HH_FORM_CHANGED');
-      return await receipt;
+      const result = await dispatchResult;
+      return result?.outcome ? result : await receipt;
     } catch { return unknown('JOB_HH_RECEIPT_READ_FAILED'); }
     finally { armed = false; await page.unroute('**/*', guard).catch(() => {}); }
   }

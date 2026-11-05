@@ -15,7 +15,7 @@ test('private runtime starts with Chromium sandbox, authenticates health and ref
     assert.equal((await fetch('http://127.0.0.1:8080/health')).status, 401);
     const foreign = await fetch('http://127.0.0.1:8080/rpc', { method: 'POST', headers: {
       authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ userId: randomUUID(), operation: 'resumes', args: {} }) });
+    body: JSON.stringify({ userId: 'invalid-user', operation: 'resumes', args: {} }) });
     assert.equal(foreign.status, 403);
   } finally { await runtime.close(); }
   const applyToken = randomBytes(32).toString('hex');

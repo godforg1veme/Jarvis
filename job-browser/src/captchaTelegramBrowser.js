@@ -1,4 +1,5 @@
 const { randomUUID, createHash } = require('node:crypto');
+const { newGuardedPage } = require('./webSocketGuard');
 const { validInit, validAnswerRequest, readForm, sameForm, validPictureKey } = require('./captchaProtocol');
 const { normalizeAnswer } = require('./captchaTelegramProtocol');
 const { readSearchPage, readVacancyPage, readResumes } = require('./hhPageReader');
@@ -33,7 +34,7 @@ class CaptchaTelegramBrowser {
     const old = this.page; this.page = null;
     try {
       if (old) await bounded(() => old.close(), this.closeTimeoutMs);
-      this.page = await bounded(() => this.context.newPage(), 5000);
+      this.page = await bounded(() => newGuardedPage(this.context), 5000);
     } catch (error) { this.onUnhealthy(); throw error; }
     const page = this.page; page.once('crash', () => this.crashed.add(page));
     this.openedAt = this.now();
@@ -243,7 +244,7 @@ class CaptchaTelegramBrowser {
     this.verificationReason = 'navigation_failed'; this.verificationStatus = null;
     await this.drain(); this.armed = null; this.initAllowed = false;
     if (!validTarget(target)) return false;
-    const reader = await this.context.newPage();
+    const reader = await newGuardedPage(this.context);
     try {
       const response = await reader.goto(target, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await reader.waitForTimeout(1500);

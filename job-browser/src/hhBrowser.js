@@ -12,6 +12,7 @@ const { readLoginInputFields } = require('./loginInputFields');
 const { handleLoginCaptcha } = require('./loginCaptcha');
 const {readExistingApplication,visibleAppliedAction}=require('./existingApplication');
 const { hhDate } = require('./hhSearchDates');
+const { newGuardedPage } = require('./webSocketGuard');
 const failure = (code) => Object.assign(new Error(code), { code });
 const CAPABILITIES = Object.freeze({ dateWindows: true, dateWindowGranularity: 'moscow_day', maxPages: 1000 });
 
@@ -71,7 +72,7 @@ class HhBrowser {
     return this.run(async () => {
       if (this.loginSessionId === sessionId && ['waiting','captcha','authenticated'].includes(this.loginState)) return { ok: true };
       if (this.loginPage && !this.loginPage.isClosed()) throw failure('JOB_BROWSER_BUSY');
-      const page = await this.context.newPage();
+      const page = await newGuardedPage(this.context);
       this.loginPage = page; this.loginSessionId = sessionId; this.loginState = 'waiting';
       this.loginResumes = []; this.loginExpiresAt = Date.now() + 600000; this.loginNextSequence = 1; this.loginGestureAt = 0;
       clearTimeout(this.loginExpiryTimer);
@@ -225,7 +226,7 @@ class HhBrowser {
   }
   async open(url, expected) {
     this.manualCoordinator?.assertAutomatic();
-    const page = await this.context.newPage(); page.setDefaultTimeout(10000);
+    const page = await newGuardedPage(this.context); page.setDefaultTimeout(10000);
     let attempt = null;
     try {
       attempt = this.captchaRecovery && ['search', 'vacancy'].includes(expected)

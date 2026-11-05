@@ -6,7 +6,7 @@ const target = 'https://hh.ru/vacancy/123';
 function fixture() {
   let opened = 0, closed = 0;
   const old = new EventEmitter(); old.isClosed = () => false; old.close = async () => { closed++; };
-  const fresh = new EventEmitter(); fresh.isClosed = () => false; fresh.goto = async () => { opened++; }; fresh.close = async () => {};
+  const fresh = new EventEmitter(); fresh.isClosed = () => false; fresh.goto = async () => { opened++; }; fresh.close = async () => {}; fresh.routeWebSocket = async () => {};
   const coordinator = { status: () => ({ phase: 'active', revision: 4 }) };
   const ctrl = new CaptchaTelegramBrowser({ context: { newPage: async () => fresh }, coordinator, now: () => 1000 });
   ctrl.page = old; return { ctrl, old, fresh, counts: () => ({ opened, closed }) };
