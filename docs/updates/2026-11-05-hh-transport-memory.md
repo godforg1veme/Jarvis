@@ -4,6 +4,8 @@
 
 ## Русский
 
+Более новый результат: [повторное расследование](2026-11-05-hh-runtime-reopened.md). После этого окна обнаружены ещё четыре heap OOM; вывод о полном исправлении памяти отозван. Результат окна ниже сохраняется как история.
+
 ### Причины и ремонт
 
 Предыдущий живой тест локализовал сбой первичной квитанции в Chromium
@@ -94,6 +96,8 @@ WebSocketRoute=0 во всех выборках. В последней выбо�
 удалён, новые автоматизации/таймеры обслуживания не устанавливались.
 
 ## English
+
+Newer result: [reopened investigation](2026-11-05-hh-runtime-reopened.md). Four later heap OOM crashes invalidate the conclusion that memory was fully repaired. The observation below is preserved as history.
 
 ### Causes and repair
 

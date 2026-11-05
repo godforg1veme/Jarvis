@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { captureSubmissionReceipt } = require('../src/submissionReceipt');
+const { captureSubmissionReceipt, readSubmissionReceipt } = require('../src/submissionReceipt');
 
 const input = { resumeId: 'fixtureResume', externalId: '123' };
 const receipt = JSON.stringify({ topic_id: 444, chat_id: 555, responseStatus: {
@@ -37,4 +37,20 @@ test('receipt failures remain unknown with closed metadata, body and format reas
     { outcome: 'unknown', reasonCode: 'JOB_HH_RECEIPT_FORMAT' });
   assert.deepEqual(await get({ ...base, body: async () => Buffer.alloc(1048577) }),
     { outcome: 'unknown', reasonCode: 'JOB_HH_RECEIPT_FORMAT' });
+});
+
+test('HTTP failure categories expose no response text or redirect location and never establish success', async () => {
+  for(const [status,headers,body,code] of [
+    [302,{location:'/account/captcha?state=private-marker'},'', 'CAPTCHA'],
+    [307,{location:'https://other.invalid/account/captcha?private-marker'},'', 'REDIRECT'],
+    [302,{location:'/account/login?private-marker'},'', 'AUTH_REQUIRED'],
+    [401,{},'', 'AUTH_REQUIRED'],[403,{},'', 'FORBIDDEN'],[429,{},'', 'RATE_LIMITED'],
+    [503,{},'', 'SERVER_ERROR'],[422,{},'', 'CLIENT_ERROR'],
+    [403,{'content-type':'text/plain'},'XSRF cookie does not match POST body','XSRF_REJECTED'],
+  ]) {
+    if(body)headers['content-length']=String(Buffer.byteLength(body));
+    const result=await readSubmissionReceipt({status:()=>status,headers:()=>headers,body:async()=>Buffer.from(body)},input);
+    assert.deepEqual(result,{outcome:'unknown',reasonCode:`JOB_HH_RECEIPT_${code}`});
+    assert.equal(JSON.stringify(result).includes('private-marker'),false);
+  }
 });

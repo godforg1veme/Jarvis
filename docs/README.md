@@ -4,6 +4,13 @@
 
 ## Русский
 
+5 ноября [расследование памяти и отказов HH открыто повторно](updates/2026-11-05-hh-runtime-reopened.md):
+после успешного короткого окна browser ещё четыре раза завершился с heap OOM.
+WebSocket retention исправлен, второй источник роста пока неизвестен. Отклик VK
+138448900 не подтверждён; повтор запрещён. Диагностический candidate добавляет
+закрытые HTTP-категории и server-side счётчики Playwright. Автопоиск off.
+
+
 5 ноября [исправлены транспорт квитанции и утечка маршрутов WebSocket](updates/2026-11-05-hh-transport-memory.md),
 код `168d823` установлен на DE; source Windows/DE/NL синхронизирован.
 30-минутный изолированный soak: 8 218 циклов, 0 удержанных WebSocketRoute.
@@ -226,6 +233,14 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 Архивы не заменяют действующие правила и новую проверку окружения.
 
 ## English
+
+November 5: [memory and HH refusal investigation is reopened](updates/2026-11-05-hh-runtime-reopened.md).
+After the successful short window the browser crashed four more times with
+heap OOM. WebSocket retention is fixed; the second growth source remains unknown.
+VK application 138448900 is unconfirmed and cannot be resent. The diagnostic
+candidate adds closed HTTP categories and server-side Playwright counters.
+Automation is off.
+
 
 November 5: [receipt transport and WebSocket route retention are fixed](updates/2026-11-05-hh-transport-memory.md),
 code `168d823` is deployed on DE; Windows/DE/NL sources are synchronized.

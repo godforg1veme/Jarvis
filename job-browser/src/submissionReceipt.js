@@ -1,12 +1,40 @@
 const { normalizeSubmissionReceipt } = require('./submissionProtocol');
+const { inspectResponseError } = require('./captchaResponse');
 
 const unknown = (reasonCode) => ({ outcome: 'unknown', reasonCode });
+
+async function httpFailure(response, status, headers) {
+  if ([301,302,303,307,308].includes(status)) {
+    try {
+      const u = new URL(headers.location, 'https://hh.ru');
+      if (typeof headers.location === 'string' && headers.location.length <= 8192
+        && u.origin === 'https://hh.ru' && !u.username && !u.password) {
+        if (['/account/captcha','/captcha'].includes(u.pathname)) return unknown('JOB_HH_RECEIPT_CAPTCHA');
+        if (u.pathname === '/account/login') return unknown('JOB_HH_RECEIPT_AUTH_REQUIRED');
+      }
+    } catch {}
+    return unknown('JOB_HH_RECEIPT_REDIRECT');
+  }
+  if (status === 401) return unknown('JOB_HH_RECEIPT_AUTH_REQUIRED');
+  if (status === 429) return unknown('JOB_HH_RECEIPT_RATE_LIMITED');
+  if ([400,403,422].includes(status)) {
+    const reason = await inspectResponseError(response);
+    if (reason === 'xsrf_rejected') return unknown('JOB_HH_RECEIPT_XSRF_REJECTED');
+    if (reason === 'origin_rejected') return unknown('JOB_HH_RECEIPT_ORIGIN_REJECTED');
+    if (['captcha_expired','captcha_rejected'].includes(reason)) return unknown('JOB_HH_RECEIPT_CAPTCHA');
+    if (reason === 'rate_limited') return unknown('JOB_HH_RECEIPT_RATE_LIMITED');
+  }
+  if (status === 403) return unknown('JOB_HH_RECEIPT_FORBIDDEN');
+  if (status >= 500 && status <= 599) return unknown('JOB_HH_RECEIPT_SERVER_ERROR');
+  if (status >= 400 && status <= 499) return unknown('JOB_HH_RECEIPT_CLIENT_ERROR');
+  return unknown('JOB_HH_RECEIPT_HTTP');
+}
 
 async function readSubmissionReceipt(response, input) {
   let status, headers;
   try { status = response.status(); headers = response.headers(); }
   catch { return unknown('JOB_HH_RECEIPT_META_FAILED'); }
-  if (status < 200 || status >= 300) return unknown('JOB_HH_RECEIPT_HTTP');
+  if (status < 200 || status >= 300) return httpFailure(response, status, headers);
   if (!/^application\/json(?:;|$)/i.test(headers['content-type'] || '')
     || Number(headers['content-length'] || 0) > 1048576) return unknown('JOB_HH_RECEIPT_FORMAT');
   let bytes;
