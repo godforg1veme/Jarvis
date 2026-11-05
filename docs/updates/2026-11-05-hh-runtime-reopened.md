@@ -24,7 +24,7 @@ bounded helper для малого объявленного несжатого t
 литеральные категории, без тела, headers, URL и исключений.
 
 Метрики памяти дополнены числовыми размерами server fetchResponses/fetchLog,
-server dispatchers/active calls и областей V8. Внутренний toImpl используется
+server routes-in-flight, dispatchers/active calls и областей V8. Внутренний toImpl используется
 только для диагностики, не для разрешений или исполнения. Недоступность
 счётчиков обозначается явно. Ни GC, ни heap dumps не включались.
 
@@ -33,6 +33,11 @@ server dispatchers/active calls и областей V8. Внутренний toI
 случаи не воспроизвели второй источник heap. Candidate прошёл server suite
 (941 passed, 2 DB-only skipped), 10/10 профильных Linux/HTTPS и один полный
 runtime startup; security review не нашла обхода или утечки содержимого.
+
+Отдельный локальный race с закрытием страницы до завершения route воспроизвёл
+удержание 500 server routes при стабильном client objects=16; после GC heap
+вырос с 31 до 49 MiB. Связь с рабочим OOM пока не доказана. Новый числовой
+счётчик проверен при настоящем Linux runtime startup (routes=0).
 
 Установка метрик — не исправление утечки. Следующий шаг — сопоставить
 продовые server counters и V8 при росте, получить воспроизведение, затем
@@ -62,7 +67,7 @@ small declared uncompressed text/JSON; only literal categories leave it, without
 bodies, headers, URLs or exceptions.
 
 Memory diagnostics add numeric server fetchResponses/fetchLog sizes, server
-dispatcher/active-call counts and V8 spaces. Internal toImpl is diagnostic-only,
+routes-in-flight, dispatcher/active-call counts and V8 spaces. Internal toImpl is diagnostic-only,
 never used for authorization or execution. Unavailable counters are explicit.
 No forced GC or heap dumps were enabled.
 
@@ -71,6 +76,11 @@ large SSR/GET and 1000 health probes did not reproduce the second heap source
 locally. The candidate passed the server suite (941 passed, two DB-only skipped),
 10/10 focused Linux/HTTPS checks and full runtime startup; security review found
 no bypass or content disclosure.
+
+A local race closing pages before route completion retained 500 server routes
+while client objects stayed at 16; post-GC heap grew from 31 to 49 MiB.
+Its connection to production OOM remains unproven. The numeric counter passed
+a real Linux runtime startup check (routes=0).
 
 Installing counters does not fix the leak. Next: correlate production server
 counters and V8 growth, reproduce it, repair the confirmed source and verify a
