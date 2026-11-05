@@ -36,12 +36,37 @@ runtime startup; security review не нашла обхода или утечк�
 
 Отдельный локальный race с закрытием страницы до завершения route воспроизвёл
 удержание 500 server routes при стабильном client objects=16; после GC heap
-вырос с 31 до 49 MiB. Связь с рабочим OOM пока не доказана. Новый числовой
-счётчик проверен при настоящем Linux runtime startup (routes=0).
+вырос с 31 до 49 MiB. На DE установлен диагностический 58f39f7; Windows,
+GitHub и source обоих VPS совпали. Окружение, mounts и хэши 386 server/56 browser
+файлов сверены. За первые десять минут server routes выросли 0 → 49 → 99;
+последний замер: active=0, queued=0, pages=1, client objects=21, server active=0,
+fetchResponses/fetchLog/WebSocketRoute=0. Это подтверждает retention в рабочем
+контексте; доля в прежних OOM пока не измерена.
 
-Установка метрик — не исправление утечки. Следующий шаг — сопоставить
-продовые server counters и V8 при росте, получить воспроизведение, затем
-исправить подтверждённый источник и проверить более длительное окно.
+Кандидат ремонта: после завершения операции остановить оставшиеся ресурсы
+через window.stop и закрыть страницу, обе стадии с deadline. Контекстные
+guards остаются. Сбой очистки помечает runtime unhealthy. При reconciliation
+health escalation происходит после durable ledger.finish, чтобы не терять
+уже доказанный результат. Общий helper подключён к чтению, откликам,
+поднятию резюме, login, CAPTCHA и health. В Linux на 100 страницах с delayed GET
+прямой close оставил 1524 routes и heap 60 MiB после GC; helper — 0 routes,
+heap 44 MiB, client objects=16 в обоих случаях. Это короткий regression test;
+длительный тест и установка ремонта ещё не завершены. Проверки кандидата:
+Linux browser 146/146, 16/16 HTTP/native/journal/recovery/raise проверок,
+три runtime acceptance. Ревизия нашла и закрыла пропуск поднятия резюме.
+Два старых acceptance fixture приведены к уже действующему userId и числовому
+memory-log контракту; production RPC не менялся. Запущен часовой локальный
+soak с delayed GET, health probes и post-GC проверками каждые пять минут;
+его результат пока не установлен.
+
+Владелец подтвердил общую политику анкет: ответы об опыте берутся из
+подтверждённых сведений резюме; если сведений не хватает, отклик останавливается
+без отправки. CRM — ожидаемая остановка. Свежая читающая проверка VK не нашла
+видимого applied action или допустимого reference; это не доказательство
+отсутствия старого POST и не разрешение повторять его.
+
+Установка метрик — не исправление утечки. Проверки и более длительное окно
+должны подтвердить окончательный ремонт.
 Автопоиск остаётся off; диагностический выпуск не разрешает новый POST
 для неопределённых операций. Публикация и VPS согласованы владельцем.
 
@@ -79,10 +104,35 @@ no bypass or content disclosure.
 
 A local race closing pages before route completion retained 500 server routes
 while client objects stayed at 16; post-GC heap grew from 31 to 49 MiB.
-Its connection to production OOM remains unproven. The numeric counter passed
-a real Linux runtime startup check (routes=0).
+Diagnostic 58f39f7 is installed on DE; Windows, GitHub and both VPS sources
+matched. Environment, mounts and hashes of 386 server/56 browser files matched.
+Over its first ten minutes, server routes grew 0 → 49 → 99. The last sample
+had active=0, queued=0, pages=1, client objects=21, server active=0 and zero
+fetchResponses/fetchLog/WebSocketRoute. This confirms production-context
+retention; its contribution to previous OOMs has not been measured.
 
-Installing counters does not fix the leak. Next: correlate production server
-counters and V8 growth, reproduce it, repair the confirmed source and verify a
-longer window. Automation remains off; this diagnostic rollout never authorizes
+Repair candidate: after an operation completes, stop remaining resources with
+window.stop and close the page, with a deadline for each stage. Context guards
+remain. Cleanup failure marks the runtime unhealthy. During reconciliation,
+health escalation follows durable ledger.finish so established proof is retained.
+The shared helper covers reads, applications, resume raises, login, CAPTCHA and
+health. In Linux, 100 pages with delayed GET retained 1524 routes and 60 MiB
+post-GC heap with direct close, versus zero routes and 44 MiB with the helper;
+client objects stayed at 16 in both cases. This is a short regression test;
+long testing and repair installation are not complete. The candidate passed
+Linux browser 146/146, 16/16 HTTP/native/journal/recovery/raise checks and three
+runtime acceptances. Review found and closed the omitted resume-raise consumer.
+Two stale acceptance fixtures now match the existing userId and numeric memory
+log contracts; production RPC is unchanged. A one-hour local soak with delayed
+GET, health probes and post-GC checks every five minutes is running; its outcome
+is not yet established.
+
+The owner confirmed the general questionnaire policy: personal experience
+answers use confirmed resume information; missing information stops submission.
+CRM is an expected stop. A fresh read-only VK probe found no visible applied
+action or valid reference; this neither proves the old POST was absent nor
+authorizes another one.
+
+Installing counters does not fix the leak. Validation and a longer observation
+must establish the final repair. Automation remains off; this rollout never authorizes
 another POST for uncertain operations. The owner authorized publication/VPS work.

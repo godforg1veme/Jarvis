@@ -1,4 +1,5 @@
 const { newGuardedPage } = require('./webSocketGuard');
+const { closeGuardedPage } = require('./pageCleanup');
 
 function bounded(work, timeoutMs) {
   let timer;
@@ -25,7 +26,7 @@ class BrowserHealth {
       // A dedicated blank page cannot race HH navigation or execute HH scripts.
       const page = await newGuardedPage(this.context);
       try { return await page.evaluate(() => 1) === 1; }
-      finally { await page.close(); }
+      finally { await closeGuardedPage(page, { onUnhealthy: () => this.fail() }); }
     }, this.timeoutMs).catch(() => false).then(ok => {
       if (!ok) this.fail();
       return ok && !this.failed && !this.stopped;

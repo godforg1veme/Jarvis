@@ -8,7 +8,7 @@ const { HhBrowser } = require('../src/hhBrowser');
 
 function fixture() {
   const context = new EventEmitter(), page = new EventEmitter(); let probes = 0, closes = 0;
-  page.isClosed = () => false; page.evaluate = async () => { probes++; return 1; };
+  page.isClosed = () => false; page.evaluate = async fn => { if (fn.toString().includes('window.stop')) return; probes++; return 1; };
   page.routeWebSocket = async () => {};
   page.close = async () => { closes++; };
   context.pages = () => [page]; context.newPage = async () => page;

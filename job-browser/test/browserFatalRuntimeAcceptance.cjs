@@ -6,6 +6,7 @@ const { once } = require('node:events');
 const { randomUUID, randomBytes } = require('node:crypto');
 const { ManualState, initial } = require('../src/manualState');
 const { bounded } = require('../src/browserHealth');
+const lifecycleOutput = text => text.replace(/^JOB_BROWSER_MEMORY(?: [a-z_]+=-?\d+)+\n/gm, '');
 
 test('actual browser main exits after Chromium loss, restarts with original pause/claims and stops normally', {timeout:30000},async()=>{
   const profile='/home/pwuser/profile';assert.deepEqual(await fs.readdir(profile),[]);
@@ -37,12 +38,12 @@ test('actual browser main exits after Chromium loss, restarts with original paus
     assert.ok(browserPid,'fixture Chromium child found');
     const exited=once(first.child,'exit');process.kill(browserPid,'SIGKILL');
     assert.deepEqual(await bounded(()=>exited,10000),[1,null]);
-    assert.match(first.stderr(),/^JOB_BROWSER_UNHEALTHY\n$/);
+    assert.match(lifecycleOutput(first.stderr()),/^JOB_BROWSER_UNHEALTHY\n$/);
     assert.deepEqual(await store.read(),expected);
     second=await launch();
     const health=await fetch('http://127.0.0.1:8080/health',{headers:{authorization:`Bearer ${token}`}});
     assert.equal(health.status,200);assert.deepEqual(await store.read(),expected);
     const stopped=once(second.child,'exit');second.child.kill('SIGTERM');
-    assert.deepEqual(await bounded(()=>stopped,10000),[0,null]);assert.equal(second.stderr(),'');
+    assert.deepEqual(await bounded(()=>stopped,10000),[0,null]);assert.equal(lifecycleOutput(second.stderr()),'');
   }finally{for(const run of [first,second])if(run&&run.child.exitCode===null)run.child.kill('SIGKILL');}
 });

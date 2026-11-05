@@ -1,6 +1,7 @@
 const { allowedRequest } = require('./networkPolicy');
 const { readResumes } = require('./hhPageReader');
 const { validRaiseRequest, ID } = require('./resumeRaiseProtocol');
+const { closeGuardedPage } = require('./pageCleanup');
 const BUTTON = 'button[data-qa~="resume-update-button_actions"]';
 // Never use the home-page button: HH says it raises all resumes at once.
 async function raiseResume({ browser, ledger, userId, operationId, resumeId, receiptTimeoutMs=18000 }) {
@@ -53,6 +54,6 @@ async function raiseResume({ browser, ledger, userId, operationId, resumeId, rec
     }
     return await ledger.finish({ userId, operationId, resumeId }, sent ? 'unknown' : 'failed');
   } catch { return await ledger.finish({ userId, operationId, resumeId }, sent ? 'unknown' : 'failed'); }
-  finally { clearTimeout(timer); await opened?.page.close().catch(() => {}); }
+  finally { clearTimeout(timer); await closeGuardedPage(opened?.page, { onUnhealthy: browser.onTimeout }).catch(() => {}); }
 }
 module.exports = { raiseResume };

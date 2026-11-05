@@ -9,6 +9,7 @@ const { dispatchApplication } = require('./applicationDispatch');
 const { readApplicationReference, verifyChatLetter } = require('./applicationProof');
 const { verifyChatData } = require('./chatApplicationProof');
 const {visibleAppliedAction}=require('./existingApplication');
+const { closeGuardedPage } = require('./pageCleanup');
 const { normalizeQuestionnaire, normalizeAnswers, STOP_REASONS }=require('../../shared/jobQuestionnaire');
 
 const unknown = (reasonCode) => ({ outcome: 'unknown', ...(reasonCode ? { reasonCode } : {}) });
@@ -19,6 +20,7 @@ class HhApplicationDriver {
   constructor({ browser, dispatch = dispatchApplication, responseTimeoutMs = 25000 }) {
     if (typeof dispatch !== 'function' || !Number.isInteger(responseTimeoutMs) || responseTimeoutMs < 250 || responseTimeoutMs > 30000) throw new Error('JOB_BROWSER_CONFIG_INVALID');
     this.browser = browser; this.dispatch = dispatch; this.responseTimeoutMs = responseTimeoutMs;
+    this.readCleanupFailed = false;
   }
   async prepare(input) {
     const hh = this.browser, inspected = await hh.inspectNow(input);
@@ -37,7 +39,7 @@ class HhApplicationDriver {
     try {
       const state = await prepareApplicationPage(opened.page, { ...input, resumes });
       return { ...state, page: opened.page, resumes, releaseNavigationGuard: opened.releaseReadGuard };
-    } catch (error) { await opened.page.close().catch(() => {}); throw error; }
+    } catch (error) { await closeGuardedPage(opened.page, { onUnhealthy: hh.onTimeout }).catch(() => {}); throw error; }
   }
   async clickAndVerify({ prepared, ...input }) {
     const hh = this.browser, page = prepared.page;
@@ -107,6 +109,7 @@ class HhApplicationDriver {
     finally { armed = false; await page.unroute('**/*', guard).catch(() => {}); }
   }
   async readResult(input) {
+    this.readCleanupFailed = false;
     if (typeof input.letter !== 'string' || !input.letter.trim() || input.letter.length > 10000) return unknown();
     // The existing HH chat proof establishes the letter but cannot establish
     // the exact questionnaire answers after an uncertain submission.
@@ -135,9 +138,17 @@ class HhApplicationDriver {
       await frame.locator('[data-qa="chat-bubble-title"]').first().waitFor({ state: 'attached', timeout: 5000 });
       return await verifyChatLetter(frame, input) ? { outcome: 'sent', verified: true, externalId: reference.topicId } : unknown();
     } catch { return unknown(); }
-    finally { await page.close().catch(() => {}); }
+    finally {
+      try { await closeGuardedPage(page, { onUnhealthy: () => { this.readCleanupFailed = true; } }); }
+      catch { this.readCleanupFailed = true; }
+    }
   }
-  async close(prepared) { await prepared?.page?.close(); }
+  finishReadResultCleanup() {
+    if (!this.readCleanupFailed) return;
+    this.readCleanupFailed = false;
+    this.browser.onTimeout?.();
+  }
+  async close(prepared) { await closeGuardedPage(prepared?.page, { onUnhealthy: this.browser.onTimeout }); }
 }
 
 module.exports = { HhApplicationDriver };

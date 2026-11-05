@@ -1,5 +1,6 @@
 // Page-scoped routes are disposed with the page. The context route remains a
 // backstop for unexpected popups and pages that are not created by Jarvis.
+const { closeGuardedPage } = require('./pageCleanup');
 async function newGuardedPage(context) {
   const page = await context.newPage();
   try {
@@ -7,7 +8,7 @@ async function newGuardedPage(context) {
     await page.routeWebSocket('**/*', socket => socket.close());
     return page;
   } catch (error) {
-    await page.close().catch(() => {});
+    await closeGuardedPage(page).catch(() => {});
     throw error;
   }
 }

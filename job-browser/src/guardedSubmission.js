@@ -50,6 +50,7 @@ class GuardedSubmission {
         const result = await this.driver.readResult({ ...identity, letter: input.letter });
         return await this.ledger.finish(identity, result);
       } catch { return { outcome: 'unknown' }; }
+      finally { try { this.driver.finishReadResultCleanup?.(); } catch {} }
     });
   }
 }

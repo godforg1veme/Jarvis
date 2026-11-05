@@ -1,5 +1,6 @@
 const { randomUUID, createHash } = require('node:crypto');
 const { newGuardedPage } = require('./webSocketGuard');
+const { closeGuardedPage } = require('./pageCleanup');
 const { validInit, validAnswerRequest, readForm, sameForm, validPictureKey } = require('./captchaProtocol');
 const { normalizeAnswer } = require('./captchaTelegramProtocol');
 const { readSearchPage, readVacancyPage, readResumes } = require('./hhPageReader');
@@ -33,9 +34,9 @@ class CaptchaTelegramBrowser {
     // challenge tab again after an OOM or keep its accumulated page resources.
     const old = this.page; this.page = null;
     try {
-      if (old) await bounded(() => old.close(), this.closeTimeoutMs);
+      if (old) await closeGuardedPage(old, { timeoutMs: this.closeTimeoutMs, onUnhealthy: this.onUnhealthy });
       this.page = await bounded(() => newGuardedPage(this.context), 5000);
-    } catch (error) { this.onUnhealthy(); throw error; }
+    } catch (error) { if (error.code !== 'JOB_BROWSER_PAGE_CLEANUP_FAILED') this.onUnhealthy(); throw error; }
     const page = this.page; page.once('crash', () => this.crashed.add(page));
     this.openedAt = this.now();
     await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 30000 });
@@ -278,8 +279,8 @@ class CaptchaTelegramBrowser {
         await this.journal.write({ ...state, phase: 'resolved' });
       }
       this.verificationReason = 'verified'; return true;
-    } finally { await reader.close().catch(() => {}); }
+    } finally { await closeGuardedPage(reader, { onUnhealthy: this.onUnhealthy }); }
   }
-  async close() { this.current = null; this.armed = null; if (this.page) await bounded(() => this.page.close(), 2000).catch(() => {}); }
+  async close() { this.current = null; this.armed = null; if (this.page) await closeGuardedPage(this.page, { onUnhealthy: this.onUnhealthy }).catch(() => {}); }
 }
 module.exports = { CaptchaTelegramBrowser, validPng, hashKey, hashOperation };

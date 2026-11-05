@@ -6,9 +6,11 @@
 
 5 ноября [расследование памяти и отказов HH открыто повторно](updates/2026-11-05-hh-runtime-reopened.md):
 после успешного короткого окна browser ещё четыре раза завершился с heap OOM.
-WebSocket retention исправлен, второй источник роста пока неизвестен. Отклик VK
-138448900 не подтверждён; повтор запрещён. Диагностический candidate добавляет
-закрытые HTTP-категории и server-side счётчики Playwright. Автопоиск off.
+WebSocket retention исправлен; второй источник подтверждён: HTTP routes остаются
+после закрытия страниц. Кандидат очистки прошёл Linux 146/146, 16 проверок
+отправки/восстановления и три runtime acceptance; часовой soak ещё идёт.
+Отклик VK 138448900 не подтверждён; повтор запрещён. Анкеты без подтверждённых
+сведений резюме останавливаются до отправки. Автопоиск off.
 
 
 5 ноября [исправлены транспорт квитанции и утечка маршрутов WebSocket](updates/2026-11-05-hh-transport-memory.md),
@@ -236,9 +238,11 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 
 November 5: [memory and HH refusal investigation is reopened](updates/2026-11-05-hh-runtime-reopened.md).
 After the successful short window the browser crashed four more times with
-heap OOM. WebSocket retention is fixed; the second growth source remains unknown.
-VK application 138448900 is unconfirmed and cannot be resent. The diagnostic
-candidate adds closed HTTP categories and server-side Playwright counters.
+heap OOM. WebSocket retention is fixed; a second source is confirmed: HTTP
+routes survive page closure. The cleanup candidate passed Linux 146/146,
+16 submission/recovery checks and three runtime acceptances; the hour-long
+soak is still running. VK application 138448900 is unconfirmed and cannot be
+resent. Questionnaires lacking confirmed resume facts stop before submission.
 Automation is off.
 
 

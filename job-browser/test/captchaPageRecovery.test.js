@@ -5,7 +5,7 @@ const { CaptchaTelegramBrowser } = require('../src/captchaTelegramBrowser');
 const target = 'https://hh.ru/vacancy/123';
 function fixture() {
   let opened = 0, closed = 0;
-  const old = new EventEmitter(); old.isClosed = () => false; old.close = async () => { closed++; };
+  const old = new EventEmitter(); old.isClosed = () => false; old.evaluate = async () => {}; old.close = async () => { closed++; };
   const fresh = new EventEmitter(); fresh.isClosed = () => false; fresh.goto = async () => { opened++; }; fresh.close = async () => {}; fresh.routeWebSocket = async () => {};
   const coordinator = { status: () => ({ phase: 'active', revision: 4 }) };
   const ctrl = new CaptchaTelegramBrowser({ context: { newPage: async () => fresh }, coordinator, now: () => 1000 });
@@ -24,6 +24,6 @@ test('used, expired and unavailable issued pictures explicitly require refresh w
 test('a stuck page close requests runtime recovery instead of accumulating orphan tabs', async () => {
   const f = fixture(); let fatal = 0;
   f.old.close = () => new Promise(() => {}); f.ctrl.closeTimeoutMs = 20; f.ctrl.onUnhealthy = () => fatal++;
-  await assert.rejects(f.ctrl.open(target), { code: 'JOB_BROWSER_OPERATION_TIMEOUT' });
+  await assert.rejects(f.ctrl.open(target), { code: 'JOB_BROWSER_PAGE_CLEANUP_FAILED' });
   assert.equal(fatal, 1); assert.equal(f.counts().opened, 0);
 });

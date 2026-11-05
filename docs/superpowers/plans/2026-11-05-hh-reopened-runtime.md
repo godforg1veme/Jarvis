@@ -15,11 +15,25 @@ HTTP status/category не сохранён. Шесть GET-проверок и �
   XSRF/origin/CAPTCHA причины без raw body/Location.
 - [x] Добавить закрытые server-side cache/dispatcher/progress и V8 counters;
   положительно проверить удержанный/освобождённый APIResponse.
-- [ ] Проверить candidate в Linux/runtime и независимой ревизией.
-- [ ] Установить диагностический candidate с сохранением off/профиля/ledger.
+- [x] Проверить candidate в Linux/runtime и независимой ревизией.
+- [x] Установить диагностический candidate с сохранением off/профиля/ledger:
+  58f39f7 на DE, оба VPS source синхронизированы; env/mounts/hash verified.
 - [ ] Установить конкретный второй источник retained heap; исправить и
   воспроизвести до/после с реальной характерной нагрузкой.
 - [ ] Устранить подтверждённую причину отказа HH с сохранением single-send.
 - [ ] Проверить более длительное окно и post-GC retained heap, не объявлять
   успех только по 30 минутам без crash.
 - [ ] Обновить русский/английский результат и синхронизировать выпуск.
+
+## Route lifecycle repair under verification
+
+Linux baseline: 100 страниц с 30 delayed GET каждая, обычный close оставил
+1524 server routes (client objects=16, post-GC heap=60 MiB). Public cleanup
+останавливает оставшиеся ресурсы через window.stop перед close, с отдельным
+deadline и закрытым failure code; контекстный security guard сохраняется.
+Применять только после результата операции. Для reconciliation подтверждение
+должно попасть в ledger до escalation cleanup failure. Регрессионный тест
+по умолчанию проверяет helper и нулевое удержание; baseline включается явно.
+
+Fresh read-only VK probe: visible applied action=false, application reference
+invalid. Это не доказательство отсутствия старой отправки и не разрешает POST.

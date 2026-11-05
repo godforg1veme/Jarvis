@@ -21,7 +21,7 @@ test('actual headless Telegram runtime preserves pending, authenticates separate
       JARVIS_JOB_BROWSER_APPLY_ENABLED: '1', JARVIS_JOB_BROWSER_APPLY_TOKEN: applyToken,
       JARVIS_HH_CAPTCHA_TELEGRAM: '1', JARVIS_JOB_CAPTCHA_TOKEN: manualToken };
     runtime = await startBrowser(env,{onFatal:()=>fatals++});
-    const options = credential => ({ method: 'POST', headers: { authorization: `Bearer ${credential}`, 'x-jarvis-owner-id': ownerId, 'content-type': 'application/json' }, body: JSON.stringify({ operation: 'status', args: {} }) });
+    const options = credential => ({ method: 'POST', headers: { authorization: `Bearer ${credential}`, 'x-jarvis-owner-id': ownerId, 'content-type': 'application/json' }, body: JSON.stringify({ userId: ownerId, operation: 'status', args: {} }) });
     assert.equal((await fetch('http://127.0.0.1:8082/rpc', options(token))).status, 403);
     assert.equal((await fetch('http://127.0.0.1:8082/rpc', options(applyToken))).status, 403);
     const status = await fetch('http://127.0.0.1:8082/rpc', options(manualToken));

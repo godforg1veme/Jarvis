@@ -13,6 +13,7 @@ const { handleLoginCaptcha } = require('./loginCaptcha');
 const {readExistingApplication,visibleAppliedAction}=require('./existingApplication');
 const { hhDate } = require('./hhSearchDates');
 const { newGuardedPage } = require('./webSocketGuard');
+const { closeGuardedPage } = require('./pageCleanup');
 const failure = (code) => Object.assign(new Error(code), { code });
 const CAPABILITIES = Object.freeze({ dateWindows: true, dateWindowGranularity: 'moscow_day', maxPages: 1000 });
 
@@ -107,14 +108,14 @@ class HhBrowser {
   expireLogin(sessionId) {
     return this.run(async () => {
       if (this.loginSessionId !== sessionId || Date.now() < this.loginExpiresAt || this.loginState === 'expired') return;
-      if (this.loginPage && !this.loginPage.isClosed()) await this.loginPage.close().catch(() => {});
+      if (this.loginPage) await closeGuardedPage(this.loginPage, { onUnhealthy: this.onTimeout }).catch(() => {});
       this.loginPage = null; this.loginState = 'expired'; this.loginResumes = [];
     });
   }
 
   async observeLogin() {
     if (this.loginSessionId && Date.now() >= this.loginExpiresAt) {
-      if (this.loginPage && !this.loginPage.isClosed()) await this.loginPage.close().catch(() => {});
+      if (this.loginPage) await closeGuardedPage(this.loginPage, { onUnhealthy: this.onTimeout }).catch(() => {});
       this.loginPage = null; this.loginState = 'expired'; this.loginResumes = [];
       return { state: 'expired', resumes: [], nextSequence: this.loginNextSequence };
     }
@@ -134,7 +135,7 @@ class HhBrowser {
       this.loginResumes = resumes.map(({ id, title }) => ({ id, title }));
       this.loginState = 'authenticated';
       await this.onAuthenticated();
-      await this.loginPage.close().catch(() => {});
+      await closeGuardedPage(this.loginPage, { onUnhealthy: this.onTimeout }).catch(() => {});
       this.loginPage = null;
     } else this.loginState = 'waiting';
     return { state: this.loginState, resumes: this.loginState === 'authenticated' ? this.loginResumes : [], nextSequence: this.loginNextSequence };
@@ -206,7 +207,7 @@ class HhBrowser {
   closeLogin({ sessionId, preserveProfile = false, complete = false }) {
     return this.run(async () => {
       if (sessionId !== this.loginSessionId) throw failure('JOB_LOGIN_SESSION_INVALID');
-      if (this.loginPage && !this.loginPage.isClosed()) await this.loginPage.close().catch(() => {});
+      if (this.loginPage) await closeGuardedPage(this.loginPage, { onUnhealthy: this.onTimeout }).catch(() => {});
       this.loginPage = null;
       if (!preserveProfile || complete) {
         clearTimeout(this.loginExpiryTimer); this.loginExpiryTimer = null;
@@ -278,7 +279,7 @@ class HhBrowser {
       if (signal.state !== expected && !zeroCandidate && !formCandidate && !privacyCandidate && !historyCandidate) throw failure('JOB_HH_DOM_CHANGED');
       return { page, captchaAttempt: attempt, releaseReadGuard: () => page.unroute('**/*', readGuard) };
     } catch (error) {
-      await page.close().catch(() => {});
+      await closeGuardedPage(page, { onUnhealthy: this.onTimeout }).catch(() => {});
       if (this.onManualRequired && ['search', 'vacancy', 'history', 'authenticated'].includes(expected)
         && (['JOB_HH_CAPTCHA_REQUIRED', 'JOB_HH_CAPTCHA_MANUAL_REQUIRED'].includes(error.code) || attempt?.permitted === 1)) {
         const recoveryId = await this.onManualRequired(url, error);
@@ -304,7 +305,7 @@ class HhBrowser {
         throw this.captchaRecovery.manual(opened.captchaAttempt);
       }
       throw error;
-    } finally { await opened.page.close().catch(() => {}); }
+    } finally { await closeGuardedPage(opened.page, { onUnhealthy: this.onTimeout }); }
   }
   search({ query, publishedFrom, publishedTo, page = 0 }) {
     if (typeof query !== 'string' || !query.trim() || query.length > 200 || !Number.isInteger(page) || page < 0 || page >= CAPABILITIES.maxPages
