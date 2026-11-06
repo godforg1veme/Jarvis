@@ -21,6 +21,7 @@ function memoryLine({ memory = process.memoryUsage(), browsers = [],
     active += browser.activeOperations || 0;
   }
   let serverAvailable = 0, serverFetchResponses = -1, serverFetchLog = -1, serverRoutesInFlight = -1;
+  let serverClosedRoutes = -1, serverRoutePagesUnknown = -1;
   let serverDispatchers = -1, serverActiveCalls = -1;
   try {
     const connection = browsers[0]?.context?._connection;
@@ -34,11 +35,20 @@ function memoryLine({ memory = process.memoryUsage(), browsers = [],
         serverFetchResponses = contexts.reduce((total, context) => total + context.fetchRequest.fetchResponses.size, 0);
         serverFetchLog = contexts.reduce((total, context) => total + context.fetchRequest.fetchLog.size, 0);
         serverRoutesInFlight = contexts.reduce((total, context) => total + context._routesInFlight.size, 0);
+        serverClosedRoutes = 0; serverRoutePagesUnknown = 0;
+        for (const context of contexts) for (const route of context._routesInFlight) {
+          try {
+            const page = route?._request?._frame?._page;
+            const closed = typeof page?.isClosed === 'function' ? page.isClosed() : null;
+            if (closed === true) serverClosedRoutes++;
+            else if (closed !== false) serverRoutePagesUnknown++;
+          } catch { serverRoutePagesUnknown++; }
+        }
         serverAvailable = 1;
       }
     }
   } catch {}
-  return `JOB_BROWSER_MEMORY heap_used_mib=${mib(memory.heapUsed)} heap_total_mib=${mib(memory.heapTotal)} rss_mib=${mib(memory.rss)} external_mib=${mib(memory.external)} large_object_mib=${space('large_object_space')} code_space_mib=${space('code_space')} native_contexts=${count(heapStats?.number_of_native_contexts)} detached_contexts=${count(heapStats?.number_of_detached_contexts)} global_handles_mib=${size(heapStats?.total_global_handles_size)} pages=${pages} queued=${queued} active=${active} playwright_objects=${playwrightObjects} playwright_responses=${playwrightResponses} playwright_websockets=${playwrightWebSockets} server_available=${serverAvailable} server_fetch_responses=${serverFetchResponses} server_fetch_log=${serverFetchLog} server_routes_inflight=${serverRoutesInFlight} server_dispatchers=${serverDispatchers} server_active_calls=${serverActiveCalls}`;
+  return `JOB_BROWSER_MEMORY heap_used_mib=${mib(memory.heapUsed)} heap_total_mib=${mib(memory.heapTotal)} rss_mib=${mib(memory.rss)} external_mib=${mib(memory.external)} large_object_mib=${space('large_object_space')} code_space_mib=${space('code_space')} native_contexts=${count(heapStats?.number_of_native_contexts)} detached_contexts=${count(heapStats?.number_of_detached_contexts)} global_handles_mib=${size(heapStats?.total_global_handles_size)} pages=${pages} queued=${queued} active=${active} playwright_objects=${playwrightObjects} playwright_responses=${playwrightResponses} playwright_websockets=${playwrightWebSockets} server_available=${serverAvailable} server_fetch_responses=${serverFetchResponses} server_fetch_log=${serverFetchLog} server_routes_inflight=${serverRoutesInFlight} server_closed_routes=${serverClosedRoutes} server_route_pages_unknown=${serverRoutePagesUnknown} server_dispatchers=${serverDispatchers} server_active_calls=${serverActiveCalls}`;
 }
 
 function startMemoryDiagnostics({ browsers, write = line => process.stderr.write(`${line}\n`), intervalMs = 300000,
