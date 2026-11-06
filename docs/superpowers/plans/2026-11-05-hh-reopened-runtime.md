@@ -18,7 +18,7 @@ HTTP status/category не сохранён. Шесть GET-проверок и �
 - [x] Проверить candidate в Linux/runtime и независимой ревизией.
 - [x] Установить диагностический candidate с сохранением off/профиля/ledger:
   58f39f7 на DE, оба VPS source синхронизированы; env/mounts/hash verified.
-- [ ] Установить конкретный второй источник retained heap; исправить и
+- [x] Установить конкретный второй источник retained heap; исправить и
   воспроизвести до/после с реальной характерной нагрузкой.
 - [ ] Устранить подтверждённую причину отказа HH с сохранением single-send.
 - [x] Проверить более длительное окно и post-GC retained heap, не объявлять
@@ -51,11 +51,17 @@ PageClosed cleanup + finally после _startHandling в terminal methods, бе
 требует restart с прежними claims, что подтверждено native CAPTCHA acceptance.
 Код d7bc189 также сохраняет pending при временной потере источника до модели;
 реальные PG acceptance подтверждают тот же item/request ID и отзыв согласия.
-Финальный LF образ: 151 browser,11 native,3 runtime,945 server на Node22;
+Финальный LF образ: 151 browser, 11 native, 3 runtime, 945 server на Node 22;
 2 DB-only skipped в общем запуске; оба вошли в отдельный PG набор 12/12.
-Часовой fixture прошёл: 10115 cycles, routes0, heap44→45MiB.
-Отдельный 30-minute soak точного LF образа:5016cycles,routes0,heap44→44MiB.
-Оба exit0; публикация/установка и новый живой тест остаются следующим шагом.
+Часовой fixture прошёл: 10 115 cycles, routes=0, heap 44→45 MiB.
+Отдельный 30-minute soak точного LF образа: 5 016 cycles, routes=0, heap 44→44 MiB.
+Оба exit=0; release `2a201a0` установлен на DE в 22:01 МСК, оба source совпали.
+388 server / 58 browser файлов сверены, env/mounts/inodes/policy неизменны,
+live/ready 200, restart=0. Автотест в 22:03 остановился до enable: manual active,
+CAPTCHA 403 от 21:09:43 МСК предшествует установке; owner off, revision 24 сохранён.
+Требуются текущая ручная проверка HH и новый живой отклик. Наблюдение runtime 22:04:40–22:14:40 МСК прошло: 21 замер, restart=0,
+closed/unknown routes=0, heap 47–64 MiB; 0 новых applications/model usage.
+Это проверка сервиса при активной CAPTCHA, не успешный живой отклик.
 
 Linux baseline: 100 страниц с 30 delayed GET каждая, обычный close оставил
 1524 server routes (client objects=16, post-GC heap=60 MiB). Public cleanup

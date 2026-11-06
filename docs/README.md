@@ -4,17 +4,19 @@
 
 ## Русский
 
-6 ноября [повторный ремонт HH подготовлен к установке](updates/2026-11-06-hh-page-cleanup.md):
-общая очистка заменяет документ до закрытия, pinned Playwright освобождает
-маршруты закрытой страницы и ошибочные terminal routes. Код a95218e/d7bc189.
-Часовой soak: 10 115 циклов, routes=0; точный LF образ: ещё 30 минут,
-5 016 циклов, heap 44→44 MiB. Проверено: 151 browser,11 native,3 runtime,
-945 server на Node 22 и отдельно 12 PG, включая два DB-only случая.
-Временная потеря HH до модели сохраняет вакансию и паузу 15 минут.
-Прежний частичный browser b6ede63 / server 93eed34 ещё работает; установка и
-новый живой отклик пока не подтверждены. В 17:31 МСК полное резюме читалось,
-manual idle, auto off, revision 24; перед установкой доступ проверяется заново.
-Анкеты без подтверждённых фактов резюме останавливаются; VK unknown не повторяется.
+6 ноября [общий ремонт HH установлен на DE](updates/2026-11-06-hh-page-cleanup.md):
+browser/server/collector `2a201a0`, исходники обоих VPS совпадают с GitHub.
+Очистка заменяет документ до закрытия, pinned Playwright освобождает маршруты
+закрытой страницы и завершает обработку при ошибках. Часовой soak: 10 115 циклов;
+точный образ прошёл ещё 30 минут и 5 016 циклов. Удержанных routes=0,
+heap после GC 44→44 MiB на образе для установки. Проверено: 151 browser,
+11 native, три runtime, 945 server на Node 22 и отдельно 12 PG, включая два
+DB-only случая. Временная потеря HH до модели сохраняет вакансию и паузу 15 минут.
+Server/browser healthy, live/ready 200. За 10 минут после установки: 21 замер,
+0 перезапусков/закрытых routes, heap 47–64 MiB. Живой тест остановлен до enable:
+CAPTCHA HTTP 403 от 21:09 МСК, до выпуска; manual active, auto off, revision 24.
+Нужна текущая проверка человека. Анкеты без подтверждённых фактов резюме
+останавливаются; исходный VK unknown не повторяется. Desktop не менялся.
 
 5 ноября [расследование памяти и отказов HH открыто повторно](updates/2026-11-05-hh-runtime-reopened.md):
 после успешного короткого окна browser ещё четыре раза завершился с heap OOM.
@@ -248,18 +250,21 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 
 ## English
 
-November 6: [the second HH repair is ready for installation](updates/2026-11-06-hh-page-cleanup.md).
-Shared cleanup replaces the document before closure; pinned Playwright releases
-closed-page routes and failed terminal routes. Code a95218e/d7bc189.
-The hour-long soak completed 10,115 cycles with zero routes; the exact LF image
-passed another 30 minutes/5,016 cycles with heap 44→44 MiB. Validation: 151 browser,
-11 native,3 runtime,945 server on Node 22 and a separate 12-case PG suite,
+November 6: [the shared HH repair is installed on DE](updates/2026-11-06-hh-page-cleanup.md).
+Browser/server/collector run `2a201a0`; both VPS sources match GitHub.
+Cleanup replaces the document before closure; pinned Playwright releases closed-page
+routes and completes bookkeeping after errors. The hour-long soak completed 10,115
+cycles; the exact release image passed another 30 minutes and 5,016 cycles, with
+zero retained routes and post-GC heap 44→44 MiB. Validation: 151 browser,
+11 native, three runtime, 945 server on Node 22 and a separate 12-case PG suite,
 including both DB-only cases. Temporary pre-model HH failure now retains the
-vacancy with 15-minute backoff. The earlier partial browser b6ede63 / server 93eed34
-is still running; installation and a new live application remain unconfirmed.
-At 17:31 Moscow time the full resume was readable, manual idle, automation off, revision 24;
-availability will be checked again before installation. Questionnaires stop
-without confirmed resume facts; the original unknown VK application is not retried.
+vacancy with 15-minute backoff. Server/browser are healthy, live/ready return 200,
+with no restarts; the ten-minute watch passed 21 samples, zero closed routes
+and heap 47–64 MiB. The live submission test stopped before enabling:
+CAPTCHA HTTP 403 at 21:09 Moscow time
+predated this release; manual active, automation off at revision 24. A current
+human check is needed. Questionnaires stop without confirmed resume facts;
+the original unknown VK application is not retried. Desktop was unchanged.
 
 November 5: [memory and HH refusal investigation is reopened](updates/2026-11-05-hh-runtime-reopened.md).
 After the successful short window the browser crashed four more times with

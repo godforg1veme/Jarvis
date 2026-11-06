@@ -4,7 +4,14 @@
 
 ## Русский
 
-### Повторный ремонт: длительные проверки пройдены, подготовлен выпуск
+### Повторный ремонт установлен на DE
+
+В 22:01 МСК установлен release `2a201a0`: browser и server/collector.
+GitHub main, Windows и source обоих VPS совпали. Серверные live/ready дали 200;
+server/browser healthy, restart=0. Env, mounts, bind inodes, ресурсные и
+security-параметры сверены до и после; остальные службы не пересоздавались.
+Desktop не изменялся. Release-status подтверждает оба VPS и 388 server-файлов;
+единственное прежнее расхождение — один неиспользуемый shared-файл Desktop.
 
 Код `a95218e` устраняет два воспроизведённых случая в Playwright 1.64.0:
 маршрут страницы остаётся до первого terminal call после закрытия target;
@@ -57,12 +64,26 @@ browser с прежним журналом. Проверка same-process refres
 строки/ID и остановку после отзыва согласия. Прошли четыре CAPTCHA-сценария;
 один сценарий с внешней frozen OCR-моделью пропущен без её артефакта.
 
-Этот кандидат ещё не установлен. Ниже сохранён первый частичный этап,
-остаточное удержание которого и потребовало повторного ремонта.
+Ниже сохранён первый частичный этап, остаточное удержание которого
+и потребовало повторного ремонта.
 В 17:29–17:31 МСК три read-only чтения HH прошли без POST; полный снимок
 выбранного резюме прочитан по настоящему RPC, заполнены все пять полей.
 Ручная пауза стала idle; auto off, revision 24. Это не подтверждает новый
-отклик и не гарантирует доступность HH к моменту установки: будет свежая проверка.
+отклик. Доступность HH к моменту установки проверена отдельно ниже.
+
+Свежая проверка в 22:03 МСК остановила живой auto-test до включения:
+manual active, CAPTCHA от 21:09:43 МСК дала 403 ещё до установки,
+automatic human, claims=2.
+Переключатель остался off, revision 24; отправки в этом тесте не начинались.
+Ошибка первого Python launcher теста исправлена до включения автоматики;
+затем фактической причиной остановки был JOB_HH_MANUAL_ACTIVE.
+Человеку запрошена текущая проверка в Telegram. Отдельное наблюдение runtime
+в 22:04:40–22:14:40 МСК прошло: 600 секунд, 21 замер, 0 перезапусков,
+0 закрытых/неизвестных routes, heap 47–64 MiB без принудительного GC.
+Server/browser healthy, live/ready 200; за окно после установки нет новых
+applications или model usage. Off, revision 24 сохранён. Это наблюдение сервиса
+при CAPTCHA-паузе; успешный живой отклик после выпуска не подтверждён.
+Исходный VK остаётся unknown с шестью сверками, повторного POST не было.
 
 ### Первый этап и обнаруженное ограничение
 
@@ -142,7 +163,15 @@ Cookie/token совпадали; картинки не были старыми. 
 
 ## English
 
-### Second repair: extended validation passed, release prepared
+### Second repair installed on DE
+
+Release `2a201a0` was installed at 22:01 Moscow time: browser and server/collector.
+GitHub main, Windows and both VPS source checkouts matched. Server live/ready
+returned 200; server/browser were healthy with zero restarts. Environment, mounts,
+bind inodes, resource limits and security settings matched before and after;
+other services were not recreated. Desktop was unchanged. Release-status verified
+both VPS and 388 server files; the sole existing difference is one unused shared
+file in the installed Desktop.
 
 Code `a95218e` fixes two reproduced Playwright 1.64.0 cases: a page route remains
 before its first terminal call when the target closes, and a handled route remains
@@ -196,13 +225,26 @@ reclaiming the same row/request ID, and stopping after consent revocation.
 Four additional CAPTCHA scenarios
 passed; one requiring an external frozen OCR model was skipped without its artifact.
 
-This candidate is not installed yet. The first partial stage remains below;
-its residual retention required this second repair.
+The first partial stage remains below; its residual retention required this
+second repair.
 At 17:29–17:31 Moscow time, three read-only HH reads passed without POSTs;
 the full selected resume was read through real RPC with all five fields populated.
 Manual pause became idle; automation remained off at revision 24. This does not
-confirm a new application or guarantee HH availability at installation time;
-that will be checked again.
+confirm a new application. HH availability at installation was checked again below.
+
+The fresh 22:03 Moscow-time check stopped the live auto-test before enabling:
+manual active, the CAPTCHA at 21:09:43 Moscow time returned 403 before installation,
+automatic human, two claims.
+Automation stayed off at revision 24; this test never started a submission.
+The first test Python launcher's error was fixed before enabling automation;
+the actual subsequent gate was JOB_HH_MANUAL_ACTIVE. A current Telegram human
+check was requested. The separate runtime watch at 22:04:40–22:14:40 Moscow time
+passed: 600 seconds, 21 samples, zero restarts, zero closed/unknown-page routes,
+heap 47–64 MiB without forced GC. Server/browser remained healthy, live/ready
+returned 200, and no new applications or model usage appeared after installation.
+Automation stayed off at revision 24. This observes the service during CAPTCHA
+pause; a successful live application after release is unconfirmed. The original
+VK operation remains unknown after six reconciliations, without another POST.
 
 ### First stage and discovered limitation
 
