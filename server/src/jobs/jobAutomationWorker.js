@@ -211,11 +211,21 @@ class JobAutomationWorker {
           : ['JOB_MODEL_UNAVAILABLE','JOB_MODEL_NOT_CONFIGURED','JOB_MODEL_INVALID_OUTPUT','JOB_MODEL_INVALID_FACTS',
             'JOB_GENERATION_OUTCOME_UNKNOWN','JOB_GENERATION_BUSY'].includes(error?.code)
             ? 'MODEL_UNAVAILABLE' : null;
-      const pending = phase === 'evaluating' && !modelInvoked && code === 'RESUME_UNAVAILABLE';
+      // A pending HH challenge blocks the selected resume read before any model
+      // request or application claim. Keep that exact item retryable after the
+      // challenge is resolved, and pause this user's automation to avoid a burst.
+      const captchaWaiting = phase === 'evaluating' && !modelInvoked
+        && ['JOB_HH_MANUAL_ACTIVE','JOB_HH_CAPTCHA_MANUAL_REQUIRED',
+          'JOB_HH_CAPTCHA_REQUIRED','JOB_HH_CAPTCHA_WAITING'].includes(error?.code);
+      const pending = phase === 'evaluating' && !modelInvoked && (code === 'RESUME_UNAVAILABLE' || captchaWaiting);
       const unknown = !(phase === 'evaluating' && !modelInvoked);
       await this.repository.update({ itemId: item.id, from: phase,
         status: pending ? 'pending' : unknown ? 'unknown' : 'failed', failurePhase,
         failureCode: /^JOB_[A-Z_]{1,70}$/.test(error?.code || '') ? error.code : 'JOB_PROCESSING_FAILED' });
+      if (captchaWaiting) {
+        await this.repository.backoff({ scope, automationRevision: item.automation_revision });
+        return;
+      }
       if (code) {
         try {
           if (code === 'MODEL_UNAVAILABLE' || code === 'RESUME_UNAVAILABLE')

@@ -18,11 +18,11 @@ function harness(decision, applicationStatus = 'sent') {
     draft_request_id: `auto-letter:${ITEM}` };
   const repository = {
     async claimCandidate() { return item; },
-    async update(value) { calls.push(['update', value.status]); return { status: value.status }; },
+    async update(value) { calls.push(['update', value.status, value.failurePhase, value.failureCode]); return { status: value.status }; },
     async enqueueAttention(value) { calls.push(['attention', value.code]); },
     async saveEvaluation(value) { calls.push(['evaluation', value.evaluation]); return { id: value.itemId }; },
     async finalizeKnownSkip(value) { calls.push(['update', 'skipped', value.evaluatedSearchRevision]); return { searchRevisionChanged: false }; },
-    async backoff() { calls.push(['backoff']); },
+    async backoff(value) { calls.push(['backoff', value.scope.userId, value.automationRevision]); },
   };
   const worker = new JobAutomationWorker({
     pool: { async query(sql) {
@@ -157,6 +157,28 @@ test('a resume read failure before model invocation waits safely and can resume'
   assert.ok(calls.some(x=>x[0]==='update'&&x[1]==='pending'));
   assert.ok(calls.some(x=>x[0]==='backoff'));
   assert.ok(!calls.some(x=>['usage','evaluate','draft','submit'].includes(x[0])));
+});
+
+test('HH challenge during the selected resume read pauses only this consented automation without a model call', async () => {
+  for (const code of ['JOB_HH_MANUAL_ACTIVE','JOB_HH_CAPTCHA_MANUAL_REQUIRED',
+    'JOB_HH_CAPTCHA_REQUIRED','JOB_HH_CAPTCHA_WAITING']) {
+    const { worker, item, calls } = harness('apply');
+    worker.resumeContextService.getSelected = async () => { throw Object.assign(new Error('fixture'), { code }); };
+    await worker.process(item);
+    assert.deepEqual(calls.filter(x => x[0] === 'update'), [['update', 'pending', 'evaluation', code]]);
+    assert.deepEqual(calls.filter(x => x[0] === 'backoff'), [['backoff', USER, 2]]);
+    assert.deepEqual(calls.filter(x => ['usage','evaluate','draft','submit','attention'].includes(x[0])), []);
+  }
+});
+
+test('a challenge error after model invocation remains uncertain and cannot start another model request', async () => {
+  const { worker, item, calls } = harness('apply');
+  worker.modelAdapter.evaluate = async () => { throw Object.assign(new Error('fixture'), { code: 'JOB_HH_MANUAL_ACTIVE' }); };
+  await worker.process(item);
+  assert.deepEqual(calls.filter(x => x[0] === 'update'), [['update', 'unknown', 'evaluation', 'JOB_HH_MANUAL_ACTIVE']]);
+  assert.deepEqual(calls.filter(x => x[0] === 'attention'), [['attention', 'PROCESSING_UNKNOWN']]);
+  assert.deepEqual(calls.filter(x => x[0] === 'backoff'), []);
+  assert.deepEqual(calls.filter(x => ['draft','submit'].includes(x[0])), []);
 });
 
 test('an interrupted model or draft never claims that an application was submitted', async () => {
