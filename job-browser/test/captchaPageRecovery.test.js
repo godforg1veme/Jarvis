@@ -12,9 +12,17 @@ function fixture() {
   const ctrl = new CaptchaTelegramBrowser({ context: { newPage: async () => fresh }, coordinator, now: () => 1000 });
   ctrl.page = old; return { ctrl, old, fresh, counts: () => ({ opened, closed }) };
 }
-test('opening CAPTCHA replaces old or crashed page rather than navigating it forever', async () => {
+test('opening CAPTCHA retires the old document before creating a fresh page', async () => {
   const f = fixture(); await f.ctrl.open(target);
   assert.equal(f.ctrl.page, f.fresh); assert.deepEqual(f.counts(), { opened: 1, closed: 1 });
+});
+
+test('a crashed document that refuses navigation requests runtime recovery without direct close', async () => {
+  const f = fixture(); let fatal = 0;
+  f.old.goto = async () => { throw new Error('fixture renderer crashed'); };
+  f.ctrl.onUnhealthy = () => fatal++;
+  await assert.rejects(f.ctrl.open(target), { code: 'JOB_BROWSER_PAGE_CLEANUP_FAILED' });
+  assert.equal(fatal, 1); assert.deepEqual(f.counts(), { opened: 0, closed: 0 });
 });
 test('used, expired and unavailable issued pictures explicitly require refresh without any navigation', async () => {
   for (const change of [{ used: true }, { expires: 999 }, { revision: 3 }]) {

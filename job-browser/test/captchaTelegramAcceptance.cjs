@@ -20,7 +20,7 @@ test('real HTTPS human CAPTCHA: image-only cache, stale/expiry, exactly-once nat
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'captcha-telegram-')); await fs.chmod(root, 0o700);
   execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', path.join(root, 'key'), '-out', path.join(root, 'cert'), '-subj', '/CN=hh.ru', '-days', '1'], { stdio: 'ignore' });
   const ownerId = randomUUID(), recoveryId = randomUUID(), target = 'https://hh.ru/vacancy/123';
-  let now = 2000000000000, keyNumber = 0, posts = 0, inits = 0, forbidden = 0, gets = 0, mode = 'reject', solved = false, controller;
+  let now = 2000000000000, keyNumber = 0, posts = 0, inits = 0, forbidden = 0, gets = 0, mode = 'reject', solved = false, controller, unhealthy = 0;
   const server = https.createServer({ key: await fs.readFile(path.join(root, 'key')), cert: await fs.readFile(path.join(root, 'cert')) }, async (req, res) => {
     const url = new URL(req.url, 'https://hh.ru');
     if (req.method === 'POST' && url.pathname === '/captcha') {
@@ -58,21 +58,30 @@ test('real HTTPS human CAPTCHA: image-only cache, stale/expiry, exactly-once nat
     res.writeHead(404); res.end();
   });
   await new Promise(resolve => server.listen(443, '127.0.0.1', resolve));
-  const browser = await chromium.launch({ headless: true, chromiumSandbox: true });
-  const context = await browser.newContext({ ignoreHTTPSErrors: true, serviceWorkers: 'block' });
-  await context.route('**/*', async route => {
+  let browser, context;
+  async function launchBrowser() {
+    browser = await chromium.launch({ headless: true, chromiumSandbox: true });
+    context = await browser.newContext({ ignoreHTTPSErrors: true, serviceWorkers: 'block' });
+    await context.route('**/*', async route => {
     const req = route.request();
     if (['GET', 'HEAD', 'OPTIONS'].includes(req.method())) return allowedRequest(req.url()) ? route.continue() : route.abort();
     try { if (controller && await controller.permit(route)) return; } catch {}
     return route.abort();
-  });
+    });
+  }
+  await launchBrowser();
   const store = new ManualState({ root: path.join(root, 'manual'), ownerId });
   const journal = new CaptchaJournal({ root: path.join(root, 'journal'), ownerId });
   await journal.write({ version: 1, ownerId, operationId: recoveryId, phase: 'blocked', detectedAt: now, retryAt: now + 120000, targetHash: createHash('sha256').update(target).digest('hex') });
   let coordinator;
   function restart() {
     coordinator = new ManualCoordinator({ store, open: u => controller.open(u), verify: (u, id) => controller.verify(u, id) });
-    controller = new CaptchaTelegramBrowser({ context, coordinator, journal, now: () => now, receiptTimeout: 1000 });
+    controller = new CaptchaTelegramBrowser({ context, coordinator, journal, now: () => now, receiptTimeout: 1000,
+      onUnhealthy: () => { unhealthy++; } });
+  }
+  async function restartBrowser() {
+    await context.close(); await browser.close();
+    await launchBrowser(); restart(); await coordinator.load();
   }
   const answer = (challenge, extra = {}) => controller.answer({ challengeId: challenge.challengeId, revision: challenge.revision, operationId: randomUUID(), text: '  ПРОВЕРКА   Картинки  ', ...extra });
   try {
@@ -92,8 +101,14 @@ test('real HTTPS human CAPTCHA: image-only cache, stale/expiry, exactly-once nat
     void cdp.send('Page.crash').catch(() => {}); await crash;
     assert.equal(crashedPage.isClosed(), false, 'renderer crash does not imply a closed Playwright page');
     assert.deepEqual(await controller.challenge(false), { outcome: 'refresh_required' });
+    const claimsBeforeCrash = (await store.read()).claims;
+    await assert.rejects(controller.challenge(true), { code: 'JOB_CAPTCHA_UNAVAILABLE', failureCode: 'JOB_CAPTCHA_OPEN_FAILED' });
+    assert.ok(unhealthy > 0, 'failed cleanup must mark the browser unhealthy');
+    assert.ok(['pending', 'active'].includes((await store.read()).phase));
+    assert.deepEqual((await store.read()).claims, claimsBeforeCrash); assert.equal(posts, 0);
+    await restartBrowser();
     const replaced = await controller.challenge(true); assert.notEqual(replaced.challengeId, first.challengeId);
-    assert.notEqual(controller.page, crashedPage); assert.equal(context.pages().length, 1);
+    assert.equal(context.pages().length, 1);
     assert.deepEqual(await answer(first), { outcome: 'stale' }); assert.equal(posts, 0);
     now += 600001; assert.deepEqual(await answer(replaced), { outcome: 'stale' }); assert.equal(posts, 0);
     assert.deepEqual(await controller.challenge(false), { outcome: 'refresh_required' });
@@ -108,7 +123,9 @@ test('real HTTPS human CAPTCHA: image-only cache, stale/expiry, exactly-once nat
     assert.deepEqual(await answer(rejected, { operationId }), { outcome: 'already_used' }); assert.equal(posts, 1);
     mode = 'unknown'; const unknown = await controller.challenge(true), unknownOperation = randomUUID();
     assert.deepEqual(await answer(unknown, { operationId: unknownOperation }), { outcome: 'unknown' }); assert.equal(posts, 2);
-    await controller.close(); restart(); await coordinator.load();
+    const claimsAfterUnknown = (await store.read()).claims;
+    await restartBrowser();
+    assert.deepEqual((await store.read()).claims, claimsAfterUnknown);
     assert.deepEqual(await answer(unknown, { operationId: unknownOperation }), { outcome: 'already_used' }); assert.equal(posts, 2);
     mode = 'redirect'; const redirected = await controller.challenge(true);
     assert.deepEqual(await answer(redirected), { outcome: 'new_challenge' }); assert.equal(posts, 3); assert.equal(forbidden, 0);
@@ -130,5 +147,5 @@ test('real HTTPS human CAPTCHA: image-only cache, stale/expiry, exactly-once nat
     await coordinator.pending({ target, recoveryId }); mode = 'wrong-target';
     await assert.rejects(controller.challenge(false), { code: 'JOB_CAPTCHA_UNAVAILABLE' });
     assert.equal(coordinator.status().phase, 'active'); assert.equal(posts, 4);
-  } finally { await controller?.close(); await context.close(); await browser.close(); await new Promise(resolve => server.close(resolve)); await fs.rm(root, { recursive: true, force: true }); }
+  } finally { await controller?.close(); await context?.close(); await browser?.close(); await new Promise(resolve => server.close(resolve)); await fs.rm(root, { recursive: true, force: true }); }
 });

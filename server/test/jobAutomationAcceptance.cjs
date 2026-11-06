@@ -5,10 +5,72 @@ const { configuredOwnerJobAccess } = require('../src/jobs/configuredOwnerJobAcce
 const { JobSearchRepository } = require('../src/jobs/jobSearchRepository');
 const { JobAutomationRepository } = require('../src/jobs/jobAutomationRepository');
 const { JobAutomationService } = require('../src/jobs/jobAutomationService');
+const { JobAutomationWorker } = require('../src/jobs/jobAutomationWorker');
 const { JobProfileRepository } = require('../src/jobs/jobProfileRepository');
 const { JobDraftRepository } = require('../src/jobs/jobDraftRepository');
 const { JobApplicationRepository } = require('../src/jobs/jobApplicationRepository');
 const { JobApplicationService } = require('../src/jobs/jobApplicationService');
+
+test('real PG: pre-model HH read outage pauses the same candidate and revocation stops its return',
+  { skip: !process.env.JARVIS_JOB_TEST_DATABASE_URL }, async () => {
+    const f = await createJobPostgresFixture();
+    try {
+      await f.pool.query("INSERT INTO user_identities(user_id,provider,external_id) VALUES($1,'telegram','101')", [f.owner]);
+      const accessService = configuredOwnerJobAccess(f.pool, '101');
+      const search = new JobSearchRepository(f.pool, { accessService });
+      await search.ensure({ scope: f.scope });
+      await f.pool.query('UPDATE job_searches SET settings=settings||$2::jsonb WHERE user_id=$1',
+        [f.owner, { queries: ['node developer'], activated: true, paused: false }]);
+      await f.pool.query("INSERT INTO job_connections(user_id,resume_id,status) VALUES($1,'resume-a','connected')", [f.owner]);
+      const repository = new JobAutomationRepository(f.pool, { accessService });
+      const resumeContextService = {
+        async selected() { return (await f.pool.query('SELECT resume_id,revision FROM job_connections WHERE user_id=$1',
+          [f.owner])).rows[0]; },
+        async getSelected() { throw Object.assign(new Error('fixture outage'), { code: 'JOB_HH_UNAVAILABLE' }); },
+      };
+      const automationService = new JobAutomationService({ pool: f.pool, repository,
+        searchRepository: search, resumeContextService, accessService, available: true });
+      const enabled = await automationService.setEnabled({ scope: f.scope, enabled: true, expectedRevision: 0 });
+      const vacancy = await search.upsertVacancy({ externalId: '9091', snapshot: {
+        externalId: '9091', title: 'Node developer', company: 'Fixture',
+        url: 'https://hh.ru/vacancy/9091', publishedAt: '2026-11-05T00:00:00.000Z',
+        description: 'Build Node integrations for internal services.', archived: false } });
+      await search.recordMatch({ userId: f.owner, vacancyId: vacancy.id, filterRevision: 1 });
+      let modelCalls = 0, submitCalls = 0, usageCalls = 0;
+      const worker = new JobAutomationWorker({ pool: f.pool, repository, automationService,
+        searchRepository: search, accessService, resumeContextService,
+        profileRepository: { async ensure() { return { revision: 1, profile: { confirmed: true,
+          baseLetter: 'I build integrations', facts: [], examples: [] } }; } },
+        modelAdapter: { async evaluate() { modelCalls++; throw new Error('model called'); } },
+        draftService: { async generate() { throw new Error('draft called'); } },
+        applicationService: { async submitAutomatic() { submitCalls++; throw new Error('submit called'); } },
+        usageRepository: { async record() { usageCalls++; }, async claimBudgetNotice() {} } });
+      const first = await repository.claimCandidate();
+      assert.equal(first?.vacancy_id, vacancy.id);
+      await worker.process(first);
+      const paused = (await f.pool.query('SELECT id,status,failure_code,evaluation_request_id FROM job_automation_items WHERE id=$1',
+        [first.id])).rows[0];
+      assert.deepEqual({ status: paused.status, failureCode: paused.failure_code },
+        { status: 'pending', failureCode: 'JOB_HH_UNAVAILABLE' });
+      const delay = (await f.pool.query('SELECT extract(epoch FROM (next_attempt_at-now())) AS seconds FROM job_automations WHERE user_id=$1',
+        [f.owner])).rows[0].seconds;
+      assert.ok(Number(delay) > 14 * 60 && Number(delay) <= 15 * 60);
+      assert.equal(await repository.claimCandidate(), null);
+      assert.deepEqual([modelCalls, usageCalls, submitCalls], [0, 0, 0]);
+      await f.pool.query("UPDATE job_automations SET next_attempt_at=now()-interval '1 second' WHERE user_id=$1 AND revision=$2",
+        [f.owner, enabled.revision]);
+      const same = await repository.claimCandidate();
+      assert.equal(same?.id, first.id);
+      assert.equal(same.evaluation_request_id, paused.evaluation_request_id);
+      await automationService.setEnabled({ scope: f.scope, enabled: false, expectedRevision: enabled.revision });
+      await worker.process(same);
+      assert.equal((await f.pool.query('SELECT status FROM job_automation_items WHERE id=$1', [same.id])).rows[0].status,
+        'skipped');
+      assert.deepEqual([modelCalls, usageCalls, submitCalls], [0, 0, 0]);
+      assert.equal(await repository.claimCandidate(), null);
+      assert.equal((await f.pool.query('SELECT count(*)::int n FROM job_applications WHERE user_id=$1', [f.owner])).rows[0].n, 0);
+    } finally { await f.close(); }
+  });
 
 test('real PG: personal consent gates candidate claims and revocation wins',
   { skip: !process.env.JARVIS_JOB_TEST_DATABASE_URL }, async () => {
