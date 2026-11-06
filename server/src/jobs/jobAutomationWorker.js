@@ -217,14 +217,21 @@ class JobAutomationWorker {
       const captchaWaiting = phase === 'evaluating' && !modelInvoked
         && ['JOB_HH_MANUAL_ACTIVE','JOB_HH_CAPTCHA_MANUAL_REQUIRED',
           'JOB_HH_CAPTCHA_REQUIRED','JOB_HH_CAPTCHA_WAITING'].includes(error?.code);
-      const pending = phase === 'evaluating' && !modelInvoked && (code === 'RESUME_UNAVAILABLE' || captchaWaiting);
+      // The selected resume is read-only at this point. A temporary source,
+      // login or browser failure can be retried under the same item after a
+      // pause; once a model call began, its original request ID stays unknown.
+      const sourceWaiting = phase === 'evaluating' && !modelInvoked
+        && ['JOB_HH_UNAVAILABLE','JOB_HH_RATE_LIMIT','JOB_BROWSER_BUSY',
+          'JOB_HH_LOGIN_REQUIRED','JOB_HH_NOT_CONNECTED'].includes(error?.code);
+      const pending = phase === 'evaluating' && !modelInvoked
+        && (code === 'RESUME_UNAVAILABLE' || captchaWaiting || sourceWaiting);
       const unknown = !(phase === 'evaluating' && !modelInvoked);
       await this.repository.update({ itemId: item.id, from: phase,
         status: pending ? 'pending' : unknown ? 'unknown' : 'failed', failurePhase,
         failureCode: /^JOB_[A-Z_]{1,70}$/.test(error?.code || '') ? error.code : 'JOB_PROCESSING_FAILED' });
-      if (captchaWaiting) {
+      if (captchaWaiting || sourceWaiting) {
         await this.repository.backoff({ scope, automationRevision: item.automation_revision });
-        return;
+        if (code !== 'LOGIN_REQUIRED') return;
       }
       if (code) {
         try {

@@ -171,11 +171,35 @@ test('HH challenge during the selected resume read pauses only this consented au
   }
 });
 
+test('temporary HH and browser read failures keep the original item pending with scoped backoff', async () => {
+  for (const code of ['JOB_HH_UNAVAILABLE','JOB_HH_RATE_LIMIT','JOB_BROWSER_BUSY',
+    'JOB_HH_LOGIN_REQUIRED','JOB_HH_NOT_CONNECTED']) {
+    const { worker, item, calls } = harness('apply');
+    worker.resumeContextService.getSelected = async () => { throw Object.assign(new Error('fixture'), { code }); };
+    await worker.process(item);
+    assert.deepEqual(calls.filter(x => x[0] === 'update'), [['update', 'pending', 'evaluation', code]]);
+    assert.deepEqual(calls.filter(x => x[0] === 'backoff'), [['backoff', USER, 2]]);
+    assert.deepEqual(calls.filter(x => x[0] === 'attention'),
+      ['JOB_HH_LOGIN_REQUIRED','JOB_HH_NOT_CONNECTED'].includes(code) ? [['attention', 'LOGIN_REQUIRED']] : []);
+    assert.deepEqual(calls.filter(x => ['usage','evaluate','draft','submit'].includes(x[0])), []);
+  }
+});
+
 test('a challenge error after model invocation remains uncertain and cannot start another model request', async () => {
   const { worker, item, calls } = harness('apply');
   worker.modelAdapter.evaluate = async () => { throw Object.assign(new Error('fixture'), { code: 'JOB_HH_MANUAL_ACTIVE' }); };
   await worker.process(item);
   assert.deepEqual(calls.filter(x => x[0] === 'update'), [['update', 'unknown', 'evaluation', 'JOB_HH_MANUAL_ACTIVE']]);
+  assert.deepEqual(calls.filter(x => x[0] === 'attention'), [['attention', 'PROCESSING_UNKNOWN']]);
+  assert.deepEqual(calls.filter(x => x[0] === 'backoff'), []);
+  assert.deepEqual(calls.filter(x => ['draft','submit'].includes(x[0])), []);
+});
+
+test('source loss after model invocation remains unknown without retry or backoff', async () => {
+  const { worker, item, calls } = harness('apply');
+  worker.modelAdapter.evaluate = async () => { throw Object.assign(new Error('fixture'), { code: 'JOB_HH_UNAVAILABLE' }); };
+  await worker.process(item);
+  assert.deepEqual(calls.filter(x => x[0] === 'update'), [['update', 'unknown', 'evaluation', 'JOB_HH_UNAVAILABLE']]);
   assert.deepEqual(calls.filter(x => x[0] === 'attention'), [['attention', 'PROCESSING_UNKNOWN']]);
   assert.deepEqual(calls.filter(x => x[0] === 'backoff'), []);
   assert.deepEqual(calls.filter(x => ['draft','submit'].includes(x[0])), []);

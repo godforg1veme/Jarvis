@@ -8,6 +8,8 @@ RUN npm ci --omit=dev --no-audit --no-fund
 WORKDIR /home/pwuser/acceptance/job-browser
 COPY --chown=pwuser:pwuser job-browser/package.json job-browser/package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund
+COPY --chown=pwuser:pwuser job-browser/patches ./patches
+RUN node patches/applyPlaywrightRouteCleanup.js
 COPY --chown=pwuser:pwuser job-browser/src ./src
 COPY --chown=pwuser:pwuser job-browser/test ./test
 COPY --chown=pwuser:pwuser shared /home/pwuser/acceptance/shared
