@@ -4,13 +4,17 @@
 
 ## Русский
 
-6 ноября [ремонт HTTP routes и ожидания CAPTCHA установлен на DE](updates/2026-11-06-hh-page-cleanup.md):
-browser `f543cc4`, server/collector `93eed34`. Часовой Linux soak: 8 919 циклов,
-0 удержанных routes, heap после GC 44 MiB в начале и конце. Проверки: browser
-146/146, native/recovery 16/16, три runtime acceptance, server 943 + 2 DB-only skip.
-Живая CAPTCHA-пауза подтверждена без модели и отправки; итоговый off, revision 24.
-Новый успешный живой отклик пока не подтверждён: HH требует проверку человека
-после CAPTCHA HTTP 403. Анкеты без подтверждённых фактов резюме останавливаются.
+6 ноября [повторный ремонт HH подготовлен к установке](updates/2026-11-06-hh-page-cleanup.md):
+общая очистка заменяет документ до закрытия, pinned Playwright освобождает
+маршруты закрытой страницы и ошибочные terminal routes. Код a95218e/d7bc189.
+Часовой soak: 10 115 циклов, routes=0; точный LF образ: ещё 30 минут,
+5 016 циклов, heap 44→44 MiB. Проверено: 151 browser,11 native,3 runtime,
+945 server на Node 22 и отдельно 12 PG, включая два DB-only случая.
+Временная потеря HH до модели сохраняет вакансию и паузу 15 минут.
+Прежний частичный browser b6ede63 / server 93eed34 ещё работает; установка и
+новый живой отклик пока не подтверждены. В 17:31 МСК полное резюме читалось,
+manual idle, auto off, revision 24; перед установкой доступ проверяется заново.
+Анкеты без подтверждённых фактов резюме останавливаются; VK unknown не повторяется.
 
 5 ноября [расследование памяти и отказов HH открыто повторно](updates/2026-11-05-hh-runtime-reopened.md):
 после успешного короткого окна browser ещё четыре раза завершился с heap OOM.
@@ -244,14 +248,18 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 
 ## English
 
-November 6: [HTTP route cleanup and CAPTCHA waiting repairs are deployed on DE](updates/2026-11-06-hh-page-cleanup.md):
-browser `f543cc4`, server/collector `93eed34`. The one-hour Linux soak completed
-8,919 cycles with zero retained routes and 44 MiB post-GC heap at start and end.
-Validation: browser 146/146, native/recovery 16/16, three runtime acceptances,
-server 943 passed and two DB-only skipped. Live CAPTCHA backoff was verified
-without a model call or submission; final off, revision 24. A new successful
-live application remains unconfirmed: HH requires human verification after
-CAPTCHA HTTP 403. Questionnaires lacking confirmed resume facts stop submission.
+November 6: [the second HH repair is ready for installation](updates/2026-11-06-hh-page-cleanup.md).
+Shared cleanup replaces the document before closure; pinned Playwright releases
+closed-page routes and failed terminal routes. Code a95218e/d7bc189.
+The hour-long soak completed 10,115 cycles with zero routes; the exact LF image
+passed another 30 minutes/5,016 cycles with heap 44→44 MiB. Validation: 151 browser,
+11 native,3 runtime,945 server on Node 22 and a separate 12-case PG suite,
+including both DB-only cases. Temporary pre-model HH failure now retains the
+vacancy with 15-minute backoff. The earlier partial browser b6ede63 / server 93eed34
+is still running; installation and a new live application remain unconfirmed.
+At 17:31 Moscow time the full resume was readable, manual idle, automation off, revision 24;
+availability will be checked again before installation. Questionnaires stop
+without confirmed resume facts; the original unknown VK application is not retried.
 
 November 5: [memory and HH refusal investigation is reopened](updates/2026-11-05-hh-runtime-reopened.md).
 After the successful short window the browser crashed four more times with

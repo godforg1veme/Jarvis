@@ -4,8 +4,78 @@
 
 ## Русский
 
+### Повторный ремонт: длительные проверки пройдены, подготовлен выпуск
+
+Код `a95218e` устраняет два воспроизведённых случая в Playwright 1.64.0:
+маршрут страницы остаётся до первого terminal call после закрытия target;
+обработанный маршрут остаётся при ошибке continue/abort/fulfill. Небольшой
+build-time patch удаляет только маршруты конкретной закрытой страницы и
+выполняет terminal bookkeeping в finally. Сборка проверяет точную версию и
+SHA-256 исходного и итогового bundle; несовпадение останавливает сборку.
+Проверка ветви future handler до разрешённого continue сохранена.
+
+Отдельный локальный сценарий выявил гонку закрытия страницы с периодическим
+POST: window.stop не убирает таймеры документа. Общий helper теперь загружает
+свежий about:blank до load при действующих guards, затем закрывает target.
+Даже документ с URL about:blank заменяется заново. Неудачная навигация
+завершает runtime без прямого закрытия живого документа; при подтверждённом
+isClosed потеря ACK закрытия не считается новой неизвестной отправкой.
+Во время штатной остановки сначала завершается текущая health probe.
+Доказательство отклика сохраняется до ошибки последующей очистки.
+Если renderer уже упал и отказывается от навигации, требуется перезапуск
+browser с прежним журналом. Проверка same-process refresh заменена проверкой
+восстановления после перезапуска; crash coverage сохранён.
+
+На канонической сборке из Git archive проверено:
+
+- Linux browser 151/151, native/driver/journal 11/11, три runtime acceptance
+  на образе для выпуска с LF. Первая сборка из Windows archive содержала
+  CRLF; проверка shell fixture это выявила. Повторный source archive создан
+  с core.autocrlf=false. Код HH и patched bundle при этом не менялись.
+- 1 000 закрытий с периодическим POST: заблокировано 1 665 попыток,
+  до локального сервера дошло 0 POST. Это изолированный fixture, не запросы HH.
+- Сквозной Telegram-handler → PostgreSQL intent → RPC → Chromium → journal:
+  сохранён точный исходный отклик, потеря ответа и restart не создают второй POST.
+- Часовой delayed-GET soak 16:45:26–17:45:42 МСК: 10 115 циклов,
+  routes=0, clientObjects=16, fatal=0; post-GC heap 44 → 45 MiB,
+  промежуточные значения 45–46 MiB.
+- Точный LF образ для установки дополнительно прошёл 30 минут
+  17:15:33–17:45:52 МСК: 5 016 циклов, те же нулевые counters,
+  heap 44 → 44 MiB. Проверены 58 browser-файлов, включая package/patch,
+  и 388 server-файлов; bundle имеет ожидаемый SHA-256.
+
+Код `d7bc189` также распространяет существующую 15-минутную паузу на
+временную недоступность HH, rate limit, занятый браузер и необходимость входа
+до модели. Исходная vacancy остаётся pending; модель и отправка не вызываются.
+После начала модели или отправки unknown и исходные ID сохраняются.
+Уведомление о входе прежнее; доступ и согласие проверяются заново при повторе.
+Проверено: worker 20/20, server 945 passed и 2 DB-only skipped;
+независимая ревизия не нашла обхода согласия или повторной отправки.
+Полный серверный набор повторно прошёл на Linux и Node 22 рабочего образа.
+Отдельный набор с PostgreSQL прошёл 12/12, включая оба DB-only случая
+серверного набора. Он проверил личное выбранное резюме, паузу, возврат той же
+строки/ID и остановку после отзыва согласия. Прошли четыре CAPTCHA-сценария;
+один сценарий с внешней frozen OCR-моделью пропущен без её артефакта.
+
+Этот кандидат ещё не установлен. Ниже сохранён первый частичный этап,
+остаточное удержание которого и потребовало повторного ремонта.
+В 17:29–17:31 МСК три read-only чтения HH прошли без POST; полный снимок
+выбранного резюме прочитан по настоящему RPC, заполнены все пять полей.
+Ручная пауза стала idle; auto off, revision 24. Это не подтверждает новый
+отклик и не гарантирует доступность HH к моменту установки: будет свежая проверка.
+
+### Первый этап и обнаруженное ограничение
+
+**Дополнение в 06:50 МСК:** новый счётчик обнаружил один route закрытой
+страницы при active=0. Очистка window.stop не закрывает все случаи.
+Полное исправление памяти не подтверждено; ниже сохранены результаты
+уже выпущенного частичного ремонта. Продолжается ремонт bookkeeping
+закрытых страниц и ошибок terminal route в Playwright.
+
 Результат продолжает [расследование 5 ноября](2026-11-05-hh-runtime-reopened.md).
 Общий ремонт памяти `f543cc4` установлен в job-browser на DE 6 ноября.
+На первом этапе browser `b6ede63` дополнительно различает маршруты закрытых страниц,
+активную загрузку и неизвестную принадлежность; отправку это не меняет.
 Он действует для владельца и подключённых аккаунтов. Разрешения, выбранные
 резюме, фильтры, claims и журнал исходных операций сохранены.
 
@@ -15,8 +85,8 @@ server routes в persistent context. На диагностическом вып�
 дважды завершился с heap OOM. Кэш APIResponse и WebSocketRoute были пусты.
 Прежнее исправление WebSocket оставалось необходимым, но не закрывало HTTP.
 
-Общая очистка теперь останавливает оставшиеся ресурсы через window.stop,
-затем закрывает страницу. Обе стадии ограничены по времени. Очистка идёт
+Первый вариант общей очистки останавливал оставшиеся ресурсы через window.stop,
+затем закрывал страницу. Обе стадии ограничены по времени. Очистка идёт
 после результата операции, сохраняет контекстные guards и помечает неудачный
 runtime unhealthy. При сверке доказанный результат сначала сохраняется
 в ledger; сбой последующей очистки не должен терять подтверждение.
@@ -35,6 +105,10 @@ runtime unhealthy. При сверке доказанный результат �
 - Независимая ревизия нашла пропущенный consumer поднятия резюме; он исправлен.
   Окружение и mounts сверены без вывода значений, 57 browser-файлов совпали
   с опубликованным source. Desktop не изменялся.
+- Новые числовые счётчики прошли Linux unit/runtime 4/4 и положительный
+  контроль: все 971 удержанный route старого close распознаны как closed,
+  unknown=0. Повторный 100-cycle helper test оставил routes=closed=unknown=0,
+  post-GC heap=44 MiB. Значения URL, headers и содержимое страниц не выводятся.
 
 Живой тест начат в 06:26:44 МСК и остановлен до новых отправок: owner manual
 coordinator был active, предыдущая CAPTCHA дала HTTP 403 и осталась на экране.
@@ -63,13 +137,85 @@ Cookie/token совпадали; картинки не были старыми. 
 нет. Исходная операция не переотправлялась; шесть попыток сверки сохранены.
 
 Успешный живой автоотклик после этого ремонта пока не подтверждён.
-Часовой тест доказывает исправление воспроизведённого удержания маршрутов,
-но не гарантирует отсутствие любых будущих OOM или отказов HH.
+Первый часовой fixture не воспроизвёл остаточное удержание, которое позднее
+обнаружил рабочий closed-page counter. Его результат не доказывает полный ремонт.
 
 ## English
 
+### Second repair: extended validation passed, release prepared
+
+Code `a95218e` fixes two reproduced Playwright 1.64.0 cases: a page route remains
+before its first terminal call when the target closes, and a handled route remains
+when continue/abort/fulfill fails. A small build-time patch removes only the exact
+closed page's routes and finishes terminal bookkeeping in finally. The build checks
+the exact version and input/output bundle SHA-256; a mismatch stops the build.
+Future-handler validation before an allowed continue remains unchanged.
+
+A separate local fixture exposed page-close races with periodic POST requests:
+window.stop leaves document timers alive. Shared cleanup now loads a fresh
+about:blank through load while guards remain active, then closes the target.
+Even a document already at about:blank is replaced. Failed navigation exits the
+runtime without directly closing a live document; confirmed isClosed prevents a
+lost close ACK from being mistaken for a new uncertain submission. Normal shutdown
+awaits the current health probe. Application proof is persisted before escalating
+subsequent cleanup failure.
+An already crashed renderer that refuses navigation requires a browser restart
+with the existing journal. The old same-process refresh assertion now checks
+recovery after restart and retains crash coverage.
+
+Canonical Git-archive build validation:
+
+- Linux browser 151/151, native/driver/journal 11/11 and three runtime acceptances
+  on the LF release image. The first Windows archive exported CRLF, detected by
+  a shell fixture. The source archive was recreated with core.autocrlf=false;
+  HH logic and the patched bundle did not change.
+- 1,000 closures with periodic POSTs blocked 1,665 attempts; zero POSTs reached
+  the local server. This is an isolated fixture, with no HH requests.
+- Full Telegram handler → PostgreSQL intent → RPC → Chromium → journal preserved
+  the exact original application; lost acknowledgement and restart never added
+  a second POST.
+- Hour-long delayed-GET soak at 16:45:26–17:45:42 Moscow time: 10,115 cycles,
+  zero retained routes, 16 client objects and zero fatal events; post-GC heap
+  44 → 45 MiB, with intermediate samples at 45–46 MiB.
+- The exact LF image intended for installation also passed 30 minutes at
+  17:15:33–17:45:52 Moscow time: 5,016 cycles, the same zero counters,
+  heap 44 → 44 MiB. All 58 browser files including package/patch and 388 server
+  files matched source; the patched bundle matched its expected SHA-256.
+
+Code `d7bc189` also extends the existing 15-minute backoff to temporary HH failure,
+rate limiting, a busy browser and required sign-in before model invocation.
+The original vacancy stays pending, with no model call or submission. After a
+model or submission begins, unknown and original IDs remain protected. Existing
+sign-in attention is preserved; each retry rechecks access and consent. Validation:
+worker 20/20, server 945 passed with two DB-only skipped; independent review found
+no consent bypass or duplicate-submission path.
+The full server suite also passed on Linux and the production image's Node 22.
+The separate PostgreSQL suite passed 12/12, including both DB-only cases skipped
+by the full server suite. It verified the personal selected resume, the pause,
+reclaiming the same row/request ID, and stopping after consent revocation.
+Four additional CAPTCHA scenarios
+passed; one requiring an external frozen OCR model was skipped without its artifact.
+
+This candidate is not installed yet. The first partial stage remains below;
+its residual retention required this second repair.
+At 17:29–17:31 Moscow time, three read-only HH reads passed without POSTs;
+the full selected resume was read through real RPC with all five fields populated.
+Manual pause became idle; automation remained off at revision 24. This does not
+confirm a new application or guarantee HH availability at installation time;
+that will be checked again.
+
+### First stage and discovered limitation
+
+**Update at 06:50 Moscow time:** the new counter found one closed-page route
+with active=0. The window.stop cleanup does not cover every case. A complete
+memory repair is unconfirmed; the deployed partial repair results remain below.
+Playwright bookkeeping cleanup for closed pages and terminal route failures
+is being repaired.
+
 This continues the [November 5 investigation](2026-11-05-hh-runtime-reopened.md).
 Shared memory repair `f543cc4` was installed in the DE job-browser on November 6.
+At the first stage, browser `b6ede63` additionally distinguishes closed-page routes, active
+loads and unknown page ownership, without changing submission behavior.
 It covers the owner and connected accounts. Permissions, selected resumes,
 filters, claims and original-operation journals were preserved.
 
@@ -79,7 +225,7 @@ no active operation in the last sample; overnight the browser had two further
 heap OOM crashes. APIResponse caches and WebSocketRoute were empty. The earlier
 WebSocket fix remained necessary but did not address HTTP retention.
 
-Shared cleanup now stops remaining resources with window.stop, then closes
+The first shared cleanup stopped remaining resources with window.stop, then closed
 the page, with a deadline for each stage. Cleanup follows the operation result,
 preserves context guards and marks a failed runtime unhealthy. Reconciliation
 persists established proof to the ledger before escalating cleanup failure.
@@ -98,6 +244,10 @@ Validation:
 - Independent review found the omitted resume-raise consumer; it was repaired.
   Environment and mounts matched without printing values; 57 browser files
   matched published source. Desktop was unchanged.
+- New numeric counters passed Linux unit/runtime 4/4 and a positive control:
+  all 971 retained direct-close routes were classified closed, with zero
+  unknown page owners. A repeat 100-cycle helper test left routes=closed=unknown=0
+  and 44 MiB post-GC heap. URLs, headers and page contents are never printed.
 
 The live test began at 06:26:44 Moscow time and was stopped before any new
 submissions: the owner's manual coordinator was active after a previous
@@ -128,5 +278,5 @@ old HTTP status was not retained and exact sent-letter proof is unavailable.
 The original operation was not repeated; its six reconciliation attempts remain.
 
 A successful live application after this repair is not yet confirmed. The
-hour-long test establishes the reproduced route-retention repair, without
-guaranteeing that every future OOM or HH rejection has been eliminated.
+first hour-long fixture did not reproduce residual retention later detected by
+the production closed-page counter. That result does not establish a complete repair.

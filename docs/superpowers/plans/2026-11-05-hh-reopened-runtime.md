@@ -18,12 +18,12 @@ HTTP status/category не сохранён. Шесть GET-проверок и �
 - [x] Проверить candidate в Linux/runtime и независимой ревизией.
 - [x] Установить диагностический candidate с сохранением off/профиля/ledger:
   58f39f7 на DE, оба VPS source синхронизированы; env/mounts/hash verified.
-- [x] Установить конкретный второй источник retained heap; исправить и
+- [ ] Установить конкретный второй источник retained heap; исправить и
   воспроизвести до/после с реальной характерной нагрузкой.
 - [ ] Устранить подтверждённую причину отказа HH с сохранением single-send.
 - [x] Проверить более длительное окно и post-GC retained heap, не объявлять
   успех только по 30 минутам без crash.
-- [ ] Обновить русский/английский результат и синхронизировать выпуск.
+- [x] Обновить русский/английский результат и синхронизировать выпуск.
 
 6 ноября: browser f543cc4, server/collector 93eed34 установлены. Linux soak
 60 минут, 8919 cycles, routes0, heap44→44MiB; 146 browser/16 native/3 runtime,
@@ -33,7 +33,29 @@ POST403, cookie/token match, statehuman; не повторялся. Pre-model CA
 Результат: docs/updates/2026-11-06-hh-page-cleanup.md. Полное закрытие исходного
 HH отказа не заявлено; требуется человек и новый живой тест после подтверждения.
 
+06:50 МСК: browser b6ede63 показал server_closed_routes=1 при active=0;
+window.stop снижает накопление, но не даёт полного lifecycle cleanup.
+Нативный Playwright repro различает unhandled route (страница закрылась до
+server terminal call) и handled route (delegate rejected). Нужны exact-page
+PageClosed cleanup + finally после _startHandling в terminal methods, без
+отправки/повтора запросов и без очистки future-handler branch до проверки guard.
+Проверенный по checksum patch применяется при сборке только к pinned1.64.0;
+неизвестный source/version обязан отклоняться. Независимая ревизия и новый
+длительный тест обязательны до полного утверждения об исправлении.
+
 ## Route lifecycle repair under verification
+
+Повторный кандидат a95218e заменяет документ свежим about:blank до load и
+применяет checksum-bound patch двух подтверждённых случаев SDK retention.
+Оба direct-close обхода при неудачной навигации запрещены; crashed renderer
+требует restart с прежними claims, что подтверждено native CAPTCHA acceptance.
+Код d7bc189 также сохраняет pending при временной потере источника до модели;
+реальные PG acceptance подтверждают тот же item/request ID и отзыв согласия.
+Финальный LF образ: 151 browser,11 native,3 runtime,945 server на Node22;
+2 DB-only skipped в общем запуске; оба вошли в отдельный PG набор 12/12.
+Часовой fixture прошёл: 10115 cycles, routes0, heap44→45MiB.
+Отдельный 30-minute soak точного LF образа:5016cycles,routes0,heap44→44MiB.
+Оба exit0; публикация/установка и новый живой тест остаются следующим шагом.
 
 Linux baseline: 100 страниц с 30 delayed GET каждая, обычный close оставил
 1524 server routes (client objects=16, post-GC heap=60 MiB). Public cleanup

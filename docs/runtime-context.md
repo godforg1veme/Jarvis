@@ -243,6 +243,25 @@ Earlier stages are retained in the [context archive](history/2026-10-23-runtime-
 
 #### Browser, CAPTCHA и диагностика
 
+При закрытии HH-страницы общий helper сначала загружает свежий about:blank
+до `load`, сохраняя request guards, затем закрывает target. При неудаче
+навигации живой документ не закрывается напрямую: runtime завершается с
+закрытым кодом ошибки. Подтверждённый результат сохраняется до такой очистки.
+Для pinned Playwright 1.64.0 build-time patch освобождает routes только
+конкретной закрытой страницы и завершает terminal bookkeeping через finally.
+Другой version/hash отклоняется при сборке; обновление SDK требует ревизии
+patch и Linux acceptance. [Проверки](verification.md),
+[расследование и результат](updates/2026-11-06-hh-page-cleanup.md).
+
+Shared HH page cleanup loads a fresh about:blank through `load` while request
+guards remain active, then closes the target. Failed navigation never directly
+closes the live document: the runtime exits with a closed failure code. Established
+proof is persisted before cleanup. A build-time patch for pinned Playwright 1.64.0
+releases only the exact closed page's routes and finishes terminal bookkeeping in
+finally. A different version/hash fails the build; SDK upgrades require patch
+review and Linux acceptance. [Verification](verification.md),
+[investigation and result](updates/2026-11-06-hh-page-cleanup.md).
+
 Домен `server/src/jobs` использует PostgreSQL, Telegram, отдельные collector
 и Chromium browser. Browser владеет приватными HH-сессиями; профили разделены
 по UUID. Read/apply credentials разделены: collector имеет только read,

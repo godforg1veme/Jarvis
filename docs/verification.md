@@ -926,7 +926,9 @@ notification dedup/revoked identity/changed scope and retirement of stale notice
 Browser unit regressions are `browserHealth.test.js` and `captchaPageRecovery.test.js`.
 The isolated HTTPS `captchaTelegramAcceptance.cjs` deliberately crashes its own
 renderer using a test-only CDP session, verifies `isClosed() === false`, explicit
-refresh and a fresh tab with no duplicate POST. This test does not enable a runtime
+refresh marking the runtime unhealthy when document retirement fails, and a new
+browser/context loading the same manual state and claims without a duplicate POST.
+This test does not enable a runtime
 CDP listener. `manualRuntimeAcceptance.cjs` checks failed Chromium health;
 `browserFatalRuntimeAcceptance.cjs` kills only its own fixture Chromium child,
 checks main-process exit, restart with the original pause/claims and normal stop.
@@ -955,11 +957,41 @@ authenticated write RPC, Chromium native-form driver and Linux journal. A lost
 acknowledgement is reconciled after restart against the original exact letter.
 It has no production env file, account volume, host ports or live HH application.
 
+The production and acceptance Dockerfiles apply
+`job-browser/patches/applyPlaywrightRouteCleanup.js` to the exact pinned Playwright
+1.64.0 bundle. A different version or input hash must fail the build. When upgrading
+Playwright, review the upstream route lifecycle before changing the patch hashes;
+never skip the compatibility check. `playwrightRoutePatch.test.js` checks both
+accepted and rejected source/version inputs without changing installed packages.
+
+Run `job-browser/test/playwrightRouteCleanupAcceptance.cjs` explicitly against
+the image built from `job-browser/Dockerfile`, with the test folder mounted
+read-only. Use the pinned sandbox/seccomp, disposable profile, `--network none`
+and no account volume. It exercises real Chromium delayed GET teardown,
+periodic blocked POSTs, replacement of a scripted about:blank document, and
+continue/abort/fulfill delegate failures on an open page. A stock unpatched
+Playwright image is a baseline, not the acceptance target for this check.
+
+`routeRetentionAcceptance.cjs` runs with `node --expose-gc --test`; set
+`JOB_ROUTE_SOAK_MS=3600000` for an hour after 100 warmup cycles. Check route,
+closed-page/unknown-page and client-object counters at every checkpoint;
+post-GC heap must remain within the bounded warmup allowance. Forced GC is
+limited to this isolated fixture. Production uses numeric diagnostics only.
+`applicationDispatchAcceptance.cjs` also holds an already accepted HTTPS POST,
+closes its page before the receipt returns, and checks that the original receipt
+is retained without a second POST. These fixtures do not prove a live HH result.
+
 Telegram menu changes: run the focused suite in
 `docs/telegram-menu-contract.md`, then full `server/npm test` before deployment.
 
-Run the smallest relevant checks first, then adjacent regression suites. For
-configured model changes, test missing-key behavior, fake transport, and a
+Run the smallest relevant checks first, then adjacent regression suites.
+For Linux fixture archives created on Windows, use
+`git -c core.autocrlf=false archive --format=tar.gz HEAD` and verify shell files
+contain LF. Plain archive with core.autocrlf=true can export CRLF, causing a shell
+fixture to fail before the code under test runs. Keep disposable fixtures separate
+from account profiles and production data.
+
+For configured model changes, test missing-key behavior, fake transport, and a
 manual live contract without printing secrets. For deployment changes, use
 `deploy/scripts/preflight.sh`, Compose health, and `deploy/scripts/smoke.sh`.
 
