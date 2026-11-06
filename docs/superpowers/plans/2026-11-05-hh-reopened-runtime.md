@@ -18,12 +18,20 @@ HTTP status/category не сохранён. Шесть GET-проверок и �
 - [x] Проверить candidate в Linux/runtime и независимой ревизией.
 - [x] Установить диагностический candidate с сохранением off/профиля/ledger:
   58f39f7 на DE, оба VPS source синхронизированы; env/mounts/hash verified.
-- [ ] Установить конкретный второй источник retained heap; исправить и
+- [x] Установить конкретный второй источник retained heap; исправить и
   воспроизвести до/после с реальной характерной нагрузкой.
 - [ ] Устранить подтверждённую причину отказа HH с сохранением single-send.
-- [ ] Проверить более длительное окно и post-GC retained heap, не объявлять
+- [x] Проверить более длительное окно и post-GC retained heap, не объявлять
   успех только по 30 минутам без crash.
 - [ ] Обновить русский/английский результат и синхронизировать выпуск.
+
+6 ноября: browser f543cc4, server/collector 93eed34 установлены. Linux soak
+60 минут, 8919 cycles, routes0, heap44→44MiB; 146 browser/16 native/3 runtime,
+server943 +2DB skip. Живой отклик заблокирован настоящей CAPTCHA: предыдущий
+POST403, cookie/token match, statehuman; не повторялся. Pre-model CAPTCHA
+ошибка теперь pending+15min backoff; живой тест подтвердил0LLM/0apps и off24.
+Результат: docs/updates/2026-11-06-hh-page-cleanup.md. Полное закрытие исходного
+HH отказа не заявлено; требуется человек и новый живой тест после подтверждения.
 
 ## Route lifecycle repair under verification
 

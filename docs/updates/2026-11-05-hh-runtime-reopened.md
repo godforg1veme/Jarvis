@@ -4,6 +4,10 @@
 
 ## Русский
 
+**Более новый результат:** [6 ноября: ремонт HTTP routes и паузы CAPTCHA](2026-11-06-hh-page-cleanup.md).
+Часовой soak завершён; исправления установлены на DE. Эта запись сохраняет
+ход расследования. Живой автоотклик ещё ожидает проверку человека в HH.
+
 После прежнего 30-минутного окна browser 168d823 ещё четыре раза завершился
 с V8 heap OOM. Page-scoped WebSocket fix сохраняет WebSocketRoute=0,
 но не устранил весь рост JS heap. Прежнее заключение о полном исправлении
@@ -71,6 +75,10 @@ soak с delayed GET, health probes и post-GC проверками каждые 
 для неопределённых операций. Публикация и VPS согласованы владельцем.
 
 ## English
+
+**Newer result:** [November 6: HTTP route cleanup and CAPTCHA backoff](2026-11-06-hh-page-cleanup.md).
+The one-hour soak completed and repairs are installed on DE. This record
+preserves the investigation; live application verification still needs the HH human check.
 
 After the previous 30-minute observation, browser 168d823 crashed four more
 times with V8 heap OOM. The page-scoped WebSocket fix keeps WebSocketRoute=0

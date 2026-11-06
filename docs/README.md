@@ -4,11 +4,19 @@
 
 ## Русский
 
+6 ноября [ремонт HTTP routes и ожидания CAPTCHA установлен на DE](updates/2026-11-06-hh-page-cleanup.md):
+browser `f543cc4`, server/collector `93eed34`. Часовой Linux soak: 8 919 циклов,
+0 удержанных routes, heap после GC 44 MiB в начале и конце. Проверки: browser
+146/146, native/recovery 16/16, три runtime acceptance, server 943 + 2 DB-only skip.
+Живая CAPTCHA-пауза подтверждена без модели и отправки; итоговый off, revision 24.
+Новый успешный живой отклик пока не подтверждён: HH требует проверку человека
+после CAPTCHA HTTP 403. Анкеты без подтверждённых фактов резюме останавливаются.
+
 5 ноября [расследование памяти и отказов HH открыто повторно](updates/2026-11-05-hh-runtime-reopened.md):
 после успешного короткого окна browser ещё четыре раза завершился с heap OOM.
 WebSocket retention исправлен; второй источник подтверждён: HTTP routes остаются
 после закрытия страниц. Кандидат очистки прошёл Linux 146/146, 16 проверок
-отправки/восстановления и три runtime acceptance; часовой soak ещё идёт.
+отправки/восстановления и три runtime acceptance; итог часового soak указан 6 ноября.
 Отклик VK 138448900 не подтверждён; повтор запрещён. Анкеты без подтверждённых
 сведений резюме останавливаются до отправки. Автопоиск off.
 
@@ -236,12 +244,21 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 
 ## English
 
+November 6: [HTTP route cleanup and CAPTCHA waiting repairs are deployed on DE](updates/2026-11-06-hh-page-cleanup.md):
+browser `f543cc4`, server/collector `93eed34`. The one-hour Linux soak completed
+8,919 cycles with zero retained routes and 44 MiB post-GC heap at start and end.
+Validation: browser 146/146, native/recovery 16/16, three runtime acceptances,
+server 943 passed and two DB-only skipped. Live CAPTCHA backoff was verified
+without a model call or submission; final off, revision 24. A new successful
+live application remains unconfirmed: HH requires human verification after
+CAPTCHA HTTP 403. Questionnaires lacking confirmed resume facts stop submission.
+
 November 5: [memory and HH refusal investigation is reopened](updates/2026-11-05-hh-runtime-reopened.md).
 After the successful short window the browser crashed four more times with
 heap OOM. WebSocket retention is fixed; a second source is confirmed: HTTP
 routes survive page closure. The cleanup candidate passed Linux 146/146,
-16 submission/recovery checks and three runtime acceptances; the hour-long
-soak is still running. VK application 138448900 is unconfirmed and cannot be
+16 submission/recovery checks and three runtime acceptances; the one-hour
+soak result is recorded on November 6. VK application 138448900 is unconfirmed and cannot be
 resent. Questionnaires lacking confirmed resume facts stop before submission.
 Automation is off.
 
