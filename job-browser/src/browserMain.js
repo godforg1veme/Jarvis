@@ -69,7 +69,7 @@ async function createMemberRuntime({ userId, root, context, env, applyEnabled, o
       manual = new ManualCoordinator({ store: new ManualState({ root: path.join(root, 'manual-recovery'), ownerId: userId }),
         open: (target) => manualPage.open(target), verify: (target, id) => manualPage.verify(target, id) });
       await manual.load();
-      manualPage = new CaptchaTelegramBrowser({ context, coordinator: manual, journal, onUnhealthy: () => health.fail() });
+      manualPage = new CaptchaTelegramBrowser({ context, coordinator: manual, journal, onUnhealthy: () => health.failCleanup() });
       if (automaticEnabled) {
         const evidence = new CaptchaAttemptStore({ root: path.join(root, 'captcha-evidence'), ownerId: userId });
         const report = () => process.stderr.write('JOB_CAPTCHA_EVIDENCE_UNAVAILABLE\n');
@@ -80,7 +80,7 @@ async function createMemberRuntime({ userId, root, context, env, applyEnabled, o
     }
     const onManualRequired = manual && ((target, error) => handoverCaptcha({ journal, manual, ownerId: userId, target, error }));
     const browser = new HhBrowser({ context, primaryResumeId, captchaRecovery, manualCoordinator: manual, onManualRequired,
-      onTimeout: () => health.fail() });
+      onTimeout: () => health.failCleanup() });
     const ledger = new ApplicationLedger({ root: path.join(root, 'applications'), ownerId: userId });
     await ledger.directory();
     const runtime = { userId, root, context, browser, manual, manualPage, health, ledger, submissions: null,
@@ -97,7 +97,7 @@ async function createMemberRuntime({ userId, root, context, env, applyEnabled, o
           };
         }
       },
-      async close() { clearInterval(evidenceTimer); health.close(); await manualPage?.close(); },
+      async close() { clearInterval(evidenceTimer); health.close(); await health.inFlight; await manualPage?.close(); },
     };
     if (primaryResumeId) await runtime.setPrimaryResume(primaryResumeId);
     health.start();
@@ -164,7 +164,7 @@ async function startBrowser(env = process.env, { onFatal = () => {} } = {}) {
       manual = new ManualCoordinator({ store: new ManualState({ root: `${root}/manual-recovery`, ownerId }),
         open: (target) => manualPage.open(target), verify: (target, id) => manualPage.verify(target, id) });
       await manual.load();
-      manualPage = new CaptchaTelegramBrowser({ context, coordinator: manual, journal, onUnhealthy: () => health.fail() });
+      manualPage = new CaptchaTelegramBrowser({ context, coordinator: manual, journal, onUnhealthy: () => health.failCleanup() });
       if (automaticEnabled) {
         const evidence = new CaptchaAttemptStore({ root: `${root}/captcha-evidence`, ownerId });
         const report = () => process.stderr.write('JOB_CAPTCHA_EVIDENCE_UNAVAILABLE\n');
@@ -176,7 +176,7 @@ async function startBrowser(env = process.env, { onFatal = () => {} } = {}) {
     }
     const onManualRequired = manual && ((target, error) => handoverCaptcha({ journal, manual, ownerId, target, error }));
     const browser = new HhBrowser({ context, primaryResumeId, captchaRecovery, manualCoordinator: manual, onManualRequired,
-      onTimeout: () => health.fail() });
+      onTimeout: () => health.failCleanup() });
     let submissions = null;
     if (applyEnabled) {
       if (!primaryResumeId) throw new Error('JOB_BROWSER_CONFIG_INVALID');
@@ -224,7 +224,7 @@ async function startBrowser(env = process.env, { onFatal = () => {} } = {}) {
       health.close();
       broker?.closeAllConnections();
       if (broker) await new Promise((resolve) => broker.close(resolve));
-      await new Promise((resolve) => server.close(resolve)); await profiles?.close(); await browser.tail; await manualPage?.close(); await context.close();
+      await new Promise((resolve) => server.close(resolve)); await profiles?.close(); await browser.tail; await health.inFlight; await manualPage?.close(); await context.close();
     } };
   } catch (error) { stopMemoryDiagnostics?.(); clearInterval(evidenceTimer); health?.close(); server?.close(); broker?.close(); await profiles?.close().catch(() => {}); await manualPage?.close(); await context?.close(); throw error; }
 }

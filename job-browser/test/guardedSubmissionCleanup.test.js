@@ -33,12 +33,12 @@ test('failed durable checkpoint remains unknown and cleanup still escalates', as
 test('driver defers cleanup health signal until the guarded caller invokes its hook', async () => {
   let closed = false, unhealthy = 0;
   const page = { url: () => 'https://hh.ru/vacancy/other', isClosed: () => false,
-    evaluate: async () => { throw Error('private'); }, close: async () => { closed = true; } };
+    goto: async () => { throw Error('private'); }, close: async () => { closed = true; } };
   const browser = { open: async () => ({ page }), onTimeout: () => { unhealthy++; } };
   const driver = new HhApplicationDriver({ browser });
   const result = await driver.readResult({ externalId: '123', resumeId: 'resume1', letter: 'Fixture' });
   assert.equal(result.outcome, 'unknown');
-  assert.equal(closed, true); assert.equal(unhealthy, 0);
+  assert.equal(closed, false); assert.equal(unhealthy, 0);
   driver.finishReadResultCleanup(); driver.finishReadResultCleanup();
   assert.equal(unhealthy, 1);
 });

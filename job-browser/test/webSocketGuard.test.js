@@ -14,7 +14,7 @@ test('page guard completes before a managed page is returned', async () => {
 test('missing or failed WebSocket guard closes the page instead of returning it', async () => {
   for(const failure of [undefined,async()=>{throw Error('fixture');}]) {
     let closed=false;
-    await assert.rejects(newGuardedPage({newPage:async()=>({routeWebSocket:failure,close:async()=>{closed=true;}})}));
+    await assert.rejects(newGuardedPage({newPage:async()=>({goto:async()=>{},routeWebSocket:failure,close:async()=>{closed=true;}})}));
     assert.equal(closed,true);
   }
 });

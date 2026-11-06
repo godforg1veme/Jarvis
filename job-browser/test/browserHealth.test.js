@@ -9,6 +9,7 @@ const { HhBrowser } = require('../src/hhBrowser');
 function fixture() {
   const context = new EventEmitter(), page = new EventEmitter(); let probes = 0, closes = 0;
   page.isClosed = () => false; page.evaluate = async fn => { if (fn.toString().includes('window.stop')) return; probes++; return 1; };
+  page.goto = async url => { assert.equal(url, 'about:blank'); };
   page.routeWebSocket = async () => {};
   page.close = async () => { closes++; };
   context.pages = () => [page]; context.newPage = async () => page;
@@ -33,10 +34,29 @@ test('hung renderer has a bounded probe and fails closed without exposing its er
   const health = new BrowserHealth({ context: f.context, timeoutMs: 20, onFatal: () => fatal++ });
   assert.equal(await health.check(), false); assert.equal(fatal, 1); health.close();
 });
+
+test('cleanup failure remains fatal during shutdown while normal context close is ignored', () => {
+  const f = fixture(); let fatal = 0;
+  const health = new BrowserHealth({ context: f.context, onFatal: () => fatal++ });
+  health.close(); f.context.emit('close'); assert.equal(fatal, 0);
+  health.failCleanup(); health.failCleanup(); assert.equal(fatal, 1);
+});
+
+test('an in-flight probe cleanup still escalates if shutdown starts before cleanup', async () => {
+  const f = fixture(); let fatal = 0, finishProbe;
+  f.page.evaluate = () => new Promise(resolve => { finishProbe = resolve; });
+  f.page.goto = async () => { throw Error('PRIVATE'); };
+  const health = new BrowserHealth({ context: f.context, onFatal: () => fatal++ });
+  const pending = health.check();
+  await new Promise(resolve => setImmediate(resolve));
+  health.close(); finishProbe(1);
+  assert.equal(await pending, false); assert.equal(fatal, 1);
+  assert.equal(f.counts().closes, 0);
+});
 test('crashed page is never probed or reused for browser health', async () => {
   const f = fixture(), health = new BrowserHealth({ context: f.context });
   f.page.emit('crash'); let freshClosed = false;
-  f.context.newPage = async () => ({ routeWebSocket: async () => {}, evaluate: async () => 1, close: async () => { freshClosed = true; } });
+  f.context.newPage = async () => ({ routeWebSocket: async () => {}, evaluate: async () => 1, goto: async () => {}, close: async () => { freshClosed = true; } });
   assert.equal(await health.check(), true); assert.equal(f.counts().probes, 0); assert.equal(freshClosed, true); health.close();
 });
 test('authenticated HTTP health returns 503 for an unusable browser and hides exceptions', async () => {

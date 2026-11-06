@@ -19,6 +19,10 @@ class BrowserHealth {
     if (this.stopped || this.failed) return;
     this.failed = true; this.onFatal();
   }
+  failCleanup() {
+    if (this.failed) return;
+    this.failed = true; this.onFatal();
+  }
   check() {
     if (this.failed || this.stopped) return Promise.resolve(false);
     if (this.inFlight) return this.inFlight;
@@ -26,7 +30,7 @@ class BrowserHealth {
       // A dedicated blank page cannot race HH navigation or execute HH scripts.
       const page = await newGuardedPage(this.context);
       try { return await page.evaluate(() => 1) === 1; }
-      finally { await closeGuardedPage(page, { onUnhealthy: () => this.fail() }); }
+      finally { await closeGuardedPage(page, { onUnhealthy: () => this.failCleanup() }); }
     }, this.timeoutMs).catch(() => false).then(ok => {
       if (!ok) this.fail();
       return ok && !this.failed && !this.stopped;

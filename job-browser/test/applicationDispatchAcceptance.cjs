@@ -15,13 +15,14 @@ const { installApplicationFixture } = require('./helpers/hhApplicationFixture');
 const { randomUUID } = require('node:crypto');
 const { parseFields } = require('../src/submissionProtocol');
 
-test('real HTTPS application dispatch retains original receipt and cookies, never follows redirect or retries lost response', async () => {
+test('real HTTPS application dispatch retains original receipt and cookies, never follows redirect or retries lost response', { timeout: 60000 }, async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'hh-transport-'));
   let server, browser;
   try {
     execFileSync('openssl', ['req','-x509','-newkey','rsa:2048','-nodes','-keyout',path.join(root,'key'),
       '-out',path.join(root,'cert'),'-subj','/CN=hh.ru','-days','1'], { stdio: 'ignore' });
     let posts = 0, forwarded = 0, mode = 'success';
+    let observedHeldPost, releaseHeldReceipt, heldReceipt, dispatchedHeld;
     const input = { externalId: '123', resumeId: 'fixtureResume', letter: 'Approved text' };
     const receipt = { topic_id: 444, chat_id: 555, responseStatus: {
       resumes: { 222: { id: 222, hash: input.resumeId } }, usedResumeIds: [222],
@@ -32,6 +33,7 @@ test('real HTTPS application dispatch retains original receipt and cookies, neve
       assert.equal(parseFields({contentType:req.headers['content-type'],body:Buffer.concat(chunks)}).get('letter'),input.letter);
       if (mode === 'drop') { req.socket.destroy(); return; }
       if (mode === 'redirect') { res.writeHead(307,{location:'https://hh.ru/forbidden'});res.end();return; }
+      if (mode === 'held') { observedHeldPost(); await heldReceipt; }
       res.writeHead(200,{'content-type':'application/json','set-cookie':'fixture_proof=1; Path=/; Secure'});res.end(JSON.stringify(receipt));
     });
     await new Promise(resolve => server.listen(443,'127.0.0.1',resolve));
@@ -39,7 +41,7 @@ test('real HTTPS application dispatch retains original receipt and cookies, neve
     const context = await browser.newContext({ignoreHTTPSErrors:true,serviceWorkers:'block'});
     let result;
     await context.route('**/*', async route => {
-      if (route.request().method() === 'POST') { result = await dispatchApplication(route,input); return; }
+      if (route.request().method() === 'POST') { result = await dispatchApplication(route,input); dispatchedHeld?.(result); return; }
       await route.fulfill({status:200,contentType:'text/html',body:'<html>fixture</html>'});
     });
     const page = await context.newPage();await page.goto('https://hh.ru/');
@@ -57,6 +59,15 @@ test('real HTTPS application dispatch retains original receipt and cookies, neve
     assert.equal(posts,1);assert.equal((await context.cookies()).some(c=>c.name==='fixture_proof'&&c.value==='1'),true);
     mode='redirect';assert.equal((await send()).outcome,'unknown');assert.equal(posts,2);assert.equal(forwarded,0);
     mode='drop';assert.equal((await send()).outcome,'unknown');assert.equal(posts,3);
+    mode='held';
+    const heldPost = new Promise(resolve => { observedHeldPost=resolve; });
+    heldReceipt = new Promise(resolve => { releaseHeldReceipt=resolve; });
+    const heldDispatch = new Promise(resolve => { dispatchedHeld=resolve; });
+    const interruptedPage = send().catch(()=>null);
+    await heldPost; await page.close(); releaseHeldReceipt();
+    assert.deepEqual(await heldDispatch,{outcome:'sent',verified:true,externalId:'444'});
+    await interruptedPage; dispatchedHeld=null;
+    assert.equal(posts,4);assert.equal(forwarded,0);
     mode='success';
     const fixture=await installApplicationFixture(context,{resumeId:input.resumeId});
     const hh=new HhBrowser({context,primaryResumeId:input.resumeId});
@@ -65,8 +76,8 @@ test('real HTTPS application dispatch retains original receipt and cookies, neve
       ledger:new ApplicationLedger({root:path.join(root,'ledger'),ownerId}),driver:new HhApplicationDriver({browser:hh})});
     const operation={...input,userId:ownerId,operationId:randomUUID()};
     assert.deepEqual(await hh.run(()=>guarded.submit(operation)),{outcome:'sent',verified:true,externalId:'444'});
-    assert.equal(posts,4);assert.equal(fixture.posts,0,'default driver actually uses HTTPS upstream');
-    assert.equal((await hh.run(()=>guarded.submit(operation))).outcome,'sent');assert.equal(posts,4);
+    assert.equal(posts,5);assert.equal(fixture.posts,0,'default driver actually uses HTTPS upstream');
+    assert.equal((await hh.run(()=>guarded.submit(operation))).outcome,'sent');assert.equal(posts,5);
     await context.close();
   } finally { await browser?.close();server?.closeAllConnections();await new Promise(resolve=>server?server.close(resolve):resolve());await fs.rm(root,{recursive:true,force:true}); }
 });

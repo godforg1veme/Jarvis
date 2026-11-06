@@ -8,23 +8,19 @@ function deadline(work, timeoutMs) {
   ]).finally(() => clearTimeout(timer));
 }
 
-// Stop in-flight subresources before closing a managed page. Playwright 1.64
-// otherwise retains failed route delegates in the persistent context.
+// Leave the document while request guards are still active. Merely stopping
+// loaders leaves page timers alive during the interception teardown at close.
 async function closeGuardedPage(page, { timeoutMs = 2000, onUnhealthy = () => {} } = {}) {
   if (!page) return;
-  let failed = false;
+  const fail = () => { try { onUnhealthy(); } catch {} throw failure(); };
   try {
     if (!page.isClosed?.()) {
-      if (typeof page.evaluate !== 'function') throw failure();
-      await deadline(() => page.evaluate(() => window.stop()), timeoutMs);
+      if (typeof page.goto !== 'function') throw failure();
+      await deadline(() => page.goto('about:blank', { waitUntil: 'load', timeout: timeoutMs }), timeoutMs);
     }
-  } catch { failed = true; }
+  } catch { fail(); }
   try { await deadline(() => page.close(), timeoutMs); }
-  catch { failed = true; }
-  if (failed) {
-    try { onUnhealthy(); } catch {}
-    throw failure();
-  }
+  catch { if (page.isClosed?.() !== true) fail(); }
 }
 
 module.exports = { closeGuardedPage };

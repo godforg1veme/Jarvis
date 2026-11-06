@@ -4,5 +4,7 @@
 !job-browser/package-lock.json
 !job-browser/src/
 !job-browser/src/**
+!job-browser/patches/
+!job-browser/patches/**
 !shared/
 !shared/jobQuestionnaire.js

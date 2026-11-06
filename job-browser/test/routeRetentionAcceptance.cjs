@@ -10,6 +10,7 @@ const { chromium } = require('playwright');
 const { newGuardedPage } = require('../src/webSocketGuard');
 const { closeGuardedPage } = require('../src/pageCleanup');
 const { BrowserHealth } = require('../src/browserHealth');
+const { memoryLine } = require('../src/runtimeMemoryDiagnostics');
 
 test('closed pages do not retain delayed GET routes in a persistent context',
   { skip: process.platform !== 'linux' }, async () => {
@@ -54,6 +55,10 @@ test('closed pages do not retain delayed GET routes in a persistent context',
         console.log(JSON.stringify({ phase, elapsedMs: soakMs ? Date.now() - soakStart : 0,
           cycles, retainedRoutes, clientObjects, heapMiB, fatal }));
         assert.equal(clientObjects, baselineObjects);
+        const diagnostic = memoryLine({ browsers: [{ context }] });
+        assert.ok(diagnostic.includes(` server_routes_inflight=${retainedRoutes} `));
+        assert.ok(diagnostic.includes(` server_closed_routes=${retainedRoutes} `));
+        assert.ok(diagnostic.includes(' server_route_pages_unknown=0 '));
         if (process.env.JOB_ROUTE_BASELINE !== '1') assert.equal(retainedRoutes, 0);
         assert.equal(fatal, 0);
         return heapMiB;

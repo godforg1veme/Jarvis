@@ -5,6 +5,8 @@ WORKDIR /home/pwuser/probe
 COPY --chown=pwuser:pwuser job-browser/package.json job-browser/package-lock.json ./
 USER pwuser
 RUN npm ci --omit=dev --no-audit --no-fund
+COPY --chown=pwuser:pwuser job-browser/patches ./patches
+RUN node patches/applyPlaywrightRouteCleanup.js
 COPY --chown=pwuser:pwuser job-browser/src ./src
 COPY --chown=pwuser:pwuser shared /home/pwuser/shared
 CMD ["node", "src/browserMain.js"]
