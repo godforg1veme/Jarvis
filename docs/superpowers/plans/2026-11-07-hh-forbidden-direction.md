@@ -36,9 +36,20 @@ Delivery remains unresolved; next stage adds closed request/response diagnostics
   Linux/Chromium160/160 passed; Windows focused6/6.
 - [x] Install diagnostic browser image with exact-source validation; preserve
   server/collector images, profiles, env, mounts and policies.
-- [ ] Current manual CAPTCHA gate; read-only diagnostic/live result after it,
+- [x] Current manual CAPTCHA gate; read-only diagnostic/live result after it,
   without repeating any previous uncertain operation.
 
 Diagnostic release `e816e67` installed: browser59/server390 files and vendor pin
 matched; env/mounts/inodes/policies/other services preserved. Final image14/14
 passed after the initial full160/160. Current manual gate active2691; autooff28.
+
+
+Final diagnostic release0f19df2: cached-response fixture/exact image158/158,
+security accepted. Actual live14:07–14:17:11skip/1unknown403, xsrf/header/cookie
+match, Origin/RefererHH, small_text/unclassified, off30; pause886seconds observed.
+Runtime21samples/heap47–62/no restarts/OOM/closed routes. Delivery NOT closed.
+- [ ] Native transport research: independent redirect denial plus original proof;
+  HTTPS localhost7-mode PoC passed, session-loss/stream-proof gates still open.
+- [ ] Selection diagnostic ambiguity: source139071223 complete50fragments,
+  source duty quote present; cannot distinguish model unclear vs invalid quote.
+  No model replay or automatic policy relaxation is authorized by this evidence.

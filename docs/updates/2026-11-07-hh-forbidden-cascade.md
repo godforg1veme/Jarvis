@@ -5,8 +5,9 @@
 ## Русский
 
 Продолжение [ремонта памяти 6 ноября](2026-11-06-hh-page-cleanup.md).
-На DE установлен server/collector `4836021`; browser остаётся `2a201a0`
-без пересоздания. GitHub main, Windows и исходники обоих VPS сверены.
+На DE установлен server/collector `4836021` и browser `0f19df2`.
+GitHub main, Windows и исходники обоих VPS сверены. Browser обновлён отдельно;
+server/collector при диагностических обновлениях не пересоздавались.
 Причина самого HTTP 403 остаётся открытой; успешная новая отправка не подтверждена.
 
 ### Что произошло ночью
@@ -93,8 +94,9 @@ NL получил исходники; HH runtime на нём не установ
 составили $0.004241008, неизвестных расходов нет. Старые unknown не повторялись.
 
 Пауза подтверждена в production, но доставка остаётся неисправленной.
-Текущий журнал сводит недоступное тело ответа, нераспознанную ошибку и общий
-отказ к одному FORBIDDEN. Следующий этап — закрытые категории ответа и
+Во время этого окна прежний журнал сводил недоступное тело ответа,
+нераспознанную ошибку и общий отказ к одному FORBIDDEN. Дальнейшие этапы добавили
+закрытые категории ответа и
 исходного запроса, без текста HH, URL, cookies или токенов. Новый 403 не даёт
 права повторить исходную отправку. Автопоиск оставлен выключенным.
 
@@ -139,14 +141,53 @@ Playwright уже буферизовал весь ответ: лимит огр�
 Независимая security-ревизия приняла границы. Точный Linux-образ прошёл158/158,
 включая localhost GET fixture chunked/gzip/br/deflate, слишком большой и
 невалидный UTF-8, другой контекст/URL/UID и запрет APIResponse.body(). Запросов
-к HH и POST в этой фикстуре нет. Установка кандидата пока не подтверждена.
-В 14:03 МСК manual state стал idle2694; новый живой тест ещё не начат.
+к HH и POST в этой фикстуре нет. Кандидат установлен в release `0f19df2`: 60 browser-файлов и patched bundle
+сверены, env/mounts/inodes/policies сохранены; live/ready200, restart0.
+В 14:03 МСК manual state стал idle2694. Полное выбранное резюме подтверждено;
+новое живое окно начато 14:07:28 МСК на revision29 с восстановлением off после
+теста и остановкой при unknown. Старые операции не повторяются.
+
+### Живое окно 14:07–14:17 МСК
+
+Окно завершено полностью: 11 skipped и одна новая unknown отправка с HTTP403.
+Из двух предварительных apply независимая проверка разрешила один и остановила
+один как UNCERTAIN. Расходы15 строк usage — $0.00791814, неопределённых расходов0.
+Пауза следующих вакансий подтверждена: наблюдалось886 секунд остатка. Наблюдатель
+восстановил off, revision30. Предыдущие unknown не переотправлялись.
+
+Диагностика исходного403: малый текстовый ответ, errorClass=unclassified;
+XSRF в теле, заголовке и cookie совпал; Origin/Referer относятся к HH. Явная потеря
+или расхождение этих полей не подтверждены. Это не доказывает anti-bot, сетевую
+блокировку или ошибку Node transport. В Jarvis14 sent за последние24 часа;
+сохранённая HH-история также показывает14 за24 часа (597 всего, checked13:54 МСК).
+[Официальная справка HH](https://feedback.hh.ru/knowledge-base/article/1618)
+указывает200 откликов в день; достижение лимита по этим данным не подтверждено.
+
+Контроль browser/server/collector:21 замер, heap47–62 MiB, restart/OOM0,
+closed/unknown routes0, live/ready200. Окончательная проверка env/mounts/inodes/
+policies и остальных служб прошла. Это стабильность runtime, не успешная доставка.
+Оба VPS и GitHub/source сверены; Desktop сохранил прежний отсутствующий shared-файл.
+
+Открыт вопрос консервативного отбора:139071223 «AI Native Product Owner»
+остановлен как UNCERTAIN. Полный источник доступен:50 фрагментов, цитата о создании
+продуктов с AI-агентами присутствует. Сохранённый вердикт не различает исходную
+неясность модели и понижение невалидной цитаты нормализатором; повторять запрос
+модели ради выяснения нельзя. Нужны закрытые метаданные этой проверки до коррекции.
+
+Доставка остаётся открытой. Проверяется обычный браузерный transport, но простая
+замена на route.continue небезопасна: Playwright пропускает redirected POST мимо
+route guards. Изолированный HTTPS PoC с отдельным CDP response guard остановил
+307/308 (включая другой origin):7 сценариев, исходныйPOST1, повторныхPOST0.
+Это только localhost fixture, не HH и не production. Потеря CDP-сессии и надёжное
+получение исходной квитанции ещё требуют проверки. Production остаётся на
+route.fetch с maxRedirects0/maxRetries0; старые неизвестные операции не повторяются.
 
 ## English
 
 This continues the [November 6 memory repair](2026-11-06-hh-page-cleanup.md).
-Server/collector `4836021` are installed on DE; browser remains `2a201a0`
-without recreation. GitHub main, Windows and both VPS source checkouts matched.
+Server/collector `4836021` and browser `0f19df2` are installed on DE.
+GitHub main, Windows and both VPS source checkouts matched. Browser was updated
+separately; diagnostic updates did not recreate server/collector.
 The HTTP 403 cause remains open; a new successful submission is not confirmed.
 
 ### Overnight evidence
@@ -233,9 +274,9 @@ applied 15-minute backoff (893 seconds remaining were observed), and the observe
 disabled automation at revision 28. No later submissions occurred. Eight usage
 rows totaled $0.004241008, with no unknown costs. Old unknowns were not resent.
 
-Production backoff is confirmed, but delivery remains unresolved. The current
-journal collapses unavailable response bodies, unclassified errors and generic
-refusals into FORBIDDEN. The next stage records closed response/request categories
+Production backoff is confirmed, but delivery remains unresolved. During that window, the former
+journal collapsed unavailable response bodies, unclassified errors and generic
+refusals into FORBIDDEN. Subsequent stages record closed response/request categories
 without HH text, URLs, cookies or tokens. A new 403 never permits repeating the
 original submission. Automation remains off.
 
@@ -281,5 +322,46 @@ inspection, not the original fetch memory use.
 Independent security review accepted the boundary. The exact Linux image passed
 158/158, including localhost GET fixtures for chunked/gzip/br/deflate, oversize,
 invalid UTF-8, wrong context/URL/UID and forbidden APIResponse.body(). The fixture
-has no HH requests or POST. Candidate installation is not yet confirmed. At
-14:03 Moscow time, manual state became idle2694; a fresh live test has not begun.
+has no HH requests or POST. The candidate is installed in release `0f19df2`: 60 browser files and the patched
+bundle matched, environment/mounts/inodes/policies were preserved, live/ready200
+and restart0. Manual state became idle2694 at14:03 Moscow time. The complete
+selected resume was verified. A fresh live window started at14:07:28 Moscow time
+on revision29, restoring off after the test and stopping on unknown. Old
+operations are never resent.
+
+### Live window14:07–14:17 Moscow time
+
+The full window completed:11 skipped and one new unknown submission with HTTP403.
+Of two preliminary apply decisions, independent verification allowed one and
+stopped one as UNCERTAIN. Fifteen usage rows totaled $0.00791814 with zero unknown
+costs. Backoff of later vacancies was observed with886 seconds remaining. The
+observer restored off at revision30. Earlier unknowns were not resent.
+
+Original403 diagnostics: small text response, errorClass=unclassified; body/header/
+cookie XSRF matched, and Origin/Referer belonged to HH. An obvious missing or
+mismatched field is not confirmed. This does not prove anti-bot, network blocking
+or a Node transport defect. Jarvis has14 sent in the last24 hours; stored HH
+history also shows14 in24 hours (597 total, checked13:54 Moscow time).
+[HH's official help](https://feedback.hh.ru/knowledge-base/article/1618) states
+200 applications per day; these observations do not confirm reaching that limit.
+
+Browser/server/collector monitoring:21 samples, heap47–62 MiB, zero restarts/OOMs
+and closed/unknown routes, live/ready200. Final environment/mount/inode/policy
+and other-service checks passed. This establishes runtime stability, not delivery.
+Both VPS and GitHub/source matched; Desktop retains its earlier missing shared file.
+
+Conservative selection remains an open question:139071223, “AI Native Product
+Owner”, was stopped as UNCERTAIN. The complete source was available:50 fragments,
+including the duty about creating products with AI agents. The stored verdict
+cannot distinguish model uncertainty from quote invalidation by the normalizer.
+Do not repeat that model request merely to diagnose it; capture closed validation
+metadata before deciding on a correction.
+
+Delivery remains unresolved. Standard browser transport is being investigated,
+but simply switching to route.continue is unsafe: Playwright bypasses route guards
+for redirected POSTs. An isolated HTTPS PoC with a separate CDP response guard
+stopped307/308, including another origin:7 scenarios, one original POST and zero
+repeated POSTs. This is localhost fixture evidence, not HH or production. CDP
+session loss and reliable original-receipt capture still require verification.
+Production retains route.fetch with maxRedirects0/maxRetries0; old uncertain
+operations are never resent.

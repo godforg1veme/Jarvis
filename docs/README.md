@@ -4,15 +4,16 @@
 
 ## Русский
 
-7 ноября [ремонт каскада HH 403 и независимая проверка направления установлены](updates/2026-11-07-hh-forbidden-cascade.md).
-Server/collector на DE — `4836021`, browser с диагностикой — `e816e67`; исходники обоих VPS
-сверены с GitHub. Ночью подтверждены 14 откликов, затем шесть 403 и два прерывания
-до application. Добавлены пауза 15 минут и отдельная проверка основной профессии
-до письма, с раздельным учётом расходов. Проверено: 954 server на Windows/Linux
-Node 22, 24 PG и шесть настоящих классификаций без HH POST.
-Живое окно 03:41–03:51 МСК: пять skipped, одна новая отправка снова получила 403.
-Пауза сработала, следующих отправок нет; auto off, revision 28. Причина самого
-403 ещё не доказана. Старые unknown не повторяются; ремонт доставки не закрыт.
+7 ноября [ремонт каскада HH403, отбора и диагностики установлен](updates/2026-11-07-hh-forbidden-cascade.md).
+Server/collector на DE — `4836021`, browser — `0f19df2`; исходники обоих VPS
+сверены с GitHub. Проверены scoped пауза15 минут, отдельное source-only veto,
+приватная диагностика XSRF/Origin и bounded разбор исходного ответа.
+Server954, PG24, реальные классификации6/6; browser160/160, последующие точные
+образы14/14 и158/158. В окне14:07–14:17 МСК:11 skipped, одна новая unknown403.
+XSRF body/header/cookie совпали, Origin/Referer HH; причина самого отказа ещё
+не доказана. Runtime:21 замер, heap47–62 MiB, рестартов/OOM/закрытых routes0.
+Auto off30, старые unknown не повторяются. Доставка остаётся открытой; проверка
+обычного браузерного transport идёт только в изолированных fixtures.
 
 6 ноября [общий ремонт HH установлен на DE](updates/2026-11-06-hh-page-cleanup.md):
 browser/server/collector `2a201a0`, исходники обоих VPS совпадают с GitHub.
@@ -260,16 +261,16 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 
 ## English
 
-November 7: [HH 403 cascade repair and independent direction verification are installed](updates/2026-11-07-hh-forbidden-cascade.md).
-DE server/collector run `4836021`, diagnostic browser `e816e67`; both VPS source checkouts
-matched GitHub. Overnight there were 14 confirmed sends, then six 403 responses
-and two interruptions before application creation. The repair adds 15-minute
-backoff and a separate main-profession check before drafting, with separate cost
-accounting. Validation: 954 server tests on Windows/Linux Node 22, 24 PG and six
-real classifier cases without HH POST. In the 03:41–03:51 Moscow live window,
-five vacancies were skipped and one new submission again returned 403. Backoff
-worked; no later sends occurred. Automation is off at revision 28. The cause of
-403 remains unproven; old unknowns are not resent and delivery repair stays open.
+November7: [HH403 cascade, selection and diagnostic repairs are installed](updates/2026-11-07-hh-forbidden-cascade.md).
+DE server/collector run `4836021`, browser `0f19df2`; both VPS sources matched
+GitHub. Scoped15-minute backoff, separate source-only veto, private XSRF/Origin
+diagnostics and bounded original-response inspection were verified. Server954,
+PG24, real classifiers6/6; browser160/160, then exact images14/14 and158/158.
+The14:07–14:17 Moscow live window had11 skipped and one new unknown403. Body/
+header/cookie XSRF matched and Origin/Referer belonged to HH; the refusal cause
+is unproven. Runtime:21 samples, heap47–62 MiB, zero restarts/OOMs/closed routes.
+Automation is off30; old unknowns are not resent. Delivery remains open; standard
+browser transport is being investigated only in isolated fixtures.
 
 November 6: [the shared HH repair is installed on DE](updates/2026-11-06-hh-page-cleanup.md).
 Browser/server/collector run `2a201a0`; both VPS sources match GitHub.
