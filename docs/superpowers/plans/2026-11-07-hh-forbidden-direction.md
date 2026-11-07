@@ -34,7 +34,11 @@ Delivery remains unresolved; next stage adds closed request/response diagnostics
 - [x] Closed original403 diagnostic, immutable claim-bound journal; no new RPC,
   secrets, POST/retry or outcome changes. Independent security review accepted.
   Linux/Chromium160/160 passed; Windows focused6/6.
-- [ ] Install diagnostic browser image with exact-source validation; preserve
+- [x] Install diagnostic browser image with exact-source validation; preserve
   server/collector images, profiles, env, mounts and policies.
 - [ ] Current manual CAPTCHA gate; read-only diagnostic/live result after it,
   without repeating any previous uncertain operation.
+
+Diagnostic release `e816e67` installed: browser59/server390 files and vendor pin
+matched; env/mounts/inodes/policies/other services preserved. Final image14/14
+passed after the initial full160/160. Current manual gate active2691; autooff28.

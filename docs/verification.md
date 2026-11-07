@@ -1053,3 +1053,17 @@ categories, refusal to read unbounded/compressed bodies, owner/claim/letter/
 questionnaire binding, immutable records and corrupt diagnostics without changing
 the result. Run Linux-only ledger cases on Linux alongside Chromium driver
 acceptance. Metadata alone does not prove the403 cause or establish submission.
+
+
+`cachedResponseErrorAcceptance.cjs` runs only localhost GET in the exact pinned
+Linux browser image. Check chunked/gzip/br/deflate, oversized and invalid UTF-8
+bodies, wrong BrowserContext/URL/UID, and a throwing APIResponse.body. The fixed
+version/bundle pin must remain closed on unknown builds. No HH requests, POST,
+raw bodies or second decompression are permitted; the limit bounds new decoding,
+not Playwright's prior fetch buffering.
+
+`cachedResponseErrorAcceptance.cjs` проверяется только localhost GET на точном
+закреплённом Linux-образе. Проверяются chunked/gzip/br/deflate, размер и UTF-8,
+чужой контекст/URL/UID и запрет APIResponse.body. Неизвестная сборка закрывает
+разбор. HH/POST/сырые тела/вторая распаковка запрещены; лимит ограничивает decode,
+а не предыдущее буферизование Playwright.

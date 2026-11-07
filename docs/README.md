@@ -5,7 +5,7 @@
 ## Русский
 
 7 ноября [ремонт каскада HH 403 и независимая проверка направления установлены](updates/2026-11-07-hh-forbidden-cascade.md).
-Server/collector на DE — `4836021`, browser с диагностикой — `4aab2a2`; исходники обоих VPS
+Server/collector на DE — `4836021`, browser с диагностикой — `e816e67`; исходники обоих VPS
 сверены с GitHub. Ночью подтверждены 14 откликов, затем шесть 403 и два прерывания
 до application. Добавлены пауза 15 минут и отдельная проверка основной профессии
 до письма, с раздельным учётом расходов. Проверено: 954 server на Windows/Linux
@@ -261,7 +261,7 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 ## English
 
 November 7: [HH 403 cascade repair and independent direction verification are installed](updates/2026-11-07-hh-forbidden-cascade.md).
-DE server/collector run `4836021`, diagnostic browser `4aab2a2`; both VPS source checkouts
+DE server/collector run `4836021`, diagnostic browser `e816e67`; both VPS source checkouts
 matched GitHub. Overnight there were 14 confirmed sends, then six 403 responses
 and two interruptions before application creation. The repair adds 15-minute
 backoff and a separate main-profession check before drafting, with separate cost

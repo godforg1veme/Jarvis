@@ -98,7 +98,7 @@ NL получил исходники; HH runtime на нём не установ
 исходного запроса, без текста HH, URL, cookies или токенов. Новый 403 не даёт
 права повторить исходную отправку. Автопоиск оставлен выключенным.
 
-### Следующий этап: диагностика исходного отказа
+### Диагностика исходного отказа
 
 Добавлена отдельная immutable запись в приватном журнале browser: категория
 размера/кодирования ответа, категория распознанной ошибки, наличие XSRF,
@@ -120,8 +120,27 @@ manual active, revision 2691; запрошена новая проверка ч�
 Дополнение `2278a97` проверяет XSRF заголовка с cookie и при отсутствии токена
 в теле POST. Старые записи предыдущей закрытой схемы остаются читаемыми.
 Точный образ дополнения прошёл 14/14 Linux/Chromium-проверок, включая нативную
-форму и durable journal; security-ревизия приняла совместимость. Дополнение
-пока не установлено; это не доказательство причины403.
+форму и durable journal; security-ревизия приняла совместимость. Дополнение установлено в release `e816e67`; это не доказательство причины403.
+Наблюдение первого образа было завершено перед заменой (13 замеров, без сбоев);
+для окончательного образа начато новое полное десятиминутное окно.
+
+### Разбор уже полученного сжатого отказа
+
+Кандидат `2dfccde` уточняет исходный403, если прежний inspector не мог прочитать
+сжатый ответ или ответ без Content-Length. Он читает только сохранённый буфер
+того же APIResponse в том же BrowserContext, с совпадением URL/status/UID,
+Playwright1.64 и точного patched SHA. До декодирования проверяются Buffer и
+размер1–32768 байт, MIME/encoding и UTF-8. Нет нового запроса, глобального поиска
+по контекстам, повторной распаковки, копирования тела через RPC или сырого лога.
+Несовпадение закрывает разбор; результат отправки остаётся unknown.
+Playwright уже буферизовал весь ответ: лимит ограничивает новый разбор,
+а не исходное потребление памяти fetch.
+
+Независимая security-ревизия приняла границы. Точный Linux-образ прошёл158/158,
+включая localhost GET fixture chunked/gzip/br/deflate, слишком большой и
+невалидный UTF-8, другой контекст/URL/UID и запрет APIResponse.body(). Запросов
+к HH и POST в этой фикстуре нет. Установка кандидата пока не подтверждена.
+В 14:03 МСК manual state стал idle2694; новый живой тест ещё не начат.
 
 ## English
 
@@ -220,7 +239,7 @@ refusals into FORBIDDEN. The next stage records closed response/request categori
 without HH text, URLs, cookies or tokens. A new 403 never permits repeating the
 original submission. Automation remains off.
 
-### Next stage: original-refusal diagnostics
+### Original-refusal diagnostics
 
 A separate immutable private browser-journal record now contains response
 size/encoding and error classes, XSRF presence and body/cookie/known-header
@@ -242,5 +261,25 @@ active, revision 2691. A fresh human check was requested; automation stays off28
 Follow-up `2278a97` compares the XSRF header with its cookie even when the POST
 body has no token. Earlier closed-schema records remain readable. Its exact
 image passed 14/14 Linux/Chromium cases, including the native form and durable
-journal; security review accepted compatibility. This follow-up is not installed
-yet and does not itself establish the403 cause.
+journal; security review accepted compatibility. This follow-up is installed
+in release `e816e67` and does not itself establish the403 cause. The first-image
+watch was superseded before replacement (13 samples without failures); a fresh
+full ten-minute window is running for the final image.
+
+### Classifying an already received compressed refusal
+
+Candidate `2dfccde` refines the original403 when the former inspector could not
+read a compressed response or one without Content-Length. It reads only that
+APIResponse's existing buffer in the same BrowserContext, with matching URL/
+status/UID, Playwright1.64 and exact patched SHA. Buffer type and1–32768 byte
+size are checked before decoding, with MIME/encoding and UTF-8 checks. There is
+no new request, global context search, second decompression, body RPC copy or
+raw log. A mismatch closes inspection; submission outcome remains unknown.
+Playwright has already buffered the full response: this limit bounds new
+inspection, not the original fetch memory use.
+
+Independent security review accepted the boundary. The exact Linux image passed
+158/158, including localhost GET fixtures for chunked/gzip/br/deflate, oversize,
+invalid UTF-8, wrong context/URL/UID and forbidden APIResponse.body(). The fixture
+has no HH requests or POST. Candidate installation is not yet confirmed. At
+14:03 Moscow time, manual state became idle2694; a fresh live test has not begun.

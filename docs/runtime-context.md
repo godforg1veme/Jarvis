@@ -275,6 +275,20 @@ cookies or tokens are retained. It is not a result, does not change lookup/reser
 and never permits retry. There is no public RPC; local reads require the original
 identity. Earlier closed diagnostic records remain compatible.
 
+Если первоначальный403 body недоступен старому inspector, pinned Linux helper
+может классифицировать уже сохранённый буфер того же APIResponse/context/URL/UID.
+Версия/hash и размер1–32768 проверяются до decode; исходный fetch уже буферизовал
+ответ целиком. При несовпадении — body_unavailable, без нового запроса, raw log,
+APIResponse.body(), global context lookup или второй распаковки. Только причина
+unknown может уточниться; доказательство отправки и запрет повторов сохраняются.
+
+When the former inspector cannot read an original403 body, a pinned Linux helper
+may classify that APIResponse/context/URL/UID's existing buffer. Version/hash and
+1–32768 byte size are checked before decoding; fetch has already buffered the full
+response. A mismatch yields body_unavailable, with no new request, raw log, body
+RPC, global context lookup or second decompression. Only the unknown reason may
+be refined; submission proof and no-resend rules remain unchanged.
+
 При закрытии HH-страницы общий helper сначала загружает свежий about:blank
 до `load`, сохраняя request guards, затем закрывает target. При неудаче
 навигации живой документ не закрывается напрямую: runtime завершается с
