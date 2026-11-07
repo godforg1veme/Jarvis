@@ -33,19 +33,29 @@ test('real PG: a forbidden HH receipt pauses later candidates while retaining th
       const automationService = new JobAutomationService({ pool: f.pool, repository,
         searchRepository: search, resumeContextService, accessService, available: true });
       const enabled = await automationService.setEnabled({ scope: f.scope, enabled: true, expectedRevision: 0 });
+      const snapshots = new Map();
       for (const externalId of ['9191', '9192']) {
-        const vacancy = await search.upsertVacancy({ externalId, snapshot: {
+        const snapshot = {
           externalId, title: 'Node developer', company: 'Fixture',
           url: `https://hh.ru/vacancy/${externalId}`, publishedAt: '2026-11-05T00:00:00.000Z',
-          description: 'Build Node integrations for internal services.', archived: false } });
+          description: 'Build Node integrations for internal services.', archived: false };
+        snapshots.set(externalId, snapshot);
+        const vacancy = await search.upsertVacancy({ externalId, snapshot });
         await search.recordMatch({ userId: f.owner, vacancyId: vacancy.id, filterRevision: 1 });
       }
       let submits = 0;
-      const operationId = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+      const profiles = new JobProfileRepository(f.pool, { accessService });
+      await profiles.ensure({ scope: f.scope });
+      const drafts = new JobDraftRepository(f.pool, { accessService });
+      const applications = new JobApplicationService({ pool: f.pool,
+        repository: new JobApplicationRepository(f.pool, { accessService }), searchRepository: search,
+        automationRepository: repository, accessService, adapter: { capabilities: { applicantApply: true },
+          async inspect({ externalId }) { return { resumeAvailable: true, manualRequired: false,
+            vacancy: snapshots.get(externalId) }; },
+          async submit() { submits++; return { outcome: 'unknown', reasonCode: 'JOB_HH_RECEIPT_FORBIDDEN' }; } } });
       const worker = new JobAutomationWorker({ pool: f.pool, repository, automationService,
         searchRepository: search, accessService, resumeContextService,
-        profileRepository: { async ensure() { return { revision: 1, profile: { confirmed: true,
-          baseLetter: 'I build Node integrations', facts: [], examples: [] } }; } },
+        profileRepository: profiles,
         modelAdapter: { async evaluate() { return { decision: 'apply', directionMatched: true,
           reasonCode: 'DIRECTION_FIT', rationale: 'Node integration work',
           directionAssessment: { primaryOccupation: 'Node developer', targetQuery: 'node developer',
@@ -56,16 +66,24 @@ test('real PG: a forbidden HH receipt pauses later candidates while retaining th
               primaryOccupation: 'Node developer', targetQuery: 'node developer', relationship: 'core',
               dutiesQuotes: ['Build Node integrations for internal services.'] },
             usage: { cost: 0 }, requestId: 'fixture-direction' }; } },
-        draftService: { async generate() { return { id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-          text: 'I build Node integrations.' }; } },
-        applicationService: { async submitAutomatic() { submits++; return { status: 'unknown', operationId,
-          failureCode: 'JOB_HH_RECEIPT_FORBIDDEN' }; } },
+        draftService: { async generate({ scope, vacancyId }) {
+          const profile = await profiles.ensure({ scope });
+          const vacancy = await search.getVacancy({ userId: scope.userId, vacancyId });
+          return drafts.append({ scope, vacancyId, profileRevision: profile.revision,
+            vacancyRevision: vacancy.revision, resumeId: 'resume-a', connectionRevision: 1,
+            text: 'I build Node integrations.', facts: [] });
+        } },
+        applicationService: applications,
         usageRepository: { async record() {}, async claimBudgetNotice() {} } });
       const first = await repository.claimCandidate();
       assert.ok(first);
       await worker.process(first);
       const original = (await f.pool.query('SELECT status,operation_id,failure_code FROM job_automation_items WHERE id=$1',
         [first.id])).rows[0];
+      const application = (await f.pool.query('SELECT status,operation_id FROM job_applications WHERE user_id=$1 AND vacancy_id=$2',
+        [f.owner, first.vacancy_id])).rows[0];
+      assert.equal(application.status, 'unknown');
+      const operationId = application.operation_id;
       assert.deepEqual(original, { status: 'unknown', operation_id: operationId,
         failure_code: 'JOB_HH_RECEIPT_FORBIDDEN' });
       const delay = (await f.pool.query('SELECT extract(epoch FROM (next_attempt_at-now())) AS seconds FROM job_automations WHERE user_id=$1',
@@ -80,6 +98,8 @@ test('real PG: a forbidden HH receipt pauses later candidates while retaining th
       const next = await repository.claimCandidate();
       assert.ok(next && next.id !== first.id);
       assert.equal(submits, 1);
+      assert.deepEqual((await f.pool.query('SELECT status,operation_id FROM job_applications WHERE user_id=$1 AND vacancy_id=$2',
+        [f.owner, first.vacancy_id])).rows[0], application);
     } finally { await f.close(); }
   });
 
