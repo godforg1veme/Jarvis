@@ -13,12 +13,15 @@ const resumeContext = { resumeId: 'one', connectionRevision: 4,
 
 function harness(decision, applicationStatus = 'sent') {
   const calls = [];
+  const usageRecords = [];
   const item = { id: ITEM, user_id: USER, vacancy_id: VACANCY, automation_revision: 2,
     conversation_id: CONVERSATION, chat_id: '123', evaluation_request_id: `auto-evaluate:${ITEM}`,
     draft_request_id: `auto-letter:${ITEM}` };
   const repository = {
     async claimCandidate() { return item; },
-    async update(value) { calls.push(['update', value.status, value.failurePhase, value.failureCode]); return { status: value.status }; },
+    async update(value) { calls.push(['update', value.status, value.failurePhase, value.failureCode]);
+      if (value.operationId) calls.push(['operation', value.operationId]);
+      return { status: value.status }; },
     async enqueueAttention(value) { calls.push(['attention', value.code]); },
     async saveEvaluation(value) { calls.push(['evaluation', value.evaluation]); return { id: value.itemId }; },
     async finalizeKnownSkip(value) { calls.push(['update', 'skipped', value.evaluatedSearchRevision]); return { searchRevisionChanged: false }; },
@@ -47,6 +50,14 @@ function harness(decision, applicationStatus = 'sent') {
         directionAssessment: { primaryOccupation: 'Integration developer', targetQuery: 'integration developer',
           relationship: 'core', dutiesQuotes: ['Build integrations for internal services.'] },
         rationale: 'Fixture role considered', usage: { cost: 0.001 }, requestId: 'model-1' };
+    },
+    async verifyDirection(input) {
+      calls.push(['direction', input]);
+      return { decision: 'apply', directionMatched: true, reasonCode: 'DIRECTION_FIT',
+        rationale: 'Source duties match', directionAssessment: { primaryOccupation: 'Integration developer',
+          targetQuery: 'integration developer', relationship: 'core',
+          dutiesQuotes: ['Build integrations for internal services.'] },
+        usage: { cost: 0.0005 }, requestId: 'source-model-1' };
     } },
     draftService: { async generate(input) { calls.push(['draft', input.requestId, input.sourceText]);
       return { id: DRAFT, text: 'My personal AI project is relevant.' }; } },
@@ -54,11 +65,11 @@ function harness(decision, applicationStatus = 'sent') {
       calls.push(['submit', input.automationRevision]); return { status: applicationStatus, operationId: null };
     } },
     usageRepository: {
-      async record(input) { calls.push(['usage', input.outcome]); },
+      async record(input) { calls.push(['usage', input.outcome]); usageRecords.push(input); },
       async claimBudgetNotice() { calls.push(['notice']); },
     },
   });
-  return { worker, item, calls };
+  return { worker, item, calls, usageRecords };
 }
 
 test('known cancellation during submission preparation skips silently', async () => {
@@ -185,24 +196,55 @@ test('temporary HH and browser read failures keep the original item pending with
   }
 });
 
-test('a challenge error after model invocation remains uncertain and cannot start another model request', async () => {
+test('a challenge error after model invocation stays unknown and pauses later candidates', async () => {
   const { worker, item, calls } = harness('apply');
   worker.modelAdapter.evaluate = async () => { throw Object.assign(new Error('fixture'), { code: 'JOB_HH_MANUAL_ACTIVE' }); };
   await worker.process(item);
   assert.deepEqual(calls.filter(x => x[0] === 'update'), [['update', 'unknown', 'evaluation', 'JOB_HH_MANUAL_ACTIVE']]);
   assert.deepEqual(calls.filter(x => x[0] === 'attention'), [['attention', 'PROCESSING_UNKNOWN']]);
-  assert.deepEqual(calls.filter(x => x[0] === 'backoff'), []);
+  assert.deepEqual(calls.filter(x => x[0] === 'backoff'), [['backoff', USER, 2]]);
   assert.deepEqual(calls.filter(x => ['draft','submit'].includes(x[0])), []);
 });
 
-test('source loss after model invocation remains unknown without retry or backoff', async () => {
+test('source loss after model invocation remains unknown while pausing future candidates', async () => {
   const { worker, item, calls } = harness('apply');
   worker.modelAdapter.evaluate = async () => { throw Object.assign(new Error('fixture'), { code: 'JOB_HH_UNAVAILABLE' }); };
   await worker.process(item);
   assert.deepEqual(calls.filter(x => x[0] === 'update'), [['update', 'unknown', 'evaluation', 'JOB_HH_UNAVAILABLE']]);
   assert.deepEqual(calls.filter(x => x[0] === 'attention'), [['attention', 'PROCESSING_UNKNOWN']]);
-  assert.deepEqual(calls.filter(x => x[0] === 'backoff'), []);
+  assert.deepEqual(calls.filter(x => x[0] === 'backoff'), [['backoff', USER, 2]]);
   assert.deepEqual(calls.filter(x => ['draft','submit'].includes(x[0])), []);
+});
+
+test('blocking HH receipts preserve the unknown original operation and pause future candidates', async () => {
+  for (const failureCode of ['JOB_HH_RECEIPT_FORBIDDEN', 'JOB_HH_RECEIPT_XSRF_REJECTED',
+    'JOB_HH_RECEIPT_ORIGIN_REJECTED', 'JOB_HH_RECEIPT_CAPTCHA',
+    'JOB_HH_RECEIPT_AUTH_REQUIRED', 'JOB_HH_RECEIPT_RATE_LIMITED']) {
+    const { worker, item, calls } = harness('apply');
+    worker.applicationService.submitAutomatic = async () => {
+      calls.push(['submit', 2]);
+      return { status: 'unknown', operationId: DRAFT, failureCode };
+    };
+    await worker.process(item);
+    assert.deepEqual(calls.filter(x => x[0] === 'update').at(-1),
+      ['update', 'unknown', 'confirmation', failureCode]);
+    assert.deepEqual(calls.filter(x => x[0] === 'backoff'), [['backoff', USER, 2]]);
+    assert.deepEqual(calls.filter(x => x[0] === 'operation'), [['operation', DRAFT]]);
+    assert.deepEqual(calls.filter(x => x[0] === 'submit'), [['submit', 2]]);
+    assert.deepEqual(calls.filter(x => x[0] === 'attention'), [['attention', 'RESULT_UNKNOWN']]);
+  }
+});
+
+test('post-model access denial retains unknown rather than retrying the item', async () => {
+  const { worker, item, calls } = harness('apply');
+  worker.draftService.generate = async () => {
+    throw Object.assign(new Error('fixture'), { code: 'JOB_HH_ACCESS_DENIED' });
+  };
+  await worker.process(item);
+  assert.deepEqual(calls.filter(x => x[0] === 'update').at(-1),
+    ['update', 'unknown', 'generation', 'JOB_HH_ACCESS_DENIED']);
+  assert.deepEqual(calls.filter(x => x[0] === 'backoff'), [['backoff', USER, 2]]);
+  assert.deepEqual(calls.filter(x => x[0] === 'submit'), []);
 });
 
 test('an interrupted model or draft never claims that an application was submitted', async () => {
@@ -252,7 +294,7 @@ test('incidental AI tools cannot authorize a letter even when an adapter returns
     const saved = calls.find(x => x[0] === 'evaluation')?.[1];
     assert.equal(saved?.decision, 'skip');
     assert.equal(saved.reasonCode, 'OUT_OF_DIRECTION');
-    assert.equal(saved.selectionPolicyVersion, 2);
+    assert.equal(saved.selectionPolicyVersion, 3);
     assert.equal(saved.directionAssessment.relationship, 'tool_only');
     assert.ok(calls.some(x => x[0] === 'usage' && x[1] === 'success'));
     assert.ok(calls.some(x => x[0] === 'update' && x[1] === 'skipped'));
@@ -284,7 +326,66 @@ test('grounded selection evidence is stored before any letter or submission', as
   await worker.process(item);
   const index = calls.findIndex(x => x[0] === 'evaluation');
   assert.ok(index >= 0 && index < calls.findIndex(x => x[0] === 'draft'));
-  assert.equal(calls[index][1].selectionPolicyVersion, 2);
+  assert.equal(calls[index][1].selectionPolicyVersion, 3);
   assert.deepEqual(calls[index][1].directionAssessment.dutiesQuotes, ['Build integrations for internal services.']);
   assert.ok(calls.some(x => x[0] === 'submit'));
+});
+
+test('source-only direction veto stops a preliminary false core and accounts for both requests', async () => {
+  const { worker, item, calls, usageRecords } = harness('apply');
+  worker.modelAdapter.verifyDirection = async input => {
+    calls.push(['direction', input]);
+    assert.deepEqual(Object.keys(input).sort(), ['settings', 'vacancy']);
+    assert.deepEqual(Object.keys(input.settings), ['queries']);
+    assert.equal(JSON.stringify(input).includes('Personal desktop AI project'), false);
+    return { decision: 'skip', directionMatched: false, reasonCode: 'OUT_OF_DIRECTION',
+      rationale: 'Primary work is outside the requested direction', directionAssessment: {
+        primaryOccupation: 'Construction estimator', targetQuery: 'integration developer',
+        relationship: 'adjacent', dutiesQuotes: [] }, usage: { cost: 0.0004 }, requestId: 'source-veto' };
+  };
+  await worker.process(item);
+  assert.equal(calls.find(x => x[0] === 'evaluation')[1].decision, 'skip');
+  assert.equal(calls.some(x => ['draft', 'submit'].includes(x[0])), false);
+  assert.deepEqual(usageRecords.map(x => [x.requestId, x.outcome, x.costUsd ?? null]), [
+    [item.evaluation_request_id, 'pending', null], [item.evaluation_request_id, 'success', 0.001],
+    [`${item.evaluation_request_id}:direction`, 'pending', null],
+    [`${item.evaluation_request_id}:direction`, 'success', 0.0004],
+  ]);
+  assert.equal(calls.find(x => x[0] === 'evaluation')[1].directionVerification.requestId,
+    `${item.evaluation_request_id}:direction`);
+});
+
+test('lost source verification stays unknown with its original pending usage and no submission', async () => {
+  const { worker, item, calls, usageRecords } = harness('apply');
+  worker.modelAdapter.verifyDirection = async () => { throw Object.assign(Error(), { code: 'JOB_MODEL_UNAVAILABLE' }); };
+  await worker.process(item);
+  assert.deepEqual(calls.filter(x => x[0] === 'update').at(-1),
+    ['update', 'unknown', 'evaluation', 'JOB_MODEL_UNAVAILABLE']);
+  assert.deepEqual(usageRecords.at(-1), { userId: USER, requestId: `${item.evaluation_request_id}:direction`, outcome: 'pending' });
+  assert.equal(calls.some(x => ['draft', 'submit'].includes(x[0])), false);
+  assert.deepEqual(calls.filter(x => x[0] === 'backoff'), [['backoff', USER, 2]]);
+});
+
+test('revocation after preliminary evaluation prevents the second provider call', async () => {
+  const { worker, item, calls, usageRecords } = harness('apply');
+  const evaluate = worker.modelAdapter.evaluate;
+  worker.modelAdapter.evaluate = async input => {
+    const result = await evaluate(input);
+    worker.automationService.assertCurrent = async () => { throw Object.assign(Error(), { code: 'JOB_AUTOMATION_UNAVAILABLE' }); };
+    return result;
+  };
+  await worker.process(item);
+  assert.equal(calls.some(x => ['direction', 'draft', 'submit'].includes(x[0])), false);
+  assert.equal(usageRecords.some(x => x.requestId.endsWith(':direction')), false);
+});
+
+test('preliminary skips never invoke source verification and missing verifier cannot authorize a letter', async () => {
+  const skipped = harness('skip');
+  await skipped.worker.process(skipped.item);
+  assert.equal(skipped.calls.some(x => x[0] === 'direction'), false);
+  const missing = harness('apply');
+  delete missing.worker.modelAdapter.verifyDirection;
+  await missing.worker.process(missing.item);
+  assert.equal(missing.calls.some(x => ['draft', 'submit'].includes(x[0])), false);
+  assert.equal(missing.calls.findLast(x => x[0] === 'update')[1], 'manual_required');
 });

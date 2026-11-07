@@ -2,6 +2,7 @@ const { jobError } = require('./jobSchemas');
 const { JOB_LETTER_RESPONSE_FORMAT } = require('./jobPrompt');
 const { readBoundedJson } = require('./boundedHttp');
 const { buildVacancyPrompt, parseVacancyDecision, buildDutyEvidenceContext } = require('./jobVacancyPrompt');
+const { buildDirectionVerificationPrompt } = require('./jobDirectionVerification');
 
 const JOB_MODEL = 'z-ai/glm-5.3-flash';
 const JOB_MODEL_PRICE_CAP = Object.freeze({ prompt: 0.15, completion: 0.5, request: 0 });
@@ -82,6 +83,13 @@ class JobModelAdapter {
     const result = await this.generate({ messages: buildVacancyPrompt(input), maxTokens: 6000,
       responseFormat: decisionFormatFor(input) });
     try { return { ...parseVacancyDecision(result.text, result.finishReason, input), usage: result.usage, requestId: result.requestId }; }
+    catch (error) { throw Object.assign(error, { modelUsage: result.usage, modelRequestId: result.requestId }); }
+  }
+  async verifyDirection(input) {
+    const result = await this.generate({ messages: buildDirectionVerificationPrompt(input), maxTokens: 6000,
+      responseFormat: decisionFormatFor(input) });
+    try { return { ...parseVacancyDecision(result.text, result.finishReason, input),
+      usage: result.usage, requestId: result.requestId }; }
     catch (error) { throw Object.assign(error, { modelUsage: result.usage, modelRequestId: result.requestId }); }
   }
 }

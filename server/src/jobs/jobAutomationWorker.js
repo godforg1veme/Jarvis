@@ -4,6 +4,18 @@ const { evaluateVacancy } = require('./jobFilters');
 const { assertAutomaticLetterTruth } = require('./jobPrompt');
 const { enforceVacancyDirection } = require('./jobVacancyPrompt');
 
+const BLOCKING_RECEIPTS = new Set([
+  'JOB_HH_RECEIPT_FORBIDDEN', 'JOB_HH_RECEIPT_XSRF_REJECTED',
+  'JOB_HH_RECEIPT_ORIGIN_REJECTED', 'JOB_HH_RECEIPT_CAPTCHA',
+  'JOB_HH_RECEIPT_AUTH_REQUIRED', 'JOB_HH_RECEIPT_RATE_LIMITED',
+]);
+const BLOCKING_SOURCE_ERRORS = new Set([
+  'JOB_HH_UNAVAILABLE', 'JOB_HH_RATE_LIMIT', 'JOB_BROWSER_BUSY',
+  'JOB_HH_LOGIN_REQUIRED', 'JOB_HH_NOT_CONNECTED', 'JOB_HH_ACCESS_DENIED',
+  'JOB_HH_MANUAL_ACTIVE', 'JOB_HH_CAPTCHA_MANUAL_REQUIRED',
+  'JOB_HH_CAPTCHA_REQUIRED', 'JOB_HH_CAPTCHA_WAITING',
+]);
+
 class JobAutomationWorker {
   constructor({ pool, repository, automationService, searchRepository, profileRepository,
     resumeContextService, modelAdapter, draftService, applicationService, usageRepository,
@@ -139,10 +151,42 @@ class JobAutomationWorker {
         directionMatched: evaluation?.directionMatched, reasonCode: evaluation?.reasonCode,
         rationale: evaluation?.rationale, directionAssessment: evaluation?.directionAssessment },
       { vacancy: vacancy.snapshot, settings: settings.settings });
+      let directionVerification = null;
+      if (evaluation.decision === 'apply') {
+        await this.automationService.assertCurrent({ scope, revision: item.automation_revision,
+          resumeId: resumeContext.resumeId, connectionRevision: resumeContext.connectionRevision });
+        if ((await this.searchRepository.getSettings({ userId: scope.userId }))?.revision !== settings.revision)
+          throw jobError('JOB_REVISION_CONFLICT');
+        if (typeof this.modelAdapter.verifyDirection !== 'function') throw jobError('JOB_MODEL_INVALID_OUTPUT');
+        // A separate, stable usage ID precedes the second API call. Loss of its
+        // result keeps this original evaluation uncertain; it cannot be retried.
+        const requestId = `${item.evaluation_request_id}:direction`;
+        await this.usageRepository.record({ userId: scope.userId, requestId, outcome: 'pending' });
+        let verified;
+        try {
+          verified = await this.modelAdapter.verifyDirection({ vacancy: vacancy.snapshot,
+            settings: { queries: settings.settings.queries } });
+        } catch (error) {
+          if (error?.modelUsage?.cost != null) await this.usageRepository.record({ userId: scope.userId,
+            requestId, providerRequestId: error.modelRequestId || null, costUsd: error.modelUsage.cost,
+            costBasis: error.modelUsage.costBasis || 'provider', outcome: 'failed' });
+          throw error;
+        }
+        await this.usageRepository.record({ userId: scope.userId, requestId,
+          providerRequestId: verified?.requestId || null, costUsd: verified?.usage?.cost ?? null,
+          costBasis: verified?.usage?.costBasis || 'provider', outcome: 'success' });
+        const direction = enforceVacancyDirection({ decision: verified?.decision,
+          directionMatched: verified?.directionMatched, reasonCode: verified?.reasonCode,
+          rationale: verified?.rationale, directionAssessment: verified?.directionAssessment },
+        { vacancy: vacancy.snapshot, settings: settings.settings });
+        directionVerification = { ...direction, requestId, providerRequestId: verified?.requestId || null };
+        evaluation = direction.decision === 'apply'
+          ? { ...evaluation, directionAssessment: direction.directionAssessment } : direction;
+      }
       await this.repository.saveEvaluation({ itemId: item.id, evaluation: {
         decision: evaluation.decision, directionMatched: evaluation.directionMatched,
         reasonCode: evaluation.reasonCode, rationale: evaluation.rationale, source: 'model', filterResult,
-        directionAssessment: evaluation.directionAssessment, selectionPolicyVersion: 2,
+        directionAssessment: evaluation.directionAssessment, directionVerification, selectionPolicyVersion: 3,
         revisions: { search: settings.revision, filter: vacancy.filter_revision,
           vacancy: vacancy.revision, profile: profile.revision,
           connection: resumeContext.connectionRevision, automation: item.automation_revision },
@@ -176,6 +220,8 @@ class JobAutomationWorker {
         failurePhase: result.status === 'cancelled' ? 'preparation' : status === 'unknown' ? 'confirmation'
           : result.failureCode === 'JOB_HH_PREPARATION_FAILED' ? 'preparation' : null,
         failureCode: result.failureCode || null });
+      if (BLOCKING_RECEIPTS.has(result.failureCode))
+        await this.repository.backoff({ scope, automationRevision: item.automation_revision });
       if (status === 'manual_required' || (status === 'failed' && result.failureCode === 'JOB_AUTOMATION_PRECHECK_FAILED')) await this.repository.enqueueAttention({ scope,
         vacancyId: item.vacancy_id, automationRevision: item.automation_revision, code: 'MANUAL_REQUIRED',
         reasonCode: result.failureCode });
@@ -220,18 +266,17 @@ class JobAutomationWorker {
       // The selected resume is read-only at this point. A temporary source,
       // login or browser failure can be retried under the same item after a
       // pause; once a model call began, its original request ID stays unknown.
-      const sourceWaiting = phase === 'evaluating' && !modelInvoked
-        && ['JOB_HH_UNAVAILABLE','JOB_HH_RATE_LIMIT','JOB_BROWSER_BUSY',
-          'JOB_HH_LOGIN_REQUIRED','JOB_HH_NOT_CONNECTED'].includes(error?.code);
+      const sourceBlocked = BLOCKING_SOURCE_ERRORS.has(error?.code);
+      const sourceWaiting = phase === 'evaluating' && !modelInvoked && sourceBlocked;
       const pending = phase === 'evaluating' && !modelInvoked
         && (code === 'RESUME_UNAVAILABLE' || captchaWaiting || sourceWaiting);
       const unknown = !(phase === 'evaluating' && !modelInvoked);
       await this.repository.update({ itemId: item.id, from: phase,
         status: pending ? 'pending' : unknown ? 'unknown' : 'failed', failurePhase,
         failureCode: /^JOB_[A-Z_]{1,70}$/.test(error?.code || '') ? error.code : 'JOB_PROCESSING_FAILED' });
-      if (captchaWaiting || sourceWaiting) {
+      if (captchaWaiting || sourceBlocked) {
         await this.repository.backoff({ scope, automationRevision: item.automation_revision });
-        if (code !== 'LOGIN_REQUIRED') return;
+        if (phase === 'evaluating' && !modelInvoked && code !== 'LOGIN_REQUIRED') return;
       }
       if (code) {
         try {

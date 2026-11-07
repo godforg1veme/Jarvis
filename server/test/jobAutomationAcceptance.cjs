@@ -11,6 +11,78 @@ const { JobDraftRepository } = require('../src/jobs/jobDraftRepository');
 const { JobApplicationRepository } = require('../src/jobs/jobApplicationRepository');
 const { JobApplicationService } = require('../src/jobs/jobApplicationService');
 
+test('real PG: a forbidden HH receipt pauses later candidates while retaining the original unknown operation',
+  { skip: !process.env.JARVIS_JOB_TEST_DATABASE_URL }, async () => {
+    const f = await createJobPostgresFixture();
+    try {
+      await f.pool.query("INSERT INTO user_identities(user_id,provider,external_id) VALUES($1,'telegram','101')", [f.owner]);
+      const accessService = configuredOwnerJobAccess(f.pool, '101');
+      const search = new JobSearchRepository(f.pool, { accessService });
+      await search.ensure({ scope: f.scope });
+      await f.pool.query('UPDATE job_searches SET settings=settings||$2::jsonb WHERE user_id=$1',
+        [f.owner, { queries: ['node developer'], activated: true, paused: false }]);
+      await f.pool.query("INSERT INTO job_connections(user_id,resume_id,status) VALUES($1,'resume-a','connected')", [f.owner]);
+      const repository = new JobAutomationRepository(f.pool, { accessService });
+      const resumeContextService = {
+        async selected() { return (await f.pool.query('SELECT resume_id,revision FROM job_connections WHERE user_id=$1',
+          [f.owner])).rows[0]; },
+        async getSelected() { return { resumeId: 'resume-a', connectionRevision: 1,
+          snapshot: { resumeId: 'resume-a', title: 'Node developer', experience: 'Node integrations',
+            skills: 'Node.js', education: '', summary: '', grammaticalGender: 'unknown' } }; },
+      };
+      const automationService = new JobAutomationService({ pool: f.pool, repository,
+        searchRepository: search, resumeContextService, accessService, available: true });
+      const enabled = await automationService.setEnabled({ scope: f.scope, enabled: true, expectedRevision: 0 });
+      for (const externalId of ['9191', '9192']) {
+        const vacancy = await search.upsertVacancy({ externalId, snapshot: {
+          externalId, title: 'Node developer', company: 'Fixture',
+          url: `https://hh.ru/vacancy/${externalId}`, publishedAt: '2026-11-05T00:00:00.000Z',
+          description: 'Build Node integrations for internal services.', archived: false } });
+        await search.recordMatch({ userId: f.owner, vacancyId: vacancy.id, filterRevision: 1 });
+      }
+      let submits = 0;
+      const operationId = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+      const worker = new JobAutomationWorker({ pool: f.pool, repository, automationService,
+        searchRepository: search, accessService, resumeContextService,
+        profileRepository: { async ensure() { return { revision: 1, profile: { confirmed: true,
+          baseLetter: 'I build Node integrations', facts: [], examples: [] } }; } },
+        modelAdapter: { async evaluate() { return { decision: 'apply', directionMatched: true,
+          reasonCode: 'DIRECTION_FIT', rationale: 'Node integration work',
+          directionAssessment: { primaryOccupation: 'Node developer', targetQuery: 'node developer',
+            relationship: 'core', dutiesQuotes: ['Build Node integrations for internal services.'] },
+          usage: { cost: 0 }, requestId: 'fixture-model' }; },
+          async verifyDirection() { return { decision: 'apply', directionMatched: true,
+            reasonCode: 'DIRECTION_FIT', rationale: 'Source direction matches', directionAssessment: {
+              primaryOccupation: 'Node developer', targetQuery: 'node developer', relationship: 'core',
+              dutiesQuotes: ['Build Node integrations for internal services.'] },
+            usage: { cost: 0 }, requestId: 'fixture-direction' }; } },
+        draftService: { async generate() { return { id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          text: 'I build Node integrations.' }; } },
+        applicationService: { async submitAutomatic() { submits++; return { status: 'unknown', operationId,
+          failureCode: 'JOB_HH_RECEIPT_FORBIDDEN' }; } },
+        usageRepository: { async record() {}, async claimBudgetNotice() {} } });
+      const first = await repository.claimCandidate();
+      assert.ok(first);
+      await worker.process(first);
+      const original = (await f.pool.query('SELECT status,operation_id,failure_code FROM job_automation_items WHERE id=$1',
+        [first.id])).rows[0];
+      assert.deepEqual(original, { status: 'unknown', operation_id: operationId,
+        failure_code: 'JOB_HH_RECEIPT_FORBIDDEN' });
+      const delay = (await f.pool.query('SELECT extract(epoch FROM (next_attempt_at-now())) AS seconds FROM job_automations WHERE user_id=$1',
+        [f.owner])).rows[0].seconds;
+      assert.ok(Number(delay) > 14 * 60 && Number(delay) <= 15 * 60);
+      assert.equal(await repository.claimCandidate(), null);
+      assert.equal(submits, 1);
+      assert.deepEqual((await f.pool.query('SELECT status,operation_id FROM job_automation_items WHERE id=$1',
+        [first.id])).rows[0], { status: 'unknown', operation_id: operationId });
+      await f.pool.query("UPDATE job_automations SET next_attempt_at=now()-interval '1 second' WHERE user_id=$1 AND revision=$2",
+        [f.owner, enabled.revision]);
+      const next = await repository.claimCandidate();
+      assert.ok(next && next.id !== first.id);
+      assert.equal(submits, 1);
+    } finally { await f.close(); }
+  });
+
 test('real PG: pre-model HH read outage pauses the same candidate and revocation stops its return',
   { skip: !process.env.JARVIS_JOB_TEST_DATABASE_URL }, async () => {
     const f = await createJobPostgresFixture();

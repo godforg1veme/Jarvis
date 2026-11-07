@@ -39,13 +39,18 @@ async function fixture({ decision = 'apply', manual = false, modelOverride = nul
   const automation = new JobAutomationRepository(f.pool, { accessService });
   const service = new JobAutomationService({ pool: f.pool, repository: automation, searchRepository: search,
     resumeContextService: resumes, accessService, available: true });
-  const calls = { evaluations: [], letters: [], submits: [], messages: [] };
+  const calls = { evaluations: [], directions: [], letters: [], submits: [], messages: [] };
   const model = modelOverride || {
     async evaluate(input) { calls.evaluations.push(input); return { decision, directionMatched: true,
       reasonCode: decision === 'apply' ? 'DIRECTION_FIT' : 'INSUFFICIENT_FIT',
       directionAssessment: { primaryOccupation: 'Developer', targetQuery: 'developer',
         relationship: 'core', dutiesQuotes: ['Build integrations for internal services.'] },
       rationale: 'Fixture decision', usage: {cost:0.001}, requestId: 'fixture-evaluation' }; },
+    async verifyDirection(input) { calls.directions.push(input); return { decision: 'apply', directionMatched: true,
+      reasonCode: 'DIRECTION_FIT', rationale: 'Source direction matches', directionAssessment: {
+        primaryOccupation: 'Developer', targetQuery: 'developer', relationship: 'core',
+        dutiesQuotes: ['Build integrations for internal services.'] },
+      usage: {cost:0.0005}, requestId: 'fixture-direction' }; },
     async generate({messages}) { const data = JSON.parse(messages[1].content); calls.letters.push(data);
       return { text: JSON.stringify({ text: `Experience of ${data.selectedResume.resumeId}`, factIds: ['fact_1'] }), finishReason:'stop', usage:{cost:0.001} }; },
   };
@@ -95,7 +100,9 @@ test('real PG: owner and member auto-apply with their complete own resume and st
     await f.deliveryWorker.tick();assert.equal(f.calls.messages.length,0);
     assert.equal((await f.pool.query("SELECT count(*)::int n FROM job_applications WHERE status='sent'")).rows[0].n,2);
     const judgments=(await f.pool.query('SELECT evaluation FROM job_automation_items')).rows;
-    assert.ok(judgments.every(x=>x.evaluation.selectionPolicyVersion===2));
+    assert.ok(judgments.every(x=>x.evaluation.selectionPolicyVersion===3));
+    assert.equal(f.calls.directions.length,2);
+    assert.ok(f.calls.directions.every(x=>!Object.hasOwn(x,'resumeContext')&&!Object.hasOwn(x,'profile')));
     assert.ok(judgments.every(x=>x.evaluation.directionAssessment.relationship==='core'));
     await f.service.setEnabled({scope:f.scopes[0],enabled:false,expectedRevision:1});
     await f.deliveryWorker.tick();assert.equal(f.calls.messages.length,0,'completed auto applications are not sent as cards after disabling');
@@ -119,7 +126,7 @@ test('real PG: incidental AI assessment skips both personal scopes without a let
     const rows=(await f.pool.query('SELECT status,evaluation FROM job_automation_items ORDER BY user_id')).rows;
     assert.equal(rows.length,2);
     assert.ok(rows.every(x=>x.status==='skipped'&&x.evaluation.reasonCode==='OUT_OF_DIRECTION'));
-    assert.ok(rows.every(x=>x.evaluation.directionAssessment.relationship==='tool_only'&&x.evaluation.selectionPolicyVersion===2));
+    assert.ok(rows.every(x=>x.evaluation.directionAssessment.relationship==='tool_only'&&x.evaluation.selectionPolicyVersion===3));
     assert.equal((await f.pool.query('SELECT count(*)::int n FROM job_drafts')).rows[0].n,0);
     assert.equal((await f.pool.query('SELECT count(*)::int n FROM job_applications')).rows[0].n,0);
     assert.equal(f.calls.messages.length,0);
@@ -232,13 +239,52 @@ test('real PG: GLM OpenRouter evaluation and letters share actual per-user cost 
   }});
   const f=await fixture({modelOverride:model});try{
     await f.worker.tick();await f.worker.tick();
-    assert.equal(requests.length,4);assert.ok(requests.every(r=>r.model===JOB_MODEL));
+    assert.equal(requests.length,6);assert.ok(requests.every(r=>r.model===JOB_MODEL));
+    const directionRequests=requests.filter(r=>Object.hasOwn(JSON.parse(r.messages[1].content),'queries'));
+    assert.equal(directionRequests.length,2);
+    assert.ok(directionRequests.every(r=>!Object.hasOwn(JSON.parse(r.messages[1].content),'selectedResume')));
     assert.equal(f.calls.submits.length,2);
     for(const scope of f.scopes){const usage=await f.usage.getMonth({userId:scope.userId});
-      assert.ok(Math.abs(usage.total-2.01)<1e-9);assert.equal(usage.pending,0);assert.equal(usage.estimated,0);}
+      assert.ok(Math.abs(usage.total-3.11)<1e-9);assert.equal(usage.pending,0);assert.equal(usage.estimated,0);}
     await f.deliveryWorker.tick();await f.deliveryWorker.tick();
     assert.equal(f.calls.messages.length,2);assert.deepEqual(f.calls.messages.map(m=>m.chatId).sort(),['101','202']);
     assert.ok(f.calls.messages.every(m=>m.answer.includes('достигли $2')&&!m.answer.includes('расчётные')));
+  }finally{await f.close();}
+});
+
+test('real PG: independent source veto defeats a preliminary false core without any draft or application',async()=>{
+  const requests=[];
+  const model=new JobModelAdapter({config:{openrouterApiKey:'fixture-existing-key'},fetchImpl:async(_url,init)=>{
+    const body=JSON.parse(init.body);requests.push(body);
+    assert.equal(body.response_format.json_schema.name,'job_vacancy_decision','a letter must never be requested');
+    const sourceOnly=Object.hasOwn(JSON.parse(body.messages[1].content),'queries');
+    const choice={decision:sourceOnly?'skip':'apply',directionMatched:!sourceOnly,
+      reasonCode:sourceOnly?'OUT_OF_DIRECTION':'DIRECTION_FIT',rationale:'Source duties',
+      directionAssessment:{primaryOccupation:sourceOnly?'Сметчик':'AI Engineer',targetQuery:'developer',
+        relationship:sourceOnly?'adjacent':'core',dutiesQuotes:[sourceOnly
+          ?'Составлять строительные сметы и рассчитывать стоимость домов.'
+          :'Внедрение ИИ в сметный модуль для ускорения расчётов.']}};
+    return Response.json({id:`fixture-veto-${requests.length}`,model:JOB_MODEL,
+      usage:{cost:sourceOnly?0.0004:0.001},choices:[{finish_reason:'stop',message:{content:JSON.stringify(choice)}}]});
+  }});
+  const f=await fixture({modelOverride:model});try{
+    for(const externalId of ['7000','7001'])await f.search.upsertVacancy({externalId,snapshot:{externalId,
+      title:'Сметчик-Расчётчик ИЖС',description:'Составлять строительные сметы и рассчитывать стоимость домов. Внедрение ИИ в сметный модуль для ускорения расчётов.',
+      url:`https://hh.ru/vacancy/${externalId}`,publishedAt:'2026-11-01T00:00:00Z',archived:false}});
+    await f.worker.tick();await f.worker.tick();await f.worker.tick();
+    assert.equal(requests.length,4);
+    assert.equal(f.calls.submits.length,0);
+    assert.equal((await f.pool.query('SELECT count(*)::int n FROM job_drafts')).rows[0].n,0);
+    assert.equal((await f.pool.query('SELECT count(*)::int n FROM job_applications')).rows[0].n,0);
+    const rows=(await f.pool.query('SELECT status,evaluation FROM job_automation_items')).rows;
+    assert.equal(rows.length,2);
+    assert.ok(rows.every(x=>x.status==='skipped'&&x.evaluation.directionVerification.decision==='skip'));
+    for(const scope of f.scopes){const usage=await f.usage.getMonth({userId:scope.userId});
+      assert.ok(Math.abs(usage.total-0.0014)<1e-9);assert.equal(usage.pending,0);}
+    for(const body of requests.filter(r=>Object.hasOwn(JSON.parse(r.messages[1].content),'queries'))){
+      assert.equal(Object.hasOwn(JSON.parse(body.messages[1].content),'selectedResume'),false);
+      assert.doesNotMatch(JSON.stringify(body),/Confirmed project detail|Project of/);
+    }
   }finally{await f.close();}
 });
 
