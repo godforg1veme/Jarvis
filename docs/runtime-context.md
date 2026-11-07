@@ -261,6 +261,20 @@ candidates for the existing15 minutes without retrying the original unknown
 operation. The monthly cost threshold remains a notice, not a hard cap.
 [Results and limits](updates/2026-11-07-hh-forbidden-cascade.md).
 
+HTTP 403 может сохранить отдельный immutable diagnostic под исходным claim в
+приватном ApplicationLedger: закрытые категории ответа/XSRF/Origin/Referer.
+Owner, operation/pair, questionnaire и letter hash проверяются при чтении;
+сырая форма, URL, cookies и токены не сохраняются. Этот файл не является result,
+не меняет lookup/reserve и не разрешает повтор. Публичного RPC для него нет;
+локальное чтение требует исходной identity. Старые закрытые записи совместимы.
+
+HTTP 403 may store a separate immutable private ApplicationLedger diagnostic
+under the original claim: closed response/XSRF/Origin/Referer categories. Reads
+validate owner, operation/pair, questionnaire and letter hash. No raw form, URLs,
+cookies or tokens are retained. It is not a result, does not change lookup/reserve
+and never permits retry. There is no public RPC; local reads require the original
+identity. Earlier closed diagnostic records remain compatible.
+
 При закрытии HH-страницы общий helper сначала загружает свежий about:blank
 до `load`, сохраняя request guards, затем закрывает target. При неудаче
 навигации живой документ не закрывается напрямую: runtime завершается с

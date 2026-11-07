@@ -1037,3 +1037,19 @@ Do not edit or commit unless the task explicitly requires it:
 `data/stt-settings.json` is a checked-in default and may be changed deliberately
 with its validation tests.
 
+
+
+## HH: закрытая диагностика 403 / Closed 403 diagnostics
+
+`node --test job-browser/test/submissionDiagnostic.test.js job-browser/test/submissionReceipt.test.js job-browser/test/applicationLedger.test.js`
+проверяет один исходный fetch без redirects/retries, закрытые категории, отказ
+чтения неограниченного/сжатого тела, owner/claim/letter/анкета, неизменяемость
+и испорченный diagnostic без изменения результата. Linux-only ledger cases
+обязательны в Linux, вместе с Chromium driver acceptance. Диагностика не
+доказывает причину403 без дополнительных фактов и не подтверждает отправку.
+
+The command above verifies one original fetch without redirects/retries, closed
+categories, refusal to read unbounded/compressed bodies, owner/claim/letter/
+questionnaire binding, immutable records and corrupt diagnostics without changing
+the result. Run Linux-only ledger cases on Linux alongside Chromium driver
+acceptance. Metadata alone does not prove the403 cause or establish submission.

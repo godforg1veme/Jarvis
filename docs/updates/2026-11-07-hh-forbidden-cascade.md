@@ -106,13 +106,22 @@ NL получил исходники; HH runtime на нём не установ
 Запись проверяет владельца, исходный operation/pair claim, анкету и хэш письма.
 Она не является квитанцией успеха, не меняет outcome, не открывает повторную
 отправку и не выходит в RPC. Тексты HH, URL, cookies и токены не сохраняются.
-Независимая security-ревизия не нашла блокеров; Linux/Chromium 160/160.
-Установка этой диагностики пока не подтверждена.
+Независимые security/functionality-ревизии не нашли блокеров; Linux/Chromium
+160/160, включая точный образ.
+Диагностика `4aab2a2` установлена на DE: 59 browser-файлов и pinned bundle
+сверены, env/mounts/inodes/policies сохранены, server/collector не пересозданы.
+Live/ready — 200; начато десятиминутное наблюдение без новых отправок.
 
 Изолированная копия только собственного профиля в tmpfs остановилась на CAPTCHA
 до нативного клика; мутаций не разрешено. Проверка не установила причину 403.
-Рабочий профиль не менялся. Текущая read-only проверка production также вернула
+Рабочий профиль не менялся. Read-only проверка production в 13:43 МСК также вернула
 manual active, revision 2691; запрошена новая проверка человека. Auto off28.
+
+Дополнение `2278a97` проверяет XSRF заголовка с cookie и при отсутствии токена
+в теле POST. Старые записи предыдущей закрытой схемы остаются читаемыми.
+Точный образ дополнения прошёл 14/14 Linux/Chromium-проверок, включая нативную
+форму и durable journal; security-ревизия приняла совместимость. Дополнение
+пока не установлено; это не доказательство причины403.
 
 ## English
 
@@ -219,10 +228,19 @@ matching, and Origin/Referer categories. It validates owner, original operation/
 pair claim, questionnaire binding and letter hash. It is not a success receipt,
 does not change outcome or permit resubmission, and is not exposed over RPC.
 HH text, URLs, cookies and tokens are never stored. Independent security review
-found no blocker; Linux/Chromium passed 160/160. Installation of this diagnostic
-stage is not yet confirmed.
+found no blocker; Linux/Chromium passed 160/160, including the exact image. Installation of diagnostic
+stage `4aab2a2` is confirmed on DE: 59 browser files and the pinned bundle
+matched. Environment/mounts/inodes/policies were preserved; server/collector
+were not recreated. Live/ready returned 200; a ten-minute watch without new
+submissions is in progress.
 
 An isolated own-profile tmpfs copy stopped at CAPTCHA before any native click;
 no mutations were allowed. This did not establish the 403 cause or change the
-working profile. A current production read-only check also returned manual
+working profile. A production read-only check at 13:43 Moscow time also returned manual
 active, revision 2691. A fresh human check was requested; automation stays off28.
+
+Follow-up `2278a97` compares the XSRF header with its cookie even when the POST
+body has no token. Earlier closed-schema records remain readable. Its exact
+image passed 14/14 Linux/Chromium cases, including the native form and durable
+journal; security review accepted compatibility. This follow-up is not installed
+yet and does not itself establish the403 cause.
