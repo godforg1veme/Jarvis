@@ -4,6 +4,9 @@
 
 ## Русский
 
+Более новый результат: [проверка 7 ноября](2026-11-07-hh-forbidden-cascade.md).
+После этой установки подтверждены 14 отправок; затем выявлена отдельная проблема HTTP 403.
+
 ### Повторный ремонт установлен на DE
 
 В 22:01 МСК установлен release `2a201a0`: browser и server/collector.
@@ -162,6 +165,9 @@ Cookie/token совпадали; картинки не были старыми. 
 обнаружил рабочий closed-page counter. Его результат не доказывает полный ремонт.
 
 ## English
+
+Newer result: [November 7 validation](2026-11-07-hh-forbidden-cascade.md).
+After this installation, 14 sends were confirmed; a separate HTTP 403 issue then appeared.
 
 ### Second repair installed on DE
 

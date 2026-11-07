@@ -1,9 +1,10 @@
 const { normalizeSubmissionReceipt } = require('./submissionProtocol');
 const { inspectResponseError } = require('./captchaResponse');
+const { responseClass } = require('./submissionDiagnostic');
 
 const unknown = (reasonCode) => ({ outcome: 'unknown', reasonCode });
 
-async function httpFailure(response, status, headers) {
+async function httpFailure(response, status, headers, inspectedError = null) {
   if ([301,302,303,307,308].includes(status)) {
     try {
       const u = new URL(headers.location, 'https://hh.ru');
@@ -18,7 +19,7 @@ async function httpFailure(response, status, headers) {
   if (status === 401) return unknown('JOB_HH_RECEIPT_AUTH_REQUIRED');
   if (status === 429) return unknown('JOB_HH_RECEIPT_RATE_LIMITED');
   if ([400,403,422].includes(status)) {
-    const reason = await inspectResponseError(response);
+    const reason = inspectedError || await inspectResponseError(response);
     if (reason === 'xsrf_rejected') return unknown('JOB_HH_RECEIPT_XSRF_REJECTED');
     if (reason === 'origin_rejected') return unknown('JOB_HH_RECEIPT_ORIGIN_REJECTED');
     if (['captcha_expired','captcha_rejected'].includes(reason)) return unknown('JOB_HH_RECEIPT_CAPTCHA');
@@ -34,7 +35,17 @@ async function readSubmissionReceipt(response, input) {
   let status, headers;
   try { status = response.status(); headers = response.headers(); }
   catch { return unknown('JOB_HH_RECEIPT_META_FAILED'); }
-  if (status < 200 || status >= 300) return httpFailure(response, status, headers);
+  if (status < 200 || status >= 300) {
+    const errorClass = status === 403 ? await inspectResponseError(response) : null;
+    const result = await httpFailure(response, status, headers, errorClass);
+    if (status !== 403) return result;
+    try {
+      const cls = responseClass(headers);
+      return { ...result, submissionDiagnostic: { status: 403, responseClass: cls,
+        errorClass, xsrf: 'unavailable', xsrfCookie: 'unavailable', xsrfHeader: 'unavailable',
+        xsrfHeaderBody: 'unavailable', origin: 'missing', referer: 'missing' } };
+    } catch { return result; }
+  }
   if (!/^application\/json(?:;|$)/i.test(headers['content-type'] || '')
     || Number(headers['content-length'] || 0) > 1048576) return unknown('JOB_HH_RECEIPT_FORMAT');
   let bytes;

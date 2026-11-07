@@ -81,3 +81,49 @@ test('Linux ledger binds exact question answers and reason without storing answe
       }
     } finally { await fs.rm(root, { recursive: true, force: true }); }
   });
+
+test('Linux ledger keeps a closed immutable 403 diagnostic under the original claim',
+  { skip: process.platform !== 'linux' }, async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'jarvis-job-diagnostic-')); await fs.chmod(root, 0o700);
+    const ownerId = randomUUID(), input = { userId: ownerId, operationId: randomUUID(),
+      externalId: '123', resumeId: 'fixtureResume', letter: 'Approved fixture' };
+    const ledger = new ApplicationLedger({ root, ownerId });
+    const submissionDiagnostic = { status: 403, responseClass: 'missing_length', errorClass: 'body_unavailable',
+      xsrf: 'present', xsrfCookie: 'unavailable', xsrfHeader: 'present', xsrfHeaderBody: 'match',
+      origin: 'hh', referer: 'hh' };
+    try {
+      assert.equal(await ledger.diagnostic(input).catch(error => error.code), 'JOB_BROWSER_LEDGER_UNAVAILABLE');
+      await assert.rejects(ledger.finish(input, { outcome: 'unknown', submissionDiagnostic }),
+        { code: 'JOB_BROWSER_LEDGER_UNAVAILABLE' });
+      await ledger.reserve(input);
+      assert.equal(await ledger.diagnostic(input), null);
+      assert.deepEqual(await ledger.finish(input, { outcome: 'unknown', reasonCode: 'JOB_HH_RECEIPT_FORBIDDEN', submissionDiagnostic }),
+        { outcome: 'unknown', reasonCode: 'JOB_HH_RECEIPT_FORBIDDEN' });
+      assert.deepEqual(await ledger.diagnostic(input), submissionDiagnostic);
+      assert.deepEqual(await ledger.lookup(input), { outcome: 'unknown' });
+      await assert.rejects(ledger.diagnostic({ ...input, userId: randomUUID() }), { code: 'JOB_BROWSER_ACCESS_DENIED' });
+      await assert.rejects(ledger.diagnostic({ ...input, externalId: '124' }), { code: 'JOB_BROWSER_LEDGER_UNAVAILABLE' });
+      await assert.rejects(ledger.diagnostic({ ...input, letter: 'Changed' }), { code: 'JOB_BROWSER_LEDGER_UNAVAILABLE' });
+      const changed = { ...submissionDiagnostic, errorClass: 'xsrf_rejected' };
+      await ledger.finish(input, { outcome: 'unknown', submissionDiagnostic: changed });
+      assert.deepEqual(await ledger.diagnostic(input), submissionDiagnostic);
+      const questionnaire = normalizeQuestionnaire({ questions: [
+        { id: 'task_1', label: 'Fixture question', type: 'text', required: true, maxLength: 100, options: [] },
+      ] });
+      await ledger.finish({ ...input, questionnaire, answers: [{ id: 'task_1', value: 'Fixture answer' }] },
+        { outcome: 'unknown', submissionDiagnostic: changed });
+      assert.deepEqual(await ledger.diagnostic(input), submissionDiagnostic);
+      await ledger.finish(input, { outcome: 'unknown', submissionDiagnostic: { ...submissionDiagnostic, privateToken: 'secret' } });
+      assert.deepEqual(await ledger.diagnostic(input), submissionDiagnostic);
+      const diagnosticName = (await fs.readdir(root)).find(name => name.startsWith('diagnostic-'));
+      const file = path.join(root, diagnosticName);
+      const text = await fs.readFile(file, 'utf8');
+      assert.ok(!text.includes(input.letter) && !text.includes('privateToken'));
+      await fs.writeFile(file, JSON.stringify({ ...JSON.parse(text), privateToken: 'secret' }));
+      await assert.rejects(ledger.diagnostic(input), { code: 'JOB_BROWSER_LEDGER_UNAVAILABLE' });
+      await fs.writeFile(file, '{');
+      await assert.rejects(ledger.diagnostic(input), { code: 'JOB_BROWSER_LEDGER_UNAVAILABLE' });
+      assert.deepEqual(await ledger.finish(input, { outcome: 'sent', verified: true, externalId: '444' }),
+        { outcome: 'sent', verified: true, externalId: '444' });
+    } finally { await fs.rm(root, { recursive: true, force: true }); }
+  });

@@ -22,7 +22,19 @@
   954 server passed /2 DB-only skipped on Node22; both included in PG24/24.
   Real current-provider public classifier benchmark6/6, cost$0.00205326,
   no HH POST. Lexical guard rejected, independent source-only veto accepted.
-- [ ] Bilingual result/status; source/branch/PR audit; authorized GitHub/both VPS
+- [x] Bilingual result/status; source/branch/PR audit; authorized GitHub/both VPS
   release, exact image source hashes, preserved env/mounts, runtime watch.
-- [ ] Fresh live gate and supervised test only if safe; otherwise record the
+- [x] Fresh live gate and supervised test only if safe; otherwise record the
   actual blocker without a new POST for any original unknown.
+
+Observed release `4836021`: live 03:41–03:51 MSK, five skips, one new403,
+15-minute backoff confirmed (893 seconds observed), automation restored off28.
+Delivery remains unresolved; next stage adds closed request/response diagnostics.
+
+- [x] Closed original403 diagnostic, immutable claim-bound journal; no new RPC,
+  secrets, POST/retry or outcome changes. Independent security review accepted.
+  Linux/Chromium160/160 passed; Windows focused6/6.
+- [ ] Install diagnostic browser image with exact-source validation; preserve
+  server/collector images, profiles, env, mounts and policies.
+- [ ] Current manual CAPTCHA gate; read-only diagnostic/live result after it,
+  without repeating any previous uncertain operation.

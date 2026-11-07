@@ -4,6 +4,7 @@ const { createHash, randomUUID } = require('node:crypto');
 const path = require('node:path');
 const { UUID } = require('./rpcProtocol');
 const { normalizeQuestionnaire, normalizeAnswers, STOP_REASONS, UNKNOWN_RESULT_REASONS } = require('../../shared/jobQuestionnaire');
+const { validSubmissionDiagnostic } = require('./submissionDiagnostic');
 const hash = (value) => createHash('sha256').update(value).digest('hex');
 const failure = (code = 'JOB_BROWSER_LEDGER_UNAVAILABLE') => Object.assign(new Error(code), { code });
 const HASH = /^[a-f\d]{64}$/;
@@ -21,7 +22,7 @@ class ApplicationLedger {
     if (!stat.isDirectory() || stat.uid !== process.getuid() || (stat.mode & 0o077)) throw failure();
   }
   location(kind, digest) {
-    if (!['operation', 'pair', 'result'].includes(kind) || !HASH.test(digest)) throw failure();
+    if (!['operation', 'pair', 'result', 'diagnostic'].includes(kind) || !HASH.test(digest)) throw failure();
     return path.join(this.root, `${kind}-${digest}.json`);
   }
   async syncDirectory() {
@@ -140,6 +141,20 @@ class ApplicationLedger {
     if (pair) this.validateClaim(pair);
     return Boolean(operation || pair);
   }
+  async diagnostic(input) {
+    const identity = this.identity(input); await this.directory();
+    const claim = this.validateClaim(await this.read('operation', identity.operationHash));
+    const pair = this.validateClaim(await this.read('pair', identity.pairHash));
+    if (claim.pairHash !== identity.pairHash || !this.same(claim, pair)
+      || !this.same(claim, { ...identity, letterHash: claim.letterHash })
+      || typeof input.letter !== 'string' || hash(input.letter) !== claim.letterHash) throw failure();
+    const value = await this.read('diagnostic', identity.operationHash);
+    if (!value) return null;
+    if (!value.claim || !this.same(this.validateClaim(value.claim), claim)
+      || Object.keys(value).sort().join(',') !== 'claim,submissionDiagnostic'
+      || !validSubmissionDiagnostic(value.submissionDiagnostic)) throw failure();
+    return value.submissionDiagnostic;
+  }
   async finish(input, result) {
     const identity = this.identity(input); await this.directory();
     const claim = this.validateClaim(await this.read('operation', identity.operationHash));
@@ -147,6 +162,13 @@ class ApplicationLedger {
     if (claim.pairHash !== identity.pairHash || !this.same(claim, pair)) throw failure('JOB_BROWSER_OPERATION_CHANGED');
     const existing = await this.result(claim);
     if (existing.outcome !== 'unknown') return existing;
+    if (result?.submissionDiagnostic && validSubmissionDiagnostic(result.submissionDiagnostic)
+      && this.same(claim, { ...identity, letterHash: claim.letterHash })
+      && (input.letter === undefined || typeof input.letter === 'string' && hash(input.letter) === claim.letterHash)) {
+      // An optional closed diagnostic cannot change the result or authorize a retry.
+      try { await this.write('diagnostic', claim.operationHash, { claim, submissionDiagnostic: result.submissionDiagnostic }); }
+      catch {}
+    }
     if (result?.outcome === 'unknown') return { outcome: 'unknown',
       ...(UNKNOWN_RESULT_REASONS.has(result.reasonCode) ? { reasonCode: result.reasonCode } : {}) };
     if (result?.verified !== true || !['sent', 'failed', 'manual_required', 'already_applied'].includes(result.outcome)

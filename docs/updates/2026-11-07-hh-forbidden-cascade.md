@@ -5,8 +5,9 @@
 ## Русский
 
 Продолжение [ремонта памяти 6 ноября](2026-11-06-hh-page-cleanup.md).
-Текущий этап пока локальный: опубликованный runtime остаётся `2a201a0`,
-GitHub/source — `726ccfa`. Новая установка ещё не подтверждена.
+На DE установлен server/collector `4836021`; browser остаётся `2a201a0`
+без пересоздания. GitHub main, Windows и исходники обоих VPS сверены.
+Причина самого HTTP 403 остаётся открытой; успешная новая отправка не подтверждена.
 
 ### Что произошло ночью
 
@@ -43,7 +44,7 @@ application/operation. Сообщение «Обработка прервана�
 server/browser/collector restart=0, heap OOM=0, closed/unknown routes=0.
 Контрольный heap 71 MiB при активной операции; production GC не форсировался.
 
-### Что исправляется
+### Установленные исправления
 
 После блокирующего receipt или ошибки HH на позднем этапе worker делает
 существующую паузу 15 минут в текущих user/conversation/chat/revision.
@@ -66,7 +67,7 @@ server/browser/collector restart=0, heap OOM=0, closed/unknown routes=0.
 Используются прежние GLM/provider/schema, новых зависимостей или миграций нет.
 Обе оценки модельные, поэтому гарантии безошибочного отбора всех профессий нет.
 
-Проверено локально: 954 server tests прошли, два DB-only отдельно вошли в
+Проверено на Windows и Node 22 в Linux-образе: 954 server tests прошли, два DB-only отдельно вошли в
 24/24 PostgreSQL-проверки. Последние проверили настоящие draft/application,
 unknown после403, паузу следующей вакансии, одинаковые IDs, изоляцию владельца
 и участника, veto без письма и раздельный учёт обеих стадий.
@@ -75,15 +76,50 @@ unknown после403, паузу следующей вакансии, один�
 отклонены; Python LLM-интеграции и системный аналитик LLM приняты. Итого 6/6,
 стоимость по provider usage $0.00205326. Это запросы классификатора, без POST в HH.
 
-Проверки и фактический выпуск будут добавлены после завершения ревизии.
-Автоотклики владельца выключены, revision 26. Старые неизвестные операции
-не повторяются. Новая живая отправка после этого этапа пока не проверена.
+### Проверка после установки
+
+Независимые ревизии направления и границ данных завершены. В образе совпали
+390 server/shared-файлов и входные файлы сборки; browser и pinned Playwright
+не изменились. Env, mounts и bind inodes, ресурсные и security-настройки,
+остальные сервисы сохранены. Live/ready вернули 200; перезапусков и OOM нет.
+В 18 замерах окна heap составил 60–70 MiB, closed/unknown routes — 0.
+NL получил исходники; HH runtime на нём не установлен. Desktop не менялся;
+сохранилось прежнее расхождение одного неиспользуемого shared-файла.
+
+В живом окне 03:41–03:51 МСК проверка человека была idle. Пять вакансий
+отклонены; одна новая отправка снова получила HTTP 403. Worker поставил
+15-минутную паузу (наблюдалось 893 секунды остатка), наблюдатель выключил
+автопоиск на revision 28. Следующих отправок не было. Восемь строк usage
+составили $0.004241008, неизвестных расходов нет. Старые unknown не повторялись.
+
+Пауза подтверждена в production, но доставка остаётся неисправленной.
+Текущий журнал сводит недоступное тело ответа, нераспознанную ошибку и общий
+отказ к одному FORBIDDEN. Следующий этап — закрытые категории ответа и
+исходного запроса, без текста HH, URL, cookies или токенов. Новый 403 не даёт
+права повторить исходную отправку. Автопоиск оставлен выключенным.
+
+### Следующий этап: диагностика исходного отказа
+
+Добавлена отдельная immutable запись в приватном журнале browser: категория
+размера/кодирования ответа, категория распознанной ошибки, наличие XSRF,
+совпадение его тела, cookie и известного заголовка, категории Origin/Referer.
+Запись проверяет владельца, исходный operation/pair claim, анкету и хэш письма.
+Она не является квитанцией успеха, не меняет outcome, не открывает повторную
+отправку и не выходит в RPC. Тексты HH, URL, cookies и токены не сохраняются.
+Независимая security-ревизия не нашла блокеров; Linux/Chromium 160/160.
+Установка этой диагностики пока не подтверждена.
+
+Изолированная копия только собственного профиля в tmpfs остановилась на CAPTCHA
+до нативного клика; мутаций не разрешено. Проверка не установила причину 403.
+Рабочий профиль не менялся. Текущая read-only проверка production также вернула
+manual active, revision 2691; запрошена новая проверка человека. Auto off28.
 
 ## English
 
 This continues the [November 6 memory repair](2026-11-06-hh-page-cleanup.md).
-This stage is local: deployed runtime remains `2a201a0`, GitHub/source `726ccfa`.
-Installation of the new changes is not yet confirmed.
+Server/collector `4836021` are installed on DE; browser remains `2a201a0`
+without recreation. GitHub main, Windows and both VPS source checkouts matched.
+The HTTP 403 cause remains open; a new successful submission is not confirmed.
 
 ### Overnight evidence
 
@@ -121,7 +157,7 @@ production server/browser/collector runtime, zero restarts, zero heap OOMs and
 zero closed/unknown-page routes. The observed heap was 71 MiB during an active
 operation; production GC was not forced.
 
-### Repair in progress
+### Installed repairs
 
 After a blocking receipt or a later-stage HH source error, the worker applies
 the existing 15-minute backoff for the current user/conversation/chat/revision.
@@ -144,7 +180,7 @@ monthly accounting and notice; the notice threshold is not a spending cap.
 The same GLM/provider/schema is used, with no new dependency or migration.
 Both judgments are model-based and do not guarantee perfect occupational matching.
 
-Local validation: 954 server tests passed; both DB-only cases were included in a
+Windows and Linux image validation on Node 22: 954 server tests passed; both DB-only cases were included in a
 separate 24/24 PostgreSQL suite. It covered real drafts/applications, unknown after
 403, pausing the next candidate, stable IDs, owner/member isolation, veto without
 letter generation and separate billing of both stages. Public cases were also
@@ -153,6 +189,40 @@ testing variant, ordinary support and ordinary QA were rejected; Python LLM
 integration and LLM systems analysis were accepted. Result 6/6, provider-reported
 cost $0.00205326. These were classifier calls without any HH POST.
 
-Validation and deployment results will be added after review. Owner automation
-is off at revision 26. Old uncertain operations are never repeated. A new live
-application after this stage is not yet validated.
+### Post-installation validation
+
+Independent direction and data-boundary reviews are complete. The image matched
+390 server/shared files and build inputs; browser and pinned Playwright were
+unchanged. Environment, mounts and bind inodes, resource/security settings and
+other services were preserved. Live/ready returned 200 with no restarts or OOMs.
+Across 18 samples, heap was 60–70 MiB and closed/unknown routes stayed at zero.
+NL received source only and has no HH runtime. Desktop was unchanged; the earlier
+single unused shared-file mismatch remains.
+
+During the 03:41–03:51 Moscow live window, the human-check state was idle. Five
+vacancies were skipped; one new submission again returned HTTP 403. The worker
+applied 15-minute backoff (893 seconds remaining were observed), and the observer
+disabled automation at revision 28. No later submissions occurred. Eight usage
+rows totaled $0.004241008, with no unknown costs. Old unknowns were not resent.
+
+Production backoff is confirmed, but delivery remains unresolved. The current
+journal collapses unavailable response bodies, unclassified errors and generic
+refusals into FORBIDDEN. The next stage records closed response/request categories
+without HH text, URLs, cookies or tokens. A new 403 never permits repeating the
+original submission. Automation remains off.
+
+### Next stage: original-refusal diagnostics
+
+A separate immutable private browser-journal record now contains response
+size/encoding and error classes, XSRF presence and body/cookie/known-header
+matching, and Origin/Referer categories. It validates owner, original operation/
+pair claim, questionnaire binding and letter hash. It is not a success receipt,
+does not change outcome or permit resubmission, and is not exposed over RPC.
+HH text, URLs, cookies and tokens are never stored. Independent security review
+found no blocker; Linux/Chromium passed 160/160. Installation of this diagnostic
+stage is not yet confirmed.
+
+An isolated own-profile tmpfs copy stopped at CAPTCHA before any native click;
+no mutations were allowed. This did not establish the 403 cause or change the
+working profile. A current production read-only check also returned manual
+active, revision 2691. A fresh human check was requested; automation stays off28.

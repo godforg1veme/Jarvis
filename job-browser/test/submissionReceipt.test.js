@@ -50,7 +50,14 @@ test('HTTP failure categories expose no response text or redirect location and n
   ]) {
     if(body)headers['content-length']=String(Buffer.byteLength(body));
     const result=await readSubmissionReceipt({status:()=>status,headers:()=>headers,body:async()=>Buffer.from(body)},input);
-    assert.deepEqual(result,{outcome:'unknown',reasonCode:`JOB_HH_RECEIPT_${code}`});
+    assert.equal(result.outcome,'unknown');
+    assert.equal(result.reasonCode,`JOB_HH_RECEIPT_${code}`);
+    if(status===403)assert.deepEqual(result.submissionDiagnostic,{
+      status:403,responseClass:body?'small_text':'missing_length',
+      errorClass:body?'xsrf_rejected':'body_unavailable',xsrf:'unavailable',xsrfCookie:'unavailable',
+      xsrfHeader:'unavailable',xsrfHeaderBody:'unavailable',
+      origin:'missing',referer:'missing'});
+    else assert.equal(result.submissionDiagnostic,undefined);
     assert.equal(JSON.stringify(result).includes('private-marker'),false);
   }
 });
