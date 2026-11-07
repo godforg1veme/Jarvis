@@ -243,6 +243,24 @@ Earlier stages are retained in the [context archive](history/2026-10-23-runtime-
 
 #### Browser, CAPTCHA и диагностика
 
+Автоотклик после предварительного apply требует отдельной проверки основной
+работы по публичной вакансии и запросам поиска. В неё не передаются резюме,
+письмо, факты кандидата и первое решение. Неопределённость или veto останавливают
+путь до письма; оба запроса учитываются отдельно до API, второй ID выводится
+из исходного evaluation_request_id. Новые кандидатуры после блокирующего
+receipt/ошибки HH ждут существующие15мин; исходная unknown операция не повторяется.
+Порог расходов остаётся месячным уведомлением, не hard cap.
+[Результат и пределы](updates/2026-11-07-hh-forbidden-cascade.md).
+
+Automatic applications require a separate main-work check after preliminary apply,
+using only the public vacancy and search queries. Resume, letter, candidate facts
+and the first verdict are excluded. Veto or uncertainty stops drafting. Both calls
+get separate usage records before the API, with the second ID derived from the
+original evaluation_request_id. A blocking receipt/HH source error pauses later
+candidates for the existing15 minutes without retrying the original unknown
+operation. The monthly cost threshold remains a notice, not a hard cap.
+[Results and limits](updates/2026-11-07-hh-forbidden-cascade.md).
+
 При закрытии HH-страницы общий helper сначала загружает свежий about:blank
 до `load`, сохраняя request guards, затем закрывает target. При неудаче
 навигации живой документ не закрывается напрямую: runtime завершается с

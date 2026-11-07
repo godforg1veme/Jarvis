@@ -4,6 +4,15 @@
 
 ## Русский
 
+7 ноября [подготовлен ремонт каскада HH 403 и независимая проверка направления](updates/2026-11-07-hh-forbidden-cascade.md).
+Ночью подтверждены 14 откликов; затем 6 неопределённых отправок получили 403,
+а 2 обработки прерваны до application. После первого 403 отсутствовала пауза;
+модель также ошибочно назвала сметчика AI QA. Кандидат добавляет scoped паузу
+и отдельное source-only veto до письма, с раздельным учётом расходов.
+Проверено: 954 server на Node 22, 24 PG и 6 настоящих классификаций без HH POST.
+Новая установка ещё не подтверждена. Runtime 2a201a0 сохраняет 0 перезапусков/OOM
+и 0 закрытых routes после более пяти часов. Auto off, revision 26.
+
 6 ноября [общий ремонт HH установлен на DE](updates/2026-11-06-hh-page-cleanup.md):
 browser/server/collector `2a201a0`, исходники обоих VPS совпадают с GitHub.
 Очистка заменяет документ до закрытия, pinned Playwright освобождает маршруты
@@ -249,6 +258,15 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 Архивы не заменяют действующие правила и новую проверку окружения.
 
 ## English
+
+November 7: [HH 403 cascade repair and independent direction verification are prepared](updates/2026-11-07-hh-forbidden-cascade.md).
+Overnight 14 applications were confirmed, followed by six uncertain submissions
+with 403 and two interruptions before application creation. Backoff was missing
+after the first 403; the model also mislabeled an estimator as AI QA. The candidate
+adds scoped backoff and a source-only veto before drafting, with separate cost
+accounting. Validation: 954 server on Node 22, 24 PG and six real classifier cases
+without HH POST. Installation is not yet confirmed. Runtime 2a201a0 has zero
+restarts/OOMs/closed routes after more than five hours. Automation is off, revision 26.
 
 November 6: [the shared HH repair is installed on DE](updates/2026-11-06-hh-page-cleanup.md).
 Browser/server/collector run `2a201a0`; both VPS sources match GitHub.

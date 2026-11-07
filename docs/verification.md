@@ -859,6 +859,20 @@ invalid retry, closed contexts, single consumption, expiry, foreign scopes,
 revisions, exact-text confirmation and original-ID unknown reconciliation.
 Model and HH responses are fixtures; live Telegram/HH acceptance remains separate.
 
+Autonomous selection policy3 verifies preliminary apply decisions a second time
+using only the public vacancy and search queries. Run
+`node --test server/test/jobDirectionVerification.test.js server/test/jobAutomationWorker.test.js`.
+Check that the second request excludes resume/profile/letter and the first verdict,
+has its own stable usage ID before the API, cannot upgrade a first skip, and
+cannot send after veto, uncertainty, changed consent or search revision.
+`jobAutomationIntegrationAcceptance.cjs` in the disposable PostgreSQL fixture
+also covers the real worker, two personal scopes, both provider-cost rows and a
+false-core source veto with no draft/application. `jobAutomationAcceptance.cjs`
+checks a real unknown application after403 and scoped15-minute blocking of later
+candidates, without retrying that operation. Never run these against production DB.
+Live classifier cases use public snapshots only; record their cost and actual
+results separately from fixture verdicts and from real HH application results.
+
 Job browser collector integration (opt-in, isolated PostgreSQL fixture only):
 
 ```powershell
