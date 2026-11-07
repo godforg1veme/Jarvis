@@ -14,7 +14,7 @@ async function dispatchApplication(route, input) {
   let response, result;
   try {
     response = await route.fetch({ maxRedirects: 0, maxRetries: 0, timeout: 15000 });
-    result = await readSubmissionReceipt(response, input);
+    result = await readSubmissionReceipt(response, input, request);
     if (result?.submissionDiagnostic) {
       try {
         // Playwright request.headers() can omit security headers such as Cookie.

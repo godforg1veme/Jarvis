@@ -1,6 +1,7 @@
 const { normalizeSubmissionReceipt } = require('./submissionProtocol');
 const { inspectResponseError } = require('./captchaResponse');
 const { responseClass } = require('./submissionDiagnostic');
+const { inspectCachedResponseError } = require('./cachedResponseError');
 
 const unknown = (reasonCode) => ({ outcome: 'unknown', reasonCode });
 
@@ -31,12 +32,14 @@ async function httpFailure(response, status, headers, inspectedError = null) {
   return unknown('JOB_HH_RECEIPT_HTTP');
 }
 
-async function readSubmissionReceipt(response, input) {
+async function readSubmissionReceipt(response, input, nativeRequest = null) {
   let status, headers;
   try { status = response.status(); headers = response.headers(); }
   catch { return unknown('JOB_HH_RECEIPT_META_FAILED'); }
   if (status < 200 || status >= 300) {
-    const errorClass = status === 403 ? await inspectResponseError(response) : null;
+    let errorClass = status === 403 ? await inspectResponseError(response) : null;
+    if (status === 403 && errorClass === 'body_unavailable' && nativeRequest)
+      errorClass = inspectCachedResponseError(response, nativeRequest);
     const result = await httpFailure(response, status, headers, errorClass);
     if (status !== 403) return result;
     try {
