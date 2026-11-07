@@ -43,16 +43,22 @@ function requestDiagnostic(request, observedHeaders = null) {
     return { xsrf, xsrfCookie: xsrf === 'present' ? xsrfCookieMatch(headers.cookie, token) : 'unavailable',
       xsrfHeader, xsrfHeaderBody: xsrf === 'present' && xsrfHeader === 'present'
         ? (headerToken === token ? 'match' : 'mismatch') : 'unavailable',
+      xsrfHeaderCookie: xsrfHeader === 'present' ? xsrfCookieMatch(headers.cookie, headerToken) : 'unavailable',
       origin: originClass(headers.origin), referer: originClass(headers.referer) };
   } catch { return { xsrf: 'unavailable', xsrfCookie: 'unavailable', xsrfHeader: 'unavailable',
-    xsrfHeaderBody: 'unavailable', origin: 'invalid', referer: 'invalid' }; }
+    xsrfHeaderBody: 'unavailable', xsrfHeaderCookie: 'unavailable', origin: 'invalid', referer: 'invalid' }; }
 }
 function validSubmissionDiagnostic(value) {
-  return !!value && Object.keys(value).sort().join(',') === 'errorClass,origin,referer,responseClass,status,xsrf,xsrfCookie,xsrfHeader,xsrfHeaderBody'
+  const keys = value && Object.keys(value).sort().join(',');
+  const legacy = keys === 'errorClass,origin,referer,responseClass,status,xsrf,xsrfCookie,xsrfHeader,xsrfHeaderBody';
+  const current = keys === 'errorClass,origin,referer,responseClass,status,xsrf,xsrfCookie,xsrfHeader,xsrfHeaderBody,xsrfHeaderCookie';
+  return (legacy || current)
     && value.status === 403 && RESPONSE_CLASSES.has(value.responseClass)
     && ERROR_CLASSES.has(value.errorClass) && TOKEN_CLASSES.has(value.xsrf)
     && MATCH_CLASSES.has(value.xsrfCookie) && HEADER_CLASSES.has(value.xsrfHeader)
-    && MATCH_CLASSES.has(value.xsrfHeaderBody) && ORIGIN_CLASSES.has(value.origin)
+    && MATCH_CLASSES.has(value.xsrfHeaderBody)
+    && (legacy || MATCH_CLASSES.has(value.xsrfHeaderCookie))
+    && ORIGIN_CLASSES.has(value.origin)
     && ORIGIN_CLASSES.has(value.referer);
 }
 module.exports = { responseClass, requestDiagnostic, validSubmissionDiagnostic };

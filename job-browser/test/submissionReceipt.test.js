@@ -55,7 +55,7 @@ test('HTTP failure categories expose no response text or redirect location and n
     if(status===403)assert.deepEqual(result.submissionDiagnostic,{
       status:403,responseClass:body?'small_text':'missing_length',
       errorClass:body?'xsrf_rejected':'body_unavailable',xsrf:'unavailable',xsrfCookie:'unavailable',
-      xsrfHeader:'unavailable',xsrfHeaderBody:'unavailable',
+      xsrfHeader:'unavailable',xsrfHeaderBody:'unavailable',xsrfHeaderCookie:'unavailable',
       origin:'missing',referer:'missing'});
     else assert.equal(result.submissionDiagnostic,undefined);
     assert.equal(JSON.stringify(result).includes('private-marker'),false);

@@ -22,10 +22,21 @@ test('closed response metadata never reads an unbounded or encoded body', () => 
 test('request diagnostic exposes categories only', () => {
   assert.deepEqual(requestDiagnostic(request({ origin: 'https://hh.ru', referer: 'https://hh.ru/secret?token=private',
     cookie: '_xsrf=secret; other=private', 'x-xsrftoken': 'secret' }, { _xsrf: 'secret' })),
-  { xsrf: 'present', xsrfCookie: 'match', xsrfHeader: 'present', xsrfHeaderBody: 'match', origin: 'hh', referer: 'hh' });
+  { xsrf: 'present', xsrfCookie: 'match', xsrfHeader: 'present', xsrfHeaderBody: 'match',
+    xsrfHeaderCookie: 'match', origin: 'hh', referer: 'hh' });
   assert.deepEqual(requestDiagnostic(request()),
   { xsrf: 'missing', xsrfCookie: 'unavailable', xsrfHeader: 'missing', xsrfHeaderBody: 'unavailable',
+    xsrfHeaderCookie: 'unavailable',
     origin: 'missing', referer: 'missing' });
+  for (const [cookie, expected] of [['_xsrf=secret', 'match'], ['_xsrf=other', 'mismatch'],
+    ['_xsrf=secret; _xsrf=other', 'ambiguous']]) {
+    const native = request({ cookie, 'x-xsrftoken': 'secret' });
+    const diagnostic = requestDiagnostic(native);
+    assert.equal(diagnostic.xsrf, 'missing');
+    assert.equal(diagnostic.xsrfCookie, 'unavailable');
+    assert.equal(diagnostic.xsrfHeaderBody, 'unavailable');
+    assert.equal(diagnostic.xsrfHeaderCookie, expected);
+  }
   assert.equal(requestDiagnostic(request({}, { _xsrf: 'private' })).xsrfHeaderBody, 'unavailable');
   const duplicate = request(); duplicate.postDataBuffer = () => Buffer.from(`${duplicateBody()}&_xsrf=second`);
   assert.equal(requestDiagnostic(duplicate).xsrf, 'duplicate');
@@ -33,7 +44,13 @@ test('request diagnostic exposes categories only', () => {
   assert.equal(requestDiagnostic(invalid).xsrf, 'invalid_form');
   assert.equal(validSubmissionDiagnostic({ status: 403, responseClass: 'small_text', errorClass: 'forbidden_generic',
     xsrf: 'present', xsrfCookie: 'match', xsrfHeader: 'present', xsrfHeaderBody: 'match',
-    origin: 'hh', referer: 'hh', raw: 'private' }), false);
+    xsrfHeaderCookie: 'match', origin: 'hh', referer: 'hh', raw: 'private' }), false);
+  const legacy = { status: 403, responseClass: 'small_text', errorClass: 'forbidden_generic',
+    xsrf: 'missing', xsrfCookie: 'unavailable', xsrfHeader: 'present', xsrfHeaderBody: 'unavailable',
+    origin: 'hh', referer: 'hh' };
+  assert.equal(validSubmissionDiagnostic(legacy), true);
+  assert.equal(validSubmissionDiagnostic({ ...legacy, xsrfHeaderCookie: 'match' }), true);
+  assert.equal(validSubmissionDiagnostic({ ...legacy, xsrfHeaderCookie: 'unexpected' }), false);
 });
 function duplicateBody() { return '_xsrf=first'; }
 test('one original POST yields closed 403 diagnostic without changing unknown result', async () => {
@@ -49,6 +66,7 @@ test('one original POST yields closed 403 diagnostic without changing unknown re
   assert.equal(result.outcome, 'unknown'); assert.equal(result.reasonCode, 'JOB_HH_RECEIPT_FORBIDDEN');
   assert.deepEqual(result.submissionDiagnostic, { status: 403, responseClass: 'encoded', errorClass: 'body_unavailable',
     xsrf: 'present', xsrfCookie: 'match', xsrfHeader: 'present', xsrfHeaderBody: 'match',
+    xsrfHeaderCookie: 'match',
     origin: 'hh', referer: 'hh' });
   assert.ok(!JSON.stringify(result).includes('secret'));
 });

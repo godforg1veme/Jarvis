@@ -43,7 +43,7 @@ async function readSubmissionReceipt(response, input) {
       const cls = responseClass(headers);
       return { ...result, submissionDiagnostic: { status: 403, responseClass: cls,
         errorClass, xsrf: 'unavailable', xsrfCookie: 'unavailable', xsrfHeader: 'unavailable',
-        xsrfHeaderBody: 'unavailable', origin: 'missing', referer: 'missing' } };
+        xsrfHeaderBody: 'unavailable', xsrfHeaderCookie: 'unavailable', origin: 'missing', referer: 'missing' } };
     } catch { return result; }
   }
   if (!/^application\/json(?:;|$)/i.test(headers['content-type'] || '')
