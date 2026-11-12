@@ -8,7 +8,7 @@ function button(parent, label, handler, className = 'secondary') {
   parent.append(node); return node;
 }
 
-function sessionKey(actor, kind) { return `jarvis-job-login:${kind}:${actor.telegramId}`; }
+function sessionKey(actor, kind) { return `jarvis-job-login:${kind}:${actor.storageScope || actor.telegramId}`; }
 function safeSessionId(actor) {
   try { const value = sessionStorage.getItem(sessionKey(actor, 'session')); return UUID.test(value || '') ? value : null; }
   catch { return null; }
@@ -67,7 +67,7 @@ export function createJobConnectionPanel({ api, actor, anchor }) {
   function invalidate() { generation++; loadSequence++; pollSequence++; clearTimer(); return generation; }
   function current(token, id = sessionId) { return !disposed && token === generation && id === sessionId; }
   function showLink(ticket, delivery) {
-    const target = new URL('/mini/job-connect/', location.origin);
+    const target = new URL('/mini/job-connect/', api.publicOrigin || location.origin);
     target.hash = new URLSearchParams({ ticket }).toString();
     link.href = target.href;
     linkValue.value = target.href;

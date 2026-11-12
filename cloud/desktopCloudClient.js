@@ -4,6 +4,7 @@ const path = require('path');
 const { createRemoteMessage, validateRemoteMessage } = require('../agents/remoteProtocol');
 const { boundedJsonFetch } = require('./boundedHttp');
 const { OutboundRequestStore, validId } = require('./outboundRequestStore');
+const { WorkspacePendingStore } = require('./workspacePendingStore');
 const { MAX_FRAME_BYTES } = require('../shared/visionSchemas');
 const MAX_VISION_RESPONSE_BYTES = Math.ceil(MAX_FRAME_BYTES / 3) * 4 + 256 * 1024;
 
@@ -97,6 +98,7 @@ class DesktopCloudClient {
     this.commandJournal = this._readCommandJournal();
     this.publicState = this._readPublicState();
     this.outboundRequests = new OutboundRequestStore(options.outboundDataPath || this.userDataPath);
+    this.workspacePending = new WorkspacePendingStore(options.outboundDataPath || this.userDataPath);
     this.socket = null;
     this.heartbeat = null;
     this.authenticationTimer = null;
@@ -249,6 +251,8 @@ class DesktopCloudClient {
       const error = new Error(body && body.code ? body.code : 'Cloud request failed.');
       error.code = body && body.code;
       error.statusCode = response.status;
+      if (urlPath.startsWith('/v1/desktop/workspace/') && response.status >= 400 && response.status < 500
+        && body.notStarted === true) error.notStarted = true;
       if (options.method && options.method !== 'GET' && (response.status >= 500 || response.status < 400
         || body.code === 'REQUEST_RETRY_WITH_NEW_ID')) error.outcome = 'unknown';
       throw error;
@@ -389,6 +393,80 @@ class DesktopCloudClient {
     return this._request(`/v1/desktop/commands/${encodeURIComponent(String(commandId || ''))}/reject`, { method: 'POST' });
   }
 
+  async workspaceRequest(input) {
+    // Revalidate even for callers outside the IPC registration.
+    const { requestInput } = require('./workspaceProtocol');
+    const request = requestInput({ path: input.path, method: input.method,
+      ...(input.body === undefined ? {} : { body: typeof input.body === 'string' ? JSON.parse(input.body) : input.body }) });
+    const scope = `${this.publicState.serverUrl}|${this.publicState.deviceId}`;
+    const origin = { serverUrl: this.publicState.serverUrl, deviceId: this.publicState.deviceId };
+    const body = request.body === undefined ? {} : JSON.parse(request.body);
+    let pending = null;
+    if (request.method === 'POST') {
+      if (request.path === '/memory/operations') pending = { kind: 'memory', id: body.operationId };
+      const personal = /^\/sections\/(documents|devices|life)\/operations$/.exec(request.path);
+      if (personal) pending = { kind: `personal-${personal[1]}`, id: body.operationId };
+      if (/^\/jobs\/resumes\/(refresh|settings)$/.test(request.path)) pending = { kind: 'job-resumes', id: body.requestId };
+      if (request.path === '/jobs/login') pending = { kind: 'job-login', id: body.requestId };
+      if (pending) this.workspacePending.claim(origin.serverUrl, origin.deviceId, pending.kind, pending.id);
+    }
+    let result;
+    try {
+      result = await this._request(`/v1/desktop/workspace${request.path}`, {
+        method: request.method, ...(request.body === undefined ? {} : {
+          headers: { 'Content-Type': 'application/json' }, body: request.body,
+        }),
+      });
+    } catch (error) {
+      if (pending) {
+        if (error.notStarted) this.workspacePending.settle(origin.serverUrl, origin.deviceId, pending.kind, pending.id);
+        else error.outcome = 'unknown';
+      }
+      throw error;
+    }
+    const memoryReceipt = /^\/memory\/operations\/([a-f0-9-]{36})(?:\/cancel)?$/i.exec(request.path);
+    const personalReceipt = /^\/sections\/(documents|devices|life)\/operations\/([a-f0-9-]{36})(?:\/cancel)?$/i.exec(request.path);
+    const jobReceipt = /^\/jobs\/resumes\/operations\/([a-f0-9-]{36})(?:\/confirm-inspection)?$/i.exec(request.path);
+    const receipt = memoryReceipt ? { kind: 'memory', id: memoryReceipt[1] }
+      : personalReceipt ? { kind: `personal-${personalReceipt[1]}`, id: personalReceipt[2] }
+        : jobReceipt ? { kind: 'job-resumes', id: jobReceipt[1] } : pending;
+    if (receipt && (receipt.kind === 'job-login' || ['completed', 'cancelled', 'complete', 'failed'].includes(result.status))) {
+      this.workspacePending.settle(origin.serverUrl, origin.deviceId, receipt.kind, receipt.id);
+    }
+    if (/^\/sections\/(memory|documents|devices|life|jobs|vpn|operations)$/.test(request.path)) {
+      const { externalUrl } = require('./workspaceProtocol');
+      if (this.workspaceLinkScope !== scope) { this.workspaceLinks = new Set(); this.workspaceLinkScope = scope; }
+      for (const action of Array.isArray(result.actions) ? result.actions : []) {
+        if (action?.kind !== 'telegram' || typeof action.href !== 'string') continue;
+        try { this.workspaceLinks.add(externalUrl(action.href, this.publicState.serverUrl, [action.href])); } catch (_) {}
+      }
+    }
+    return result;
+  }
+  workspaceTelegramLinks() {
+    return this.workspaceLinkScope === `${this.publicState.serverUrl}|${this.publicState.deviceId}`
+      ? [...(this.workspaceLinks || [])] : [];
+  }
+  listWorkspacePending() {
+    return this.workspacePending.list(this.publicState.serverUrl, this.publicState.deviceId);
+  }
+  async workspaceUpload(input) {
+    const { uploadInput } = require('./workspaceProtocol');
+    const file = uploadInput(input);
+    const origin = { serverUrl: this.publicState.serverUrl, deviceId: this.publicState.deviceId };
+    this.workspacePending.claim(origin.serverUrl, origin.deviceId, 'personal-documents', file.operationId);
+    let result;
+    try {
+      result = await this._request(`/v1/desktop/workspace/sections/documents/uploads/${file.operationId}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/octet-stream',
+          'x-jarvis-file-name': encodeURIComponent(file.name), 'x-jarvis-file-type': file.type }, body: file.data,
+      });
+    } catch (error) { error.outcome = 'unknown'; throw error; }
+    if (['completed', 'cancelled'].includes(result.status)) {
+      this.workspacePending.settle(origin.serverUrl, origin.deviceId, 'personal-documents', file.operationId);
+    }
+    return result;
+  }
   async getLifeBootstrap() { return this._request('/v1/desktop/life/bootstrap'); }
   async getMissionControl() { return this._request('/v1/desktop/life/mission-control'); }
   async getLifeTimeline({ projectId = '', cursor = '', limit = 40 } = {}) {

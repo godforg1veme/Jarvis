@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { chromium } = require('playwright');
+require('./prepareDesktopWorkspace').prepareDesktopWorkspace();
 
 const root = path.resolve(__dirname, '..');
 const output = path.join(root, 'build', 'life-os-screenshots');
@@ -76,7 +77,7 @@ async function capture(browser, name, width, mode, action = null) {
   await page.addInitScript(`window.cloudMockSource = ${cloudMock.toString()}; window.jarvisCloud = window.cloudMockSource(${JSON.stringify(fixture(mode))}, ${mode === 'loading'});`);
   await page.goto(pathToFileURL(path.join(root, 'renderer', 'cloud-chat', 'index.html')).href);
   await page.waitForLoadState('load');
-  await page.click('#life-os-open');
+  await page.click('[data-desktop-page="life"]');
   if (mode !== 'loading') await page.waitForTimeout(300);
   if (action === 'timeline') { await page.click('[data-life-view="timeline"]'); await page.waitForTimeout(80); }
   if (action === 'context') { await page.click('.life-project-card'); await page.waitForTimeout(80); }
@@ -106,13 +107,13 @@ async function keyboardAcceptance(browser) {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await page.addInitScript(`window.cloudMockSource = ${cloudMock.toString()}; window.jarvisCloud = window.cloudMockSource(${JSON.stringify(fixture('populated'))}, false);`);
   await page.goto(pathToFileURL(path.join(root, 'renderer', 'cloud-chat', 'index.html')).href);
-  await page.focus('#life-os-open'); await page.keyboard.press('Enter'); await page.waitForSelector('#life-os.is-open');
+  await page.focus('[data-desktop-page="life"]'); await page.keyboard.press('Enter'); await page.waitForSelector('#life-os.is-open');
   await page.waitForFunction(() => document.activeElement?.id === 'life-os-content');
   await page.focus('[data-life-view="people"]'); await page.keyboard.press('Enter'); await page.waitForTimeout(80);
   assert.match(await page.locator('#life-os-content h3').textContent(), /Люди/);
   await page.keyboard.press('Escape');
   assert.equal(await page.locator('#life-os').getAttribute('aria-hidden'), 'true');
-  assert.equal(await page.evaluate(() => document.activeElement?.id), 'life-os-open');
+  assert.equal(await page.evaluate(() => document.activeElement?.dataset.desktopPage), 'life');
   await page.close();
 }
 
@@ -133,7 +134,7 @@ async function moscowTimeAcceptance(browser) {
 }
 
 (async () => {
-  const browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || 'msedge' });
+  const browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || 'msedge', args: ['--allow-file-access-from-files'] });
   try {
     await moscowTimeAcceptance(browser);
     await capture(browser, 'mission-control-1440', 1440, 'populated');
@@ -157,7 +158,7 @@ async function moscowTimeAcceptance(browser) {
     const reduced = await browser.newPage({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
     await reduced.addInitScript(`window.cloudMockSource = ${cloudMock.toString()}; window.jarvisCloud = window.cloudMockSource(${JSON.stringify(fixture('populated'))}, false);`);
     await reduced.goto(pathToFileURL(path.join(root, 'renderer', 'cloud-chat', 'index.html')).href);
-    await reduced.click('#life-os-open'); await reduced.waitForTimeout(50);
+    await reduced.click('[data-desktop-page="life"]'); await reduced.waitForTimeout(50);
     assert.equal(await reduced.locator('#life-os').evaluate((node) => getComputedStyle(node).transitionDuration), '0s');
     assert.equal(await reduced.locator('.life-project-card').first().evaluate((node) => getComputedStyle(node).transitionDuration), '0s');
     await reduced.close();

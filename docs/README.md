@@ -4,6 +4,11 @@
 
 ## Русский
 
+12 ноября подготовлен [локальный тестовый Desktop `1.0.3-dashboard.1`](updates/2026-11-12-desktop-dashboard-local-test.md)
+с интерфейсом дашборда и общими личными разделами Mini App. Клиентские,
+серверные и браузерные проверки прошли; EXE собран. Выпуска на VPS и установки
+пока нет. Живая синхронизация и PostgreSQL acceptance ещё не подтверждены.
+
 7 ноября [ремонт каскада HH403, отбора и диагностики установлен](updates/2026-11-07-hh-forbidden-cascade.md).
 Server/collector на DE — `4836021`, browser — `0f19df2`; исходники обоих VPS
 сверены с GitHub. Проверены scoped пауза15 минут, отдельное source-only veto,
@@ -260,6 +265,11 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 Архивы не заменяют действующие правила и новую проверку окружения.
 
 ## English
+
+November 12: [local Desktop test build `1.0.3-dashboard.1`](updates/2026-11-12-desktop-dashboard-local-test.md)
+adds the dashboard interface and shared Mini App personal sections. Client,
+server and browser checks passed; an EXE was built. It is not deployed or
+installed. Live synchronization and PostgreSQL acceptance remain unverified.
 
 November7: [HH403 cascade, selection and diagnostic repairs are installed](updates/2026-11-07-hh-forbidden-cascade.md).
 DE server/collector run `4836021`, browser `0f19df2`; both VPS sources matched

@@ -3,6 +3,7 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { test } = require('node:test');
 const { chromium } = require('../job-browser/node_modules/playwright');
+require('./prepareDesktopWorkspace').prepareDesktopWorkspace();
 
 // Real document, Life OS handlers and native <dialog> validation; synthetic IPC only.
 function installCloudFixture() {
@@ -25,13 +26,13 @@ function installCloudFixture() {
 }
 
 test('Life OS dialogs cancel invalid forms without creating records', async (t) => {
-  const browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || 'msedge' });
+  const browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || 'msedge', args: ['--allow-file-access-from-files'] });
   try {
     for (const kind of ['project', 'person']) {
       for (const filled of [false, true]) {
         for (const action of ['cancel', 'cross', 'Escape']) {
           await t.test(`${kind}: ${filled ? 'filled' : 'empty'}, ${action}`, async () => {
-            const page = await browser.newPage();
+            const page = await browser.newPage({ reducedMotion: 'reduce' });
             const errors = [];
             page.on('pageerror', (error) => errors.push(error.message));
             try {

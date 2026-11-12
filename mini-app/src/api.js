@@ -22,7 +22,7 @@ const jobLoginCodes = new Set(['JOB_ACCESS_REVOKED','JOB_LOGIN_SESSION_INVALID',
 export class ApiError extends Error {
   constructor(code, uncertain = false) { super(messages[code] || 'Не удалось выполнить запрос. Проверь данные и повтори.'); this.code = code; this.uncertain = uncertain; }
 }
-function pendingKey(actor, kind) { return `jarvis-pending:${kind}:${actor.telegramId}`; }
+function pendingKey(actor, kind) { return `jarvis-pending:${kind}:${actor.storageScope || actor.telegramId}`; }
 export function readPending(actor, kind) {
   try {
     const value = JSON.parse(sessionStorage.getItem(pendingKey(actor, kind)) || 'null');

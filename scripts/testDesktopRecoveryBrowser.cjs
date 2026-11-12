@@ -34,7 +34,7 @@ async function run() {
           async getRequestStatus(clientMessageId) {
             window.__calls.check += 1;
             return { ok: true, clientMessageId, status,
-              ...(status === 'completed' ? { response: { answer: 'Восстановленный ответ', artifactUnavailable: true,
+              ...(status === 'completed' ? { response: { answer: 'Восстановленный ответ', answerMessageId: '33333333-3333-4333-8333-333333333333', artifactUnavailable: true,
                 confirmation: { commandId: '22222222-2222-4222-8222-222222222222' } } } : {}) };
           },
           async acknowledgeRequest() {
@@ -59,7 +59,10 @@ async function run() {
       await check.click();
       await page.getByText('Сообщение: сервер обрабатывает запрос.', { exact: true }).waitFor();
       await page.screenshot({ path: path.join(output, `pending-${width}.png`), fullPage: true, animations: 'disabled' });
-      await page.evaluate(() => window.__status('completed'));
+      await page.evaluate(() => {
+        window.jarvisChatHistory.prepend([{ id: '33333333-3333-4333-8333-333333333333', role: 'assistant', content: 'Восстановленный ответ' }], window.jarvisChatHistory.version());
+        window.__status('completed');
+      });
       await check.click();
       await page.getByText('Восстановленный ответ', { exact: true }).waitFor();
       await page.getByText(/файл из потерянного ответа восстановить нельзя/).waitFor();

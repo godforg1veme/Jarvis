@@ -2,6 +2,12 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('jarvisCloud', {
   getState: () => ipcRenderer.invoke('cloud:get-state'),
+  workspaceRequest: (path, method = 'GET', body) => ipcRenderer.invoke('workspace:request', { path, method, ...(body === undefined ? {} : { body }) }),
+  workspaceUpload: (input) => ipcRenderer.invoke('workspace:upload', input),
+  getWorkspacePending: () => ipcRenderer.invoke('workspace:pending'),
+  openWorkspaceLink: (href) => ipcRenderer.invoke('workspace:open-link', { href }),
+  openVoiceSettings: () => ipcRenderer.invoke('workspace:voice-settings'),
+  saveVoiceSettings: (input) => ipcRenderer.invoke('workspace:voice-settings-save', input),
   pair: (serverUrl, pairingCode) => ipcRenderer.invoke('cloud:pair', { serverUrl, pairingCode }),
   sendMessage: (text) => ipcRenderer.invoke('cloud:send-message', { text }),
   listPendingRequests: () => ipcRenderer.invoke('cloud:list-pending-requests'),

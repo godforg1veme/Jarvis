@@ -47,6 +47,7 @@ const { ScreenPrivacyGuard } = require('./vision/screenPrivacyGuard');
 const { allowCaptureMedia } = require('./vision/mediaPermissionPolicy');
 const { registerVisionIpc } = require('./vision/visionIpc');
 const { registerLifeOsIpc } = require('./cloud/lifeOsIpc');
+const { registerWorkspaceIpc } = require('./cloud/workspaceIpc');
 
 if (process.platform === 'win32') {
   // Keep hidden renderer processes alive so microphone capture continues in the tray/background.
@@ -672,8 +673,8 @@ function toggleTranscriptionBar(visible) {
 // --- Create Window ---
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1040,
-    height: 740,
+    width: 1440,
+    height: 900,
     minWidth: 760,
     minHeight: 560,
     frame: true,
@@ -1258,6 +1259,17 @@ app.whenReady().then(() => {
     try { return await desktopCloudClient.rejectRemoteCommand(input.commandId); } catch (_) { return { ok: false, error: 'Не удалось отменить команду.' }; }
   });
   registerLifeOsIpc({ ipcMain, isTrustedRenderer: isTrustedMainRenderer, getClient: () => desktopCloudClient });
+  registerWorkspaceIpc({ ipcMain, isTrustedRenderer: isTrustedMainRenderer,
+    getClient: () => desktopCloudClient, openExternal: (url) => shell.openExternal(url),
+    openVoiceSettings: () => ({ ...require('./voice/cloudCaptureSettings').captureSettingsForEditor(cloudVoiceService?.settings.capture),
+      enabled: Boolean(cloudVoiceService?.enabled) }),
+    saveVoiceSettings: (input) => {
+      if (!cloudVoiceService || cloudVoiceService.enabled) return { ok: false, code: 'voice_active' };
+      const settings = require('./voice/cloudCaptureSettings').saveCaptureSettings(input);
+      cloudVoiceService.settings.capture = { ...cloudVoiceService.settings.capture, ...settings };
+      cloudVoiceService.captureSettingsUnavailable = false;
+      return { ok: true, settings };
+    } });
   registerVisionIpc({ ipcMain, isTrustedRenderer: isTrustedMainRenderer, getRuntime: () => visionRuntime });
   ipcMain.handle('voice-lab:open', (event) => {
     if (!isTrustedMainRenderer(event) || !voiceLabController) return { ok: false, error: 'Voice Lab unavailable in cloud mode.' };

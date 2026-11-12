@@ -13,19 +13,25 @@ const input = z.discriminatedUnion('kind', [
 ]);
 
 class MemoryActions {
-  constructor({ accessService, memoryService }) {
+  constructor({ accessService, memoryService, authorizeActionSession = null }) {
     this.accessService = accessService;
     this.memoryService = memoryService;
+    this.authorizeActionSession = authorizeActionSession;
   }
 
   async authorized(db, session) {
     const userId = session.actor.userId;
     const actor = await this.accessService.repository.get(db, 'user', userId);
     if (!actor || actor.blocked || !actor.permissions.includes('memory')) throw accessError('forbidden');
-    const sessionHash = hashSession(session.token);
-    const live = (await db.query(`SELECT 1 FROM mini_app_sessions
-      WHERE token_hash=$1 AND user_id=$2 AND expires_at>now() FOR SHARE`, [sessionHash, userId])).rowCount;
-    if (!live) throw accessError('unauthorized');
+    const sessionHash = this.authorizeActionSession
+      ? await this.authorizeActionSession(db, session, actor, 'memory')
+      : hashSession(session.token);
+    if (!/^[a-f0-9]{64}$/.test(sessionHash)) throw accessError('unauthorized');
+    if (!this.authorizeActionSession) {
+      const live = (await db.query(`SELECT 1 FROM mini_app_sessions
+        WHERE token_hash=$1 AND user_id=$2 AND expires_at>now() FOR SHARE`, [sessionHash, userId])).rowCount;
+      if (!live) throw accessError('unauthorized');
+    }
     return { userId, sessionHash };
   }
 

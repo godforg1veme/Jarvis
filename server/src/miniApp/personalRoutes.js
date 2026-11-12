@@ -3,7 +3,8 @@ const { PersonalActions } = require('./personalActions');
 const { accessError } = require('../access/accessPolicy');
 
 function registerPersonalRoutes({ route, authorize }, services) {
-  const actions = new PersonalActions({ accessService: services.accessService, sections: services.personalActionSections || {} });
+  const actions = new PersonalActions({ accessService: services.accessService, sections: services.personalActionSections || {},
+    authorizeActionSession: services.authorizeActionSession });
   const sessionFor = async (request, section, mutation = false) => {
     const session = await authorize(request, { mutation });
     if (!session.actor.permissions.includes(section) || !['documents','devices','life'].includes(section)) throw accessError('forbidden');

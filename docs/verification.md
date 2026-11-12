@@ -1,5 +1,39 @@
 # Проверки перед выпуском
 
+## Desktop dashboard test build / Тестовая сборка дашборда (12 November)
+
+[Результат и границы / Results and limits](updates/2026-11-12-desktop-dashboard-local-test.md).
+Это локальные проверки. Production-синхронизацию и доступ к HH они не доказывают.
+These are local checks; they do not establish production sync or live HH access.
+
+```powershell
+node scripts/prepareDesktopWorkspace.js
+node scripts/testCore.cjs
+npm test --prefix server
+node scripts/testDesktopWorkspaceBrowser.cjs
+node scripts/testDesktopWorkspaceElectron.cjs
+$env:NODE_PATH = (Join-Path (Get-Location) 'job-browser/node_modules')
+node scripts/testDesktopRecoveryBrowser.cjs
+node scripts/testLifeDialogCancellation.cjs
+node scripts/testLifeOsBrowser.cjs
+py -m unittest deploy.tests.test_release_status
+```
+
+Browser/Electron fixtures require the existing job-browser Playwright install
+and Edge. The Electron fixture uses an isolated profile and replaces network
+and autostart adapters; it does not enable capture or contact production.
+For packaged code set `JARVIS_DESKTOP_TEST_ROOT` to the absolute
+`dist/win-unpacked/resources/app` directory before the Electron command.
+Браузерные fixtures используют установленный Playwright из job-browser и Edge.
+Electron запускает настоящий код с тестовым сетевым адаптером и отдельным профилем.
+Для проверки упакованного кода передай абсолютный каталог через переменную выше.
+
+Общие модули Mini App перечислены в `scripts/desktopWorkspaceModules.json`.
+`npm start` и `npm run dist:win` готовят их автоматически. Release inventory
+сравнивает упакованные копии с исходниками этого же Git ref.
+The manifest is shared by packaging and release inventory; a Mini App action
+change is also a Desktop payload change.
+
 ## HH: транспорт и память / Transport and memory (5 November)
 
 [Выпуск 168d823](updates/2026-11-05-hh-transport-memory.md): server 941 passed,

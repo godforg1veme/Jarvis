@@ -19,7 +19,10 @@ const publicFields = storedFields.filter((key) => key !== 'codeCipher').concat([
 const project = (result, fields) => Object.fromEntries(fields.filter((key) => Object.hasOwn(result || {}, key)).map((key) => [key, result[key]]));
 
 class PersonalActions {
-  constructor({ accessService, sections = {} }) { this.accessService = accessService; this.sections = sections; }
+  constructor({ accessService, sections = {}, authorizeActionSession = null }) {
+    this.accessService = accessService; this.sections = sections;
+    this.authorizeActionSession = authorizeActionSession;
+  }
   available(section) { return Object.hasOwn(this.sections, section) && Boolean(this.sections[section]); }
   config(section) {
     if (!this.available(section)) throw accessError('unavailable');
@@ -28,7 +31,8 @@ class PersonalActions {
   async authorized(db, session, section) {
     const actor = await this.accessService.repository.get(db, 'user', session.actor.userId);
     if (!actor || actor.blocked || !actor.permissions.includes(section)) throw accessError('forbidden');
-    if (!(await db.query(`SELECT 1 FROM mini_app_sessions WHERE token_hash=$1 AND user_id=$2
+    if (this.authorizeActionSession) await this.authorizeActionSession(db, session, actor, section);
+    else if (!(await db.query(`SELECT 1 FROM mini_app_sessions WHERE token_hash=$1 AND user_id=$2
       AND expires_at>now() FOR SHARE`, [hash(session.token), actor.userId])).rowCount) throw accessError('unauthorized');
     return actor;
   }

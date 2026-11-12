@@ -32,7 +32,8 @@ function registerMiniAppSelfRoutes({ route, authorize, requireOrigin }, services
   const chatLimiter = new FixedWindowRateLimiter();
   const personalActions = registerPersonalRoutes({ route, authorize }, services);
   const memoryActions = memoryActionService
-    ? new MemoryActions({ accessService, memoryService: memoryActionService }) : null;
+    ? new MemoryActions({ accessService, memoryService: memoryActionService,
+      authorizeActionSession: services.authorizeActionSession }) : null;
   const requirePermission = async (request, permission, mutation = false) => {
     const session = await authorize(request, { mutation });
     if (!session.actor.permissions.includes(permission)) fail('forbidden');

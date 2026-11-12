@@ -3,6 +3,7 @@ const { pcm16ToWav } = require('../cloud/pcmWav');
 const { createTtsService } = require('../tts/ttsService');
 const { NodeWakeWordHost } = require('./nodeWakeWordHost');
 const { getSttSettings } = require('./sttSettings');
+const { readCaptureSettings } = require('./cloudCaptureSettings');
 
 const MAX_WAKE_BUFFER_BYTES = 16 * 32000;
 const MAX_UTTERANCE_BYTES = 15 * 32000;
@@ -46,6 +47,10 @@ class CloudVoiceService {
         : { enabled: false, fallbackProvider: false },
     });
     this.settings = options.settings || getSttSettings();
+    if (!options.settings) {
+      try { this.settings.capture = { ...this.settings.capture, ...readCaptureSettings(this.settings.capture) }; }
+      catch (_) { this.captureSettingsUnavailable = true; }
+    }
     this.onStatus = typeof options.onStatus === 'function' ? options.onStatus : () => {};
     this.onResponse = typeof options.onResponse === 'function' ? options.onResponse : () => {};
     this.onTranscript = typeof options.onTranscript === 'function' ? options.onTranscript : null;
@@ -228,6 +233,7 @@ class CloudVoiceService {
   }
 
   async enable() {
+    if (this.captureSettingsUnavailable) return { ok: false, enabled: false, error: 'Не удалось прочитать настройки микрофона. Сохраните их заново в настройках.' };
     if (this.enabled) return { ok: true, enabled: true };
     if (!this.cloudClient || !this.cloudClient.isPaired()) {
       this._emit('offline', 'Сначала подключите Jarvis Desktop к серверу.');

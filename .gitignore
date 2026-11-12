@@ -8,6 +8,7 @@ node_modules/
 build/
 dist/
 out/
+renderer/workspace/shared/
 
 # Downloaded speech models and local voices
 models/
@@ -25,6 +26,8 @@ data/ai-cache.json
 data/file-index.json
 data/agent-history.json
 data/cloud-outbound-requests.json
+data/cloud-workspace-pending.json
+data/cloud-capture-settings.json
 data/tts-cache/
 data/*.log
 data/stt-profiles.json

@@ -201,9 +201,29 @@ def source_inventory(repo, fetch=False):
             "stashCount": len(git(repo, "stash", "list", "--format=%gd").splitlines())}
 
 
-def desktop_inventory(repo, app, ref="origin/main"):
+def desktop_payload(repo, ref):
     files = git_payload(repo, ref, lambda p: (p.split("/")[0] in DESKTOP_DIRS or
                        ("/" not in p and p.endswith(".js"))) and ".test." not in p and "/tests/" not in p)
+    manifest_path = "scripts/desktopWorkspaceModules.json"
+    if git(repo, "ls-tree", "--name-only", ref, "--", manifest_path):
+        try:
+            names = json.loads(git(repo, "show", f"{ref}:{manifest_path}"))
+            import re
+            if (not isinstance(names, list) or not names or len(set(names)) != len(names)
+                    or any(not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9_-]+\.(js|css)", name) for name in names)):
+                raise ValueError()
+        except (ValueError, TypeError):
+            raise InventoryError("DESKTOP_ASSET_CATALOG_INVALID") from None
+        wanted = {f"mini-app/src/{name}" for name in names}
+        sources = git_payload(repo, ref, lambda p: p in wanted)
+        if set(sources) != wanted:
+            raise InventoryError("DESKTOP_SHARED_SOURCE_MISSING")
+        files.update({f"renderer/workspace/shared/{path.rsplit('/', 1)[-1]}": body for path, body in sources.items()})
+    return files
+
+
+def desktop_inventory(repo, app, ref="origin/main"):
+    files = desktop_payload(repo, ref)
     result = compare_files(files, app, normalize_eol=True)
     result["textLineEndings"] = "normalized"
     try:

@@ -1,0 +1,10 @@
+[
+  "api.js",
+  "memoryActions.js",
+  "personalActions.js",
+  "sectionViews.js",
+  "jobConnection.js",
+  "jobResumes.js",
+  "jobAutomation.js",
+  "jobResumes.css"
+]

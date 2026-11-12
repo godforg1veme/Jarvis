@@ -13,11 +13,15 @@
       "cloud/boundedHttp.test.js",
       "cloud/cloudChatRenderer.test.js",
       "cloud/desktopCloudClient.test.js",
+      "cloud/desktopWorkspaceClient.test.js",
+      "cloud/workspaceIpc.test.js",
+      "cloud/workspacePendingStore.test.js",
       "cloud/desktopRecoveryIpc.test.js",
       "cloud/outboundRequestStore.test.js",
       "cloud/pcmWav.test.js",
       "cloud/secureCloudTransport.test.js",
       "voice/cloudVoiceService.test.js",
+      "voice/cloudCaptureSettings.test.js",
       "tts/windowsSapiService.test.js"
     ]
   },
@@ -40,6 +44,7 @@
       "test/desktopMessageService.test.js",
       "test/desktopRequestStatus.test.js",
       "test/desktopRoutes.test.js",
+      "test/desktopWorkspaceRoutes.test.js",
       "test/deviceCredentials.test.js",
       "test/deviceSessionRoute.test.js",
       "test/embeddingProvider.test.js",

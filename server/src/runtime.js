@@ -30,6 +30,7 @@ const { createAsrProvider } = require('./asr/asrProvider');
 const { DesktopRequestRepository } = require('./desktop/desktopRequestRepository');
 const { DesktopMessageService } = require('./desktop/desktopMessageService');
 const { registerDesktopRoutes } = require('./desktop/desktopRoutes');
+const { registerDesktopWorkspaceRoutes } = require('./desktop/workspaceRoutes');
 const { FixedWindowRateLimiter } = require('./http/rateLimiter');
 const { MemoryRepository } = require('./memory/memoryRepository');
 const { MemoryService } = require('./memory/memoryService');
@@ -558,6 +559,7 @@ async function createRuntime(config, overrides = {}) {
         commitmentLifecycleService: lifeCommitmentLifecycleService, missionControlService }),
     };
     const documentUploadMaxBytes = knowledgeService?.maxBytes;
+    const personalSectionReader = new SectionReader({ pool });
     memoryService = protectService(memoryService, accessService, 'memory');
     knowledgeService = protectService(knowledgeService, accessService, 'documents');
     deviceService = protectService(deviceService, accessService, 'devices');
@@ -586,6 +588,20 @@ async function createRuntime(config, overrides = {}) {
         messageService: desktopMessageService,
         asr,
         limiter: desktopRateLimiter,
+      });
+      if (accessService) registerDesktopWorkspaceRoutes(app, {
+        authenticate: authenticateDevice, accessService, pool,
+        sectionReader: personalSectionReader, conversationRepository,
+        memoryService, memoryActionService: miniAppMemoryService,
+        personalActionSections, documentUploadMaxBytes,
+        knowledgeService, deviceService, missionControlService, assistant,
+        getJobConnectionSessionService: () => jobRuntime?.connectionSessionService,
+        getJobResumeService: () => jobRuntime?.resumeService,
+        getJobAutomationService: () => jobRuntime?.automationService,
+        getJobLoginLinkDelivery: () => jobRuntime?.loginLinkDelivery,
+        getTelegramBotUsername: () => bot?.botInfo?.username,
+        operationsEnabled: config.operationsEnabled,
+        operationsPublicOrigin: config.operationsPublicOrigin,
       });
       registerCommandRoutes(app, {
         authenticate: authenticateDevice,
@@ -633,7 +649,7 @@ async function createRuntime(config, overrides = {}) {
         config.nodeEnv === 'production' ? '../public/mini' : '../../mini-app/dist') });
       registerMiniAppRoutes(app, { config, accessService, pool,
         registerUserRoutes: (routes) => registerMiniAppSelfRoutes(routes, { accessService, pool,
-          sectionReader: new SectionReader({ pool }),
+          sectionReader: personalSectionReader,
           memoryService, memoryActionService: miniAppMemoryService,
           personalActionSections, documentUploadMaxBytes,
           knowledgeService, deviceService, missionControlService, assistant, conversationRepository,

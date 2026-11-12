@@ -5,20 +5,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; media-src 'self'">
   <title>Jarvis Desktop</title>
+  <link rel="icon" type="image/png" href="../../assets/tray-icon.png">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="../life-os/life-os.css">
+  <link rel="stylesheet" href="dashboard-shell.css">
+  <link rel="stylesheet" href="../workspace/workspace.css">
+  <link rel="stylesheet" href="../workspace/shared/jobResumes.css">
 </head>
 <body>
   <main class="console">
-    <aside class="sidebar" aria-label="Статус Jarvis">
+    <aside class="sidebar" aria-label="Разделы Jarvis">
       <div class="brand">
-        <div class="brand-mark" aria-hidden="true">J</div>
-        <div>
-          <p class="eyebrow">PERSONAL SYSTEM</p>
-          <h1>JARVIS</h1>
-        </div>
+        <h1>JARVIS</h1>
       </div>
-
+      <nav class="desktop-navigation" aria-label="Основная навигация">
+        <button type="button" data-desktop-page="home"><span aria-hidden="true">⌂</span>Главная</button>
+        <button type="button" data-desktop-page="assistant" aria-current="page"><span aria-hidden="true">▤</span>Ассистент</button>
+        <button type="button" data-desktop-page="life"><span aria-hidden="true">◇</span>Life OS</button>
+        <button type="button" data-desktop-page="memory"><span aria-hidden="true">◈</span>Память</button>
+        <button type="button" data-desktop-page="documents"><span aria-hidden="true">▧</span>Документы</button>
+        <button type="button" data-desktop-page="jobs"><span aria-hidden="true">▣</span>Поиск работы</button>
+        <button type="button" data-desktop-page="devices"><span aria-hidden="true">▱</span>Устройства</button>
+        <button type="button" data-desktop-page="operations"><span aria-hidden="true">☷</span>Панель управления</button>
+        <button type="button" data-desktop-page="settings"><span aria-hidden="true">⚙</span>Настройки</button>
+      </nav>
       <section class="signal-card" aria-live="polite">
         <div class="signal-heading">
           <span id="connection-dot" class="signal-dot offline"></span>
@@ -27,11 +37,58 @@
         <p id="device-label">Подключите этот компьютер через Telegram.</p>
       </section>
 
+    </aside>
+
+    <section class="main-panel">
+      <header class="topline">
+        <div><h2 id="desktop-section-heading">Ассистент</h2></div>
+        <div class="topline-actions">
+          <button id="life-os-open" class="life-os-launch" type="button">LIFE OS <span aria-hidden="true">↗</span></button>
+          <div id="mode-badge" class="mode-badge">ОЖИДАЕТ ПРИВЯЗКИ</div>
+        </div>
+      </header>
+      <div id="desktop-home" class="desktop-home" hidden>
+        <div class="desktop-home-scene" aria-hidden="true"></div>
+      </div>
+      <div id="desktop-chat-panel" class="desktop-chat-panel">
+      <section id="pairing-card" class="pairing-card">
+        <div class="pairing-copy">
+          <p class="eyebrow">ПЕРВОЕ ПОДКЛЮЧЕНИЕ</p>
+          <h3>Свяжите этот ПК со своим Jarvis</h3>
+          <p>В Telegram отправьте <code>/pair Имя ПК</code>, затем введите полученный одноразовый код.</p>
+        </div>
+        <form id="pairing-form" class="pairing-form">
+          <label>Адрес сервера<input id="server-url" type="url" inputmode="url" autocomplete="url" placeholder="https://jarvis.rilora.ru" required></label>
+          <label>Код подключения<input id="pairing-code" type="text" autocomplete="one-time-code" placeholder="JARVIS-XXXX-XXXX-XXXX-XXXX" required></label>
+          <button id="pair-button" class="primary-button" type="submit">Подключить Desktop</button>
+          <p id="pairing-error" class="form-error" role="alert"></p>
+        </form>
+      </section>
+      <section id="chat-shell" class="chat-shell is-disabled" aria-label="Чат с Jarvis">
+        <div id="messages" class="messages" aria-live="polite" aria-relevant="additions text">
+          <div class="empty-chat"><div class="empty-glyph">⌁</div><h3 id="empty-chat-title">Подключите Desktop</h3><p id="empty-chat-description">Подключите этот компьютер через Telegram, чтобы начать разговор.</p></div>
+        </div>
+        <div id="pending-requests" class="pending-requests" aria-live="polite" hidden></div>
+        <form id="message-form" class="composer">
+          <label class="composer-field" for="message-input"><span class="composer-prefix" aria-hidden="true">›</span><textarea id="message-input" rows="1" maxlength="10000" aria-label="Сообщение для Jarvis" placeholder="Напишите Jarvis…" disabled></textarea></label>
+          <button id="send-button" class="send-button" type="submit" disabled aria-label="Отправить сообщение">↑</button>
+        </form>
+      </section>
+      </div>
+      <main id="desktop-workspace" class="desktop-workspace" hidden tabindex="-1">
+        <h2 id="desktop-page-title"></h2>
+        <div id="desktop-page-content"></div>
+      </main>
+    </section>
+
+    <aside class="desktop-tools" aria-label="Голос и зрение">
+      <div class="desktop-orbit" aria-hidden="true"></div>
       <section class="voice-card">
-        <p class="eyebrow">VOICE CHANNEL</p>
         <div class="voice-core-stage" id="voice-core-stage">
           <canvas id="voice-core-canvas"></canvas>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4m-4 0h8"/></svg>
         </div>
+        <span class="desktop-tool-name" aria-hidden="true">Голос</span>
         <h2 id="voice-title">Голос выключен</h2>
         <p id="voice-description">После подключения Jarvis будет ждать wake word локально.</p>
         <button id="voice-toggle" class="voice-button" type="button" disabled>
@@ -43,78 +100,25 @@
 
       <section class="vision-card" aria-labelledby="vision-title">
         <div class="vision-heading">
-          <div><p class="eyebrow">PERCEPTION DOCK</p><h2 id="vision-title">Зрение выключено</h2></div>
+          <div><h2 id="vision-title">Зрение выключено</h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M2 12c2.5-4 5.8-6 10-6s7.5 2 10 6c-2.5 4-5.8 6-10 6S4.5 16 2 12Z"/><circle cx="12" cy="12" r="2.5"/></svg></div>
           <span id="vision-indicator" class="vision-indicator off" aria-hidden="true"></span>
         </div>
-        <div id="vision-preview" class="vision-preview" aria-label="Последний кадр, отправленный на анализ"><span>NO VISUAL SIGNAL</span></div>
-        <label class="vision-source-label" for="vision-camera">Камера</label>
-        <select id="vision-camera" class="vision-select" disabled><option value="auto">Автовыбор · Camo при наличии</option><option value="">Без камеры</option></select>
-        <label class="vision-check"><input id="vision-screens" type="checkbox" checked disabled><span>Оба монитора одним пространством</span></label>
+        <span class="desktop-tool-name" aria-hidden="true">Зрение</span>
         <div class="vision-actions">
           <button id="vision-toggle" class="vision-button" type="button" disabled>Включить</button>
           <button id="vision-stop" class="vision-stop" type="button" disabled>STOP</button>
         </div>
-        <button id="vision-timeline-open" class="vision-timeline-open" type="button" disabled>Открыть визуальную память</button>
         <p id="vision-state" class="vision-state" aria-live="polite">Камера и экраны физически закрыты</p>
         <p id="vision-timer" class="vision-timer">00:00 · OFF</p>
+        <details class="vision-details"><summary>Параметры зрения</summary>
+        <div id="vision-preview" class="vision-preview" aria-label="Последний кадр, отправленный на анализ"><span>NO VISUAL SIGNAL</span></div>
+        <label class="vision-source-label" for="vision-camera">Камера</label>
+        <select id="vision-camera" class="vision-select" disabled><option value="auto">Автовыбор · Camo при наличии</option><option value="">Без камеры</option></select>
+        <label class="vision-check"><input id="vision-screens" type="checkbox" checked disabled><span>Оба монитора одним пространством</span></label>
+        <button id="vision-timeline-open" class="vision-timeline-open" type="button" disabled>Открыть визуальную память</button>
+        </details>
       </section>
-
-      <div class="privacy-note">
-        <span aria-hidden="true">◈</span>
-        До wake word звук остаётся на этом ПК. На сервер уходит только завершённая фраза.
-      </div>
     </aside>
-
-    <section class="main-panel">
-      <header class="topline">
-        <div>
-          <p class="eyebrow">CLOUD BRAIN · LOCAL HANDS</p>
-          <h2>Разговор с Jarvis</h2>
-        </div>
-        <div class="topline-actions">
-          <button id="life-os-open" class="life-os-launch" type="button">LIFE OS <span aria-hidden="true">↗</span></button>
-          <div id="mode-badge" class="mode-badge">ОЖИДАЕТ ПРИВЯЗКИ</div>
-        </div>
-      </header>
-
-      <section id="pairing-card" class="pairing-card">
-        <div class="pairing-copy">
-          <p class="eyebrow">ПЕРВОЕ ПОДКЛЮЧЕНИЕ</p>
-          <h3>Свяжите этот ПК со своим Jarvis</h3>
-          <p>В Telegram отправьте <code>/pair Имя ПК</code>, затем введите полученный одноразовый код.</p>
-        </div>
-        <form id="pairing-form" class="pairing-form">
-          <label>
-            Адрес сервера
-            <input id="server-url" type="url" inputmode="url" autocomplete="url" placeholder="https://jarvis.rilora.ru" required>
-          </label>
-          <label>
-            Код подключения
-            <input id="pairing-code" type="text" autocomplete="one-time-code" placeholder="JARVIS-XXXX-XXXX-XXXX-XXXX" required>
-          </label>
-          <button id="pair-button" class="primary-button" type="submit">Подключить Desktop</button>
-          <p id="pairing-error" class="form-error" role="alert"></p>
-        </form>
-      </section>
-
-      <section id="chat-shell" class="chat-shell is-disabled" aria-label="Чат с Jarvis">
-        <div id="messages" class="messages" aria-live="polite" aria-relevant="additions text">
-          <div class="empty-chat">
-            <div class="empty-glyph">⌁</div>
-            <h3 id="empty-chat-title">Подключите Desktop</h3>
-            <p id="empty-chat-description">Подключите этот компьютер через Telegram, чтобы начать разговор.</p>
-          </div>
-        </div>
-        <div id="pending-requests" class="pending-requests" aria-live="polite" hidden></div>
-        <form id="message-form" class="composer">
-          <label class="composer-field" for="message-input">
-            <span class="composer-prefix" aria-hidden="true">›</span>
-            <textarea id="message-input" rows="1" maxlength="10000" aria-label="Сообщение для Jarvis" placeholder="Напишите Jarvis…" disabled></textarea>
-          </label>
-          <button id="send-button" class="send-button" type="submit" disabled aria-label="Отправить сообщение">↑</button>
-        </form>
-      </section>
-    </section>
   </main>
   <section id="life-os" class="life-os" aria-labelledby="life-os-title" aria-hidden="true">
     <header class="life-os-header">
@@ -176,5 +180,8 @@
   <script src="../life-os/life-os-view-model.js"></script>
   <script src="../life-os/life-os.js"></script>
   <script src="renderer.js"></script>
+  <script src="dashboard-shell.js"></script>
+  <script src="dashboard-scene.js"></script>
+  <script type="module" src="../workspace/workspace.js"></script>
 </body>
 </html>

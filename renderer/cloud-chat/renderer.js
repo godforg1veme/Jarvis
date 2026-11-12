@@ -50,6 +50,8 @@ const checkingRequestIds = new Set();
 let requestScope = 'false||';
 let requestScopeGeneration = 0;
 let pendingListRevision = 0;
+let chatMessageVersion = 0;
+const emptyChatTemplate = elements.messages.querySelector('.empty-chat')?.cloneNode(true);
 
 function currentRequestScope() {
   return `${Boolean(state.paired)}|${state.serverUrl || ''}|${state.deviceId || ''}`;
@@ -128,9 +130,14 @@ function clearEmptyChat() {
 
 function appendMessage(role, text, meta, options = {}) {
   if (!text) return;
+  const existing = options.messageId ? elements.messages.querySelector(`[data-message-id="${CSS.escape(String(options.messageId))}"]`) : null;
+  if (existing && !(Array.isArray(options.buttons) && options.buttons.length && !existing.querySelector('.message-actions'))) return existing;
+  chatMessageVersion++;
   clearEmptyChat();
-  const message = document.createElement('article');
+  const message = existing || document.createElement('article');
+  if (!existing) {
   message.className = `message ${role}`;
+  if (options.messageId) message.dataset.messageId = String(options.messageId);
   const label = document.createElement('div');
   label.className = 'message-meta';
   label.textContent = meta || (role === 'user' ? 'ВЫ' : role === 'system' ? 'СИСТЕМА' : 'JARVIS');
@@ -138,6 +145,7 @@ function appendMessage(role, text, meta, options = {}) {
   body.className = 'message-body';
   body.textContent = text;
   message.append(label, body);
+  }
   if (options && Array.isArray(options.buttons) && options.buttons.length) {
     const actions = document.createElement('div');
     actions.className = 'message-actions';
@@ -162,9 +170,31 @@ function appendMessage(role, text, meta, options = {}) {
     }
     message.appendChild(actions);
   }
-  elements.messages.appendChild(message);
+  if (!existing) elements.messages.appendChild(message);
   elements.messages.scrollTop = elements.messages.scrollHeight;
+  return message;
 }
+
+window.jarvisChatHistory = {
+  version: () => chatMessageVersion,
+  prepend(messages, expectedVersion) {
+    // A send/recovery that raced this read will get a fresh history request.
+    if (expectedVersion !== chatMessageVersion) return false;
+    const seen = new Set([...elements.messages.querySelectorAll('[data-message-id]')].map((row) => row.dataset.messageId));
+    const before = elements.messages.firstElementChild;
+    const scrollTop = elements.messages.scrollTop;
+    const height = elements.messages.scrollHeight;
+    for (const row of messages) {
+      if (!row || !['user', 'assistant'].includes(row.role) || typeof row.content !== 'string'
+        || !row.id || seen.has(String(row.id))) continue;
+      seen.add(String(row.id));
+      const message = appendMessage(row.role, row.content, null, { messageId: row.id });
+      if (message && before?.isConnected) elements.messages.insertBefore(message, before);
+    }
+    elements.messages.scrollTop = scrollTop + Math.max(0, elements.messages.scrollHeight - height);
+    return true;
+  },
+};
 
 function connectionText(connection) {
   if (connection === 'online') return 'Подключён к облаку';
@@ -257,7 +287,7 @@ async function checkPendingRequest(id) {
       if (!displayedRecoveredIds.has(id)) {
         const response = result.response;
         if (!response || typeof response.answer !== 'string' || !response.answer.trim()) return;
-        appendMessage('assistant', response.answer, null, { buttons: confirmationButtons(response) });
+        appendMessage('assistant', response.answer, null, { buttons: confirmationButtons(response), messageId: response.answerMessageId });
         if (response.artifactUnavailable === true) appendMessage('system',
           'Действие завершено, но файл из потерянного ответа восстановить нельзя. Проверьте результат в разделе VPN перед дальнейшими действиями.');
         displayedRecoveredIds.add(id);
@@ -285,6 +315,13 @@ function renderState(nextState) {
     pendingRequestRows.clear();
     displayedRecoveredIds.clear();
     checkingRequestIds.clear();
+    chatMessageVersion++;
+    decidedCommandIds.clear();
+    if (emptyChatTemplate) {
+      elements.messages.replaceChildren(emptyChatTemplate.cloneNode(true));
+      elements.emptyChatTitle = elements.messages.querySelector('#empty-chat-title');
+      elements.emptyChatDescription = elements.messages.querySelector('#empty-chat-description');
+    } else elements.messages.replaceChildren();
     renderPendingRequests();
     if (state.paired) void refreshPendingRequests();
   }
@@ -574,9 +611,9 @@ async function initialize() {
     if (message.requestScope && (!state.paired || message.requestScope.serverUrl !== state.serverUrl
       || message.requestScope.deviceId !== state.deviceId)) return;
     const generation = requestScopeGeneration;
-    if (message.transcript) appendMessage('user', message.transcript, 'ВЫ · ГОЛОС');
+    if (message.transcript) appendMessage('user', message.transcript, 'ВЫ · ГОЛОС', { messageId: message.messageId });
     if (message.answer) {
-      appendMessage('assistant', message.answer);
+      appendMessage('assistant', message.answer, null, { messageId: message.answerMessageId, buttons: confirmationButtons(message) });
       await acknowledgeDisplayedRequest(message.clientMessageId, generation);
       if (quantumCore) {
         quantumCore.setMode('speech');
@@ -653,7 +690,6 @@ elements.pairingForm.addEventListener('submit', async (event) => {
   }
   elements.pairingCode.value = '';
   renderState(result);
-  appendMessage('system', 'Desktop подключён. История этого устройства теперь хранится в облаке.');
   elements.messageInput.focus();
 });
 
@@ -661,7 +697,7 @@ elements.messageForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const text = elements.messageInput.value.trim();
   if (!text || !cloud || !state.paired) return;
-  appendMessage('user', text);
+  const sentRow = appendMessage('user', text);
   elements.messageInput.value = '';
   elements.sendButton.disabled = true;
   const generation = requestScopeGeneration;
@@ -691,7 +727,8 @@ elements.messageForm.addEventListener('submit', async (event) => {
       return;
     }
     const msgButtons = confirmationButtons(result);
-    appendMessage('assistant', result.answer, null, { buttons: msgButtons });
+    if (sentRow && result.messageId) sentRow.dataset.messageId = result.messageId;
+    appendMessage('assistant', result.answer, null, { buttons: msgButtons, messageId: result.answerMessageId });
     await acknowledgeDisplayedRequest(result.clientMessageId, generation);
     if (quantumCore) {
       quantumCore.setMode('speech');

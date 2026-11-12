@@ -183,6 +183,25 @@ class ReleaseStatusTests(unittest.TestCase):
         self.assertEqual(missing["missing"], 1)
         self.assertFalse(missing["matches"])
 
+    def test_desktop_shared_assets_track_their_mini_app_sources(self):
+        (self.repo / "scripts").mkdir()
+        (self.repo / "scripts/desktopWorkspaceModules.json").write_text('["memoryActions.js"]')
+        (self.repo / "mini-app/src").mkdir(parents=True)
+        source = self.repo / "mini-app/src/memoryActions.js"
+        source.write_text("original action\n")
+        self.git("add", "."); self.git("commit", "-m", "shared asset")
+        files = status.desktop_payload(self.repo, "HEAD")
+        installed = self.root / "installed"
+        for name, body in files.items():
+            target = installed / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(body)
+        self.assertTrue(status.compare_files(files, installed)["matches"])
+        source.write_text("updated action\n")
+        self.git("add", "."); self.git("commit", "-m", "change mini source only")
+        updated = status.desktop_payload(self.repo, "HEAD")
+        self.assertEqual(status.compare_files(updated, installed)["changed"], 1)
+
     def test_vps_old_source_cannot_pass_using_its_own_stale_tracking_ref(self):
         source = self.inspect()
         stale = dict(source, head="0" * 40, githubMain="0" * 40)

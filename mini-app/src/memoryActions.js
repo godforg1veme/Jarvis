@@ -102,7 +102,7 @@ export function createMemoryActions({ api, actor, onChanged, onFatal, isActive =
         await finish(await api.request(mode === 'cancel' ? `${path}/cancel` : path, mode === 'cancel' ? 'POST' : 'GET'));
       }
     } catch (error) {
-      if (mode === 'submit' && submitted && error instanceof ApiError && ['invalid', 'rate_limited'].includes(error.code)) {
+      if (mode === 'submit' && submitted && error instanceof ApiError && !error.uncertain && ['invalid', 'rate_limited'].includes(error.code)) {
         clearPending(actor, 'memory', pending); pending = null;
         status.textContent = error.message;
       } else if (pending) {

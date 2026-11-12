@@ -1,0 +1,43 @@
+#desktop-page-content { --text: #e6e9ed; --cyan: #dce4eb; --line: #ffffff16; }
+#desktop-page-content button,.desktop-history-tools button { font: inherit; font-size: 13px; min-height: 40px; padding: 9px 15px; border: 1px solid #ffffff20; border-radius: 10px; color: #dce1e7; background: #ffffff07; }
+#desktop-page-content button.primary { color: #101419; background: #dce2e8; border-color: #dce2e8; }
+#desktop-page-content button:disabled { opacity: .45; cursor: default; }
+#desktop-page-content :is(button,a,input,textarea,select):focus-visible,.desktop-history-tools button:focus-visible { outline: 2px solid #c5d7e7; outline-offset: 3px; }
+#desktop-page-content :is(input,textarea,select) { width: 100%; max-width: 100%; min-width: 0; font: inherit; color: #e4e8ed; background: #0d1015; border: 1px solid #ffffff26; border-radius: 9px; padding: 12px; }
+#desktop-page-content label { font-size: 13px; color: #bbc3cc; }
+#desktop-page-content :is(.personal-actions__form,.memory-actions__form,.personal-actions__fields,.workspace-settings) { display: grid; gap: 14px; }
+#desktop-page-content [hidden],.desktop-history-tools [hidden] { display: none !important; }
+#desktop-page-content :is(.memory-actions__controls,.personal-actions__controls,.personal-actions__choices,.section-list-tools,.job-controls,.section-handoff__links) { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+#desktop-page-content :is(.personal-actions,.memory-actions,.job-panel) { margin-bottom: 22px; }
+#desktop-page-content :is(.memory-actions__preview,.personal-actions__preview) { padding: 16px; border-left: 2px solid #8e9baa; background: #ffffff05; overflow-wrap: anywhere; white-space: pre-wrap; }
+#desktop-page-content :is(.workspace-error,.form-error) { color: #edb6b6; }
+#desktop-page-content :is(.workspace-status,.muted,.section-filter__status,.section-list-feedback,.personal-actions__status,.memory-actions__status) { color: #a5b0bc; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+#desktop-page-content :is(.section-cards) { list-style: none; margin: 20px 0; padding: 0; }
+#desktop-page-content .section-card { display: flex; gap: 16px; padding: 20px 0; border-bottom: 1px solid #ffffff12; }
+#desktop-page-content .section-card__icon { flex: 0 0 24px; color: #aab5c1; }
+#desktop-page-content .section-card__content { flex: 1; min-width: 0; }
+#desktop-page-content .section-card__summary { cursor: pointer; min-height: 32px; }
+#desktop-page-content .section-card__title { font-weight: 500; line-height: 1.5; overflow-wrap: anywhere; }
+#desktop-page-content .section-card__toggle { margin-left: 14px; font-size: 11px; color: #98a6b5; }
+#desktop-page-content .section-card__detail { font-size: 13px; color: #b1bdc9; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+#desktop-page-content .section-empty { padding: 35px 0; color: #aeb8c4; font-size: 14px; }
+#desktop-page-content .section-empty strong { font-weight: 500; }
+#desktop-page-content .section-filter { margin-top: 24px; }
+#desktop-page-content .section-filter input { margin-top: 9px; }
+#desktop-page-content .section-handoff__links a { color: #dde4ed; text-decoration: none; padding: 11px 15px; border: 1px solid #ffffff20; border-radius: 9px; font-size: 13px; }
+#desktop-page-content .job-panel { display: grid; gap: 16px; }
+#desktop-page-content .job-panel h2 { font-size: 22px; font-weight: 500; }
+#desktop-page-content :is(.job-login-share,.job-resume-controls) { display: grid; gap: 12px; }
+#desktop-page-content .job-login-link { color: #e2e8f0; }
+#desktop-page-content .job-controls :is(input[type=checkbox]) { width: 18px; }
+.desktop-history-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 0 0 12px; }
+.desktop-history-tools button { min-height: 30px; padding: 5px 10px; color: #aab5c3; background: transparent; font-size: 11px; }
+.desktop-history-tools .workspace-status { width: 100%; margin: 0; font-size: 12px; color: #c0a3a3; }
+.desktop-history-tools .workspace-status:empty { display: none; }
+.workspace-history { display: grid; gap: 16px; margin: 20px 0; }
+.workspace-history .message { max-width: 100%; }
+.workspace-address { font-size: 12px; color: #9ca9b8; overflow-wrap: anywhere; }
+.workspace-voice-settings { display: grid; gap: 14px; }
+#desktop-page-content .workspace-check { display: flex; align-items: center; gap: 12px; min-height: 40px; }
+#desktop-page-content .workspace-check input { width: 18px; }
+@media(max-width:900px) { #desktop-page-content .section-card { gap: 10px; } }

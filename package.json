@@ -1,14 +1,14 @@
 {
   "name": "jarvis",
-  "version": "1.0.2",
+  "version": "1.0.3-dashboard.1",
   "description": "Cloud-first Windows client for the Jarvis personal assistant",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "node scripts/prepareDesktopWorkspace.js && electron .",
     "start:legacy": "start.bat",
     "test:cloud": "node --test cloud/*.test.js voice/cloudVoiceService.test.js tts/windowsSapiService.test.js",
     "test:core": "node scripts/testCore.cjs",
-    "dist:win": "node scripts/checkCloudPackageAssets.js && node scripts/prepareWakeWordRuntime.js && node scripts/prepareReleaseIcon.js && electron-builder --win nsis",
+    "dist:win": "node scripts/prepareDesktopWorkspace.js && node scripts/checkCloudPackageAssets.js && node scripts/prepareWakeWordRuntime.js && node scripts/prepareReleaseIcon.js && electron-builder --win nsis",
     "setup": "node scripts/installDependencies.js"
   },
   "author": "",
@@ -32,6 +32,17 @@
       "!docs/**",
       "!build/**",
       "!models/**",
+      "!models",
+      "!job-browser",
+      "!job-browser/**",
+      "!.agents",
+      "!.agents/**",
+      "!.codex",
+      "!.codex/**",
+      "!AGENTS.md",
+      "!CLAUDE.md",
+      "!gemini.md",
+      "!AI-OFFICE.md",
       "!voices/**",
       "!stt_runtime/**",
       "!agent_runtime/**",
@@ -43,7 +54,9 @@
       "!jarvis-server-deploy.zip",
       "!ref-napi-*.tgz",
       "!error.txt",
-      "!**/*.test.js"
+      "!**/*.test.js",
+      "!scripts/testDesktopWorkspace*",
+      "!scripts/fixtures/desktopWorkspace*"
     ],
     "extraResources": [
       {
