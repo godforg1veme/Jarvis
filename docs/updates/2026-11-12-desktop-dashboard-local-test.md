@@ -85,6 +85,10 @@ Telegram и один автоматический перезапуск HH-бра
 Тестовый установщик: `dist/Jarvis-Desktop-1.0.3-dashboard.1-Setup.exe`.
 Сборка использует Node `24.14.1` для bundled wake-word runtime и сохраняет
 `npmRebuild: false`. Установщик не запускался поверх рабочего приложения.
+Пакет сверён с кодом `f1c4103`: 168 файлов, отсутствующих и изменённых нет;
+native Electron и bundled Node совпадают, Vosk загружается под packaged Node.
+Размер установщика — 197 394 473 байта. Локальный
+`dist/desktop-dashboard-test.json` сохраняет SHA-256 и commit кода сборки.
 
 Для настоящего доступа к новым разделам требуется согласованный выпуск
 серверной части. Старый production API пока не имеет новых маршрутов;
@@ -149,6 +153,10 @@ The exact unhealthy trigger remains unknown. Production services were unchanged.
 
 Installer: `dist/Jarvis-Desktop-1.0.3-dashboard.1-Setup.exe`, using bundled Node
 24.14.1 with `npmRebuild: false`. It was not installed over the working app.
+The package matches code `f1c4103`: 168 checked files, none missing or changed;
+native Electron and bundled Node match, and packaged Node loads Vosk. Installer
+size is 197,394,473 bytes. The local `dist/desktop-dashboard-test.json` records
+its SHA-256 and code commit.
 New sections require a separately authorized server release; the old production
 API currently returns an unavailable state. New PostgreSQL acceptance, live
 Telegram/HH, microphone/camera activation and installation remain unverified.
