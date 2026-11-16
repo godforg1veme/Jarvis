@@ -1,5 +1,24 @@
 # Проверки перед выпуском
 
+## Desktop: PostgreSQL acceptance (16 November)
+
+[Выпуск и результат / Release record](updates/2026-11-16-desktop-dashboard-release.md).
+30 сценариев прошли на отдельном PostgreSQL 16/pgvector без production-данных.
+30 cases passed on a private PostgreSQL 16/pgvector fixture without production data.
+
+```powershell
+# JARVIS_MINI_TEST_DATABASE_URL must point only to an isolated test database.
+node --test server/test/desktopWorkspacePostgresAcceptance.cjs server/test/miniAppPostgresAcceptance.cjs server/test/miniAppIntegrationAcceptance.cjs server/test/miniAppMemoryOperationsAcceptance.cjs server/test/miniAppPersonalActionsAcceptance.cjs
+node --test server/test/miniAppSectionPagingAcceptance.cjs
+```
+
+Personal-action acceptance requires a loopback database URL; the Linux runner
+shares the test PostgreSQL container's network namespace with no host ports.
+Paging runs on a fresh database so its schema-local vector extension is not
+hidden by a public extension created by another fixture. Integration requires
+built Mini App assets. При отсутствии URL новый тест пропускает DB-сценарии;
+такой запуск не подтверждает работу PostgreSQL. A skipped run is not DB acceptance.
+
 ## Desktop dashboard test build / Тестовая сборка дашборда (12 November)
 
 [Результат и границы / Results and limits](updates/2026-11-12-desktop-dashboard-local-test.md).
