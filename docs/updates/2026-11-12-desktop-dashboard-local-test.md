@@ -2,6 +2,8 @@
 
 ## Русский
 
+Более новый результат: [выпуск и установка 16 ноября](2026-11-16-desktop-dashboard-release.md).
+
 12 ноября подготовлена локальная тестовая версия `1.0.3-dashboard.1`.
 Изменения находятся в `codex/desktop-dashboard`; в GitHub и на VPS они
 не опубликованы. Установленный Desktop `1.0.2` не заменялся.
@@ -98,6 +100,8 @@ Desktop показывает недоступность раздела. PostgreS
 Нельзя считать перенос полностью принятым по локальным fixtures.
 
 ## English
+
+Newer result: [November 16 release and installation](2026-11-16-desktop-dashboard-release.md).
 
 Local test version `1.0.3-dashboard.1` was prepared on November 12 in
 `codex/desktop-dashboard`. Nothing was published to GitHub or deployed to VPSs;

@@ -4,7 +4,8 @@
 
 16 ноября владелец поручил опубликовать серверную часть и установить Desktop
 `1.0.3-dashboard.1`. Основа — [локальный результат 12 ноября](2026-11-12-desktop-dashboard-local-test.md).
-Выпуск выполняется; итог установки и живой проверки будет записан здесь.
+Выпуск завершён: сервер на DE обновлён, EXE установлен и проверен с рабочей
+привязкой. Исходники Windows и обоих VPS синхронизированы с GitHub main.
 
 Перед публикацией повторно сверены GitHub, Windows и оба VPS: исходники
 совпадали с `496f78c`, чужих незакоммиченных изменений и открытых PR не было.
@@ -31,11 +32,40 @@ server subset 806/806. Ранее прошли полный server unit 960 test
 Оба VPS получают принятую `main`; неизменившиеся службы не перезапускаются.
 Камера, микрофон и автоотклики для проверки не включаются.
 
+
+Итог живой проверки 16 ноября, около 22:47 МСК:
+
+- Server release `307986605be6a8c736de91ff0ea40dc368b7f5ae`, image
+  `jarvis-desktop-server:3079866`; 391 файлов и входы сборки совпали с main.
+  Перед заменой серверный образ прошёл ещё 23 PostgreSQL acceptance без ошибок
+  и пропусков. Окружение (93 ключа Compose) сверено без вывода значений;
+  исходный bind секрета сохранён. Collector/browser сохранили container IDs.
+- Установлен Desktop `1.0.3-dashboard.1`: 168 файлов, 0 отсутствующих,
+  0 изменённых. Electron 42.11.9 и bundled Node 24.14.1 совпадают со сборкой.
+  Старая привязка сохранилась, соединение online. Все 13 проверенных чтений
+  через настоящий IPC и сервер успешны: профиль, личные разделы, HH-настройки
+  и обе отдельные истории диалога. Личные данные в отчёт не выводились.
+- В установленном приложении проверены все пункты меню и пять экранов Life OS,
+  закрытие Life OS и возврат на главную: без горизонтального переполнения
+  и новых ошибок renderer. Life OS открывается поверх текущего раздела.
+  Изменения/отмены/дедупликация проверены в изолированных сценариях;
+  рабочие записи и HH-согласия для проверки не изменялись.
+- Live/ready внутри сервера 200, публичные live и Mini App 200 при curl
+  и браузерном User-Agent. Проба Python urllib получила 403 на внешнем входе;
+  рабочий Desktop и обычные HTTP-пробы успешны. Сервер healthy;
+  в структурированных журналах после замены 0 warning/error/fatal.
+  Host Agent, Xray, Hysteria и таймеры проб активны на обоих VPS.
+- Микрофон и камера оставались выключены; их физический захват и живые
+  HH-отклики не проверялись. Изолированные тестовые контейнеры удалены.
+  Отладочный запуск Desktop завершён; приложение запущено обычным способом.
+
 ## English
 
 On November 16 the owner authorized publishing the server changes and installing
 Desktop `1.0.3-dashboard.1`, based on the [November 12 local result](2026-11-12-desktop-dashboard-local-test.md).
-Release is in progress; installation and live acceptance results will be recorded here.
+Release completed: the DE server was updated and the EXE installed and checked
+with the existing device pairing. Windows and both VPS source checkouts match
+GitHub main.
 
 Before publication, GitHub, Windows and both VPS source checkouts matched
 `496f78c`. There were no foreign uncommitted changes or open PRs. The working
@@ -61,3 +91,32 @@ consent. It adds no migrations or production dependencies. Only the DE server
 needs replacing; collector/browser, Host Agent and VPN remain unchanged.
 Both VPS source checkouts receive accepted `main`; unchanged services are not
 restarted. Tests do not enable microphone, camera or live job applications.
+
+Live acceptance on November 16, around 22:47 Moscow time:
+
+- Server release `307986605be6a8c736de91ff0ea40dc368b7f5ae`, image
+  `jarvis-desktop-server:3079866`; all 391 files and build inputs match main.
+  Before replacement, this image passed another 23 PostgreSQL acceptance cases
+  with no failures or skips. All 93 Compose environment keys were compared
+  without exposing values; the original secret bind was preserved.
+  Collector/browser container IDs stayed unchanged.
+- Desktop `1.0.3-dashboard.1` is installed: 168 files checked, none missing
+  or changed. Electron 42.11.9 and bundled Node 24.14.1 match the build.
+  The existing pairing was preserved and the connection is online. All 13
+  read requests through real IPC and the live server succeeded: profile,
+  personal sections, HH settings and the two separate conversation histories.
+  No personal content was printed in the report.
+- Every menu entry and all five Life OS screens were checked in the installed
+  app, including closing Life OS and returning Home, with no horizontal
+  overflow or new renderer errors. Life OS opens over the current section.
+  Mutations, cancellations and deduplication passed isolated scenarios;
+  acceptance did not change live records or HH consent.
+- Internal live/ready returned 200; public live and Mini App returned 200
+  using curl and a browser User-Agent. Python urllib received an external
+  403, while the working Desktop and ordinary HTTP probes succeeded.
+  The server is healthy; post-replacement structured logs contain zero
+  warnings, errors or fatal events. Host Agent, Xray, Hysteria and probe
+  timers are active on both VPS hosts.
+- Microphone and camera remained off; physical capture and live HH applications
+  were not exercised. Isolated test containers were removed. The debugging
+  Desktop session was stopped and the app restarted normally.

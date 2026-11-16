@@ -4,6 +4,13 @@
 
 ## Русский
 
+16 ноября [Desktop dashboard выпущен и установлен](updates/2026-11-16-desktop-dashboard-release.md):
+EXE `1.0.3-dashboard.1`, сервер DE `3079866`, исходники Windows/DE/NL совпадают
+с GitHub. PostgreSQL 30/30; установленный клиент online, 13 живых чтений и
+все пункты меню проверены. Сервер healthy, новых ошибок после замены нет.
+Камера/микрофон и живые HH-отклики не включались. Запись ниже от 12 ноября
+описывает состояние до выпуска.
+
 12 ноября подготовлен [локальный тестовый Desktop `1.0.3-dashboard.1`](updates/2026-11-12-desktop-dashboard-local-test.md)
 с интерфейсом дашборда и общими личными разделами Mini App. Клиентские,
 серверные и браузерные проверки прошли; EXE собран. Выпуска на VPS и установки
@@ -265,6 +272,13 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 Архивы не заменяют действующие правила и новую проверку окружения.
 
 ## English
+
+November 16: [Desktop dashboard released and installed](updates/2026-11-16-desktop-dashboard-release.md).
+EXE `1.0.3-dashboard.1`, DE server `3079866`; Windows/DE/NL source matches
+GitHub. PostgreSQL 30/30; the installed client is online, with 13 live reads
+and every menu entry checked. Server healthy, no new post-replacement errors.
+Camera/microphone and live HH applications were not enabled. The November 12
+entry below describes the state before this release.
 
 November 12: [local Desktop test build `1.0.3-dashboard.1`](updates/2026-11-12-desktop-dashboard-local-test.md)
 adds the dashboard interface and shared Mini App personal sections. Client,
