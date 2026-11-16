@@ -19,7 +19,7 @@
 - [x] Подключить оригинальные компоненты, убрать вторую сцену, связать названия
   и клики с Desktop-разделами. Непривязанному клиенту оставить форму входа.
 - [x] Проверить браузерные сценарии и реальный Electron; получить скриншот.
-- [x] Локальная сборка и установка EXE по поручению владельца; [результат](../updates/2026-11-16-desktop-original-visual-install.md).
+- [x] Сборка, установка EXE, публикация в main и обновление обоих VPS по поручению владельца; [результат](../updates/2026-11-16-desktop-original-visual-install.md).
 
 ## English
 
@@ -37,4 +37,4 @@ component integration, removal of the duplicate scene, Desktop destination
 labels, unpaired sign-in preservation, browser and native Electron checks,
 and screenshot capture. EXE installation was authorized and completed locally; see the
 [acceptance result](../updates/2026-11-16-desktop-original-visual-install.md).
-Source publication remains outside this installation.
+Source publication and both VPS updates were subsequently authorized and completed.

@@ -31,11 +31,40 @@ renderer и горизонтального переполнения не обн�
 SHA-256 установщика:
 `cd0de6eaa990b3c5bd56ca99c3b0d95006388afc5797e12ca1d8e6ad09afb264`.
 После локальной установки владелец поручил публикацию и обновление обоих VPS.
-Выпуск выполняется; окончательные SHA и проверки будут записаны ниже.
+Выпуск завершён; результат публикации и проверки приведён ниже.
 Перед выпуском исправлен старт с незавершёнными запросами: Assistant остаётся
 видимым, а пользовательский переход во время загрузки не переопределяется.
 Recovery-проверки прошли при 1440×900 и 760×560; inventory — 19 tests,
 один Windows symlink skip. Каталог пяти ресурсов сцены включён в сверку EXE. [План](../plans/2026-11-16-desktop-original-visual.md).
+
+
+### Публикация и VPS
+
+Принятый код: `fa4c8a9d8e65f5b6e4ca8914616db0ac891aabdb`, объединён
+в GitHub main. Windows и исходники DE/NL синхронизированы, рабочая ветка
+объединена и удалена после проверки. Чужих незакоммиченных изменений нет.
+Описание продукта, текущий статус, план и проверки обновлены на двух языках.
+
+На DE установлен immutable server release `fa4c8a9`, image
+`jarvis-desktop-server:fa4c8a9`. Перед заменой: preflight OK, 93 ключа
+окружения совпали, исходный bind секрета сохранён. Собранный образ прошёл
+7 route-тестов без ошибок и пропусков; Operations UI и Mini App собраны.
+После замены: 391 серверный файл и входы сборки совпали. Публичные
+live/ready, `/ops/` и `/mini/` вернули 200; закрытый Desktop route без токена
+вернул 401. Сервер healthy; структурированные журналы после замены —
+0 warning/error/fatal. Collector/browser сохранили container IDs;
+Host Agent и VPN-сервисы активны на обоих VPS без переустановки.
+
+Финальный EXE повторно установлен после ремонта стартового восстановления.
+Сверка: 167 файлов кода и 5 ресурсов сцены совпали, native Electron и
+bundled Node совпали. Повторная живая проверка: соединение online, сцена
+ready, 13 чтений успешны, все 9 пунктов меню доступны, ошибок renderer — 0.
+Приложение перезапущено обычным способом; отладочный порт закрыт.
+Итоговая release-status проверка на принятой main завершилась с exit code 0.
+
+[GitHub Release и EXE](https://github.com/godforg1veme/Jarvis/releases/tag/desktop-1.0.3-dashboard.2)
+опубликованы как prerelease. Загружен установщик Windows x64 (197 038 970 bytes)
+и SHA256SUMS.txt; digest GitHub совпал с локальным SHA-256, указанным выше.
 
 ## English
 
@@ -69,8 +98,39 @@ restarted normally.
 Installer SHA-256:
 `cd0de6eaa990b3c5bd56ca99c3b0d95006388afc5797e12ca1d8e6ad09afb264`.
 Following local installation, the owner authorized publication and both VPS
-updates. Release is in progress; final revisions and checks will be recorded below.
+updates. Release completed; publication and acceptance results follow below.
 Startup now keeps Assistant visible when unresolved requests exist and preserves
 navigation chosen during startup. Recovery passed at 1440×900 and 760×560;
 inventory passed 19 tests with one Windows symlink skip. Five compiled scene
 assets are now included in installed EXE verification. [Plan](../plans/2026-11-16-desktop-original-visual.md).
+
+
+### Publication and VPS
+
+Accepted code `fa4c8a9d8e65f5b6e4ca8914616db0ac891aabdb` was merged into
+GitHub main. Windows and DE/NL source checkouts are synchronized. The working
+branch was removed after its merge was verified. No foreign uncommitted work
+was present. Product description, status, plan and checks were updated in
+both languages.
+
+DE now runs immutable server release `fa4c8a9`, image
+`jarvis-desktop-server:fa4c8a9`. Before replacement, preflight passed, all
+93 environment keys matched and the original secret bind was preserved.
+The built image passed 7 route tests with no failures or skips, and includes
+compiled Operations UI and Mini App assets. After replacement, all 391 server
+files and build inputs matched. Public live/ready, `/ops/` and `/mini/`
+returned 200; the protected Desktop route returned 401 without a token.
+The server is healthy; post-replacement structured logs contain zero warnings,
+errors or fatal events. Collector/browser container IDs stayed unchanged.
+Host Agent and VPN services remain active on both VPS hosts without reinstall.
+
+The final EXE was reinstalled after the startup recovery fix. All 167 code
+files and 5 compiled scene assets matched; native Electron and bundled Node
+matched. Repeated live acceptance: online connection, ready scene, 13 successful
+reads, all 9 menu entries available and zero renderer errors. The app was
+restarted normally with the debugging port closed. Final release-status on
+accepted main returned exit code 0.
+
+The [GitHub Release and EXE](https://github.com/godforg1veme/Jarvis/releases/tag/desktop-1.0.3-dashboard.2)
+are published as a prerelease. The Windows x64 installer (197,038,970 bytes)
+and SHA256SUMS.txt are attached. GitHub's digest matches the local SHA-256 above.

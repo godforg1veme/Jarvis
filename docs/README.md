@@ -4,12 +4,12 @@
 
 ## Русский
 
-16 ноября после визуальной обратной связи локально подключён [оригинальный
-визуал веб-панели к Desktop](plans/2026-11-16-desktop-original-visual.md).
-Одна исходная OrbitalScene и SharedSky заменяют упрощённую копию. Проверены
-19 браузерных сценариев, 17 тестов сцены и настоящий Electron через file://.
-[EXE `1.0.3-dashboard.2` установлен и проверен](updates/2026-11-16-desktop-original-visual-install.md):
-172 файла совпали, 13 живых чтений успешны. Исходники этой правки пока локальные.
+16 ноября [оригинальный визуал Desktop выпущен](updates/2026-11-16-desktop-original-visual-install.md):
+EXE `1.0.3-dashboard.2` установлен, установщик опубликован в GitHub Releases.
+Принятый код и server release — `fa4c8a9`, исходники Windows/DE/NL совпадают
+с GitHub main. Проверены 167 файлов клиента, 5 ресурсов сцены, 391 серверный
+файл, 13 живых чтений и все пункты меню. Сервер healthy; итоговая сверка без
+замечаний. Ниже сохранён результат первого выпуска Desktop до визуальной правки.
 
 16 ноября [Desktop dashboard выпущен и установлен](updates/2026-11-16-desktop-dashboard-release.md):
 EXE `1.0.3-dashboard.1`, сервер DE `3079866`, исходники Windows/DE/NL совпадают
@@ -280,12 +280,12 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 
 ## English
 
-November 16: following visual feedback, the [original web dashboard visual
-was integrated locally into Desktop](plans/2026-11-16-desktop-original-visual.md).
-One original OrbitalScene and SharedSky replace the simplified replica.
-Checks cover 19 browser scenarios, 17 scene tests and real Electron via file://.
-[EXE `1.0.3-dashboard.2` is installed and verified](updates/2026-11-16-desktop-original-visual-install.md):
-172 files matched and 13 live reads succeeded. Its source changes remain local.
+November 16: [original Desktop visual released](updates/2026-11-16-desktop-original-visual-install.md).
+EXE `1.0.3-dashboard.2` is installed; the installer is published in GitHub Releases.
+Accepted code and server release: `fa4c8a9`. Windows/DE/NL source matches
+GitHub main. Checks covered 167 client files, 5 scene assets, 391 server files,
+13 live reads and every menu entry. Server healthy; final inventory has no
+issues. The first Desktop release result below is retained as history.
 
 November 16: [Desktop dashboard released and installed](updates/2026-11-16-desktop-dashboard-release.md).
 EXE `1.0.3-dashboard.1`, DE server `3079866`; Windows/DE/NL source matches

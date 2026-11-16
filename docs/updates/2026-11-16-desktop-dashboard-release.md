@@ -2,6 +2,8 @@
 
 ## Русский
 
+Более новый результат: [оригинальный визуал и EXE dashboard.2](2026-11-16-desktop-original-visual-install.md).
+
 16 ноября владелец поручил опубликовать серверную часть и установить Desktop
 `1.0.3-dashboard.1`. Основа — [локальный результат 12 ноября](2026-11-12-desktop-dashboard-local-test.md).
 Выпуск завершён: сервер на DE обновлён, EXE установлен и проверен с рабочей
@@ -60,6 +62,8 @@ server subset 806/806. Ранее прошли полный server unit 960 test
   Отладочный запуск Desktop завершён; приложение запущено обычным способом.
 
 ## English
+
+Newer result: [original visual and dashboard.2 EXE](2026-11-16-desktop-original-visual-install.md).
 
 On November 16 the owner authorized publishing the server changes and installing
 Desktop `1.0.3-dashboard.1`, based on the [November 12 local result](2026-11-12-desktop-dashboard-local-test.md).
