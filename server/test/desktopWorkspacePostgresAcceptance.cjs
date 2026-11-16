@@ -235,4 +235,3 @@ test('Removing memory permission after an authorized snapshot blocks reads and m
       assert.equal((await f.pool.query('SELECT count(*)::int AS n FROM memories WHERE user_id=$1', [f.member.userId])).rows[0].n, 0);
     } finally { await f.close(); }
   });
-
