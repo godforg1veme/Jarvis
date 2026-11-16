@@ -1,5 +1,27 @@
 # Проверки перед выпуском
 
+## Desktop: original web visual / Оригинальный визуал веб-панели
+
+[Установка и выпуск / Installation and release](updates/2026-11-16-desktop-original-visual-install.md).
+
+```powershell
+node scripts/prepareDesktopScene.js
+node scripts/testDesktopWorkspaceBrowser.cjs
+node scripts/testDesktopRecoveryBrowser.cjs
+node scripts/testDesktopWorkspaceElectron.cjs
+py -m unittest discover -s deploy/tests -p test_release_status.py
+```
+
+Сборка сцены использует исходные компоненты ops-ui без внешнего сайта.
+`scripts/desktopSceneAssets.json` хранит SHA-256 пяти принятых ресурсов;
+release-status проверяет их в установленном приложении. При изменении сцены
+пересобери её и включи обновлённый каталог в тот же коммит.
+The scene build reuses ops-ui components locally. The committed catalog stores
+SHA-256 hashes for five accepted assets; release-status checks the installed
+files. Rebuild and commit the updated catalog together with scene changes.
+Startup recovery keeps Assistant visible while requests need reconciliation,
+and does not override navigation made during startup.
+
 ## Desktop: PostgreSQL acceptance (16 November)
 
 [Выпуск и результат / Release record](updates/2026-11-16-desktop-dashboard-release.md).

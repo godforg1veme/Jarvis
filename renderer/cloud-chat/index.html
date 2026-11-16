@@ -9,11 +9,13 @@
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="../life-os/life-os.css">
   <link rel="stylesheet" href="dashboard-shell.css">
+  <link rel="stylesheet" href="../orbital/scene.css">
   <link rel="stylesheet" href="../workspace/workspace.css">
   <link rel="stylesheet" href="../workspace/shared/jobResumes.css">
 </head>
 <body>
   <main class="console">
+    <div id="desktop-original-scene"></div>
     <aside class="sidebar" aria-label="Разделы Jarvis">
       <div class="brand">
         <h1>JARVIS</h1>
@@ -48,7 +50,7 @@
         </div>
       </header>
       <div id="desktop-home" class="desktop-home" hidden>
-        <div class="desktop-home-scene" aria-hidden="true"></div>
+
       </div>
       <div id="desktop-chat-panel" class="desktop-chat-panel">
       <section id="pairing-card" class="pairing-card">
@@ -181,7 +183,7 @@
   <script src="../life-os/life-os.js"></script>
   <script src="renderer.js"></script>
   <script src="dashboard-shell.js"></script>
-  <script src="dashboard-scene.js"></script>
+  <script src="../orbital/scene.js"></script>
   <script type="module" src="../workspace/workspace.js"></script>
 </body>
 </html>

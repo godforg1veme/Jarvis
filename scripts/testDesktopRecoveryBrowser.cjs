@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
-const { chromium } = require('playwright');
+const { chromium } = require('../job-browser/node_modules/playwright');
 
 async function run() {
   const output = path.join(__dirname, '..', 'build', 'desktop-recovery-screenshots');
@@ -49,6 +49,7 @@ async function run() {
       });
       await page.goto(pathToFileURL(path.join(__dirname, '..', 'renderer', 'cloud-chat', 'index.html')).href);
       await page.getByRole('heading', { name: 'Я на связи' }).waitFor();
+      assert.equal(await page.locator('[data-desktop-page="assistant"]').getAttribute('aria-current'), 'page');
       assert.equal(await page.getByRole('textbox', { name: 'Сообщение для Jarvis' }).count(), 1);
       await page.evaluate(() => window.__state('offline'));
       await page.getByRole('heading', { name: 'Нет соединения с облаком' }).waitFor();

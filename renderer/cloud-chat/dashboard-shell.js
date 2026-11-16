@@ -11,6 +11,7 @@
   const workspaceTitle = document.getElementById('desktop-page-title');
   const lifeOpen = document.getElementById('life-os-open');
   let current = 'assistant';
+  let navigated = false;
 
   function show(page, focus = false) {
     if (!pages.has(page)) return;
@@ -32,6 +33,7 @@
   }
 
   for (const button of buttons) button.addEventListener('click', () => {
+    navigated = true;
     const page = button.dataset.desktopPage;
     if (!pages.has(page)) return;
     if (page === 'life') {
@@ -43,6 +45,7 @@
     window.dispatchEvent(new CustomEvent('desktop:navigate', { detail: { page } }));
   });
   window.addEventListener('desktop:page', (event) => {
+    navigated = true;
     const page = event.detail?.page;
     if (page === 'life') { lifeOpen.click(); return; }
     show(page, false);
@@ -54,4 +57,10 @@
     }
   });
   show(current);
+  const cloud = window.jarvisCloud;
+  Promise.all([cloud?.getState(), cloud?.listPendingRequests()]).then(([state, pending]) => {
+    if (!navigated && state?.paired && pending?.ok && Array.isArray(pending.requests)
+      && pending.requests.length === 0 && !document.querySelector('#messages button')
+      && current === 'assistant') show('home');
+  }).catch(() => {});
 })();

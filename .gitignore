@@ -81,3 +81,6 @@ Thumbs.db
 Desktop.ini
 .vscode/
 .idea/
+
+# Generated from the original Operations UI scene
+renderer/orbital/

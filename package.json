@@ -1,14 +1,14 @@
 {
   "name": "jarvis",
-  "version": "1.0.3-dashboard.1",
+  "version": "1.0.3-dashboard.2",
   "description": "Cloud-first Windows client for the Jarvis personal assistant",
   "main": "main.js",
   "scripts": {
-    "start": "node scripts/prepareDesktopWorkspace.js && electron .",
+    "start": "node scripts/prepareDesktopWorkspace.js && node scripts/prepareDesktopScene.js && electron .",
     "start:legacy": "start.bat",
     "test:cloud": "node --test cloud/*.test.js voice/cloudVoiceService.test.js tts/windowsSapiService.test.js",
     "test:core": "node scripts/testCore.cjs",
-    "dist:win": "node scripts/prepareDesktopWorkspace.js && node scripts/checkCloudPackageAssets.js && node scripts/prepareWakeWordRuntime.js && node scripts/prepareReleaseIcon.js && electron-builder --win nsis",
+    "dist:win": "node scripts/prepareDesktopWorkspace.js && node scripts/prepareDesktopScene.js && node scripts/checkCloudPackageAssets.js && node scripts/prepareWakeWordRuntime.js && node scripts/prepareReleaseIcon.js && electron-builder --win nsis",
     "setup": "node scripts/installDependencies.js"
   },
   "author": "",
@@ -29,6 +29,7 @@
       "**/*",
       "!server/**",
       "!mini-app/**",
+      "!ops-ui/**",
       "!docs/**",
       "!build/**",
       "!models/**",
@@ -56,6 +57,7 @@
       "!error.txt",
       "!**/*.test.js",
       "!scripts/testDesktopWorkspace*",
+      "!scripts/testDesktopRecovery*",
       "!scripts/fixtures/desktopWorkspace*"
     ],
     "extraResources": [

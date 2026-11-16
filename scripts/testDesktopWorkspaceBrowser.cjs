@@ -36,6 +36,10 @@ async function main() {
   await check('Home animation controls + no WebGL crash', async () => {
     await page.click('[data-desktop-page="home"]');
     assert.equal(await page.locator('#desktop-home').isVisible(), true);
+    await page.waitForSelector('.desktop-original-universe[data-scene-state="ready"]', { timeout: 20000 });
+    await page.waitForFunction(() => document.querySelector('.shared-space__milky-way')?.naturalWidth > 0);
+    assert.equal(await page.locator('#desktop-original-scene canvas[data-engine]').count(), 1);
+    await page.waitForTimeout(800);
     await page.screenshot({ path: path.join(screenshots, 'home-1440x900.png') });
     await page.click('[data-desktop-page="settings"]'); await page.getByRole('button', { name: 'Приостановить анимацию' }).click();
     assert.equal(await page.locator('body').getAttribute('data-scene-paused'), 'true');

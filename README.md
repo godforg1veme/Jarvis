@@ -98,7 +98,9 @@ Windows-приложение и облачный API для подключённ
   со ссылками на страницы. Загруженное содержимое считается недоверенным.
 - Windows-клиент на Electron предоставляет облачный чат, локальное распознавание
   ключевого слова, голос и ограниченные инструменты для приложений и файлов.
-  Учётные данные устройства защищены Windows DPAPI.
+  Учётные данные устройства защищены Windows DPAPI. Desktop использует оригинальную
+  орбитальную сцену веб-панели и общие личные разделы Mini App: память, документы,
+  устройства и поиск работы. [Выпуск Desktop](docs/updates/2026-11-16-desktop-original-visual-install.md).
 - Удалённые действия на устройствах проходят через проверенный план и Tool Gateway.
   Действия, меняющие состояние, требуют подтверждения в исходном клиенте.
 - Первый сценарий Vision поддерживает явное локальное разрешение на камеру или
@@ -226,7 +228,7 @@ The bot interface is unchanged. [Release and limitations](docs/updates/2026-10-2
 - For connected HH accounts, cover letters use the selected personal resume. Instructions require emphasizing supported strengths without invented achievements or apologies for missing experience. The direct text-edit button replaces an entire draft without AI; manual sending requires separate confirmation. [Complete resume reading passed for the owner](docs/updates/2026-11-01-hh-session-and-complete-resume-repair.md). Live member checks and the first real autonomous application remain open.
 - DE uses the fine-tuned HH OCR with image rectification: up to three automatic attempts, then a photo for the owner in Telegram. An unknown result stops automation earlier. Replying to the photo authorizes one submission; verified access resumes the search from its saved position. The human flow passed on 16 October; the first live OCR attempt on 18 October did not confirm access and handed a photo to the owner. A later live OCR answer test, approved by the owner, returned solved and resumed collection; a fully autonomous cycle remains unconfirmed. This CAPTCHA flow needs no Tailscale connection or separate web screen. See the [release and verification limits](docs/updates/2026-10-18-hh-ocr-live-acceptance.md).
 - The knowledge service stores private document metadata and text for owner-scoped search. It supports text and office formats, plus page-linked PDF search. Uploaded content is treated as untrusted data.
-- The Windows Electron client provides cloud chat, local wake-word detection, speech, and bounded tools for apps and files. Device credentials are protected with Windows DPAPI.
+- The Windows Electron client provides cloud chat, local wake-word detection, speech, and bounded tools for apps and files. Device credentials are protected with Windows DPAPI. Desktop uses the original web dashboard orbital scene and shares personal memory, documents, devices and job-search sections with Mini App. See the [Desktop release](docs/updates/2026-11-16-desktop-original-visual-install.md).
 - Remote device actions use a validated plan and Tool Gateway. Actions that change state require confirmation in the client that started the request.
 - The first Vision workflow supports an explicit local camera or screen lease, two-display capture, bounded scene state, and owner-scoped visual memory. Two-display capture and a live Camo camera were tested locally; deployment of the Vision provider remains open.
 - Allowlisted Telegram voice notes can be transcribed by the private GigaAM service on DE-4. The service processes `voice` notes under size, duration, and rate limits. Real owner Telegram voice was accepted; paired Desktop voice still needs a client check.

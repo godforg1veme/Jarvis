@@ -202,6 +202,33 @@ class ReleaseStatusTests(unittest.TestCase):
         updated = status.desktop_payload(self.repo, "HEAD")
         self.assertEqual(status.compare_files(updated, installed)["changed"], 1)
 
+    def test_generated_scene_is_checked_and_unsafe_catalog_is_rejected(self):
+        entry = self.repo / 'ops-ui/src/desktop-scene.tsx'
+        entry.parent.mkdir(parents=True)
+        entry.write_text('scene entry')
+        catalog = self.repo / 'scripts/desktopSceneAssets.json'
+        catalog.parent.mkdir()
+        names = ['scene.js', 'scene.css', 'assets/milky-way-gaia-4k.webp',
+                 'assets/milky-way-gaia-8k.webp', 'assets/SKY-CREDITS.md']
+        hashes = {name: status.digest(name.encode()) for name in names}
+        catalog.write_text(json.dumps(hashes))
+        self.git('add', '.'); self.git('commit', '-m', 'scene catalog')
+        app = self.root / 'installed'
+        for name in names:
+            target = app / 'renderer/orbital' / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(name.encode())
+        self.assertTrue(status.desktop_scene_inventory(self.repo, app, 'HEAD')['sceneMatches'])
+        target = app / 'renderer/orbital/scene.js'
+        target.write_bytes(b'changed compiled scene')
+        self.assertFalse(status.desktop_scene_inventory(self.repo, app, 'HEAD')['sceneMatches'])
+        target.unlink()
+        self.assertFalse(status.desktop_scene_inventory(self.repo, app, 'HEAD')['sceneMatches'])
+        catalog.write_text(json.dumps({'../../private': '0' * 64}))
+        self.git('add', '.'); self.git('commit', '-m', 'invalid catalog')
+        with self.assertRaises(status.InventoryError):
+            status.desktop_scene_inventory(self.repo, app, 'HEAD')
+
     def test_vps_old_source_cannot_pass_using_its_own_stale_tracking_ref(self):
         source = self.inspect()
         stale = dict(source, head="0" * 40, githubMain="0" * 40)

@@ -9,7 +9,7 @@ import { ORBIT_SPECS, getAllPositions, getObjectBounds, orbitPosition, orbitPrec
 import GalacticBackdrop from './GalacticBackdrop';
 import AmbientEvents from './AmbientEvents';
 
-type Props = { selected: SceneSelection; onSelect: (selection: Exclude<SceneSelection, null>) => void; paused: boolean; reducedMotion: boolean; onReady: () => void; onFailure: () => void };
+type Props = { navigationLabels?: Partial<Record<PlanetKey | 'core', string>>; selected: SceneSelection; onSelect: (selection: Exclude<SceneSelection, null>) => void; paused: boolean; reducedMotion: boolean; onReady: () => void; onFailure: () => void };
 type HoverHandler = (label: string | null, event?: ThreeEvent<PointerEvent>) => void;
 type Hover = { label: string; x: number; y: number } | null;
 
@@ -308,11 +308,12 @@ export default function OrbitalScene(props: Props) {
   const [hover, setHover] = useState<Hover>(null);
   const onHover = useCallback<HoverHandler>((label, event) => {
     if (!label || !event || !container.current) { setHover((previous) => previous === null ? previous : null); return; }
+    label = label === 'Ядро · Обзор' ? props.navigationLabels?.core ?? label : props.navigationLabels?.[planets.find((planet) => planet.label === label)?.key as PlanetKey] ?? label;
     const bounds = container.current.getBoundingClientRect();
     const x = Math.max(8, Math.min(event.nativeEvent.clientX - bounds.left + 18, bounds.width - 155));
     const y = Math.max(8, Math.min(event.nativeEvent.clientY - bounds.top + 16, bounds.height - 40));
     setHover((previous) => previous?.label === label && previous.x === x && previous.y === y ? previous : { label, x, y });
-  }, []);
+  }, [props.navigationLabels]);
   useEffect(() => { setHover(null); }, [props.selected]);
   return <SceneBoundary onFailure={props.onFailure}><div ref={container} style={{ position: 'relative', width: '100%', height: '100%' }}>
     <Canvas orthographic frameloop="demand" dpr={[1, 1.5]} camera={{ position: [0, 0, 13], near: .1, far: 80 }} gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
@@ -332,8 +333,8 @@ export default function OrbitalScene(props: Props) {
       <System {...props} onHover={onHover} labels={labels} />
     </Canvas>
     <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
-      <div ref={(node) => { labels.current.core = node; }} style={labelStyle}>JARVIS</div>
-      {planets.map((planet) => <div key={planet.key} ref={(node) => { labels.current[planet.key] = node; }} style={labelStyle}>{planet.label}</div>)}
+      <div ref={(node) => { labels.current.core = node; }} style={labelStyle}>{props.navigationLabels?.core ?? 'JARVIS'}</div>
+      {planets.map((planet) => <div key={planet.key} ref={(node) => { labels.current[planet.key] = node; }} style={labelStyle}>{props.navigationLabels?.[planet.key] ?? planet.label}</div>)}
     </div>
     {hover && <div role="status" style={{ position: 'absolute', left: hover.x, top: hover.y, pointerEvents: 'none', padding: '7px 10px', color: '#e9edef', background: 'rgba(8,10,12,.94)', border: '1px solid rgba(210,217,222,.28)', borderRadius: 4, font: '500 12px/1.2 system-ui,sans-serif', whiteSpace: 'nowrap', zIndex: 2 }}>{hover.label}</div>}
   </div></SceneBoundary>;

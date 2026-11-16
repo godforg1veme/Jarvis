@@ -34,3 +34,12 @@ if (verification.error || verification.status !== 0) {
   console.error('Dependency verification failed.');
   process.exit(verification.status || 1);
 }
+
+// Desktop packages the original web dashboard scene from these locked inputs.
+const sceneDependencies = spawnSync(process.execPath, [npmCli, 'ci'], {
+  cwd: path.join(root, 'ops-ui'), env: environment, stdio: 'inherit', windowsHide: true,
+});
+if (sceneDependencies.error || sceneDependencies.status !== 0) {
+  console.error('Operations UI build dependency installation failed.');
+  process.exit(sceneDependencies.status || 1);
+}

@@ -222,9 +222,33 @@ def desktop_payload(repo, ref):
     return files
 
 
+def desktop_scene_inventory(repo, app, ref):
+    entry = "ops-ui/src/desktop-scene.tsx"
+    if git(repo, "ls-tree", "--name-only", ref, "--", entry):
+        try:
+            hashes = json.loads(git(repo, "show", f"{ref}:scripts/desktopSceneAssets.json"))
+            expected = {"scene.js", "scene.css", "assets/milky-way-gaia-4k.webp",
+                        "assets/milky-way-gaia-8k.webp", "assets/SKY-CREDITS.md"}
+            if not isinstance(hashes, dict) or set(hashes) != expected:
+                raise ValueError()
+            import re
+            if any(not isinstance(h, str) or not re.fullmatch(r"[0-9a-f]{64}", h) for h in hashes.values()):
+                raise ValueError()
+        except (ValueError, TypeError):
+            raise InventoryError("DESKTOP_SCENE_CATALOG_INVALID") from None
+        changed = sum(not (app / "renderer/orbital" / name).is_file()
+                      or digest((app / "renderer/orbital" / name).read_bytes()) != h
+                      for name, h in hashes.items())
+        return {"sceneFilesChecked": len(hashes), "sceneMatches": changed == 0}
+    return {}
+
+
 def desktop_inventory(repo, app, ref="origin/main"):
     files = desktop_payload(repo, ref)
     result = compare_files(files, app, normalize_eol=True)
+    scene = desktop_scene_inventory(repo, app, ref)
+    result.update(scene)
+    result["matches"] = result["matches"] and scene.get("sceneMatches", True)
     result["textLineEndings"] = "normalized"
     try:
         source = json.loads(git(repo, "show", f"{ref}:package.json"))

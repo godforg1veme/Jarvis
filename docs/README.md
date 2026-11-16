@@ -4,6 +4,13 @@
 
 ## Русский
 
+16 ноября после визуальной обратной связи локально подключён [оригинальный
+визуал веб-панели к Desktop](plans/2026-11-16-desktop-original-visual.md).
+Одна исходная OrbitalScene и SharedSky заменяют упрощённую копию. Проверены
+19 браузерных сценариев, 17 тестов сцены и настоящий Electron через file://.
+[EXE `1.0.3-dashboard.2` установлен и проверен](updates/2026-11-16-desktop-original-visual-install.md):
+172 файла совпали, 13 живых чтений успешны. Исходники этой правки пока локальные.
+
 16 ноября [Desktop dashboard выпущен и установлен](updates/2026-11-16-desktop-dashboard-release.md):
 EXE `1.0.3-dashboard.1`, сервер DE `3079866`, исходники Windows/DE/NL совпадают
 с GitHub. PostgreSQL 30/30; установленный клиент online, 13 живых чтений и
@@ -272,6 +279,13 @@ PostgreSQL/RPC 16/16. Исходники синхронизированы; пе�
 Архивы не заменяют действующие правила и новую проверку окружения.
 
 ## English
+
+November 16: following visual feedback, the [original web dashboard visual
+was integrated locally into Desktop](plans/2026-11-16-desktop-original-visual.md).
+One original OrbitalScene and SharedSky replace the simplified replica.
+Checks cover 19 browser scenarios, 17 scene tests and real Electron via file://.
+[EXE `1.0.3-dashboard.2` is installed and verified](updates/2026-11-16-desktop-original-visual-install.md):
+172 files matched and 13 live reads succeeded. Its source changes remain local.
 
 November 16: [Desktop dashboard released and installed](updates/2026-11-16-desktop-dashboard-release.md).
 EXE `1.0.3-dashboard.1`, DE server `3079866`; Windows/DE/NL source matches
